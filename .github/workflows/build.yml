@@ -67,13 +67,12 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: gh-pages
-          path: gh-pages
-        continue-on-error: true
 
-      - name: Prepare gh-pages directory
-        run: mkdir -p gh-pages
+      - name: Fetch gh-pages history
+        run: |
+          git fetch origin gh-pages:gh-pages || true
+          mkdir -p site-content
+          git worktree add site-content gh-pages || true
 
       - uses: actions/download-artifact@v4
         with:
@@ -84,16 +83,16 @@ jobs:
         id: version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Add release to composite site
+      - name: Build composite site
         run: |
           VERSION="${{ steps.version.outputs.version }}"
 
-          mkdir -p gh-pages/releases/${VERSION}
-          cp -r new-release/* gh-pages/releases/${VERSION}/
+          mkdir -p site-content/releases/${VERSION}
+          cp -r new-release/* site-content/releases/${VERSION}/
 
           CHILDREN=""
           CHILD_COUNT=0
-          for dir in gh-pages/releases/*/; do
+          for dir in site-content/releases/*/; do
             if [ -d "$dir" ]; then
               rel=$(basename "$dir")
               CHILDREN="${CHILDREN}<child location=\"releases/${rel}\"/>"
@@ -104,10 +103,9 @@ jobs:
           TIMESTAMP=$(date +%s000)
 
           generate_composite() {
-            local type_name="$1"
-            local type_class="$2"
-            local pi_name="$3"
-            cat <<EOF
+            local type_class="$1"
+            local pi_name="$2"
+            cat <<XMLEOF
           <?xml version="1.0" encoding="UTF-8"?>
           <?${pi_name} version="1.0.0"?>
           <repository name="JDT Bridge Update Site" type="${type_class}" version="1.0.0">
@@ -119,27 +117,28 @@ jobs:
               ${CHILDREN}
             </children>
           </repository>
-          EOF
+          XMLEOF
           }
 
-          generate_composite content \
+          generate_composite \
             "org.eclipse.equinox.internal.p2.metadata.repository.CompositeMetadataRepository" \
             "compositeMetadataRepository" \
-            > gh-pages/compositeContent.xml
+            > site-content/compositeContent.xml
 
-          generate_composite artifacts \
+          generate_composite \
             "org.eclipse.equinox.internal.p2.artifact.repository.CompositeArtifactRepository" \
             "compositeArtifactRepository" \
-            > gh-pages/compositeArtifacts.xml
+            > site-content/compositeArtifacts.xml
 
-          cat > gh-pages/p2.index <<EOF
+          cat > site-content/p2.index <<IDXEOF
           version=1
           metadata.repository.factory.order=compositeContent.xml,\!
           artifact.repository.factory.order=compositeArtifacts.xml,\!
-          EOF
+          IDXEOF
 
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          folder: gh-pages
+          folder: site-content
+          branch: gh-pages
           clean: false
