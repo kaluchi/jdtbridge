@@ -1,0 +1,51 @@
+name: Build
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  cli:
+    name: CLI tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cli
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: cli/package-lock.json
+
+      - run: npm ci
+      - run: npm test
+
+  plugin:
+    name: Plugin build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml', '**/*.target') }}
+          restore-keys: ${{ runner.os }}-maven-
+
+      - name: Build and test
+        run: xvfb-run mvn clean verify -B -Pci
+        env:
+          MAVEN_OPTS: >-
+            -Djdk.xml.totalEntitySizeLimit=0
+            -Djdk.xml.maxGeneralEntitySizeLimit=0

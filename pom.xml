@@ -47,7 +47,17 @@
     <properties>
         <tycho.version>4.0.9</tycho.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <target.file>jdtbridge.target</target.file>
     </properties>
+
+    <profiles>
+        <profile>
+            <id>ci</id>
+            <properties>
+                <target.file>jdtbridge-ci.target</target.file>
+            </properties>
+        </profile>
+    </profiles>
 
     <build>
         <plugins>
@@ -63,7 +73,7 @@
                 <version>${tycho.version}</version>
                 <configuration>
                     <target>
-                        <file>${project.basedir}/../jdtbridge.target</file>
+                        <file>${project.basedir}/../${target.file}</file>
                     </target>
                     <environments>
                         <environment>

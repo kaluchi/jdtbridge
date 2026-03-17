@@ -11,6 +11,8 @@ coverage/
 
 # Generated
 *.target
+!jdtbridge.target
+!jdtbridge-ci.target
 *.class
 
 # OS
