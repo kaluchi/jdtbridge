@@ -1,0 +1,7 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: JDT Bridge Branding
+Bundle-SymbolicName: io.github.kaluchi.jdtbridge.branding
+Bundle-Version: 1.0.0.qualifier
+Bundle-Vendor: kaluchi
+Automatic-Module-Name: io.github.kaluchi.jdtbridge.branding
