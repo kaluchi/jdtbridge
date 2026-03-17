@@ -10,7 +10,8 @@ export function formatTestResults(result) {
   if (result.failed > 0) parts.push(red(`${result.failed} failed`));
   if (result.errors > 0) parts.push(red(`${result.errors} errors`));
   if (result.ignored > 0) parts.push(yellow(`${result.ignored} ignored`));
-  parts.push(`${result.time.toFixed(1)}s`);
+  const time = Number.isFinite(result.time) ? result.time : 0;
+  parts.push(`${time.toFixed(1)}s`);
   console.log(parts.join(", "));
 
   // Failure details

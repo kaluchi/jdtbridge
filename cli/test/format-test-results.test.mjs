@@ -26,6 +26,14 @@ describe("formatTestResults", () => {
     expect(logs[0]).toContain("1.2s");
   });
 
+  it("falls back to 0.0s when time is not finite", () => {
+    formatTestResults({
+      total: 0, passed: 0, failed: 0, errors: 0, ignored: 0,
+      time: Number.NaN, failures: [],
+    });
+    expect(logs[0]).toContain("0.0s");
+  });
+
   it("shows failed and error counts", () => {
     formatTestResults({
       total: 10, passed: 7, failed: 2, errors: 1, ignored: 0,

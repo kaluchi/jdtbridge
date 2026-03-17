@@ -41,6 +41,27 @@ function authHeaders() {
 }
 
 /**
+ * Parse JSON responses, tolerating non-finite numeric literals sometimes
+ * returned by the Eclipse bridge (for example `time: NaN` in test results).
+ * @param {string} data
+ * @returns {any}
+ */
+function parseJson(data) {
+  try {
+    return JSON.parse(data);
+  } catch {
+    const sanitized = data
+      .replace(/:\s*NaN\b/g, ": null")
+      .replace(/:\s*Infinity\b/g, ": null")
+      .replace(/:\s*-Infinity\b/g, ": null");
+    if (sanitized !== data) {
+      return JSON.parse(sanitized);
+    }
+    throw new Error("Invalid JSON: " + data);
+  }
+}
+
+/**
  * HTTP GET request, returns parsed JSON.
  * @param {string} path - URL path with query string
  * @param {number} [timeoutMs=10000]
@@ -67,9 +88,9 @@ export function get(path, timeoutMs = 10_000) {
             return;
           }
           try {
-            resolve(JSON.parse(data));
-          } catch {
-            reject(new Error("Invalid JSON: " + data));
+            resolve(parseJson(data));
+          } catch (e) {
+            reject(e);
           }
         });
       },
@@ -113,14 +134,14 @@ export function getRaw(path, timeoutMs = 10_000) {
           const contentType = res.headers["content-type"] || "";
           if (contentType.startsWith("application/json")) {
             try {
-              const json = JSON.parse(data);
+              const json = parseJson(data);
               if (json.error) {
                 reject(new Error(json.error));
               } else {
                 resolve({ headers: res.headers, body: data });
               }
-            } catch {
-              reject(new Error("Invalid JSON: " + data));
+            } catch (e) {
+              reject(e);
             }
           } else {
             resolve({ headers: res.headers, body: data });

@@ -74,6 +74,18 @@ describe("client", () => {
     await expect(get("/bad")).rejects.toThrow("Invalid JSON");
   });
 
+  it("get() tolerates NaN in JSON response", async () => {
+    let port;
+    ({ server, port } = await startServer((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end('{"total":0,"passed":0,"failed":0,"errors":0,"ignored":0,"time":NaN,"failures":[]}');
+    }));
+    mockDiscovery(port);
+    const { get } = await import("../src/client.mjs");
+    const result = await get("/test");
+    expect(result.time).toBeNull();
+  });
+
   it("get() sends Bearer token when present", async () => {
     let receivedAuth;
     let port;
@@ -178,6 +190,18 @@ describe("client", () => {
     mockDiscovery(port);
     const { getRaw } = await import("../src/client.mjs");
     await expect(getRaw("/bad")).rejects.toThrow("Invalid JSON");
+  });
+
+  it("getRaw() tolerates NaN in JSON content", async () => {
+    let port;
+    ({ server, port } = await startServer((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end('{"time":NaN}');
+    }));
+    mockDiscovery(port);
+    const { getRaw } = await import("../src/client.mjs");
+    const result = await getRaw("/test");
+    expect(result.body).toContain('"time":NaN');
   });
 
   it("getRaw() rejects on non-200", async () => {
