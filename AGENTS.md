@@ -1,8 +1,8 @@
 # JDT Bridge — Agent Instructions
 
-## First-time setup check
+## Environment check (REQUIRED)
 
-Before doing any work, verify the development environment:
+**MUST run these checks at the start of every conversation, before any other work.** Do not skip this even if the user's request seems unrelated — the `jdt` CLI is central to this project and must be verified working.
 
 1. **Check if `jdt` CLI is available:** run `jdt setup --check`
    - If the command is not found: `cd cli && npm install && npm link`
