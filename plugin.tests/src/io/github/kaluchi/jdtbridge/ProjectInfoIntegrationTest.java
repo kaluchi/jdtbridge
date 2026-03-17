@@ -1,26 +1,28 @@
 package io.github.kaluchi.jdtbridge;
 
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
 
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
  * Integration tests for ProjectHandler using a real JDT workspace.
  */
+@EnabledIfSystemProperty(named = "jdtbridge.integration-tests", matches = "true")
 public class ProjectInfoIntegrationTest {
 
     private static final ProjectHandler handler = new ProjectHandler();
 
-    @BeforeClass
+    @BeforeAll
     public static void setUp() throws Exception {
         TestFixture.create();
     }
 
-    @AfterClass
+    @AfterAll
     public static void tearDown() throws Exception {
         TestFixture.destroy();
     }
@@ -29,36 +31,36 @@ public class ProjectInfoIntegrationTest {
     public void projectInfoBasicFields() throws Exception {
         String json = handler.handleProjectInfo(
                 Map.of("project", TestFixture.PROJECT_NAME));
-        assertTrue("Should have name: " + json,
-                json.contains("\"name\":\"" + TestFixture.PROJECT_NAME + "\""));
-        assertTrue("Should have totalTypes: " + json,
-                json.contains("\"totalTypes\":"));
-        assertTrue("Should have sourceRoots: " + json,
-                json.contains("\"sourceRoots\":["));
+        assertTrue(json.contains("\"name\":\"" + TestFixture.PROJECT_NAME + "\""),
+                "Should have name: " + json);
+        assertTrue(json.contains("\"totalTypes\":"),
+                "Should have totalTypes: " + json);
+        assertTrue(json.contains("\"sourceRoots\":["),
+                "Should have sourceRoots: " + json);
     }
 
     @Test
     public void projectInfoIncludesPackages() throws Exception {
         String json = handler.handleProjectInfo(
                 Map.of("project", TestFixture.PROJECT_NAME));
-        assertTrue("Should have test.model: " + json,
-                json.contains("test.model"));
-        assertTrue("Should have test.service: " + json,
-                json.contains("test.service"));
-        assertTrue("Should have test.broken: " + json,
-                json.contains("test.broken"));
+        assertTrue(json.contains("test.model"),
+                "Should have test.model: " + json);
+        assertTrue(json.contains("test.service"),
+                "Should have test.service: " + json);
+        assertTrue(json.contains("test.broken"),
+                "Should have test.broken: " + json);
     }
 
     @Test
     public void projectInfoIncludesTypes() throws Exception {
         String json = handler.handleProjectInfo(
                 Map.of("project", TestFixture.PROJECT_NAME));
-        assertTrue("Should have Animal: " + json,
-                json.contains("Animal"));
-        assertTrue("Should have Dog: " + json,
-                json.contains("Dog"));
-        assertTrue("Should have AnimalService: " + json,
-                json.contains("AnimalService"));
+        assertTrue(json.contains("Animal"),
+                "Should have Animal: " + json);
+        assertTrue(json.contains("Dog"),
+                "Should have Dog: " + json);
+        assertTrue(json.contains("AnimalService"),
+                "Should have AnimalService: " + json);
     }
 
     @Test
@@ -66,26 +68,26 @@ public class ProjectInfoIntegrationTest {
         // Small project — members should be included
         String json = handler.handleProjectInfo(
                 Map.of("project", TestFixture.PROJECT_NAME));
-        assertTrue("Should include members: " + json,
-                json.contains("\"membersIncluded\":true"));
+        assertTrue(json.contains("\"membersIncluded\":true"),
+                "Should include members: " + json);
         // With members, methods should be an object with visibility groups
-        assertTrue("Should have public methods: " + json,
-                json.contains("\"public\":["));
+        assertTrue(json.contains("\"public\":["),
+                "Should have public methods: " + json);
     }
 
     @Test
     public void projectInfoNotFound() throws Exception {
         String json = handler.handleProjectInfo(
                 Map.of("project", "nonexistent-xyz"));
-        assertTrue("Should return error: " + json,
-                json.contains("error"));
+        assertTrue(json.contains("error"),
+                "Should return error: " + json);
     }
 
     @Test
     public void projectInfoHasJavaNature() throws Exception {
         String json = handler.handleProjectInfo(
                 Map.of("project", TestFixture.PROJECT_NAME));
-        assertTrue("Should have java nature: " + json,
-                json.contains("\"java\""));
+        assertTrue(json.contains("\"java\""),
+                "Should have java nature: " + json);
     }
 }

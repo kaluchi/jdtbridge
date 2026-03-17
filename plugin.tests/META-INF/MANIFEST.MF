@@ -6,4 +6,5 @@ Bundle-SymbolicName: io.github.kaluchi.jdtbridge.tests
 Bundle-Version: 1.0.0.qualifier
 Fragment-Host: io.github.kaluchi.jdtbridge
 Bundle-RequiredExecutionEnvironment: JavaSE-21
-Require-Bundle: org.junit;bundle-version="4.13"
+Require-Bundle: junit-jupiter-api;bundle-version="5.14",
+ org.opentest4j

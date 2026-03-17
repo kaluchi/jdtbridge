@@ -1,30 +1,32 @@
 package io.github.kaluchi.jdtbridge;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
 import java.util.Map;
 
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
  * Integration tests for DiagnosticsHandler using a real JDT workspace.
  * The test project has a BrokenClass with an intentional compilation error.
  */
+@EnabledIfSystemProperty(named = "jdtbridge.integration-tests", matches = "true")
 public class DiagnosticsIntegrationTest {
 
     private static final DiagnosticsHandler handler =
             new DiagnosticsHandler();
 
-    @BeforeClass
+    @BeforeAll
     public static void setUp() throws Exception {
         TestFixture.create();
     }
 
-    @AfterClass
+    @AfterAll
     public static void tearDown() throws Exception {
         TestFixture.destroy();
     }
@@ -35,12 +37,12 @@ public class DiagnosticsIntegrationTest {
         params.put("project", TestFixture.PROJECT_NAME);
         params.put("no-refresh", "");
         String json = handler.handleErrors(params);
-        assertTrue("Should find error in BrokenClass: " + json,
-                json.contains("BrokenClass"));
-        assertTrue("Should be ERROR severity: " + json,
-                json.contains("\"severity\":\"ERROR\""));
-        assertTrue("Should mention UnknownType: " + json,
-                json.contains("UnknownType"));
+        assertTrue(json.contains("BrokenClass"),
+                "Should find error in BrokenClass: " + json);
+        assertTrue(json.contains("\"severity\":\"ERROR\""),
+                "Should be ERROR severity: " + json);
+        assertTrue(json.contains("UnknownType"),
+                "Should mention UnknownType: " + json);
     }
 
     @Test
@@ -51,7 +53,7 @@ public class DiagnosticsIntegrationTest {
                 "/" + TestFixture.PROJECT_NAME + "/src/test/model/Dog.java");
         params.put("no-refresh", "");
         String json = handler.handleErrors(params);
-        assertEquals("Dog.java should have no errors", "[]", json);
+        assertEquals("[]", json, "Dog.java should have no errors");
     }
 
     @Test
@@ -62,8 +64,8 @@ public class DiagnosticsIntegrationTest {
         params.put("no-refresh", "");
         String json = handler.handleErrors(params);
         // Should at least find the ERROR
-        assertTrue("Should find errors: " + json,
-                json.contains("ERROR"));
+        assertTrue(json.contains("ERROR"),
+                "Should find errors: " + json);
     }
 
     @Test
@@ -72,7 +74,7 @@ public class DiagnosticsIntegrationTest {
         params.put("project", "no-such-project-xyz");
         params.put("no-refresh", "");
         String json = handler.handleErrors(params);
-        assertTrue("Should return error: " + json,
-                json.contains("error"));
+        assertTrue(json.contains("error"),
+                "Should return error: " + json);
     }
 }

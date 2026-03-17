@@ -1,8 +1,8 @@
 package io.github.kaluchi.jdtbridge;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -11,7 +11,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests for Activator utilities: token generation and bridge file format.
@@ -27,23 +27,23 @@ public class ActivatorTest {
     @Test
     public void tokenIs32HexChars() {
         String token = invokeGenerateToken();
-        assertEquals("Token should be 32 chars", 32, token.length());
-        assertTrue("Token should be lowercase hex: " + token,
-                HEX_32.matcher(token).matches());
+        assertEquals(32, token.length(), "Token should be 32 chars");
+        assertTrue(HEX_32.matcher(token).matches(),
+                "Token should be lowercase hex: " + token);
     }
 
     @Test
     public void tokenIsUnique() {
         String token1 = invokeGenerateToken();
         String token2 = invokeGenerateToken();
-        assertNotEquals("Tokens should differ", token1, token2);
+        assertNotEquals(token1, token2, "Tokens should differ");
     }
 
     @Test
     public void tokenContainsNoUpperCase() {
         String token = invokeGenerateToken();
-        assertEquals("Should be lowercase",
-                token, token.toLowerCase());
+        assertEquals(token, token.toLowerCase(),
+                "Should be lowercase");
     }
 
     // ---- Bridge file format ----
@@ -90,8 +90,8 @@ public class ActivatorTest {
 
             assertEquals(String.valueOf(port), parsed.get("port"));
             assertEquals(token, parsed.get("token"));
-            assertTrue("PID should be numeric",
-                    parsed.get("pid").matches("\\d+"));
+            assertTrue(parsed.get("pid").matches("\\d+"),
+                    "PID should be numeric");
             assertEquals("D:/test-workspace", parsed.get("workspace"));
         } finally {
             Files.deleteIfExists(tempFile);
@@ -104,10 +104,10 @@ public class ActivatorTest {
         String content = "port=8080\ntoken=abc\npid=1\nworkspace=/w\n";
         Map<String, String> parsed = parseBridgeFile(content);
 
-        assertTrue("Must have port", parsed.containsKey("port"));
-        assertTrue("Must have token", parsed.containsKey("token"));
-        assertTrue("Must have pid", parsed.containsKey("pid"));
-        assertTrue("Must have workspace", parsed.containsKey("workspace"));
+        assertTrue(parsed.containsKey("port"), "Must have port");
+        assertTrue(parsed.containsKey("token"), "Must have token");
+        assertTrue(parsed.containsKey("pid"), "Must have pid");
+        assertTrue(parsed.containsKey("workspace"), "Must have workspace");
     }
 
     // ---- Helpers ----

@@ -1,7 +1,7 @@
 package io.github.kaluchi.jdtbridge;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -9,30 +9,32 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
  * Tests the HTTP server layer: real TCP connections, auth, routing.
  */
+@EnabledIfSystemProperty(named = "jdtbridge.integration-tests", matches = "true")
 public class HttpIntegrationTest {
 
     private static HttpServer server;
     private static int port;
     private static final String TOKEN = "test-secret-token-42";
 
-    @BeforeClass
+    @BeforeAll
     public static void setUp() throws Exception {
         TestFixture.create();
         server = new HttpServer();
         server.setToken(TOKEN);
         server.start();
         port = server.getPort();
-        assertTrue("Port should be assigned", port > 0);
+        assertTrue(port > 0, "Port should be assigned");
     }
 
-    @AfterClass
+    @AfterAll
     public static void tearDown() throws Exception {
         if (server != null) server.stop();
         TestFixture.destroy();
@@ -44,8 +46,8 @@ public class HttpIntegrationTest {
     public void noTokenReturns401() throws Exception {
         String response = rawRequest("GET /projects HTTP/1.1",
                 "Host: localhost");
-        assertTrue("Should be 401: " + response,
-                response.startsWith("HTTP/1.1 401"));
+        assertTrue(response.startsWith("HTTP/1.1 401"),
+                "Should be 401: " + response);
     }
 
     @Test
@@ -53,8 +55,8 @@ public class HttpIntegrationTest {
         String response = rawRequest("GET /projects HTTP/1.1",
                 "Host: localhost",
                 "Authorization: Bearer wrong-token");
-        assertTrue("Should be 401: " + response,
-                response.startsWith("HTTP/1.1 401"));
+        assertTrue(response.startsWith("HTTP/1.1 401"),
+                "Should be 401: " + response);
     }
 
     @Test
@@ -62,8 +64,8 @@ public class HttpIntegrationTest {
         String response = rawRequest("GET /projects HTTP/1.1",
                 "Host: localhost",
                 "Authorization: Bearer " + TOKEN);
-        assertTrue("Should be 200: " + response,
-                response.startsWith("HTTP/1.1 200"));
+        assertTrue(response.startsWith("HTTP/1.1 200"),
+                "Should be 200: " + response);
     }
 
     @Test
@@ -71,8 +73,8 @@ public class HttpIntegrationTest {
         String response = rawRequest("GET /projects HTTP/1.1",
                 "Host: localhost",
                 "Authorization: Basic dXNlcjpwYXNz");
-        assertTrue("Basic auth should be rejected: " + response,
-                response.startsWith("HTTP/1.1 401"));
+        assertTrue(response.startsWith("HTTP/1.1 401"),
+                "Basic auth should be rejected: " + response);
     }
 
     @Test
@@ -81,8 +83,8 @@ public class HttpIntegrationTest {
                 "Host: localhost",
                 "Authorization:  Bearer  " + TOKEN);
         // Extra spaces around Bearer — should fail (strict match)
-        assertTrue("Malformed Bearer should be 401: " + response,
-                response.startsWith("HTTP/1.1 401"));
+        assertTrue(response.startsWith("HTTP/1.1 401"),
+                "Malformed Bearer should be 401: " + response);
     }
 
     @Test
@@ -90,8 +92,8 @@ public class HttpIntegrationTest {
         String response = rawRequest("GET /projects HTTP/1.1",
                 "Host: localhost",
                 "Authorization: ");
-        assertTrue("Empty auth should be 401: " + response,
-                response.startsWith("HTTP/1.1 401"));
+        assertTrue(response.startsWith("HTTP/1.1 401"),
+                "Empty auth should be 401: " + response);
     }
 
     @Test
@@ -100,8 +102,8 @@ public class HttpIntegrationTest {
         String response = rawRequest("GET /projects HTTP/1.1",
                 "Host: localhost",
                 "authorization: Bearer " + TOKEN);
-        assertTrue("Lowercase header should work: " + response,
-                response.startsWith("HTTP/1.1 200"));
+        assertTrue(response.startsWith("HTTP/1.1 200"),
+                "Lowercase header should work: " + response);
     }
 
     @Test
@@ -121,8 +123,8 @@ public class HttpIntegrationTest {
                         new InputStreamReader(socket.getInputStream(),
                                 StandardCharsets.UTF_8));
                 String firstLine = reader.readLine();
-                assertTrue("No-token server should allow: " + firstLine,
-                        firstLine.startsWith("HTTP/1.1 200"));
+                assertTrue(firstLine.startsWith("HTTP/1.1 200"),
+                        "No-token server should allow: " + firstLine);
             }
         } finally {
             openServer.stop();
@@ -133,8 +135,8 @@ public class HttpIntegrationTest {
     public void error401BodyIsJson() throws Exception {
         String response = rawRequest("GET /projects HTTP/1.1",
                 "Host: localhost");
-        assertTrue("401 body should be JSON: " + response,
-                response.contains("{\"error\":\"Unauthorized\"}"));
+        assertTrue(response.contains("{\"error\":\"Unauthorized\"}"),
+                "401 body should be JSON: " + response);
     }
 
     // ---- Routing ----
@@ -142,39 +144,39 @@ public class HttpIntegrationTest {
     @Test
     public void projectsEndpoint() throws Exception {
         String body = authedGet("/projects");
-        assertTrue("Should be JSON array: " + body,
-                body.startsWith("["));
-        assertTrue("Should include test project: " + body,
-                body.contains(TestFixture.PROJECT_NAME));
+        assertTrue(body.startsWith("["),
+                "Should be JSON array: " + body);
+        assertTrue(body.contains(TestFixture.PROJECT_NAME),
+                "Should include test project: " + body);
     }
 
     @Test
     public void findEndpoint() throws Exception {
         String body = authedGet("/find?name=Dog&source");
-        assertTrue("Should find Dog: " + body,
-                body.contains("test.model.Dog"));
+        assertTrue(body.contains("test.model.Dog"),
+                "Should find Dog: " + body);
     }
 
     @Test
     public void unknownPathReturnsError() throws Exception {
         String body = authedGet("/nonexistent");
-        assertTrue("Should be error: " + body,
-                body.contains("Unknown path"));
+        assertTrue(body.contains("Unknown path"),
+                "Should be error: " + body);
     }
 
     @Test
     public void errorsEndpoint() throws Exception {
         String body = authedGet("/errors?project="
                 + TestFixture.PROJECT_NAME + "&no-refresh");
-        assertTrue("Should contain BrokenClass error: " + body,
-                body.contains("BrokenClass"));
+        assertTrue(body.contains("BrokenClass"),
+                "Should contain BrokenClass error: " + body);
     }
 
     @Test
     public void typeInfoEndpoint() throws Exception {
         String body = authedGet("/type-info?class=test.model.Animal");
-        assertTrue("Should be interface: " + body,
-                body.contains("\"kind\":\"interface\""));
+        assertTrue(body.contains("\"kind\":\"interface\""),
+                "Should be interface: " + body);
     }
 
     @Test
@@ -182,12 +184,12 @@ public class HttpIntegrationTest {
         String response = rawRequest("GET /source?class=test.model.Dog HTTP/1.1",
                 "Host: localhost",
                 "Authorization: Bearer " + TOKEN);
-        assertTrue("Should be 200: " + response,
-                response.startsWith("HTTP/1.1 200"));
-        assertTrue("Should have X-File header: " + response,
-                response.contains("X-File:"));
-        assertTrue("Should have source body: " + response,
-                response.contains("public class Dog"));
+        assertTrue(response.startsWith("HTTP/1.1 200"),
+                "Should be 200: " + response);
+        assertTrue(response.contains("X-File:"),
+                "Should have X-File header: " + response);
+        assertTrue(response.contains("public class Dog"),
+                "Should have source body: " + response);
     }
 
     @Test
@@ -195,8 +197,8 @@ public class HttpIntegrationTest {
         // URL-encoded class name
         String body = authedGet(
                 "/type-info?class=test.model.Dog");
-        assertTrue("Should work with dots: " + body,
-                body.contains("test.model.Dog"));
+        assertTrue(body.contains("test.model.Dog"),
+                "Should work with dots: " + body);
     }
 
     // ---- Helpers ----

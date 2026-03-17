@@ -1,28 +1,30 @@
 package io.github.kaluchi.jdtbridge;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
 
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
  * Integration tests for edge cases: overloaded methods, inner classes,
  * enums, annotations, abstract classes.
  */
+@EnabledIfSystemProperty(named = "jdtbridge.integration-tests", matches = "true")
 public class EdgeCaseIntegrationTest {
 
     private static final SearchHandler search = new SearchHandler();
 
-    @BeforeClass
+    @BeforeAll
     public static void setUp() throws Exception {
         TestFixture.create();
     }
 
-    @AfterClass
+    @AfterAll
     public static void tearDown() throws Exception {
         TestFixture.destroy();
     }
@@ -40,7 +42,7 @@ public class EdgeCaseIntegrationTest {
             count++;
             idx++;
         }
-        assertEquals("Should have 3 add() overloads", 3, count);
+        assertEquals(3, count, "Should have 3 add() overloads");
     }
 
     @Test
@@ -49,12 +51,12 @@ public class EdgeCaseIntegrationTest {
                 Map.of("class", "test.edge.Calculator", "method", "add"));
         // Without arity, all overloads should be returned
         String body = resp.body();
-        assertTrue("Should contain int overload: " + body,
-                body.contains("int add(int a, int b)"));
-        assertTrue("Should contain double overload: " + body,
-                body.contains("double add(double a, double b)"));
-        assertTrue("Should contain 3-arg overload: " + body,
-                body.contains("int add(int a, int b, int c)"));
+        assertTrue(body.contains("int add(int a, int b)"),
+                "Should contain int overload: " + body);
+        assertTrue(body.contains("double add(double a, double b)"),
+                "Should contain double overload: " + body);
+        assertTrue(body.contains("int add(int a, int b, int c)"),
+                "Should contain 3-arg overload: " + body);
     }
 
     @Test
@@ -63,11 +65,11 @@ public class EdgeCaseIntegrationTest {
                 Map.of("class", "test.edge.Calculator",
                         "method", "add", "arity", "3"));
         String body = resp.body();
-        assertTrue("Should contain 3-arg overload: " + body,
-                body.contains("int a, int b, int c"));
+        assertTrue(body.contains("int a, int b, int c"),
+                "Should contain 3-arg overload: " + body);
         // Should be a single method, not multiple
-        assertTrue("Should have start line header",
-                resp.headers().containsKey("X-Start-Line"));
+        assertTrue(resp.headers().containsKey("X-Start-Line"),
+                "Should have start line header");
     }
 
     @Test
@@ -85,16 +87,16 @@ public class EdgeCaseIntegrationTest {
     @Test
     public void findInnerClass() throws Exception {
         String json = search.handleFind(Map.of("name", "Inner"));
-        assertTrue("Should find Outer.Inner: " + json,
-                json.contains("test.edge.Outer.Inner")
-                        || json.contains("Outer$Inner"));
+        assertTrue(json.contains("test.edge.Outer.Inner")
+                        || json.contains("Outer$Inner"),
+                "Should find Outer.Inner: " + json);
     }
 
     @Test
     public void findStaticNested() throws Exception {
         String json = search.handleFind(Map.of("name", "StaticNested"));
-        assertTrue("Should find StaticNested: " + json,
-                json.contains("StaticNested"));
+        assertTrue(json.contains("StaticNested"),
+                "Should find StaticNested: " + json);
     }
 
     @Test
@@ -102,20 +104,20 @@ public class EdgeCaseIntegrationTest {
         // Inner classes are found by $ separator in JDT
         String json = search.handleTypeInfo(
                 Map.of("class", "test.edge.Outer"));
-        assertTrue("Should be a class: " + json,
-                json.contains("\"kind\":\"class\""));
-        assertTrue("Should have name field: " + json,
-                json.contains("\"name\":\"name\""));
+        assertTrue(json.contains("\"kind\":\"class\""),
+                "Should be a class: " + json);
+        assertTrue(json.contains("\"name\":\"name\""),
+                "Should have name field: " + json);
     }
 
     @Test
     public void sourceOuter() throws Exception {
         HttpServer.Response resp = search.handleSource(
                 Map.of("class", "test.edge.Outer"));
-        assertTrue("Should contain Inner: " + resp.body(),
-                resp.body().contains("public class Inner"));
-        assertTrue("Should contain StaticNested: " + resp.body(),
-                resp.body().contains("public static class StaticNested"));
+        assertTrue(resp.body().contains("public class Inner"),
+                "Should contain Inner: " + resp.body());
+        assertTrue(resp.body().contains("public static class StaticNested"),
+                "Should contain StaticNested: " + resp.body());
     }
 
     // ---- Enum ----
@@ -124,25 +126,25 @@ public class EdgeCaseIntegrationTest {
     public void typeInfoEnum() throws Exception {
         String json = search.handleTypeInfo(
                 Map.of("class", "test.edge.Color"));
-        assertTrue("Should be enum: " + json,
-                json.contains("\"kind\":\"enum\""));
-        assertTrue("Should have lower method: " + json,
-                json.contains("\"name\":\"lower\""));
+        assertTrue(json.contains("\"kind\":\"enum\""),
+                "Should be enum: " + json);
+        assertTrue(json.contains("\"name\":\"lower\""),
+                "Should have lower method: " + json);
     }
 
     @Test
     public void sourceEnum() throws Exception {
         HttpServer.Response resp = search.handleSource(
                 Map.of("class", "test.edge.Color"));
-        assertTrue("Should contain RED: " + resp.body(),
-                resp.body().contains("RED"));
+        assertTrue(resp.body().contains("RED"),
+                "Should contain RED: " + resp.body());
     }
 
     @Test
     public void findEnum() throws Exception {
         String json = search.handleFind(Map.of("name", "Color"));
-        assertTrue("Should find Color: " + json,
-                json.contains("test.edge.Color"));
+        assertTrue(json.contains("test.edge.Color"),
+                "Should find Color: " + json);
     }
 
     // ---- Annotation ----
@@ -151,18 +153,18 @@ public class EdgeCaseIntegrationTest {
     public void typeInfoAnnotation() throws Exception {
         String json = search.handleTypeInfo(
                 Map.of("class", "test.edge.Marker"));
-        assertTrue("Should be annotation: " + json,
-                json.contains("\"kind\":\"annotation\""));
+        assertTrue(json.contains("\"kind\":\"annotation\""),
+                "Should be annotation: " + json);
     }
 
     @Test
     public void sourceAnnotation() throws Exception {
         HttpServer.Response resp = search.handleSource(
                 Map.of("class", "test.edge.Marker"));
-        assertTrue("Should contain @Retention: " + resp.body(),
-                resp.body().contains("@Retention"));
-        assertTrue("Should contain value(): " + resp.body(),
-                resp.body().contains("String value()"));
+        assertTrue(resp.body().contains("@Retention"),
+                "Should contain @Retention: " + resp.body());
+        assertTrue(resp.body().contains("String value()"),
+                "Should contain value(): " + resp.body());
     }
 
     // ---- Abstract class + deeper hierarchy ----
@@ -171,37 +173,37 @@ public class EdgeCaseIntegrationTest {
     public void subtypesOfAbstract() throws Exception {
         String json = search.handleSubtypes(
                 Map.of("class", "test.edge.AbstractPet"));
-        assertTrue("Should find Parrot: " + json,
-                json.contains("test.edge.Parrot"));
+        assertTrue(json.contains("test.edge.Parrot"),
+                "Should find Parrot: " + json);
     }
 
     @Test
     public void hierarchyOfParrot() throws Exception {
         String json = search.handleHierarchy(
                 Map.of("class", "test.edge.Parrot"));
-        // Parrot → AbstractPet → Object
-        assertTrue("Should have AbstractPet in supers: " + json,
-                json.contains("test.edge.AbstractPet"));
-        assertTrue("Should have Object in supers: " + json,
-                json.contains("java.lang.Object"));
+        // Parrot -> AbstractPet -> Object
+        assertTrue(json.contains("test.edge.AbstractPet"),
+                "Should have AbstractPet in supers: " + json);
+        assertTrue(json.contains("java.lang.Object"),
+                "Should have Object in supers: " + json);
         // Parrot implements Animal (through AbstractPet)
-        assertTrue("Should have Animal in interfaces: " + json,
-                json.contains("test.model.Animal"));
+        assertTrue(json.contains("test.model.Animal"),
+                "Should have Animal in interfaces: " + json);
     }
 
     @Test
     public void deepSubtypesOfAnimal() throws Exception {
-        // Animal → Dog, Cat, AbstractPet, Parrot
+        // Animal -> Dog, Cat, AbstractPet, Parrot
         String json = search.handleSubtypes(
                 Map.of("class", "test.model.Animal"));
-        assertTrue("Should find Dog: " + json,
-                json.contains("test.model.Dog"));
-        assertTrue("Should find Cat: " + json,
-                json.contains("test.model.Cat"));
-        assertTrue("Should find AbstractPet: " + json,
-                json.contains("test.edge.AbstractPet"));
-        assertTrue("Should find Parrot: " + json,
-                json.contains("test.edge.Parrot"));
+        assertTrue(json.contains("test.model.Dog"),
+                "Should find Dog: " + json);
+        assertTrue(json.contains("test.model.Cat"),
+                "Should find Cat: " + json);
+        assertTrue(json.contains("test.edge.AbstractPet"),
+                "Should find AbstractPet: " + json);
+        assertTrue(json.contains("test.edge.Parrot"),
+                "Should find Parrot: " + json);
     }
 
     @Test
@@ -210,12 +212,12 @@ public class EdgeCaseIntegrationTest {
         // AbstractPet, and Parrot inherits it
         String json = search.handleImplementors(
                 Map.of("class", "test.model.Animal", "method", "name"));
-        assertTrue("Should find Dog: " + json,
-                json.contains("test.model.Dog"));
-        assertTrue("Should find Cat: " + json,
-                json.contains("test.model.Cat"));
-        assertTrue("Should find AbstractPet: " + json,
-                json.contains("test.edge.AbstractPet"));
+        assertTrue(json.contains("test.model.Dog"),
+                "Should find Dog: " + json);
+        assertTrue(json.contains("test.model.Cat"),
+                "Should find Cat: " + json);
+        assertTrue(json.contains("test.edge.AbstractPet"),
+                "Should find AbstractPet: " + json);
     }
 
     // ---- Project info with edge types ----
@@ -225,13 +227,13 @@ public class EdgeCaseIntegrationTest {
         ProjectHandler handler = new ProjectHandler();
         String json = handler.handleProjectInfo(
                 Map.of("project", TestFixture.PROJECT_NAME));
-        assertTrue("Should have test.edge: " + json,
-                json.contains("test.edge"));
-        assertTrue("Should have Calculator: " + json,
-                json.contains("Calculator"));
-        assertTrue("Should have Color as enum: " + json,
-                json.contains("\"kind\":\"enum\""));
-        assertTrue("Should have Marker as annotation: " + json,
-                json.contains("\"kind\":\"annotation\""));
+        assertTrue(json.contains("test.edge"),
+                "Should have test.edge: " + json);
+        assertTrue(json.contains("Calculator"),
+                "Should have Calculator: " + json);
+        assertTrue(json.contains("\"kind\":\"enum\""),
+                "Should have Color as enum: " + json);
+        assertTrue(json.contains("\"kind\":\"annotation\""),
+                "Should have Marker as annotation: " + json);
     }
 }

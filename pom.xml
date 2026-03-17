@@ -45,7 +45,7 @@
     </modules>
 
     <properties>
-        <tycho.version>4.0.9</tycho.version>
+        <tycho.version>5.0.2</tycho.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <target.file>jdtbridge.target</target.file>
     </properties>

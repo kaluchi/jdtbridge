@@ -22,7 +22,22 @@
                 <configuration>
                     <useUIHarness>false</useUIHarness>
                     <useUIThread>false</useUIThread>
-                    <argLine>-Xmx512m</argLine>
+                    <argLine>-Xmx512m -Djdtbridge.integration-tests=true</argLine>
+                    <providerHint>junit5</providerHint>
+                    <dependencies>
+                        <dependency>
+                            <type>eclipse-plugin</type>
+                            <artifactId>junit-jupiter-engine</artifactId>
+                        </dependency>
+                        <dependency>
+                            <type>eclipse-plugin</type>
+                            <artifactId>junit-platform-launcher</artifactId>
+                        </dependency>
+                        <dependency>
+                            <type>eclipse-plugin</type>
+                            <artifactId>junit-platform-commons</artifactId>
+                        </dependency>
+                    </dependencies>
                 </configuration>
             </plugin>
         </plugins>
