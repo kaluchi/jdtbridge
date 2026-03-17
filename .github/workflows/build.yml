@@ -7,9 +7,6 @@ on:
   pull_request:
     branches: [master]
 
-permissions:
-  contents: write
-
 jobs:
   cli:
     name: CLI tests
@@ -66,6 +63,8 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [cli, plugin]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -89,57 +88,55 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
 
-          # Copy new release into versioned directory
           mkdir -p gh-pages/releases/${VERSION}
           cp -r new-release/* gh-pages/releases/${VERSION}/
 
-          # Collect all release directories
-          RELEASES=""
+          CHILDREN=""
           CHILD_COUNT=0
           for dir in gh-pages/releases/*/; do
             if [ -d "$dir" ]; then
               rel=$(basename "$dir")
-              RELEASES="${RELEASES}    <child location=\"releases/${rel}\"/>\n"
+              CHILDREN="${CHILDREN}<child location=\"releases/${rel}\"/>"
               CHILD_COUNT=$((CHILD_COUNT + 1))
             fi
           done
 
           TIMESTAMP=$(date +%s000)
 
-          # Generate compositeContent.xml
-          cat > gh-pages/compositeContent.xml << XMLEOF
+          generate_composite() {
+            local type_name="$1"
+            local type_class="$2"
+            local pi_name="$3"
+            cat <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
-          <?compositeMetadataRepository version="1.0.0"?>
-          <repository name="JDT Bridge Update Site" type="org.eclipse.equinox.internal.p2.metadata.repository.CompositeMetadataRepository" version="1.0.0">
+          <?${pi_name} version="1.0.0"?>
+          <repository name="JDT Bridge Update Site" type="${type_class}" version="1.0.0">
             <properties size="2">
               <property name="p2.timestamp" value="${TIMESTAMP}"/>
               <property name="p2.compressed" value="false"/>
             </properties>
             <children size="${CHILD_COUNT}">
-          $(echo -e "$RELEASES")  </children>
+              ${CHILDREN}
+            </children>
           </repository>
-          XMLEOF
+          EOF
+          }
 
-          # Generate compositeArtifacts.xml
-          cat > gh-pages/compositeArtifacts.xml << XMLEOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <?compositeArtifactRepository version="1.0.0"?>
-          <repository name="JDT Bridge Update Site" type="org.eclipse.equinox.internal.p2.artifact.repository.CompositeArtifactRepository" version="1.0.0">
-            <properties size="2">
-              <property name="p2.timestamp" value="${TIMESTAMP}"/>
-              <property name="p2.compressed" value="false"/>
-            </properties>
-            <children size="${CHILD_COUNT}">
-          $(echo -e "$RELEASES")  </children>
-          </repository>
-          XMLEOF
+          generate_composite content \
+            "org.eclipse.equinox.internal.p2.metadata.repository.CompositeMetadataRepository" \
+            "compositeMetadataRepository" \
+            > gh-pages/compositeContent.xml
 
-          # Generate p2.index
-          cat > gh-pages/p2.index << INDEXEOF
+          generate_composite artifacts \
+            "org.eclipse.equinox.internal.p2.artifact.repository.CompositeArtifactRepository" \
+            "compositeArtifactRepository" \
+            > gh-pages/compositeArtifacts.xml
+
+          cat > gh-pages/p2.index <<EOF
           version=1
           metadata.repository.factory.order=compositeContent.xml,\!
           artifact.repository.factory.order=compositeArtifacts.xml,\!
-          INDEXEOF
+          EOF
 
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4
