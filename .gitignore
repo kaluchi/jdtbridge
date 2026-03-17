@@ -11,13 +11,15 @@ coverage/
 
 # Generated
 *.target
-!jdtbridge.target
 !jdtbridge-ci.target
 *.class
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Claude Code (local per-developer settings)
+.claude/settings.local.json
 
 # IDEs
 .idea/
