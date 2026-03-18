@@ -138,7 +138,7 @@ Multiple Eclipse instances are supported — each writes its own instance file, 
 
 ## Known limitations
 
-- **Workspace must be fully built.** JDT search relies on the Eclipse index. If the workspace hasn't been fully indexed, results may be incomplete. Use `jdt errors --build` or `--clean` to trigger builds.
+- **Workspace must be fully built.** JDT search relies on the Eclipse index. If the workspace hasn't been fully indexed, results may be incomplete. Use `jdt build` or `jdt build --clean` to trigger builds.
 
 ## License
 

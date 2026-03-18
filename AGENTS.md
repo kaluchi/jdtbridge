@@ -30,7 +30,8 @@ The `jdt` CLI gives you the same semantic understanding of Java code that a deve
 | Task | Use `jdt` | Not grep |
 |------|-----------|----------|
 | Find call sites | `jdt refs <FQN> <method>` | grep returns string matches, comments, identically-named methods |
-| Check compilation | `jdt errors --project <name>` | Maven takes 30-90s, jdt is sub-second |
+| Check compilation | `jdt errors --project <name>` | Maven takes 30-90s, jdt is instant |
+| Trigger build | `jdt build --project <name> [--clean]` | `mvn compile` has 30s+ overhead |
 | Read library source | `jdt source <FQN>` | Library sources are inside JARs — grep can't reach them |
 | Type hierarchy | `jdt hierarchy <FQN>` | grep for "extends/implements" misses transitive hierarchy |
 | Run single test | `jdt test <FQN> [method]` | Maven Surefire has 30s+ lifecycle overhead |
@@ -48,6 +49,7 @@ jdt hierarchy <FQN>                       supers + interfaces + subtypes
 jdt impl <FQN> <method> [--arity N]       implementations of interface method
 jdt type-info <FQN>                       class overview (fields, methods, signatures)
 jdt source <FQN> [method] [--arity N]     source code (project + library classes)
+jdt build [--project <name>] [--clean]    build project (incremental or clean)
 jdt test <FQN> [method]                   run JUnit test
 jdt errors [--project <name>]             compilation errors
 jdt format <file>                         format with Eclipse settings

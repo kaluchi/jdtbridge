@@ -10,6 +10,7 @@ import { hierarchy, help as hierarchyHelp } from "./commands/hierarchy.mjs";
 import { implementors, help as implementorsHelp } from "./commands/implementors.mjs";
 import { typeInfo, help as typeInfoHelp } from "./commands/type-info.mjs";
 import { source, help as sourceHelp } from "./commands/source.mjs";
+import { build, help as buildHelp } from "./commands/build.mjs";
 import { test, help as testHelp } from "./commands/test.mjs";
 import { errors, help as errorsHelp } from "./commands/errors.mjs";
 import {
@@ -42,6 +43,7 @@ const commands = {
   implementors: { fn: implementors, help: implementorsHelp },
   "type-info": { fn: typeInfo, help: typeInfoHelp },
   source: { fn: source, help: sourceHelp },
+  build: { fn: build, help: buildHelp },
   test: { fn: test, help: testHelp },
   errors: { fn: errors, help: errorsHelp },
   "organize-imports": { fn: organizeImports, help: organizeImportsHelp },
@@ -64,6 +66,7 @@ const aliases = {
   oi: "organize-imports",
   ae: "active-editor",
   src: "source",
+  b: "build",
   err: "errors",
   fmt: "format",
 };
@@ -100,12 +103,13 @@ Search & navigation:
   type-info${fmtAliases("type-info")} <FQN>                             class overview (fields, methods, line numbers)
   source${fmtAliases("source")} <FQN> [method] [--arity n]           type or method source code (project and libraries)
 
-Testing:
+Testing & building:
+  build${fmtAliases("build")} [--project <name>] [--clean]      build project (incremental or clean)
   test <FQN> [method]                         run JUnit test class or method
   test --project <name> [--package <pkg>]     run tests in project/package
 
 Diagnostics:
-  errors${fmtAliases("errors")} [--file <path>] [--project <name>]   compilation errors (refresh by default)
+  errors${fmtAliases("errors")} [--file <path>] [--project <name>]   compilation errors
 
 Refactoring:
   organize-imports${fmtAliases("organize-imports")} <file>                     organize imports

@@ -59,19 +59,29 @@ Returns source code as `text/plain` with `X-File`, `X-Start-Line`, `X-End-Line` 
 
 Run JUnit tests via Eclipse's built-in runner. By default, refreshes the project from disk and waits for auto-build before launching. Returns summary and failure details.
 
+## Building
+
+### `GET /build?[project=<name>][&clean]`
+
+Trigger a project build. Always refreshes from disk first.
+
+| Parameter | Description |
+|-----------|-------------|
+| `project` | Project to build (omit for workspace-wide incremental) |
+| `clean` | Clean + full rebuild (requires `project`) |
+
+Returns `{"errors": N}` with the count of compilation errors after build.
+
 ## Diagnostics
 
-### `GET /errors?[file=<path>][&project=<name>][&no-refresh][&build][&clean][&warnings][&all]`
+### `GET /errors?[file=<path>][&project=<name>][&warnings][&all]`
 
-Compilation diagnostics. By default refreshes from disk and returns only errors.
+Compilation diagnostics. Refreshes from disk and waits for auto-build before reading markers.
 
 | Parameter | Description |
 |-----------|-------------|
 | `file` | Workspace-relative path to filter by specific file |
 | `project` | Project name to filter by |
-| `no-refresh` | Skip disk refresh (use if Eclipse is already in sync) |
-| `build` | Trigger explicit incremental build |
-| `clean` | Clean + full rebuild (requires `project`) |
 | `warnings` | Include warnings (default: errors only) |
 | `all` | All marker types (jdt + checkstyle + maven + ...) |
 

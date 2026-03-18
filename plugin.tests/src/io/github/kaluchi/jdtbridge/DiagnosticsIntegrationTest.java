@@ -35,7 +35,6 @@ public class DiagnosticsIntegrationTest {
     public void errorsFindsCompilationError() throws Exception {
         Map<String, String> params = new HashMap<>();
         params.put("project", TestFixture.PROJECT_NAME);
-        params.put("no-refresh", "");
         String json = handler.handleErrors(params);
         assertTrue(json.contains("BrokenClass"),
                 "Should find error in BrokenClass: " + json);
@@ -51,7 +50,6 @@ public class DiagnosticsIntegrationTest {
         Map<String, String> params = new HashMap<>();
         params.put("file",
                 "/" + TestFixture.PROJECT_NAME + "/src/test/model/Dog.java");
-        params.put("no-refresh", "");
         String json = handler.handleErrors(params);
         assertEquals("[]", json, "Dog.java should have no errors");
     }
@@ -61,7 +59,6 @@ public class DiagnosticsIntegrationTest {
         Map<String, String> params = new HashMap<>();
         params.put("project", TestFixture.PROJECT_NAME);
         params.put("warnings", "");
-        params.put("no-refresh", "");
         String json = handler.handleErrors(params);
         // Should at least find the ERROR
         assertTrue(json.contains("ERROR"),
@@ -72,8 +69,47 @@ public class DiagnosticsIntegrationTest {
     public void errorsProjectNotFound() throws Exception {
         Map<String, String> params = new HashMap<>();
         params.put("project", "no-such-project-xyz");
-        params.put("no-refresh", "");
         String json = handler.handleErrors(params);
+        assertTrue(json.contains("error"),
+                "Should return error: " + json);
+    }
+
+    @Test
+    public void buildIncremental() throws Exception {
+        Map<String, String> params = new HashMap<>();
+        params.put("project", TestFixture.PROJECT_NAME);
+        String json = handler.handleBuild(params);
+        assertTrue(json.contains("\"errors\""),
+                "Should return errors count: " + json);
+    }
+
+    @Test
+    public void buildClean() throws Exception {
+        Map<String, String> params = new HashMap<>();
+        params.put("project", TestFixture.PROJECT_NAME);
+        params.put("clean", "");
+        String json = handler.handleBuild(params);
+        assertTrue(json.contains("\"errors\""),
+                "Should return errors count: " + json);
+        // BrokenClass has a compilation error
+        assertTrue(json.contains("\"errors\":1") || json.contains("\"errors\": 1"),
+                "Should have 1 error from BrokenClass: " + json);
+    }
+
+    @Test
+    public void buildCleanWithoutProject() throws Exception {
+        Map<String, String> params = new HashMap<>();
+        params.put("clean", "");
+        String json = handler.handleBuild(params);
+        assertTrue(json.contains("error"),
+                "Should return error about missing project: " + json);
+    }
+
+    @Test
+    public void buildProjectNotFound() throws Exception {
+        Map<String, String> params = new HashMap<>();
+        params.put("project", "no-such-project-xyz");
+        String json = handler.handleBuild(params);
         assertTrue(json.contains("error"),
                 "Should return error: " + json);
     }

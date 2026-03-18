@@ -138,7 +138,7 @@ describe("commands (integration)", () => {
       ]));
     });
     const { errors } = await import("../src/commands/errors.mjs");
-    await errors(["--no-refresh"]);
+    await errors([]);
     expect(io.logs[0]).toContain("ERROR");
     expect(io.logs[0]).toContain("[JDT]");
     expect(io.logs[0]).toContain("cannot resolve symbol");
@@ -150,7 +150,7 @@ describe("commands (integration)", () => {
       res.end("[]");
     });
     const { errors } = await import("../src/commands/errors.mjs");
-    await errors(["--no-refresh"]);
+    await errors([]);
     expect(io.logs[0]).toBe("(no errors)");
   });
 
@@ -238,6 +238,38 @@ describe("commands (integration)", () => {
     expect(io.logs[0]).toContain("3 tests");
     expect(io.logs[0]).toContain("1 failed");
     expect(io.logs.some((l) => l.includes("app.FooTest.testBar"))).toBe(true);
+  });
+
+  it("build shows success with 0 errors", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ errors: 0 }));
+    });
+    const { build } = await import("../src/commands/build.mjs");
+    await build(["--project", "m8-client"]);
+    expect(io.logs[0]).toBe("Build complete (0 errors)");
+  });
+
+  it("build exits 1 on compilation errors", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ errors: 3 }));
+    });
+    const { build } = await import("../src/commands/build.mjs");
+    await expect(build(["--project", "m8-client"])).rejects.toThrow("exit(1)");
+    expect(io.logs[0]).toBe("Build complete (3 errors)");
+  });
+
+  it("build with --clean flag", async () => {
+    await setupMock((req, res) => {
+      expect(req.url).toContain("clean");
+      expect(req.url).toContain("project=m8-client");
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ errors: 0 }));
+    });
+    const { build } = await import("../src/commands/build.mjs");
+    await build(["--project", "m8-client", "--clean"]);
+    expect(io.logs[0]).toBe("Build complete (0 errors)");
   });
 
   it("source prints file header and body", async () => {
@@ -449,7 +481,14 @@ describe("commands (integration)", () => {
   it("errors exits on server error", async () => {
     await setupMock(errorServer());
     const { errors } = await import("../src/commands/errors.mjs");
-    await expect(errors(["--no-refresh"])).rejects.toThrow("exit(1)");
+    await expect(errors([])).rejects.toThrow("exit(1)");
+    expect(io.errors[0]).toContain("Something went wrong");
+  });
+
+  it("build exits on server error", async () => {
+    await setupMock(errorServer());
+    const { build } = await import("../src/commands/build.mjs");
+    await expect(build(["--project", "m8-client"])).rejects.toThrow("exit(1)");
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
@@ -635,7 +674,7 @@ describe("commands (integration)", () => {
       ]));
     });
     const { errors } = await import("../src/commands/errors.mjs");
-    await errors(["--no-refresh", "--warnings"]);
+    await errors(["--warnings"]);
     expect(io.logs[0]).toContain("WARN");
   });
 

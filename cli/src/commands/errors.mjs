@@ -8,18 +8,12 @@ export async function errors(args) {
   const params = [];
   if (flags.file) params.push(`file=${encodeURIComponent(toWsPath(flags.file))}`);
   if (flags.project) params.push(`project=${encodeURIComponent(flags.project)}`);
-  const noRefresh = args.includes("--no-refresh");
-  if (noRefresh) params.push("no-refresh");
-  if (flags.build) params.push("build");
-  if (flags.clean) params.push("clean");
   if (flags.warnings) params.push("warnings");
   if (flags.all) params.push("all");
 
   let url = "/errors";
   if (params.length > 0) url += "?" + params.join("&");
-  const timeout =
-    !noRefresh || flags.build || flags.clean ? 180_000 : 10_000;
-  const results = await get(url, timeout);
+  const results = await get(url, 180_000);
   if (results.error) {
     console.error(results.error);
     process.exit(1);
@@ -39,20 +33,20 @@ export async function errors(args) {
 export const help = `Check compilation errors and diagnostics.
 
 Usage:  jdt errors [--file <path>] [--project <name>]
-                   [--no-refresh] [--build] [--clean]
                    [--warnings] [--all]
 
 Scope (pick one or omit for entire workspace):
   --file <path>       single file (workspace-relative)
   --project <name>    entire project
 
-Build/refresh flags:
-  (default)           refresh from disk + wait for auto-build
-  --no-refresh        skip disk refresh
-  --build             trigger incremental build
-  --clean             clean + full rebuild (requires --project)
+Options:
+  --warnings          include warnings (default: errors only)
+  --all               all marker types (jdt + checkstyle + maven + ...)
+
+Refreshes from disk and waits for auto-build before reading markers.
+Use 'jdt build' to trigger explicit builds.
 
 Examples:
   jdt errors --project m8-server
   jdt errors --file m8-server/src/main/java/.../Foo.java
-  jdt errors --project m8-server --clean`;
+  jdt errors --project m8-server --all --warnings`;

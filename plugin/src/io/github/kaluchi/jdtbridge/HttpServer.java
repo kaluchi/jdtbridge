@@ -193,6 +193,8 @@ public class HttpServer {
                         search.handleImplementors(params));
                 case "/errors" -> Response.json(
                         diagnostics.handleErrors(params));
+                case "/build" -> Response.json(
+                        diagnostics.handleBuild(params));
                 case "/type-info" -> Response.json(
                         search.handleTypeInfo(params));
                 case "/source" -> search.handleSource(params);

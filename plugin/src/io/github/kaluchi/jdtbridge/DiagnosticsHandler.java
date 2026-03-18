@@ -11,17 +11,16 @@ import org.eclipse.core.resources.IncrementalProjectBuilder;
 import org.eclipse.core.resources.ResourcesPlugin;
 
 /**
- * Handler for /errors endpoint: compilation diagnostics
- * with optional refresh/build.
+ * Handler for /errors and /build endpoints.
  */
 class DiagnosticsHandler {
+
+    private static final String JDT_PROBLEM_MARKER =
+            "org.eclipse.jdt.core.problem";
 
     String handleErrors(Map<String, String> params) throws Exception {
         String filePath = params.get("file");
         String projectName = params.get("project");
-        boolean refresh = !params.containsKey("no-refresh");
-        boolean build = params.containsKey("build");
-        boolean clean = params.containsKey("clean");
         boolean includeWarnings = params.containsKey("warnings");
         boolean all = params.containsKey("all");
 
@@ -46,48 +45,15 @@ class DiagnosticsHandler {
             scope = root;
         }
 
-        // Determine project for build operations
-        IProject buildProject = null;
-        if (scope instanceof IProject p) {
-            buildProject = p;
-        } else if (!(scope instanceof IWorkspaceRoot)) {
-            buildProject = scope.getProject();
-        }
-
-        // Refresh from disk
-        if (refresh) {
-            int depth = (scope instanceof IFile)
-                    ? IResource.DEPTH_ZERO : IResource.DEPTH_INFINITE;
-            scope.refreshLocal(depth, null);
-        }
-
-        // Build
-        if (clean) {
-            if (buildProject == null) {
-                return Json.error("clean requires a specific project"
-                        + " (use 'project' param)");
-            }
-            buildProject.build(
-                    IncrementalProjectBuilder.CLEAN_BUILD, null);
-            buildProject.build(
-                    IncrementalProjectBuilder.FULL_BUILD, null);
-        } else if (build) {
-            if (buildProject != null) {
-                buildProject.build(
-                        IncrementalProjectBuilder.INCREMENTAL_BUILD,
-                        null);
-            } else {
-                ResourcesPlugin.getWorkspace().build(
-                        IncrementalProjectBuilder.INCREMENTAL_BUILD,
-                        null);
-            }
-        } else if (refresh) {
-            JdtUtils.joinAutoBuild();
-        }
+        // Refresh from disk and wait for auto-build
+        int depth = (scope instanceof IFile)
+                ? IResource.DEPTH_ZERO : IResource.DEPTH_INFINITE;
+        scope.refreshLocal(depth, null);
+        JdtUtils.joinAutoBuild();
 
         // Read markers
         String markerType = all ? IMarker.PROBLEM
-                : "org.eclipse.jdt.core.problem";
+                : JDT_PROBLEM_MARKER;
         IMarker[] markers = scope.findMarkers(
                 markerType, true, IResource.DEPTH_INFINITE);
 
@@ -119,6 +85,68 @@ class DiagnosticsHandler {
             arr.add(entry);
         }
         return arr.toString();
+    }
+
+    String handleBuild(Map<String, String> params) throws Exception {
+        String projectName = params.get("project");
+        boolean clean = params.containsKey("clean");
+
+        IWorkspaceRoot root = ResourcesPlugin.getWorkspace().getRoot();
+
+        // Determine scope for refresh and marker counting
+        IResource scope;
+        IProject buildProject = null;
+        if (projectName != null && !projectName.isBlank()) {
+            IProject project = root.getProject(projectName);
+            if (!project.exists()) {
+                return Json.error(
+                        "Project not found: " + projectName);
+            }
+            scope = project;
+            buildProject = project;
+        } else {
+            scope = root;
+        }
+
+        if (clean && buildProject == null) {
+            return Json.error("clean requires a specific project"
+                    + " (use 'project' param)");
+        }
+
+        // Refresh from disk and let auto-build settle
+        scope.refreshLocal(IResource.DEPTH_INFINITE, null);
+        JdtUtils.joinAutoBuild();
+
+        // Build
+        if (clean) {
+            buildProject.build(
+                    IncrementalProjectBuilder.CLEAN_BUILD, null);
+            buildProject.build(
+                    IncrementalProjectBuilder.FULL_BUILD, null);
+        } else if (buildProject != null) {
+            buildProject.build(
+                    IncrementalProjectBuilder.INCREMENTAL_BUILD,
+                    null);
+        } else {
+            ResourcesPlugin.getWorkspace().build(
+                    IncrementalProjectBuilder.INCREMENTAL_BUILD,
+                    null);
+        }
+
+        // Count error markers on scope
+        IMarker[] markers = scope.findMarkers(
+                JDT_PROBLEM_MARKER, true,
+                IResource.DEPTH_INFINITE);
+        int errorCount = 0;
+        for (IMarker marker : markers) {
+            if (marker.getAttribute(IMarker.SEVERITY, -1)
+                    == IMarker.SEVERITY_ERROR) {
+                errorCount++;
+            }
+        }
+
+        return Json.object()
+                .put("errors", errorCount).toString();
     }
 
     String shortMarkerType(String type) {

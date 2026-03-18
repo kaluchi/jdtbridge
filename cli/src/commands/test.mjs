@@ -39,7 +39,6 @@ Usage:  jdt test <FQN> [method]
 Flags:
   --project <name>   run all tests in a project
   --package <pkg>    narrow to a specific package (with --project)
-  --no-refresh       skip disk refresh + auto-build
   --timeout <sec>    test run timeout in seconds (default: 120)
 
 Examples:

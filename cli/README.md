@@ -41,21 +41,20 @@ jdt type-info <FQN>                                    # (alias: ti) class overv
 jdt source <FQN> [method] [--arity N]                  # (alias: src) source code (project + libraries)
 ```
 
-### Testing
+### Testing & building
 
 ```bash
+jdt build [--project <name>] [--clean]                 # (alias: b) build project
 jdt test <FQN> [method] [--timeout N]                  # run JUnit test class or method
 jdt test --project <name> [--package <pkg>]            # run tests in project/package
 ```
 
-Tests auto-refresh from disk and wait for auto-build. Use `--no-refresh` to skip.
+All commands auto-refresh from disk. `build` is the only command that triggers explicit builds.
 
 ### Diagnostics
 
 ```bash
 jdt errors [--project <name>] [--file <path>]          # (alias: err) compilation errors
-jdt errors --build                                     # trigger incremental build
-jdt errors --clean --project <name>                    # clean + full rebuild
 jdt errors --warnings --all                            # include warnings and all marker types
 ```
 
