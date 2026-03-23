@@ -14,7 +14,7 @@ export async function source(args) {
   if (method) url += `&method=${encodeURIComponent(method)}`;
   if (flags.arity !== undefined && flags.arity !== true)
     url += `&arity=${flags.arity}`;
-  const result = await getRaw(url);
+  const result = await getRaw(url, 30_000);
   const file = result.headers["x-file"] || "?";
   const startLine = result.headers["x-start-line"] || "?";
   const endLine = result.headers["x-end-line"] || "?";

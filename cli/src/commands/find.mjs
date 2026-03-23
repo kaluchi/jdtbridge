@@ -11,7 +11,7 @@ export async function find(args) {
   }
   let url = `/find?name=${encodeURIComponent(name)}`;
   if (args.includes("--source-only")) url += "&source";
-  const results = await get(url);
+  const results = await get(url, 30_000);
   if (results.error) {
     console.error(results.error);
     process.exit(1);
