@@ -2,10 +2,10 @@
 <?compositeMetadataRepository version="1.0.0"?>
 <repository name="JDT Bridge Update Site" type="org.eclipse.equinox.internal.p2.metadata.repository.CompositeMetadataRepository" version="1.0.0">
   <properties size="2">
-    <property name="p2.timestamp" value="1774307591000"/>
+    <property name="p2.timestamp" value="1774328663000"/>
     <property name="p2.compressed" value="false"/>
   </properties>
-  <children size="3">
-    <child location="releases/1.0.0"/><child location="releases/1.1.0"/><child location="releases/1.2.0"/>
+  <children size="4">
+    <child location="releases/1.0.0"/><child location="releases/1.1.0"/><child location="releases/1.2.0"/><child location="releases/1.3.0"/>
   </children>
 </repository>
