@@ -29,6 +29,7 @@ public class HttpServer {
     private final RefactoringHandler refactoring =
             new RefactoringHandler();
     private final EditorHandler editor = new EditorHandler();
+    private final LaunchHandler launch = new LaunchHandler();
     private final TestHandler testHandler = new TestHandler();
     private final ProjectHandler projectInfo = new ProjectHandler();
     private final ConfigService configService =
@@ -269,6 +270,14 @@ public class HttpServer {
                         editor.handleEditors(params));
                 case "/open" -> Response.json(
                         editor.handleOpen(params));
+                case "/launch/list" -> Response.json(
+                        launch.handleList(params));
+                case "/launch/configs" -> Response.json(
+                        launch.handleConfigs(params));
+                case "/launch/clear" -> Response.json(
+                        launch.handleClear(params));
+                case "/launch/console" -> Response.json(
+                        launch.handleConsole(params));
                 default -> Response.json(Json.error(
                         "Unknown path: " + path));
             };

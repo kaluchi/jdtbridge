@@ -71,6 +71,15 @@ jdt rename <FQN> <newName> --field <old>               # rename field
 jdt move <FQN> <target.package>                        # move type to another package
 ```
 
+### Launches
+
+```bash
+jdt launch list                                        # list launches (running + terminated)
+jdt launch configs                                     # list saved launch configurations
+jdt launch console <name> [--tail N]                   # show console output
+jdt launch clear [name]                                # remove terminated launches
+```
+
 ### Editor
 
 ```bash

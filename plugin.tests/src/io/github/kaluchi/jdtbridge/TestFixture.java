@@ -206,6 +206,20 @@ class TestFixture {
             }
             """;
 
+    private static final String SIMPLE_TEST_SRC = """
+            package test.edge;
+
+            import org.junit.jupiter.api.Test;
+            import static org.junit.jupiter.api.Assertions.assertEquals;
+
+            public class SimpleTest {
+                @Test
+                public void onePlusOne() {
+                    assertEquals(2, 1 + 1);
+                }
+            }
+            """;
+
     // ---- Refactoring targets (separate classes that can be renamed/moved) ----
 
     private static final String RENAME_TARGET_SRC = """
@@ -281,13 +295,16 @@ class TestFixture {
         IFolder srcFolder = project.getFolder("src");
         srcFolder.create(true, true, null);
 
-        // Set classpath: src + JRE
+        // Set classpath: src + JRE + JUnit 5
         IClasspathEntry srcEntry =
                 JavaCore.newSourceEntry(srcFolder.getFullPath());
         IClasspathEntry jreEntry = JavaCore.newContainerEntry(
                 new Path("org.eclipse.jdt.launching.JRE_CONTAINER"));
+        IClasspathEntry junitEntry = JavaCore.newContainerEntry(
+                new Path("org.eclipse.jdt.junit.JUNIT_CONTAINER/5"));
         javaProject.setRawClasspath(
-                new IClasspathEntry[] { srcEntry, jreEntry }, null);
+                new IClasspathEntry[] { srcEntry, jreEntry,
+                        junitEntry }, null);
 
         // Initialize project preferences (needed by refactoring APIs)
         javaProject.setOption(JavaCore.COMPILER_SOURCE, "21");
@@ -331,6 +348,8 @@ class TestFixture {
                 "Parrot.java", CONCRETE_PET_SRC, true, null);
         edgePkg.createCompilationUnit(
                 "Repository.java", GENERIC_SRC, true, null);
+        edgePkg.createCompilationUnit(
+                "SimpleTest.java", SIMPLE_TEST_SRC, true, null);
 
         // Refactoring targets
         IPackageFragment refactorPkg =

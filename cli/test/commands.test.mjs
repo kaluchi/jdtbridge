@@ -531,6 +531,123 @@ describe("commands (integration)", () => {
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
+  // ---- launch ----
+
+  it("launch list shows launches", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify([
+        { name: "m8-server", type: "Java Application", mode: "run", terminated: false, pid: "12345" },
+        { name: "ObjectMapperTest", type: "JUnit", mode: "run", terminated: true, exitCode: 0 },
+      ]));
+    });
+    const { launchList } = await import("../src/commands/launch.mjs");
+    await launchList();
+    expect(io.logs[0]).toContain("m8-server");
+    expect(io.logs[0]).toContain("running");
+    expect(io.logs[1]).toContain("ObjectMapperTest");
+    expect(io.logs[1]).toContain("terminated");
+  });
+
+  it("launch list empty", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end("[]");
+    });
+    const { launchList } = await import("../src/commands/launch.mjs");
+    await launchList();
+    expect(io.logs[0]).toBe("(no launches)");
+  });
+
+  it("launch console shows output", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        name: "m8-server",
+        terminated: false,
+        output: "Server started on port 8080\nReady.\n",
+      }));
+    });
+    const { launchConsole } = await import("../src/commands/launch.mjs");
+    await launchConsole(["m8-server"]);
+    expect(io.logs[0]).toContain("Server started");
+  });
+
+  it("launch console with tail", async () => {
+    await setupMock((req, res) => {
+      expect(req.url).toContain("tail=10");
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ name: "m8-server", terminated: false, output: "last line\n" }));
+    });
+    const { launchConsole } = await import("../src/commands/launch.mjs");
+    await launchConsole(["m8-server", "--tail", "10"]);
+    expect(io.logs[0]).toContain("last line");
+  });
+
+  it("launch configs shows configurations", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify([
+        { name: "m8-server", type: "Java Application" },
+        { name: "AllTests", type: "JUnit" },
+      ]));
+    });
+    const { launchConfigs } = await import("../src/commands/launch.mjs");
+    await launchConfigs();
+    expect(io.logs[0]).toContain("m8-server");
+    expect(io.logs[0]).toContain("Java Application");
+    expect(io.logs[1]).toContain("AllTests");
+  });
+
+  it("launch configs empty", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end("[]");
+    });
+    const { launchConfigs } = await import("../src/commands/launch.mjs");
+    await launchConfigs();
+    expect(io.logs[0]).toBe("(no launch configurations)");
+  });
+
+  it("launch clear shows count", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ removed: 3 }));
+    });
+    const { launchClear } = await import("../src/commands/launch.mjs");
+    await launchClear([]);
+    expect(io.logs[0]).toContain("3");
+    expect(io.logs[0]).toContain("launches");
+  });
+
+  it("launch clear by name", async () => {
+    await setupMock((req, res) => {
+      expect(req.url).toContain("name=old-test");
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ removed: 1 }));
+    });
+    const { launchClear } = await import("../src/commands/launch.mjs");
+    await launchClear(["old-test"]);
+    expect(io.logs[0]).toContain("1");
+  });
+
+  it("launch console missing name exits", async () => {
+    const { launchConsole } = await import("../src/commands/launch.mjs");
+    await expect(launchConsole([])).rejects.toThrow("exit(1)");
+  });
+
+  it("launch console error exits", async () => {
+    await setupMock(errorServer());
+    const { launchConsole } = await import("../src/commands/launch.mjs");
+    await expect(launchConsole(["m8-server"])).rejects.toThrow("exit(1)");
+  });
+
+  it("launch list error exits", async () => {
+    await setupMock(errorServer());
+    const { launchList } = await import("../src/commands/launch.mjs");
+    await expect(launchList()).rejects.toThrow("exit(1)");
+  });
+
   it("editors exits on server error", async () => {
     await setupMock(errorServer());
     const { editors } = await import("../src/commands/editor.mjs");

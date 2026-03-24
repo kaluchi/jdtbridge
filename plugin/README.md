@@ -116,6 +116,24 @@ Returns all open editors as a JSON array. Active editor first, then tab order. F
 
 Open a type or method in the Eclipse editor.
 
+## Launches
+
+### `GET /launch/list`
+
+Returns all registered launches (running and terminated) as a JSON array. Most recent first.
+
+### `GET /launch/configs`
+
+Returns all saved launch configurations (Run → Run Configurations).
+
+### `GET /launch/console?name=<config-name>[&tail=<N>][&stream=stdout|stderr]`
+
+Returns console output (stdout + stderr) of a launch. `tail` limits to last N lines. `stream` filters to stdout or stderr only.
+
+### `GET /launch/clear[?name=<config-name>]`
+
+Removes terminated launches and their console output. Without `name`, removes all terminated. With `name`, removes only that one.
+
 ## Connection details
 
 On startup, the plugin writes a JSON file to `~/.jdtbridge/instances/<hash>.json`:

@@ -133,7 +133,6 @@ class TestHandler {
                     Log.warn("Failed to terminate launch", e);
                 }
             }
-            manager.removeLaunch(launch);
         }
     }
 

@@ -61,11 +61,11 @@ public class TestHandlerIntegrationTest {
     }
 
     @Test
-    public void detectTestKindJunit4() throws Exception {
-        // test.model.Dog has no JUnit 5 on classpath -> JUnit 4
+    public void detectTestKindJunit5() throws Exception {
+        // test project has JUnit 5 on classpath
         Object type = invokeFindType("test.model.Dog");
         String kind = invokeDetectTestKind(type);
-        assertEquals("org.eclipse.jdt.junit.loader.junit4", kind);
+        assertEquals("org.eclipse.jdt.junit.loader.junit5", kind);
     }
 
     private Object invokeFindType(String fqn) {

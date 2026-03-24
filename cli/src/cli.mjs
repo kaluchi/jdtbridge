@@ -29,12 +29,54 @@ import {
   editorsHelp,
   openHelp,
 } from "./commands/editor.mjs";
+import {
+  launchList,
+  launchConfigs,
+  launchClear,
+  launchConsole,
+  launchListHelp,
+  launchConfigsHelp,
+  launchClearHelp,
+  launchConsoleHelp,
+} from "./commands/launch.mjs";
 import { setup, help as setupHelp } from "./commands/setup.mjs";
 import { isConnectionError } from "./client.mjs";
 import { bold, red, dim } from "./color.mjs";
 import { createRequire } from "node:module";
 
 const { version } = createRequire(import.meta.url)("../package.json");
+
+const launchSubcommands = {
+  list: { fn: launchList, help: launchListHelp },
+  configs: { fn: launchConfigs, help: launchConfigsHelp },
+  clear: { fn: launchClear, help: launchClearHelp },
+  console: { fn: launchConsole, help: launchConsoleHelp },
+};
+
+const launchHelp = `Manage launches (running and terminated processes).
+
+Subcommands:
+  jdt launch list                           list all launches
+  jdt launch configs                        list saved launch configurations
+  jdt launch console <name> [--tail N]      show console output
+  jdt launch clear [name]                   remove terminated launches
+
+Use "jdt help launch <subcommand>" for details.`;
+
+async function launchDispatch(args) {
+  const [sub, ...rest] = args;
+  if (!sub || sub === "--help") {
+    console.log(launchHelp);
+    return;
+  }
+  const cmd = launchSubcommands[sub];
+  if (!cmd) {
+    console.error(`Unknown launch subcommand: ${sub}`);
+    console.log(launchHelp);
+    process.exit(1);
+  }
+  await cmd.fn(rest);
+}
 
 const commands = {
   projects: { fn: projects, help: projectsHelp },
@@ -55,6 +97,7 @@ const commands = {
   move: { fn: move, help: moveHelp },
   editors: { fn: editors, help: editorsHelp },
   open: { fn: open, help: openHelp },
+  launch: { fn: launchDispatch, help: launchHelp },
   setup: { fn: setup, help: setupHelp },
 };
 
@@ -120,6 +163,12 @@ Refactoring:
   rename <FQMN> <newName> [--field <old>]     rename type/method/field
   move <FQN> <target.package>                 move type to another package
 
+Launches:
+  launch list                                 list launches (running + terminated)
+  launch configs                              list saved launch configurations
+  launch console <name> [--tail N]            show console output of a launch
+  launch clear [name]                         remove terminated launches
+
 Editor:
   editors${fmtAliases("editors")}                                    list open editors (absolute paths)
   open <FQMN>                                 open in Eclipse editor
@@ -146,7 +195,9 @@ export async function run(argv) {
   if (command === "help") {
     const topic = rest[0];
     const resolved = topic ? resolve(topic) : null;
-    if (resolved) {
+    if (resolved === "launch" && rest[1] && launchSubcommands[rest[1]]) {
+      console.log(launchSubcommands[rest[1]].help);
+    } else if (resolved) {
       console.log(commands[resolved].help);
     } else if (topic) {
       console.error(`Unknown command: ${topic}`);
