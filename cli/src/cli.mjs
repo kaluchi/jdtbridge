@@ -99,16 +99,16 @@ Search & navigation:
   projects                                    list workspace projects
   project-info${fmtAliases("project-info")} <name> [--lines N]             project overview (adaptive detail)
   find <Name|*Pattern*|pkg> [--source-only]   find types by name, wildcard, or package
-  references${fmtAliases("references")} <FQN> [method] [--field <name>]  references to type/method/field
+  references${fmtAliases("references")} <FQMN> [--field <name>]         references to type/method/field
   subtypes${fmtAliases("subtypes")} <FQN>                              all subtypes/implementors
   hierarchy${fmtAliases("hierarchy")} <FQN>                             full hierarchy (supers + interfaces + subtypes)
-  implementors${fmtAliases("implementors")} <FQN> <method> [--arity n]     implementations of interface method
+  implementors${fmtAliases("implementors")} <FQMN>                            implementations of interface method
   type-info${fmtAliases("type-info")} <FQN>                             class overview (fields, methods, line numbers)
-  source${fmtAliases("source")} <FQN> [method] [--arity n]           type or method source code (project and libraries)
+  source${fmtAliases("source")} <FQMN>                              type or method source code (project and libraries)
 
 Testing & building:
   build${fmtAliases("build")} [--project <name>] [--clean]      build project (incremental or clean)
-  test <FQN> [method]                         run JUnit test class or method
+  test <FQMN>                                 run JUnit test class or method
   test --project <name> [--package <pkg>]     run tests in project/package
 
 Diagnostics:
@@ -117,12 +117,12 @@ Diagnostics:
 Refactoring:
   organize-imports${fmtAliases("organize-imports")} <file>                     organize imports
   format${fmtAliases("format")} <file>                               format with Eclipse project settings
-  rename <FQN> <newName> [--method|--field]   rename type/method/field
+  rename <FQMN> <newName> [--field <old>]     rename type/method/field
   move <FQN> <target.package>                 move type to another package
 
 Editor:
   active-editor${fmtAliases("active-editor")}                               current file and cursor line
-  open <FQN> [method]                         open in Eclipse editor
+  open <FQMN>                                 open in Eclipse editor
 
 Setup:
   setup [--check|--remove]                    install/check/remove Eclipse plugin

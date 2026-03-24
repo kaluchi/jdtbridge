@@ -1,5 +1,5 @@
 import { get } from "../client.mjs";
-import { extractPositional, parseFlags } from "../args.mjs";
+import { extractPositional, parseFlags, parseFqmn } from "../args.mjs";
 import { stripProject } from "../paths.mjs";
 
 export async function activeEditor() {
@@ -18,16 +18,18 @@ export async function activeEditor() {
 export async function open(args) {
   const pos = extractPositional(args);
   const flags = parseFlags(args);
-  const fqn = pos[0];
-  const method = pos[1];
+  const parsed = parseFqmn(pos[0]);
+  const fqn = parsed.className;
+  const method = parsed.method || pos[1];
   if (!fqn) {
-    console.error("Usage: open <FQN> [method] [--arity n]");
+    console.error("Usage: open <FQN>[#method[(param types)]]");
     process.exit(1);
   }
   let url = `/open?class=${encodeURIComponent(fqn)}`;
   if (method) url += `&method=${encodeURIComponent(method)}`;
-  if (flags.arity !== undefined && flags.arity !== true)
-    url += `&arity=${flags.arity}`;
+  if (parsed.paramTypes) {
+    url += `&paramTypes=${encodeURIComponent(parsed.paramTypes.join(","))}`;
+  }
   const result = await get(url);
   if (result.error) {
     console.error(result.error);
@@ -42,8 +44,9 @@ Usage:  jdt active-editor`;
 
 export const openHelp = `Open a type or method in the Eclipse editor.
 
-Usage:  jdt open <FQN> [method] [--arity n]
+Usage:  jdt open <FQN>[#method[(param types)]]
 
 Examples:
   jdt open app.m8.dao.StaffDaoImpl
-  jdt open app.m8.dao.StaffDaoImpl getStaff`;
+  jdt open app.m8.dao.StaffDaoImpl#getStaff
+  jdt open "app.m8.dao.StaffDaoImpl#save(Order)"`;

@@ -1,19 +1,22 @@
 import { getRaw } from "../client.mjs";
-import { extractPositional, parseFlags } from "../args.mjs";
+import { extractPositional, parseFlags, parseFqmn } from "../args.mjs";
 import { stripProject } from "../paths.mjs";
 
 export async function source(args) {
   const pos = extractPositional(args);
   const flags = parseFlags(args);
-  const [fqn, method] = pos;
+  const parsed = parseFqmn(pos[0]);
+  const fqn = parsed.className;
   if (!fqn) {
-    console.error("Usage: source <FQN> [method] [--arity n]");
+    console.error("Usage: source <FQN>[#method[(param types)]]");
     process.exit(1);
   }
+  const method = parsed.method || pos[1];
   let url = `/source?class=${encodeURIComponent(fqn)}`;
   if (method) url += `&method=${encodeURIComponent(method)}`;
-  if (flags.arity !== undefined && flags.arity !== true)
-    url += `&arity=${flags.arity}`;
+  if (parsed.paramTypes) {
+    url += `&paramTypes=${encodeURIComponent(parsed.paramTypes.join(","))}`;
+  }
   const result = await getRaw(url, 30_000);
   const file = result.headers["x-file"] || "?";
   const startLine = result.headers["x-start-line"] || "?";
@@ -35,9 +38,9 @@ export async function source(args) {
 
 export const help = `Print source code of a type or method.
 
-Usage:  jdt source <FQN> [method] [--arity <n>]
+Usage:  jdt source <FQN>[#method[(param types)]]
 
 Examples:
   jdt source app.m8.dao.StaffDaoImpl
-  jdt source app.m8.dao.StaffDaoImpl getStaff
-  jdt source app.m8.dao.StaffDaoImpl save --arity 2`;
+  jdt source app.m8.dao.StaffDaoImpl#getStaff
+  jdt source "app.m8.dao.StaffDaoImpl#save(Order)"`;

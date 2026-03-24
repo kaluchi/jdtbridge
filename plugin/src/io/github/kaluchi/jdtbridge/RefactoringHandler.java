@@ -151,7 +151,6 @@ class RefactoringHandler {
 
         String methodName = params.get("method");
         String fieldName = params.get("field");
-        int arity = JdtUtils.parseArity(params.get("arity"));
 
         IJavaElement element;
         String refactoringId;
@@ -165,8 +164,8 @@ class RefactoringHandler {
             element = field;
             refactoringId = IJavaRefactorings.RENAME_FIELD;
         } else if (methodName != null && !methodName.isBlank()) {
-            IMethod method =
-                    JdtUtils.findMethod(type, methodName, arity);
+            IMethod method = JdtUtils.findMethod(type, methodName,
+                    params.get("paramTypes"));
             if (method == null) {
                 return Json.error("Method not found: " + methodName
                         + " in " + fqn);

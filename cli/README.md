@@ -33,19 +33,19 @@ Run `jdt help <command>` for detailed flags and examples. Most commands have sho
 jdt projects                                           # list workspace projects
 jdt project-info <name> [--lines N]                    # (alias: pi) project overview
 jdt find <Name|package> [--source-only]                 # find types by name, wildcard, or package
-jdt references <FQN> [method] [--field <name>]         # (alias: refs) references to type/method/field
+jdt references <FQMN> [--field <name>]                  # (alias: refs) references to type/method/field
 jdt subtypes <FQN>                                     # (alias: subt) all subtypes/implementors
 jdt hierarchy <FQN>                                    # (alias: hier) supers + interfaces + subtypes
-jdt implementors <FQN> <method> [--arity N]            # (alias: impl) implementations of interface method
+jdt implementors <FQMN>                                # (alias: impl) implementations of interface method
 jdt type-info <FQN>                                    # (alias: ti) class overview (fields, methods)
-jdt source <FQN> [method] [--arity N]                  # (alias: src) source code (project + libraries)
+jdt source <FQMN>                                      # (alias: src) source code (project + libraries)
 ```
 
 ### Testing & building
 
 ```bash
 jdt build [--project <name>] [--clean]                 # (alias: b) build project
-jdt test <FQN> [method] [--timeout N]                  # run JUnit test class or method
+jdt test <FQMN> [--timeout N]                           # run JUnit test class or method
 jdt test --project <name> [--package <pkg>]            # run tests in project/package
 ```
 
@@ -66,7 +66,7 @@ File paths are workspace-relative: `my-app/src/main/java/.../Foo.java`.
 jdt organize-imports <file>                            # (alias: oi) organize imports
 jdt format <file>                                      # (alias: fmt) format code (Eclipse settings)
 jdt rename <FQN> <newName>                             # rename type
-jdt rename <FQN> <newName> --method <old>              # rename method
+jdt rename <FQMN> <newName>                            # rename method (FQMN includes method)
 jdt rename <FQN> <newName> --field <old>               # rename field
 jdt move <FQN> <target.package>                        # move type to another package
 ```
@@ -75,7 +75,7 @@ jdt move <FQN> <target.package>                        # move type to another pa
 
 ```bash
 jdt active-editor                                      # (alias: ae) current file and cursor line
-jdt open <FQN> [method] [--arity N]                    # open in Eclipse editor
+jdt open <FQMN>                                        # open in Eclipse editor
 ```
 
 ## Instance discovery

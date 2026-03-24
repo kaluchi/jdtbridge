@@ -1,18 +1,21 @@
 import { get } from "../client.mjs";
-import { extractPositional, parseFlags } from "../args.mjs";
+import { extractPositional, parseFlags, parseFqmn } from "../args.mjs";
 import { stripProject } from "../paths.mjs";
 
 export async function implementors(args) {
   const pos = extractPositional(args);
   const flags = parseFlags(args);
-  const [fqn, method] = pos;
+  const parsed = parseFqmn(pos[0]);
+  const fqn = parsed.className;
+  const method = parsed.method || pos[1];
   if (!fqn || !method) {
-    console.error("Usage: implementors <FQN> <method> [--arity n]");
+    console.error("Usage: implementors <FQN>#<method>[(param types)]");
     process.exit(1);
   }
   let url = `/implementors?class=${encodeURIComponent(fqn)}&method=${encodeURIComponent(method)}`;
-  if (flags.arity !== undefined && flags.arity !== true)
-    url += `&arity=${flags.arity}`;
+  if (parsed.paramTypes) {
+    url += `&paramTypes=${encodeURIComponent(parsed.paramTypes.join(","))}`;
+  }
   const results = await get(url, 30_000);
   if (results.error) {
     console.error(results.error);
@@ -29,6 +32,7 @@ export async function implementors(args) {
 
 export const help = `Find implementations of an interface method across all implementing classes.
 
-Usage:  jdt implementors <FQN> <method> [--arity <n>]
+Usage:  jdt implementors <FQN>#<method>[(param types)]
 
-Example:  jdt implementors app.m8.web.shared.core.HasId getId`;
+Examples:
+  jdt implementors app.m8.web.shared.core.HasId#getId`;

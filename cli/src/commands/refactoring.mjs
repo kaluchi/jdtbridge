@@ -1,5 +1,5 @@
 import { get } from "../client.mjs";
-import { extractPositional, parseFlags } from "../args.mjs";
+import { extractPositional, parseFlags, parseFqmn } from "../args.mjs";
 import { toWsPath } from "../paths.mjs";
 import { green, yellow } from "../color.mjs";
 
@@ -46,19 +46,22 @@ export async function format(args) {
 export async function rename(args) {
   const pos = extractPositional(args);
   const flags = parseFlags(args);
-  const fqn = pos[0];
+  const parsed = parseFqmn(pos[0]);
+  const fqn = parsed.className;
   const newName = pos[1];
   if (!fqn || !newName) {
     console.error(
-      "Usage: rename <FQN> <newName> [--field name] [--method name] [--arity n]",
+      "Usage: rename <FQN>[#method[(param types)]] <newName> [--field name]",
     );
     process.exit(1);
   }
   let url = `/rename?class=${encodeURIComponent(fqn)}&newName=${encodeURIComponent(newName)}`;
   if (flags.field) url += `&field=${encodeURIComponent(flags.field)}`;
-  if (flags.method) url += `&method=${encodeURIComponent(flags.method)}`;
-  if (flags.arity !== undefined && flags.arity !== true)
-    url += `&arity=${flags.arity}`;
+  const methodName = parsed.method || flags.method;
+  if (methodName) url += `&method=${encodeURIComponent(methodName)}`;
+  if (parsed.paramTypes) {
+    url += `&paramTypes=${encodeURIComponent(parsed.paramTypes.join(","))}`;
+  }
   const result = await get(url, 30_000);
   if (result.error) {
     console.error(result.error);
@@ -103,11 +106,12 @@ Example:  jdt format m8-server/src/main/java/.../Foo.java`;
 
 export const renameHelp = `Rename a type, method, or field (updates all references).
 
-Usage:  jdt rename <FQN> <newName> [--method <old>] [--field <old>] [--arity <n>]
+Usage:  jdt rename <FQN>[#method[(param types)]] <newName>
+        jdt rename <FQN> <newName> [--field <old>]
 
 Examples:
   jdt rename app.m8.dto.Foo Bar
-  jdt rename app.m8.dto.Foo getBar --method getFoo`;
+  jdt rename app.m8.dto.Foo#getFoo getBar`;
 
 export const moveHelp = `Move a type to another package (updates all references).
 

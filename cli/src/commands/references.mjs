@@ -1,24 +1,26 @@
 import { get } from "../client.mjs";
-import { extractPositional, parseFlags } from "../args.mjs";
+import { extractPositional, parseFlags, parseFqmn } from "../args.mjs";
 import { formatReferences } from "../format/references.mjs";
 
 export async function references(args) {
   const pos = extractPositional(args);
   const flags = parseFlags(args);
-  const fqn = pos[0];
+  const parsed = parseFqmn(pos[0]);
+  const fqn = parsed.className;
   if (!fqn) {
-    console.error("Usage: references <FQN> [method] [--field name] [--arity n]");
+    console.error("Usage: references <FQN>[#method[(param types)]] [--field name]");
     process.exit(1);
   }
   let url = `/references?class=${encodeURIComponent(fqn)}`;
   if (flags.field) {
     url += `&field=${encodeURIComponent(flags.field)}`;
   } else {
-    const method = pos[1];
+    const method = parsed.method || pos[1];
     if (method) url += `&method=${encodeURIComponent(method)}`;
+    if (parsed.paramTypes) {
+      url += `&paramTypes=${encodeURIComponent(parsed.paramTypes.join(","))}`;
+    }
   }
-  if (flags.arity !== undefined && flags.arity !== true)
-    url += `&arity=${flags.arity}`;
   const results = await get(url, 30_000);
   if (results.error) {
     console.error(results.error);
@@ -33,19 +35,20 @@ export async function references(args) {
 
 export const help = `Find all references to a type, method, or field across the workspace.
 
-Usage:  jdt references <FQN> [method]
+Usage:  jdt references <FQN>[#method[(param types)]]
         jdt references <FQN> --field <name>
-        jdt references <FQN> [method] --arity <n>
 
-Arguments:
-  FQN       fully qualified class name
-  method    method name (optional)
+FQMN formats (Fully Qualified Method Name):
+  pkg.Class#method              any overload
+  pkg.Class#method()            zero-arg overload
+  pkg.Class#method(String)      specific signature
+  pkg.Class.method(String)      Eclipse Copy Qualified Name style
 
 Flags:
   --field <name>   find references to a field
-  --arity <n>      disambiguate overloaded methods by parameter count
 
 Examples:
   jdt references app.m8.dto.web.core.IdOrgRoot
-  jdt references app.m8.dao.StaffDaoImpl getStaff
+  jdt references app.m8.dao.StaffDaoImpl#getStaff
+  jdt references "app.m8.dao.StaffDaoImpl#save(Order)"
   jdt references app.m8.dao.StaffDaoImpl --field staffCache`;

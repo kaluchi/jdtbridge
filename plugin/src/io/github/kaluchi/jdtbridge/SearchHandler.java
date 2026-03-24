@@ -177,7 +177,6 @@ class SearchHandler {
 
         String methodName = params.get("method");
         String fieldName = params.get("field");
-        int arity = JdtUtils.parseArity(params.get("arity"));
         IJavaElement target;
 
         if (fieldName != null && !fieldName.isBlank()) {
@@ -188,8 +187,8 @@ class SearchHandler {
             }
             target = field;
         } else if (methodName != null && !methodName.isBlank()) {
-            IMethod method =
-                    JdtUtils.findMethod(type, methodName, arity);
+            IMethod method = JdtUtils.findMethod(type, methodName,
+                    params.get("paramTypes"));
             if (method == null) {
                 return Json.error("Method not found: " + methodName
                         + " in " + fqn);
@@ -318,14 +317,14 @@ class SearchHandler {
             return Json.error("Type not found: " + fqn);
         }
 
-        int arity = JdtUtils.parseArity(params.get("arity"));
-        IMethod method =
-                JdtUtils.findMethod(type, methodName, arity);
+        IMethod method = JdtUtils.findMethod(type, methodName,
+                params.get("paramTypes"));
         if (method == null) {
             return Json.error("Method not found: " + methodName
                     + " in " + fqn);
         }
 
+        int arity = method.getNumberOfParameters();
         ITypeHierarchy hierarchy = type.newTypeHierarchy(null);
         Json arr = Json.array();
         for (IType sub : hierarchy.getAllSubtypes(type)) {
@@ -333,9 +332,8 @@ class SearchHandler {
             try {
                 for (IMethod m : sub.getMethods()) {
                     if (m.getElementName().equals(methodName)
-                            && (arity < 0
-                                    || m.getNumberOfParameters()
-                                            == arity)) {
+                            && m.getNumberOfParameters()
+                                    == arity) {
                         arr.add(Json.object()
                                 .put("fqn",
                                         sub.getFullyQualifiedName())
@@ -433,9 +431,9 @@ class SearchHandler {
         String fullSource = getFullSource(type);
 
         if (methodName != null && !methodName.isBlank()) {
-            int arity = JdtUtils.parseArity(params.get("arity"));
-            List<IMethod> methods =
-                    JdtUtils.findMethods(type, methodName, arity);
+            List<IMethod> methods = JdtUtils.findMethods(
+                    type, methodName,
+                    params.get("paramTypes"));
             if (methods.isEmpty()) {
                 return HttpServer.Response.json(
                         Json.error("Method not found: " + methodName

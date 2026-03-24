@@ -1,15 +1,16 @@
 import { get } from "../client.mjs";
-import { extractPositional, parseFlags } from "../args.mjs";
+import { extractPositional, parseFlags, parseFqmn } from "../args.mjs";
 import { formatTestResults } from "../format/test-results.mjs";
 
 export async function test(args) {
   const pos = extractPositional(args);
   const flags = parseFlags(args);
   let url = "/test?";
-  const fqn = pos[0];
+  const parsed = parseFqmn(pos[0]);
+  const fqn = parsed.className;
   if (fqn) {
     url += `class=${encodeURIComponent(fqn)}`;
-    const method = pos[1];
+    const method = parsed.method || pos[1];
     if (method) url += `&method=${encodeURIComponent(method)}`;
   } else if (flags.project) {
     url += `project=${encodeURIComponent(flags.project)}`;
@@ -33,7 +34,8 @@ export async function test(args) {
 
 export const help = `Run JUnit tests via Eclipse's built-in test runner.
 
-Usage:  jdt test <FQN> [method]
+Usage:  jdt test <FQN>[#method]
+        jdt test <FQN> [method]
         jdt test --project <name> [--package <pkg>]
 
 Flags:
@@ -43,5 +45,6 @@ Flags:
 
 Examples:
   jdt test app.m8ws.utils.ObjectMapperTest
+  jdt test app.m8ws.utils.ObjectMapperTest#testSerialize
   jdt test app.m8ws.utils.ObjectMapperTest testSerialize
   jdt test --project m8-server`;

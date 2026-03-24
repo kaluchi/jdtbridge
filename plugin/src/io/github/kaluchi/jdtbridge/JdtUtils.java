@@ -28,37 +28,81 @@ class JdtUtils {
         return null;
     }
 
-    static IMethod findMethod(IType type, String name, int arity)
-            throws JavaModelException {
+    static IMethod findMethod(IType type, String name,
+            String paramTypesStr) throws JavaModelException {
+        String[] paramTypes = parseParamTypes(paramTypesStr);
         for (IMethod m : type.getMethods()) {
-            if (m.getElementName().equals(name)) {
-                if (arity < 0 || m.getNumberOfParameters() == arity)
-                    return m;
+            if (!m.getElementName().equals(name)) continue;
+            if (paramTypes != null) {
+                if (matchesParamTypes(m, paramTypes)) return m;
+            } else {
+                return m;
             }
         }
         return null;
     }
 
-    static List<IMethod> findMethods(IType type, String name, int arity)
-            throws JavaModelException {
+    static List<IMethod> findMethods(IType type, String name,
+            String paramTypesStr) throws JavaModelException {
+        String[] paramTypes = parseParamTypes(paramTypesStr);
         List<IMethod> result = new ArrayList<>();
         for (IMethod m : type.getMethods()) {
-            if (m.getElementName().equals(name)) {
-                if (arity < 0 || m.getNumberOfParameters() == arity) {
+            if (!m.getElementName().equals(name)) continue;
+            if (paramTypes != null) {
+                if (matchesParamTypes(m, paramTypes))
                     result.add(m);
-                }
+            } else {
+                result.add(m);
             }
         }
         return result;
     }
 
-    static int parseArity(String s) {
-        if (s == null) return -1;
-        try {
-            return Integer.parseInt(s);
-        } catch (NumberFormatException e) {
-            return -1;
+    static String[] parseParamTypes(String s) {
+        if (s == null) return null;
+        if (s.isEmpty()) return new String[0];
+        return s.split(",");
+    }
+
+    private static boolean matchesParamTypes(IMethod m,
+            String[] paramTypes) throws JavaModelException {
+        String[] methodParams = m.getParameterTypes();
+        if (methodParams.length != paramTypes.length) return false;
+        for (int i = 0; i < methodParams.length; i++) {
+            String jdtType = Signature.toString(methodParams[i]);
+            if (!typeMatches(jdtType, paramTypes[i].trim())) {
+                return false;
+            }
         }
+        return true;
+    }
+
+    static boolean typeMatches(String jdtType, String userType) {
+        String jdt = stripGenerics(jdtType);
+        String user = stripGenerics(userType);
+        if (jdt.equals(user)) return true;
+        return simpleName(jdt).equals(simpleName(user));
+    }
+
+    private static String stripGenerics(String type) {
+        int start = type.indexOf('<');
+        if (start < 0) return type;
+        int end = type.lastIndexOf('>');
+        String suffix = end + 1 < type.length()
+                ? type.substring(end + 1) : "";
+        return type.substring(0, start) + suffix;
+    }
+
+    private static String simpleName(String type) {
+        String suffix = "";
+        String base = type;
+        while (base.endsWith("[]")) {
+            suffix += "[]";
+            base = base.substring(0, base.length() - 2);
+        }
+        int dot = base.lastIndexOf('.');
+        if (dot >= 0) base = base.substring(dot + 1);
+        return base + suffix;
     }
 
     static String typeKind(IType type) throws JavaModelException {

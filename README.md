@@ -10,12 +10,12 @@ Eclipse's JDT compiler builds a deep semantic index of your code — type hierar
 # "Who calls this method?" — grep returns 200 hits including comments,
 # identically-named methods in other classes, and string literals.
 # JDT returns only the 8 actual call sites, with file and line numbers.
-jdt refs com.example.dao.OrderRepository save --arity 1
+jdt refs "com.example.dao.OrderRepository#save(Order)"
 
 # Read Spring/Hibernate/JDK source code by name.
 # Without JDT this is impossible — library sources live inside JARs.
 # The agent gets the same "go to definition" power a developer has in the IDE.
-jdt src org.springframework.transaction.support.TransactionTemplate execute
+jdt src org.springframework.transaction.support.TransactionTemplate#execute
 
 # "Did my edit compile?" — Maven takes 30-90 seconds for a module build.
 # Eclipse's incremental compiler already knows the answer. Sub-second response.
@@ -24,7 +24,7 @@ jdt err --project my-app-server
 # "What classes implement this interface method?" — grep for a common name
 # like "save" or "onInit" returns every class that has that method name.
 # JDT resolves the type hierarchy and returns only actual implementations.
-jdt impl com.example.core.Repository save --arity 1
+jdt impl "com.example.core.Repository#save(Order)"
 
 # Understand a 600-line class without reading it. Fields, method signatures,
 # supertypes, line numbers — structured overview, not raw source.
@@ -32,7 +32,7 @@ jdt ti com.example.web.OrderController
 
 # Run a single test method in seconds via Eclipse's built-in runner.
 # Maven Surefire takes 30+ seconds of lifecycle overhead for the same thing.
-jdt test com.example.service.OrderServiceTest testCalculateTotal
+jdt test com.example.service.OrderServiceTest#testCalculateTotal
 ```
 
 ## Getting started
@@ -109,20 +109,20 @@ Most commands have short aliases for quick typing.
 | `projects` | | List workspace projects |
 | `project-info <name>` | `pi` | Project overview (packages, types, methods) |
 | `find <Name\|package>` | | Find types by name, wildcard, or package |
-| `references <FQN> [method]` | `refs` | All references to a type, method, or field |
+| `references <FQMN>` | `refs` | All references to a type, method, or field |
 | `subtypes <FQN>` | `subt` | All subtypes and implementors |
 | `hierarchy <FQN>` | `hier` | Full type hierarchy (supers + subs) |
-| `implementors <FQN> <method>` | `impl` | Implementations of an interface method |
+| `implementors <FQMN>` | `impl` | Implementations of an interface method |
 | `type-info <FQN>` | `ti` | Class overview (fields, methods, signatures) |
-| `source <FQN> [method]` | `src` | Source code — project and library classes |
+| `source <FQMN>` | `src` | Source code — project and library classes |
 | `build [--project <name>]` | `b` | Build project (incremental or clean) |
-| `test <FQN> [method]` | | Run JUnit tests |
+| `test <FQMN>` | | Run JUnit tests |
 | `errors [--project <name>]` | `err` | Compilation errors and diagnostics |
 | `organize-imports <file>` | `oi` | Organize imports (Eclipse settings) |
 | `format <file>` | `fmt` | Format code (Eclipse settings) |
-| `rename <FQN> <new>` | | Rename type, method, or field across workspace |
+| `rename <FQMN> <new>` | | Rename type, method, or field across workspace |
 | `move <FQN> <package>` | | Move type to another package |
-| `open <FQN> [method]` | | Open in Eclipse editor |
+| `open <FQMN>` | | Open in Eclipse editor |
 | `active-editor` | `ae` | Current file and cursor position |
 | `setup [--check\|--remove]` | | Install, check, or remove Eclipse plugin |
 

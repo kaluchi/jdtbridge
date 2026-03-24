@@ -189,6 +189,23 @@ class TestFixture {
             }
             """;
 
+    private static final String GENERIC_SRC = """
+            package test.edge;
+
+            import java.util.List;
+            import java.util.Map;
+
+            public class Repository {
+                public void save(String item) {}
+                public void save(String item, int priority) {}
+                public void save(List<String> items) {}
+                public List<String> findAll() { return null; }
+                public Map<String, Object> findByIds(String[] ids) {
+                    return null;
+                }
+            }
+            """;
+
     // ---- Refactoring targets (separate classes that can be renamed/moved) ----
 
     private static final String RENAME_TARGET_SRC = """
@@ -312,6 +329,8 @@ class TestFixture {
                 "AbstractPet.java", ABSTRACT_SRC, true, null);
         edgePkg.createCompilationUnit(
                 "Parrot.java", CONCRETE_PET_SRC, true, null);
+        edgePkg.createCompilationUnit(
+                "Repository.java", GENERIC_SRC, true, null);
 
         // Refactoring targets
         IPackageFragment refactorPkg =

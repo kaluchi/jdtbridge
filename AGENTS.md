@@ -29,13 +29,27 @@ The `jdt` CLI gives you the same semantic understanding of Java code that a deve
 
 | Task | Use `jdt` | Not grep |
 |------|-----------|----------|
-| Find call sites | `jdt refs <FQN> <method>` | grep returns string matches, comments, identically-named methods |
+| Find call sites | `jdt refs <FQN>#<method>` | grep returns string matches, comments, identically-named methods |
 | Check compilation | `jdt errors --project <name>` | Maven takes 30-90s, jdt is instant |
 | Trigger build | `jdt build --project <name> [--clean]` | `mvn compile` has 30s+ overhead |
 | Read library source | `jdt source <FQN>` | Library sources are inside JARs — grep can't reach them |
 | Type hierarchy | `jdt hierarchy <FQN>` | grep for "extends/implements" misses transitive hierarchy |
-| Run single test | `jdt test <FQN> [method]` | Maven Surefire has 30s+ lifecycle overhead |
+| Run single test | `jdt test <FQN>#<method>` | Maven Surefire has 30s+ lifecycle overhead |
 | Class overview | `jdt type-info <FQN>` | Reading a 600-line file wastes context |
+
+### FQMN (Fully Qualified Method Name)
+
+Commands that accept methods support FQMN notation — class and method in one argument:
+
+```
+pkg.Class#method              any overload
+pkg.Class#method()            zero-arg overload
+pkg.Class#method(String)      specific signature
+pkg.Class.method(String)      Eclipse Copy Qualified Name style
+```
+
+Parameter types can be simple names (`String`) or FQN (`java.lang.String`).
+Generics are stripped for matching: `List<String>` matches `List`.
 
 ### Key commands
 
@@ -43,19 +57,19 @@ The `jdt` CLI gives you the same semantic understanding of Java code that a deve
 jdt projects                              list workspace projects
 jdt project-info <name>                   project overview (packages, types, methods)
 jdt find <Name|*Pattern*|pkg> [--source-only] find types by name, wildcard, or package
-jdt refs <FQN> [method] [--field <name>]  references to type/method/field
+jdt refs <FQMN> [--field <name>]          references to type/method/field
 jdt subtypes <FQN>                        all subtypes/implementors
 jdt hierarchy <FQN>                       supers + interfaces + subtypes
-jdt impl <FQN> <method> [--arity N]       implementations of interface method
+jdt impl <FQMN>                           implementations of interface method
 jdt type-info <FQN>                       class overview (fields, methods, signatures)
-jdt source <FQN> [method] [--arity N]     source code (project + library classes)
+jdt source <FQMN>                         type or method source code (project + libraries)
 jdt build [--project <name>] [--clean]    build project (incremental or clean)
-jdt test <FQN> [method]                   run JUnit test
+jdt test <FQMN>                           run JUnit test
 jdt errors [--project <name>]             compilation errors
 jdt format <file>                         format with Eclipse settings
 jdt organize-imports <file>               organize imports
-jdt rename <FQN> <newName>                rename type/method/field
-jdt open <FQN> [method]                   open in Eclipse editor
+jdt rename <FQMN> <newName>               rename type/method/field
+jdt open <FQMN>                           open in Eclipse editor
 ```
 
 Run `jdt help <command>` for detailed flags and examples.
@@ -98,6 +112,18 @@ mvn clean verify -Pci
 # CLI tests only
 cd cli && npm test
 ```
+
+### Installing plugin into Eclipse
+
+After `mvn clean verify` has built the p2 site, install without rebuilding:
+
+```bash
+jdt setup --skip-build          # uses last mvn build, skips redundant rebuild
+```
+
+**IMPORTANT:** `jdt setup` (without `--skip-build`) triggers a full Maven build
+internally. If you already ran `mvn clean verify`, always use `--skip-build`
+to avoid building twice.
 
 ### Target platform
 

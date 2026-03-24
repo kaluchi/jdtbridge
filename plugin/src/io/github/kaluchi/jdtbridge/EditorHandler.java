@@ -82,9 +82,8 @@ class EditorHandler {
 
         IJavaElement target = type;
         if (methodName != null && !methodName.isBlank()) {
-            int arity = JdtUtils.parseArity(params.get("arity"));
-            IMethod method =
-                    JdtUtils.findMethod(type, methodName, arity);
+            IMethod method = JdtUtils.findMethod(type, methodName,
+                    params.get("paramTypes"));
             if (method != null) {
                 target = method;
             }

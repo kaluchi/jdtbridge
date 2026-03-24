@@ -28,9 +28,11 @@ Find type declarations by name. Supports wildcards (`*Controller*`, `Find*`). Ad
 ]
 ```
 
-### `GET /references?class=<FQN>[&method=<name>][&field=<name>][&arity=<n>]`
+### `GET /references?class=<FQN>[&method=<name>][&field=<name>][&paramTypes=<types>]`
 
 Find all references to a type, method, or field. Filters out inaccurate matches and javadoc references. Returns file, line, enclosing member, and source line content.
+
+`paramTypes` is a comma-separated list of parameter types for disambiguating overloaded methods (e.g., `paramTypes=String,int`). Supports simple names and FQN; generics are stripped for matching.
 
 ### `GET /subtypes?class=<FQN>`
 
@@ -40,7 +42,7 @@ Find all direct and indirect subtypes/implementors of a type.
 
 Full type hierarchy: superclass chain, all super interfaces, and all subtypes.
 
-### `GET /implementors?class=<FQN>&method=<name>[&arity=<n>]`
+### `GET /implementors?class=<FQN>&method=<name>[&paramTypes=<types>]`
 
 Find implementations of an interface method across all implementing classes.
 
@@ -48,13 +50,14 @@ Find implementations of an interface method across all implementing classes.
 
 Class overview: kind, superclass, interfaces, fields (with modifiers and types), methods (with full signatures), and line numbers.
 
-### `GET /source?class=<FQN>[&method=<name>][&arity=<n>]`
+### `GET /source?class=<FQN>[&method=<name>][&paramTypes=<types>]`
 
 Returns source code as `text/plain` with `X-File`, `X-Start-Line`, `X-End-Line` headers. Without `method`, returns the full class source. With `method`, returns method source (or all overloads if multiple match).
 
 ## Testing
 
 ### `GET /test?class=<FQN>[&method=<name>][&timeout=<sec>][&no-refresh]`
+
 ### `GET /test?project=<name>[&package=<pkg>][&timeout=<sec>][&no-refresh]`
 
 Run JUnit tests via Eclipse's built-in runner. By default, refreshes the project from disk and waits for auto-build before launching. Returns summary and failure details.
@@ -95,7 +98,7 @@ Organize imports using Eclipse project settings. Returns `{"added":N,"removed":N
 
 Format a Java file using Eclipse project formatter settings. Returns `{"modified":true/false}`.
 
-### `GET /rename?class=<FQN>&newName=<name>[&method=<old>][&field=<old>][&arity=<n>]`
+### `GET /rename?class=<FQN>&newName=<name>[&method=<old>][&field=<old>][&paramTypes=<types>]`
 
 Rename a type, method, or field. Updates all references across the workspace.
 
@@ -109,7 +112,7 @@ Move a type to another package. Creates the target package if it doesn't exist. 
 
 Returns the file and cursor line of the currently active Eclipse editor.
 
-### `GET /open?class=<FQN>[&method=<name>][&arity=<n>]`
+### `GET /open?class=<FQN>[&method=<name>][&paramTypes=<types>]`
 
 Open a type or method in the Eclipse editor.
 
