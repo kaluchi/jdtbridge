@@ -29,7 +29,9 @@ public class HttpServer {
     private final RefactoringHandler refactoring =
             new RefactoringHandler();
     private final EditorHandler editor = new EditorHandler();
-    private final LaunchHandler launch = new LaunchHandler();
+    private final LaunchTracker launchTracker = new LaunchTracker();
+    private final LaunchHandler launch =
+            new LaunchHandler(launchTracker);
     private final TestHandler testHandler = new TestHandler();
     private final ProjectHandler projectInfo = new ProjectHandler();
     private final ConfigService configService =
@@ -63,6 +65,7 @@ public class HttpServer {
     }
 
     public void start() throws IOException {
+        launchTracker.start();
         serverSocket = new ServerSocket(
                 0, 50, InetAddress.getLoopbackAddress());
         running = true;
@@ -81,6 +84,7 @@ public class HttpServer {
     }
 
     public void stop() {
+        launchTracker.stop();
         running = false;
         try {
             if (serverSocket != null) serverSocket.close();
@@ -282,6 +286,8 @@ public class HttpServer {
                         launch.handleRun(params));
                 case "/launch/stop" -> Response.json(
                         launch.handleStop(params));
+                case "/launch/diag" -> Response.json(
+                        launchTracker.handleDiag());
                 default -> Response.json(Json.error(
                         "Unknown path: " + path));
             };

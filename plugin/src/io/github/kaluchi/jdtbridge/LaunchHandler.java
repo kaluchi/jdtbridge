@@ -7,13 +7,17 @@ import org.eclipse.debug.core.ILaunch;
 import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.debug.core.ILaunchManager;
 import org.eclipse.debug.core.model.IProcess;
-import org.eclipse.debug.core.model.IStreamMonitor;
-import org.eclipse.debug.core.model.IStreamsProxy;
 
 /**
  * Handlers for launch management: list launches, read console output.
  */
 class LaunchHandler {
+
+    private final LaunchTracker tracker;
+
+    LaunchHandler(LaunchTracker tracker) {
+        this.tracker = tracker;
+    }
 
     private ILaunchManager launchManager() {
         return DebugPlugin.getDefault().getLaunchManager();
@@ -22,46 +26,62 @@ class LaunchHandler {
     String handleList(Map<String, String> params) {
         ILaunch[] launches = launchManager().getLaunches();
         Json arr = Json.array();
+        var seen = new java.util.HashSet<String>();
+
+        // Launches from the manager (newest first)
         for (int i = launches.length - 1; i >= 0; i--) {
             ILaunch launch = launches[i];
             String name = launchName(launch);
-            String type = launchType(launch);
-            String mode = launch.getLaunchMode();
-            boolean terminated = launch.isTerminated();
-
-            Json entry = Json.object()
-                    .put("name", name)
-                    .put("type", type)
-                    .put("mode", mode)
-                    .put("terminated", terminated);
-
-            String startedAt = launch.getAttribute(
-                    DebugPlugin.ATTR_LAUNCH_TIMESTAMP);
-            if (startedAt != null) {
-                try {
-                    entry.put("started",
-                            Long.parseLong(startedAt));
-                } catch (NumberFormatException e) { /* skip */ }
-            }
-
-            IProcess[] processes = launch.getProcesses();
-            if (processes.length > 0) {
-                IProcess proc = processes[0];
-                if (terminated) {
-                    try {
-                        entry.put("exitCode", proc.getExitValue());
-                    } catch (Exception e) { /* ignored */ }
-                }
-                String pid = proc.getAttribute(
-                        IProcess.ATTR_PROCESS_ID);
-                if (pid != null) {
-                    entry.put("pid", pid);
-                }
-            }
-
-            arr.add(entry);
+            seen.add(name);
+            arr.add(launchEntry(launch, name));
         }
+
+        // Tracked launches not in the manager (disappeared)
+        for (var entry : tracker.all().entrySet()) {
+            if (seen.contains(entry.getKey())) continue;
+            LaunchTracker.TrackedLaunch tl = entry.getValue();
+            arr.add(launchEntry(tl.launch, entry.getKey()));
+        }
+
         return arr.toString();
+    }
+
+    private Json launchEntry(ILaunch launch, String name) {
+        String type = launchType(launch);
+        String mode = launch.getLaunchMode();
+        boolean terminated = launch.isTerminated();
+
+        Json entry = Json.object()
+                .put("name", name)
+                .put("type", type)
+                .put("mode", mode)
+                .put("terminated", terminated);
+
+        String startedAt = launch.getAttribute(
+                DebugPlugin.ATTR_LAUNCH_TIMESTAMP);
+        if (startedAt != null) {
+            try {
+                entry.put("started",
+                        Long.parseLong(startedAt));
+            } catch (NumberFormatException e) { /* skip */ }
+        }
+
+        IProcess[] processes = launch.getProcesses();
+        if (processes.length > 0) {
+            IProcess proc = processes[0];
+            if (terminated) {
+                try {
+                    entry.put("exitCode", proc.getExitValue());
+                } catch (Exception e) { /* ignored */ }
+            }
+            String pid = proc.getAttribute(
+                    IProcess.ATTR_PROCESS_ID);
+            if (pid != null) {
+                entry.put("pid", pid);
+            }
+        }
+
+        return entry;
     }
 
     String handleConfigs(Map<String, String> params) {
@@ -151,15 +171,35 @@ class LaunchHandler {
         String name = params.get("name");
         ILaunch[] launches = launchManager().getLaunches();
         int removed = 0;
+        var cleared = new java.util.HashSet<String>();
+
+        // Remove terminated launches from the manager
         for (ILaunch launch : launches) {
             if (!launch.isTerminated()) continue;
+            String lName = launchName(launch);
             if (name != null && !name.isBlank()
-                    && !name.equals(launchName(launch))) {
+                    && !name.equals(lName)) {
                 continue;
             }
             launchManager().removeLaunch(launch);
+            tracker.remove(lName);
+            cleared.add(lName);
             removed++;
         }
+
+        // Remove tracked entries not in the manager
+        for (var entry : tracker.all().entrySet()) {
+            if (cleared.contains(entry.getKey())) continue;
+            if (name != null && !name.isBlank()
+                    && !name.equals(entry.getKey())) {
+                continue;
+            }
+            if (entry.getValue().terminated) {
+                tracker.remove(entry.getKey());
+                removed++;
+            }
+        }
+
         return Json.object()
                 .put("removed", removed)
                 .toString();
@@ -226,6 +266,12 @@ class LaunchHandler {
         return null;
     }
 
+    /**
+     * Read console output for a launch. The tracker (IStreamMonitor
+     * listeners) is the primary source — it survives ILaunch removal
+     * from the manager and works even when IStreamsProxy.getContents()
+     * is empty (ProcessConsole calls setBuffered(false)).
+     */
     String handleConsole(Map<String, String> params) {
         String name = params.get("name");
         if (name == null || name.isBlank()) {
@@ -235,42 +281,23 @@ class LaunchHandler {
         String tailStr = params.get("tail");
         String stream = params.get("stream");
 
-        ILaunch target = findLaunch(name);
-        if (target == null) {
-            return Json.error("Launch not found: " + name);
-        }
-
-        IProcess[] processes = target.getProcesses();
-        if (processes.length == 0) {
-            return Json.error("No process for launch: " + name);
-        }
-
-        StringBuilder output = new StringBuilder();
-        for (IProcess proc : processes) {
-            IStreamsProxy proxy = proc.getStreamsProxy();
-            if (proxy != null) {
-                if (!"stderr".equals(stream)) {
-                    appendStream(
-                            proxy.getOutputStreamMonitor(),
-                            output);
-                }
-                if (!"stdout".equals(stream)) {
-                    appendStream(
-                            proxy.getErrorStreamMonitor(),
-                            output);
-                }
+        // Primary: tracker (survives ILaunch removal from manager)
+        LaunchTracker.TrackedLaunch tl = tracker.get(name);
+        if (tl == null) {
+            // Launch exists in manager but tracker missed it?
+            ILaunch target = findLaunch(name);
+            if (target == null) {
+                return Json.error("Launch not found: " + name);
             }
+            return Json.object()
+                    .put("name", name)
+                    .put("terminated", target.isTerminated())
+                    .put("output", "")
+                    .toString();
         }
 
-        // Fallback: read from UI console if streams were empty
-        if (output.isEmpty()) {
-            String consoleText = readProcessConsole(processes[0]);
-            if (consoleText != null) {
-                output.append(consoleText);
-            }
-        }
-
-        String result = output.toString();
+        String output = tl.getOutput(stream);
+        String result = output;
         if (tailStr != null) {
             try {
                 int tailLines = Integer.parseInt(tailStr);
@@ -279,8 +306,8 @@ class LaunchHandler {
         }
 
         return Json.object()
-                .put("name", launchName(target))
-                .put("terminated", target.isTerminated())
+                .put("name", name)
+                .put("terminated", tl.terminated)
                 .put("output", result)
                 .toString();
     }
@@ -296,38 +323,6 @@ class LaunchHandler {
         return null;
     }
 
-    @SuppressWarnings("restriction")
-    private String readProcessConsole(IProcess process) {
-        try {
-            var consoles = org.eclipse.ui.console.ConsolePlugin
-                    .getDefault().getConsoleManager().getConsoles();
-            for (var console : consoles) {
-                if (console instanceof
-                        org.eclipse.debug.internal.ui.views
-                                .console.ProcessConsole pc) {
-                    if (pc.getProcess() == process) {
-                        var doc = pc.getDocument();
-                        if (doc != null) {
-                            return doc.get();
-                        }
-                    }
-                }
-            }
-        } catch (Throwable e) {
-            // UI console not available
-        }
-        return null;
-    }
-
-    private void appendStream(IStreamMonitor monitor,
-            StringBuilder sb) {
-        if (monitor == null) return;
-        String contents = monitor.getContents();
-        if (contents != null && !contents.isEmpty()) {
-            sb.append(contents);
-        }
-    }
-
     private String tail(String text, int lines) {
         if (lines <= 0) return text;
         int pos = text.length();
@@ -337,7 +332,7 @@ class LaunchHandler {
         return pos <= 0 ? text : text.substring(pos + 1);
     }
 
-    private static String launchName(ILaunch launch) {
+    static String launchName(ILaunch launch) {
         ILaunchConfiguration config =
                 launch.getLaunchConfiguration();
         if (config != null) return config.getName();

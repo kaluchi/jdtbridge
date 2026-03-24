@@ -1,5 +1,6 @@
 package io.github.kaluchi.jdtbridge;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -25,6 +26,15 @@ public class Activator implements BundleActivator {
 
     @Override
     public void start(BundleContext context) throws Exception {
+        // Skip server in test environments (Tycho surefire)
+        String workspace = ResourcesPlugin.getWorkspace().getRoot()
+                .getLocation().toOSString();
+        if (workspace.contains("target" + File.separator
+                + "work")) {
+            Log.info("Test environment detected — skipping server");
+            return;
+        }
+
         String token = generateToken();
 
         server = new HttpServer();

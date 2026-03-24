@@ -10,6 +10,8 @@ import java.util.Map;
 import org.eclipse.debug.core.DebugPlugin;
 import org.eclipse.debug.core.ILaunch;
 import org.eclipse.debug.core.ILaunchManager;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -22,7 +24,18 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
         matches = "true")
 public class LaunchHandlerTest {
 
-    private final LaunchHandler handler = new LaunchHandler();
+    private final LaunchTracker tracker = new LaunchTracker();
+    private final LaunchHandler handler = new LaunchHandler(tracker);
+
+    @BeforeEach
+    void startTracker() {
+        tracker.start();
+    }
+
+    @AfterEach
+    void stopTracker() {
+        tracker.stop();
+    }
 
     @Nested
     class List {
@@ -276,11 +289,11 @@ public class LaunchHandlerTest {
                 assertTrue(listJson.contains("\"terminated\""),
                         "Should have terminated: " + listJson);
 
-                // Console should have output
-                // Launch has no config name, so label is
-                // process label
+                // Console should return valid JSON
                 String consoleJson = handler.handleConsole(
                         Map.of("name", "java -version"));
+                assertFalse(consoleJson.contains("error"),
+                        "Should not error: " + consoleJson);
                 assertTrue(
                         consoleJson.contains("\"output\""),
                         "Should have output: " + consoleJson);
@@ -331,8 +344,8 @@ public class LaunchHandlerTest {
     class ConsoleWithEmptyStreams {
 
         @Test
-        void emptyStreamsDoNotCrash() throws Exception {
-            // Launch with no process — "No process for launch"
+        void launchWithNoProcessReturnsEmptyOutput()
+                throws Exception {
             ILaunchManager mgr =
                     DebugPlugin.getDefault().getLaunchManager();
             ILaunch launch = new org.eclipse.debug.core.Launch(
@@ -341,8 +354,10 @@ public class LaunchHandlerTest {
             try {
                 String json = handler.handleConsole(
                         Map.of("name", "(unknown)"));
-                assertTrue(json.contains("No process"),
-                        "Should say no process: " + json);
+                assertFalse(json.contains("error"),
+                        "Should not error: " + json);
+                assertTrue(json.contains("\"output\":\"\""),
+                        "Should have empty output: " + json);
             } finally {
                 mgr.removeLaunch(launch);
             }
