@@ -1,14 +1,23 @@
 # JDT Bridge — Agent Instructions
 
+## Prerequisites
+
+Required tools (verified by `jdt setup --check`):
+- **Node.js** >= 20, **npm** — CLI runtime
+- **Java** >= 21, **Maven** >= 3.9 — plugin build (Tycho)
+- **Eclipse IDE** — running, with JDT Bridge plugin installed
+- **git**, **gh** (GitHub CLI) — version control, PRs, releases
+
 ## Environment check (REQUIRED)
 
-**MUST run these checks at the start of every conversation, before any other work.** Do not skip this even if the user's request seems unrelated — the `jdt` CLI is central to this project and must be verified working.
+**MUST run at the start of every conversation, before any other work.**
 
-1. **Check if `jdt` CLI is available:** run `jdt setup --check`
-   - If the command is not found: `cd cli && npm install && npm link`
-   - If the plugin is not installed or Eclipse path is unknown: `jdt setup --eclipse <path>`
-   - If Eclipse is not running: start it, then run `jdt setup --check` again
-2. **Check if `jdtbridge.target` exists** in the repo root. If missing, create it pointing to the local Eclipse installation:
+1. Run `jdt setup --check` — verifies CLI, Node, Java, Maven, Eclipse, bridge
+   - Command not found → `cd cli && npm install && npm link`
+   - Plugin not installed → `jdt setup --eclipse <path>`
+   - Eclipse not running → start it, re-run check
+2. Verify `jdtbridge.target` exists in repo root (gitignored, per-developer).
+   If missing, create it pointing to the local Eclipse directory:
    ```xml
    <?xml version="1.0" encoding="UTF-8" standalone="no"?>
    <?pde version="3.8"?>
@@ -18,28 +27,27 @@
        </locations>
    </target>
    ```
-   This file is gitignored per-user — each developer points it to their own Eclipse.
-3. **Verify bridge is live:** `jdt projects` should list workspace projects.
-
-If all checks pass, you have full semantic Java analysis available — use it.
+3. Run `jdt projects` — should list workspace projects.
 
 ## Use `jdt` for Java analysis
 
-The `jdt` CLI gives you the same semantic understanding of Java code that a developer has in Eclipse. **Prefer `jdt` over grep/glob for Java-specific queries:**
+**Prefer `jdt` over grep/glob for Java-specific queries.** Grep returns
+string matches; `jdt` returns semantic results from Eclipse's compiler index.
 
-| Task | Use `jdt` | Not grep |
-|------|-----------|----------|
-| Find call sites | `jdt refs <FQN>#<method>` | grep returns string matches, comments, identically-named methods |
-| Check compilation | `jdt errors --project <name>` | Maven takes 30-90s, jdt is instant |
-| Trigger build | `jdt build --project <name> [--clean]` | `mvn compile` has 30s+ overhead |
-| Read library source | `jdt source <FQN>` | Library sources are inside JARs — grep can't reach them |
-| Type hierarchy | `jdt hierarchy <FQN>` | grep for "extends/implements" misses transitive hierarchy |
-| Run single test | `jdt test <FQN>#<method>` | Maven Surefire has 30s+ lifecycle overhead |
-| Class overview | `jdt type-info <FQN>` | Reading a 600-line file wastes context |
+Run `jdt help` for the full command list. Key examples:
+
+```bash
+jdt refs <FQMN>                  # find call sites (not string matches)
+jdt source <FQMN>               # read source — including library JARs
+jdt type-info <FQN>              # class overview without reading 600 lines
+jdt test <FQN>#<method>          # run one test method (not full Maven lifecycle)
+jdt errors --project <name>      # instant compilation check
+jdt build --project <name>       # incremental build (1-3s, not 40s Maven)
+```
 
 ### FQMN (Fully Qualified Method Name)
 
-Commands that accept methods support FQMN notation — class and method in one argument:
+Commands that accept methods support FQMN — class and method in one argument:
 
 ```
 pkg.Class#method              any overload
@@ -48,126 +56,92 @@ pkg.Class#method(String)      specific signature
 pkg.Class.method(String)      Eclipse Copy Qualified Name style
 ```
 
-Parameter types can be simple names (`String`) or FQN (`java.lang.String`).
-Generics are stripped for matching: `List<String>` matches `List`.
-
-### Key commands
-
-```
-jdt projects                              list workspace projects
-jdt project-info <name>                   project overview (packages, types, methods)
-jdt find <Name|*Pattern*|pkg> [--source-only] find types by name, wildcard, or package
-jdt refs <FQMN> [--field <name>]          references to type/method/field
-jdt subtypes <FQN>                        all subtypes/implementors
-jdt hierarchy <FQN>                       supers + interfaces + subtypes
-jdt impl <FQMN>                           implementations of interface method
-jdt type-info <FQN>                       class overview (fields, methods, signatures)
-jdt source <FQMN>                         type or method source code (project + libraries)
-jdt build [--project <name>] [--clean]    build project (incremental or clean)
-jdt test <FQMN>                           run JUnit test
-jdt errors [--project <name>]             compilation errors
-jdt format <file>                         format with Eclipse settings
-jdt organize-imports <file>               organize imports
-jdt rename <FQMN> <newName>               rename type/method/field
-jdt open <FQMN>                           open in Eclipse editor
-```
-
-Run `jdt help <command>` for detailed flags and examples.
+Types can be simple (`String`) or FQN (`java.lang.String`).
+Generics are stripped: `List<String>` matches `List`.
 
 ### Pipe composability
 
-`jdt` output flows through the shell — filter it to save context:
-
 ```bash
-jdt ti io.github.kaluchi.jdtbridge.SearchHandler | grep handle   # 26 methods → just the 8 handlers
+jdt ti io.github.kaluchi.jdtbridge.SearchHandler | grep handle   # 26 methods → 8 handlers
 jdt refs io.github.kaluchi.jdtbridge.JdtUtils#findMethod | wc -l # count, not 51 lines
 jdt errors --project my-server | head -5                         # one error at a time
-jdt src org.springframework.jdbc.core.JdbcTemplate#query | grep -n throw  # find throws in library code
+jdt src org.springframework.jdbc.core.JdbcTemplate#query | grep -n throw  # throws in library code
 ```
 
 ## Project structure
 
-```
-├── cli/                   # Node.js CLI (jdt command)
-│   ├── src/               # CLI source (ESM)
-│   └── test/              # CLI tests (vitest)
-├── plugin/                # Eclipse plugin (Java, OSGi bundle)
-├── plugin.tests/          # Plugin tests (JUnit 5 Jupiter, Fragment-Host)
-├── feature/               # Eclipse feature for p2
-├── site/                  # Eclipse update site
-├── pom.xml                # Parent POM (Tycho 5.0.2 reactor)
-├── jdtbridge.target       # Local target platform (gitignored, per-developer)
-└── jdtbridge-ci.target    # CI target platform (p2, download.eclipse.org)
-```
+See [README.md](README.md) for full overview. Key directories:
+- `cli/src/` — Node.js CLI (ESM, `.mjs`)
+- `plugin/src/` — Eclipse plugin (Java, OSGi)
+- `plugin.tests/src/` — Plugin tests (JUnit 5, Fragment-Host of plugin)
+- `scripts/release.mjs` — release automation
 
-## Building
+## Development workflow
 
-```bash
-# Local build (uses your Eclipse as target platform)
-mvn clean verify
+### `jdt build` vs `mvn verify`
 
-# CI build (downloads Eclipse from p2 — no local Eclipse needed)
-mvn clean verify -Pci
+| | `jdt build` | `mvn clean verify` |
+|---|---|---|
+| What | Eclipse incremental compiler | Tycho full build |
+| Speed | 1-3 seconds | 40-60 seconds |
+| Tests | No | Unit + integration |
+| Output | Compiled classes in Eclipse | p2 site in `site/target/` |
+| When | Quick iteration while coding | Before commit, before `jdt setup` |
 
-# CLI tests only
-cd cli && npm test
-```
+For CI without local Eclipse: `mvn clean verify -Pci` (uses p2 target platform).
 
-### Installing plugin into Eclipse
+### Making changes
 
-After `mvn clean verify` has built the p2 site, install without rebuilding:
+1. **Create a branch** — never commit directly to master
+2. **Write code + tests** — every change needs tests
+3. **Build incrementally** — plugin first, tests second:
+   ```bash
+   jdt build --project io.github.kaluchi.jdtbridge
+   jdt build --project io.github.kaluchi.jdtbridge.tests
+   jdt test --project io.github.kaluchi.jdtbridge.tests
+   ```
+4. **Full Tycho build** — `mvn clean verify`
+5. **Install and verify live** — `jdt setup --skip-build`, then test
+6. **Check ALL docs** if CLI syntax or API changed:
+   - `cli/src/cli.mjs` (`jdt help` output)
+   - `cli/src/commands/*.mjs` (per-command help)
+   - `README.md`, `cli/README.md`, `plugin/README.md`, this file
+7. **Commit → push → PR → squash merge → delete branch**
 
-```bash
-jdt setup --skip-build          # uses last mvn build, skips redundant rebuild
-```
+### Important details
 
-**IMPORTANT:** `jdt setup` (without `--skip-build`) triggers a full Maven build
-internally. If you already ran `mvn clean verify`, always use `--skip-build`
-to avoid building twice.
+- **New Java files invisible until build.** `jdt test` says "Type not found"
+  → run `jdt build` for the project first.
+- **Build order matters.** `plugin.tests` is a Fragment-Host of `plugin` —
+  sees package-private members, but must build after plugin.
+- **`jdt setup --skip-build` restarts Eclipse.** Port changes. `jdt` commands
+  auto-discover the new port, but raw `curl` URLs break.
+- **`jdt setup` without `--skip-build` runs Maven internally.**
+  After `mvn clean verify`, always add `--skip-build` — never build twice.
 
-### Target platform
+### Test infrastructure
 
-- `jdtbridge.target` — points to your local Eclipse directory. Each developer creates their own. Gitignored.
-- `jdtbridge-ci.target` — points to `download.eclipse.org/eclipse/updates/4.39/`. Used by CI profile (`-Pci`).
-- The `ci` Maven profile switches between them via `${target.file}` property.
-
-## Testing
-
-### Plugin tests (JUnit 5 Jupiter)
-
-- **Unit tests** (5 classes): run everywhere — Tycho, Eclipse, `jdt test`
-- **Integration tests** (7 classes, `*IntegrationTest`): gated by `@EnabledIfSystemProperty(named="jdtbridge.integration-tests")`, only run in `mvn verify` (Tycho sets the property)
-
-```bash
-# All tests via Tycho (unit + integration)
-mvn clean verify
-
-# Unit tests only via jdt (fast, no build needed)
-jdt test --project io.github.kaluchi.jdtbridge.tests
-```
-
-### CLI tests (vitest)
-
-```bash
-cd cli && npm test
-```
+- **CLI tests:** `cd cli && npm test` (vitest)
+- **Plugin unit tests:** `jdt test --project io.github.kaluchi.jdtbridge.tests`
+- **Integration tests:** `mvn clean verify` only — use `@EnabledIfSystemProperty(named = "jdtbridge.integration-tests", matches = "true")`
+- **Test fixture:** `TestFixture.java` creates a project with known classes —
+  `test.model.Animal`, `Dog`, `Cat`, `test.edge.Calculator` (overloads),
+  `Repository` (generics). Add new test types there.
 
 ## Releasing
 
-Use the release script in `scripts/release.mjs`. It bumps versions everywhere
-(Tycho + npm), builds, tests, commits, tags, and pushes. CI then deploys
-automatically (npm publish, p2 site, GitHub Release).
-
 ```bash
-node scripts/release.mjs 1.3.0          # full release: bump + build + tag + push
-node scripts/release.mjs 1.3.0 --dry    # bump + build, no commit/tag/push
-node scripts/release.mjs 1.3.0 --bump   # bump versions only, no build
+node scripts/release.mjs 1.4.0          # bump + build + tag + push
+node scripts/release.mjs 1.4.0 --dry    # bump + build only
+node scripts/release.mjs 1.4.0 --bump   # bump versions only
 ```
 
-The script requires: clean working tree, master branch, tag must not exist.
+Requires: clean working tree, master branch, tag must not exist.
+CI deploys automatically: npm publish, p2 site, GitHub Release.
 
-## Code style
+## Conventions
 
-- Java: Eclipse formatter settings (use `jdt format <file>` to auto-format)
-- JavaScript: ESM modules (.mjs), no TypeScript
-- Commit messages: imperative mood, concise ("Add X", "Fix Y", not "Added X")
+- Java: Eclipse formatter (`jdt format <file>`)
+- JavaScript: ESM (`.mjs`), no TypeScript
+- Commits: imperative mood ("Add X", "Fix Y"), Co-Authored-By in message
+- PRs: no "Generated with Claude Code" in body — Co-Authored-By is enough
