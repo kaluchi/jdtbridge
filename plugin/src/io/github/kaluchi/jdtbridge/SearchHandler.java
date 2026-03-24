@@ -36,10 +36,11 @@ class SearchHandler {
 
     String handleProjects() throws Exception {
         Json arr = Json.array();
-        for (IJavaProject p : JavaCore.create(
-                ResourcesPlugin.getWorkspace().getRoot())
-                .getJavaProjects()) {
-            arr.add(p.getElementName());
+        for (var p : ResourcesPlugin.getWorkspace().getRoot()
+                .getProjects()) {
+            if (p.isOpen() && !p.getName().startsWith(".")) {
+                arr.add(p.getName());
+            }
         }
         return arr.toString();
     }
