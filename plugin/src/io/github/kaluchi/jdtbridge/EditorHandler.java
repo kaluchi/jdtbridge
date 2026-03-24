@@ -2,69 +2,79 @@ package io.github.kaluchi.jdtbridge;
 
 import java.util.Map;
 
+import org.eclipse.core.resources.IFile;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.ui.JavaUI;
-import org.eclipse.jface.text.ITextSelection;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.ui.IEditorPart;
+import org.eclipse.ui.IEditorReference;
 import org.eclipse.ui.IFileEditorInput;
+import org.eclipse.ui.IWorkbenchPage;
+import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.PlatformUI;
 
 /**
- * Handlers for Eclipse editor interaction: active-editor, open.
+ * Handlers for Eclipse editor interaction: editors list, open.
  */
 class EditorHandler {
 
-    String handleActiveEditor(Map<String, String> params) throws Exception {
-        String[] result = {Json.error("Failed to query editor")};
-        Display.getDefault().syncExec(() -> {
+    String handleEditors(Map<String, String> params) throws Exception {
+        String[] result = {"[]"};
+        Runnable query = () -> {
             try {
-                var window = PlatformUI.getWorkbench()
+                IWorkbenchWindow window = PlatformUI.getWorkbench()
                         .getActiveWorkbenchWindow();
                 if (window == null
                         || window.getActivePage() == null) {
-                    result[0] = Json.object()
-                            .put("file", (String) null).toString();
-                    return;
-                }
-                IEditorPart editor =
-                        window.getActivePage().getActiveEditor();
-                if (editor == null) {
-                    result[0] = Json.object()
-                            .put("file", (String) null).toString();
                     return;
                 }
 
-                String file = null;
-                var input = editor.getEditorInput();
-                if (input instanceof IFileEditorInput fileInput) {
-                    file = fileInput.getFile().getFullPath().toString();
-                }
+                IWorkbenchPage page = window.getActivePage();
+                IEditorReference[] refs =
+                        page.getEditorReferences();
+                IEditorPart active = page.getActiveEditor();
 
-                int line = -1;
-                var sp = editor.getSite().getSelectionProvider();
-                if (sp != null) {
-                    var sel = sp.getSelection();
-                    if (sel instanceof ITextSelection ts) {
-                        line = ts.getStartLine() + 1;
+                Json arr = Json.array();
+                if (active != null) {
+                    addEditorEntry(active.getEditorInput(), arr);
+                }
+                for (IEditorReference ref : refs) {
+                    IEditorPart editor = ref.getEditor(false);
+                    if (editor != null && editor == active)
+                        continue;
+                    try {
+                        addEditorEntry(ref.getEditorInput(), arr);
+                    } catch (Exception ignored) {
+                        // Skip editors that can't provide input
                     }
                 }
-
-                if (file != null) {
-                    result[0] = Json.object()
-                            .put("file", file)
-                            .put("line", line).toString();
-                } else {
-                    result[0] = Json.object()
-                            .put("file", (String) null).toString();
-                }
+                result[0] = arr.toString();
             } catch (Exception e) {
-                result[0] = Json.error(e.getMessage());
+                // No workbench — return empty array
             }
-        });
+        };
+        Display display = Display.getCurrent();
+        if (display != null) {
+            query.run();
+        } else {
+            try {
+                Display.getDefault().syncExec(query);
+            } catch (Exception e) {
+                // Headless — no Display thread
+            }
+        }
         return result[0];
+    }
+
+    private void addEditorEntry(
+            org.eclipse.ui.IEditorInput input, Json arr) {
+        if (!(input instanceof IFileEditorInput fi)) return;
+        IFile file = fi.getFile();
+        if (file.getLocation() == null) return;
+        arr.add(Json.object()
+                .put("file", file.getLocation().toOSString()));
     }
 
     String handleOpen(Map<String, String> params) throws Exception {

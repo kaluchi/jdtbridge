@@ -108,9 +108,9 @@ Move a type to another package. Creates the target package if it doesn't exist. 
 
 ## Editor
 
-### `GET /active-editor`
+### `GET /editors`
 
-Returns the file and cursor line of the currently active Eclipse editor.
+Returns all open editors as a JSON array. Active editor first, then tab order. Files are absolute OS paths.
 
 ### `GET /open?class=<FQN>[&method=<name>][&paramTypes=<types>]`
 

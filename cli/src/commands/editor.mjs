@@ -1,17 +1,18 @@
 import { get } from "../client.mjs";
 import { extractPositional, parseFlags, parseFqmn } from "../args.mjs";
-import { stripProject } from "../paths.mjs";
 
-export async function activeEditor() {
-  const result = await get("/active-editor");
-  if (result.error) {
-    console.error(result.error);
+export async function editors() {
+  const results = await get("/editors");
+  if (results.error) {
+    console.error(results.error);
     process.exit(1);
   }
-  if (result.file === null) {
-    console.log("(no file open)");
-  } else {
-    console.log(`${stripProject(result.file)}:${result.line}`);
+  if (results.length === 0) {
+    console.log("(no open editors)");
+    return;
+  }
+  for (const r of results) {
+    console.log(r.file);
   }
 }
 
@@ -38,9 +39,11 @@ export async function open(args) {
   console.log("Opened");
 }
 
-export const activeEditorHelp = `Show the file and cursor line of the active Eclipse editor.
+export const editorsHelp = `List all open editors in Eclipse. Active editor first.
 
-Usage:  jdt active-editor`;
+Usage:  jdt editors
+
+Output: absolute file paths, one per line.`;
 
 export const openHelp = `Open a type or method in the Eclipse editor.
 

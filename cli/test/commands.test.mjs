@@ -195,24 +195,28 @@ describe("commands (integration)", () => {
     expect(io.logs[0]).toBe("Moved");
   });
 
-  it("active-editor shows file:line", async () => {
+  it("editors lists open files", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ file: "/m8-server/src/Foo.java", line: 42 }));
+      res.end(JSON.stringify([
+        { file: "D:/projects/src/Foo.java" },
+        { file: "D:/projects/src/Bar.java" },
+      ]));
     });
-    const { activeEditor } = await import("../src/commands/editor.mjs");
-    await activeEditor();
-    expect(io.logs[0]).toBe("m8-server/src/Foo.java:42");
+    const { editors } = await import("../src/commands/editor.mjs");
+    await editors();
+    expect(io.logs[0]).toBe("D:/projects/src/Foo.java");
+    expect(io.logs[1]).toBe("D:/projects/src/Bar.java");
   });
 
-  it("active-editor shows no file open", async () => {
+  it("editors shows empty message", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ file: null }));
+      res.end("[]");
     });
-    const { activeEditor } = await import("../src/commands/editor.mjs");
-    await activeEditor();
-    expect(io.logs[0]).toBe("(no file open)");
+    const { editors } = await import("../src/commands/editor.mjs");
+    await editors();
+    expect(io.logs[0]).toBe("(no open editors)");
   });
 
   it("open shows Opened", async () => {
@@ -527,10 +531,10 @@ describe("commands (integration)", () => {
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
-  it("active-editor exits on server error", async () => {
+  it("editors exits on server error", async () => {
     await setupMock(errorServer());
-    const { activeEditor } = await import("../src/commands/editor.mjs");
-    await expect(activeEditor()).rejects.toThrow("exit(1)");
+    const { editors } = await import("../src/commands/editor.mjs");
+    await expect(editors()).rejects.toThrow("exit(1)");
     expect(io.errors[0]).toContain("Something went wrong");
   });
 

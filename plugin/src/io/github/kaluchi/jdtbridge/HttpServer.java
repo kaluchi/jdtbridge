@@ -265,8 +265,8 @@ public class HttpServer {
                         refactoring.handleMove(params));
                 case "/test" -> Response.json(
                         testHandler.handleTest(params));
-                case "/active-editor" -> Response.json(
-                        editor.handleActiveEditor(params));
+                case "/editors" -> Response.json(
+                        editor.handleEditors(params));
                 case "/open" -> Response.json(
                         editor.handleOpen(params));
                 default -> Response.json(Json.error(

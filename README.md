@@ -123,7 +123,7 @@ Most commands have short aliases for quick typing.
 | `rename <FQMN> <new>` | | Rename type, method, or field across workspace |
 | `move <FQN> <package>` | | Move type to another package |
 | `open <FQMN>` | | Open in Eclipse editor |
-| `active-editor` | `ae` | Current file and cursor position |
+| `editors` | `ed` | List all open editors (absolute paths) |
 | `setup [--check\|--remove]` | | Install, check, or remove Eclipse plugin |
 
 Run `jdt help <command>` for detailed flags and options.

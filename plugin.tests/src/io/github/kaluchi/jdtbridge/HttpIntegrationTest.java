@@ -215,6 +215,8 @@ public class HttpIntegrationTest {
         return response;
     }
 
+    // /editors requires Display thread — tested live, not in headless CI
+
     private String rawRequest(String requestLine, String... headers)
             throws Exception {
         try (Socket socket = new Socket("localhost", port)) {

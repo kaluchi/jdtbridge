@@ -24,9 +24,9 @@ import {
   moveHelp,
 } from "./commands/refactoring.mjs";
 import {
-  activeEditor,
+  editors,
   open,
-  activeEditorHelp,
+  editorsHelp,
   openHelp,
 } from "./commands/editor.mjs";
 import { setup, help as setupHelp } from "./commands/setup.mjs";
@@ -53,7 +53,7 @@ const commands = {
   format: { fn: format, help: formatHelp },
   rename: { fn: rename, help: renameHelp },
   move: { fn: move, help: moveHelp },
-  "active-editor": { fn: activeEditor, help: activeEditorHelp },
+  editors: { fn: editors, help: editorsHelp },
   open: { fn: open, help: openHelp },
   setup: { fn: setup, help: setupHelp },
 };
@@ -67,7 +67,7 @@ const aliases = {
   pi: "project-info",
   ti: "type-info",
   oi: "organize-imports",
-  ae: "active-editor",
+  ed: "editors",
   src: "source",
   b: "build",
   err: "errors",
@@ -121,7 +121,7 @@ Refactoring:
   move <FQN> <target.package>                 move type to another package
 
 Editor:
-  active-editor${fmtAliases("active-editor")}                               current file and cursor line
+  editors${fmtAliases("editors")}                                    list open editors (absolute paths)
   open <FQMN>                                 open in Eclipse editor
 
 Setup:

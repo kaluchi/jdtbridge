@@ -74,7 +74,7 @@ jdt move <FQN> <target.package>                        # move type to another pa
 ### Editor
 
 ```bash
-jdt active-editor                                      # (alias: ae) current file and cursor line
+jdt editors                                             # (alias: ed) list all open editors (absolute paths)
 jdt open <FQMN>                                        # open in Eclipse editor
 ```
 
