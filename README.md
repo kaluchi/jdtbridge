@@ -126,6 +126,8 @@ Most commands have short aliases for quick typing.
 | `editors` | `ed` | List all open editors (absolute paths) |
 | `launch list` | | List launches (running + terminated) |
 | `launch configs` | | List saved launch configurations (MRU order) |
+| `launch run <config>` | | Launch a configuration |
+| `launch stop <name>` | | Stop a running launch |
 | `launch console <name>` | | Show console output of a launch |
 | `launch clear [name]` | | Remove terminated launches |
 | `setup [--check\|--remove]` | | Install, check, or remove Eclipse plugin |

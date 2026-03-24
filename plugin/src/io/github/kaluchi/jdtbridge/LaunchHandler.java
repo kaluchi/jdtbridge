@@ -66,28 +66,31 @@ class LaunchHandler {
 
     String handleConfigs(Map<String, String> params) {
         try {
-            // Try to get MRU-ordered history from UI layer
+            var allConfigs =
+                    launchManager().getLaunchConfigurations();
             ILaunchConfiguration[] recent = getRecentConfigs();
-            if (recent != null && recent.length > 0) {
-                Json arr = Json.array();
+
+            // Recent first, then remaining alphabetically
+            Json arr = Json.array();
+            var seen = new java.util.HashSet<String>();
+
+            if (recent != null) {
                 for (var config : recent) {
                     arr.add(Json.object()
                             .put("name", config.getName())
                             .put("type",
                                     config.getType().getName()));
+                    seen.add(config.getName());
                 }
-                return arr.toString();
             }
 
-            // Fallback: all configs alphabetically
-            var configs =
-                    launchManager().getLaunchConfigurations();
-            Json arr = Json.array();
-            for (var config : configs) {
+            for (var config : allConfigs) {
+                if (seen.contains(config.getName())) continue;
                 arr.add(Json.object()
                         .put("name", config.getName())
                         .put("type", config.getType().getName()));
             }
+
             return arr.toString();
         } catch (Exception e) {
             return Json.error(e.getMessage());
@@ -99,12 +102,44 @@ class LaunchHandler {
         try {
             var mgr = org.eclipse.debug.internal.ui.DebugUIPlugin
                     .getDefault().getLaunchConfigurationManager();
-            // "org.eclipse.debug.ui.launchGroup.run" is the
-            // standard Run group
-            var history = mgr.getLaunchHistory(
+            var runHistory = mgr.getLaunchHistory(
                     "org.eclipse.debug.ui.launchGroup.run");
-            if (history != null) {
-                return history.getHistory();
+            var debugHistory = mgr.getLaunchHistory(
+                    "org.eclipse.debug.ui.launchGroup.debug");
+
+            // Merge: favorites first, then recent from both groups
+            var result = new java.util.ArrayList<
+                    ILaunchConfiguration>();
+            var seen = new java.util.HashSet<String>();
+
+            // Favorites from run group
+            if (runHistory != null) {
+                for (var c : runHistory.getFavorites()) {
+                    if (seen.add(c.getName())) result.add(c);
+                }
+            }
+            // Favorites from debug group
+            if (debugHistory != null) {
+                for (var c : debugHistory.getFavorites()) {
+                    if (seen.add(c.getName())) result.add(c);
+                }
+            }
+            // Recent history (run)
+            if (runHistory != null) {
+                for (var c : runHistory.getHistory()) {
+                    if (seen.add(c.getName())) result.add(c);
+                }
+            }
+            // Recent history (debug)
+            if (debugHistory != null) {
+                for (var c : debugHistory.getHistory()) {
+                    if (seen.add(c.getName())) result.add(c);
+                }
+            }
+
+            if (!result.isEmpty()) {
+                return result.toArray(
+                        new ILaunchConfiguration[0]);
             }
         } catch (Throwable e) {
             // UI plugin not available — fall through
@@ -128,6 +163,67 @@ class LaunchHandler {
         return Json.object()
                 .put("removed", removed)
                 .toString();
+    }
+
+    String handleRun(Map<String, String> params) {
+        String name = params.get("name");
+        if (name == null || name.isBlank()) {
+            return Json.error("Missing 'name' parameter");
+        }
+        String mode = params.containsKey("debug")
+                ? ILaunchManager.DEBUG_MODE
+                : ILaunchManager.RUN_MODE;
+        try {
+            ILaunchConfiguration config = findConfig(name);
+            if (config == null) {
+                return Json.error(
+                        "Launch configuration not found: " + name);
+            }
+            ILaunch launch = config.launch(mode, null, true);
+            return Json.object()
+                    .put("ok", true)
+                    .put("name", launchName(launch))
+                    .put("mode", mode)
+                    .toString();
+        } catch (Exception e) {
+            return Json.error(e.getMessage());
+        }
+    }
+
+    String handleStop(Map<String, String> params) {
+        String name = params.get("name");
+        if (name == null || name.isBlank()) {
+            return Json.error("Missing 'name' parameter");
+        }
+        ILaunch target = findLaunch(name);
+        if (target == null) {
+            return Json.error("Launch not found: " + name);
+        }
+        if (target.isTerminated()) {
+            return Json.error("Already terminated: " + name);
+        }
+        try {
+            target.terminate();
+            return Json.object()
+                    .put("ok", true)
+                    .put("name", name)
+                    .toString();
+        } catch (Exception e) {
+            return Json.error(
+                    "Failed to terminate: " + e.getMessage());
+        }
+    }
+
+    private ILaunchConfiguration findConfig(String name) {
+        try {
+            for (var config
+                    : launchManager().getLaunchConfigurations()) {
+                if (name.equals(config.getName())) {
+                    return config;
+                }
+            }
+        } catch (Exception e) { /* ignored */ }
+        return null;
     }
 
     String handleConsole(Map<String, String> params) {

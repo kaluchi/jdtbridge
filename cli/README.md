@@ -76,6 +76,8 @@ jdt move <FQN> <target.package>                        # move type to another pa
 ```bash
 jdt launch list                                        # list launches (running + terminated)
 jdt launch configs                                     # list saved launch configurations
+jdt launch run <config> [--debug]                      # launch a configuration
+jdt launch stop <name>                                 # stop a running launch
 jdt launch console <name> [--tail N]                   # show console output
 jdt launch clear [name]                                # remove terminated launches
 ```

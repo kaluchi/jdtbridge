@@ -130,6 +130,14 @@ Returns all saved launch configurations (Run → Run Configurations).
 
 Returns console output (stdout + stderr) of a launch. `tail` limits to last N lines. `stream` filters to stdout or stderr only.
 
+### `GET /launch/run?name=<config-name>[&debug]`
+
+Launch a saved configuration. Returns immediately (fire-and-forget). Add `&debug` for debug mode.
+
+### `GET /launch/stop?name=<name>`
+
+Terminate a running launch.
+
 ### `GET /launch/clear[?name=<config-name>]`
 
 Removes terminated launches and their console output. Without `name`, removes all terminated. With `name`, removes only that one.

@@ -327,6 +327,69 @@ public class LaunchHandlerTest {
         }
     }
 
+    @Nested
+    class Run {
+
+        @Test
+        void missingNameReturnsError() {
+            String json = handler.handleRun(Map.of());
+            assertTrue(json.contains("error"),
+                    "Should return error: " + json);
+        }
+
+        @Test
+        void unknownConfigReturnsError() {
+            String json = handler.handleRun(
+                    Map.of("name", "no-such-config-xyz"));
+            assertTrue(json.contains("error"),
+                    "Should return error: " + json);
+            assertTrue(json.contains("not found"),
+                    "Should say not found: " + json);
+        }
+    }
+
+    @Nested
+    class Stop {
+
+        @Test
+        void missingNameReturnsError() {
+            String json = handler.handleStop(Map.of());
+            assertTrue(json.contains("error"),
+                    "Should return error: " + json);
+        }
+
+        @Test
+        void unknownLaunchReturnsError() {
+            String json = handler.handleStop(
+                    Map.of("name", "no-such-launch-xyz"));
+            assertTrue(json.contains("error"),
+                    "Should return error: " + json);
+        }
+
+        @Test
+        void terminatedLaunchReturnsError() throws Exception {
+            ILaunchManager mgr =
+                    DebugPlugin.getDefault().getLaunchManager();
+            ILaunch launch = new org.eclipse.debug.core.Launch(
+                    null, "run", null);
+            Process proc = new ProcessBuilder(
+                    "java", "-version").start();
+            proc.waitFor(5,
+                    java.util.concurrent.TimeUnit.SECONDS);
+            DebugPlugin.newProcess(launch, proc,
+                    "stop-test-terminated");
+            mgr.addLaunch(launch);
+            try {
+                String json = handler.handleStop(
+                        Map.of("name", "stop-test-terminated"));
+                assertTrue(json.contains("Already terminated"),
+                        "Should say already terminated: " + json);
+            } finally {
+                mgr.removeLaunch(launch);
+            }
+        }
+    }
+
     // ---- HTTP routing tests ----
 
     @Nested

@@ -48,6 +48,39 @@ export async function launchClear(args) {
   console.log(`Removed ${result.removed} terminated launch${result.removed !== 1 ? "es" : ""}`);
 }
 
+export async function launchRun(args) {
+  const pos = extractPositional(args);
+  const name = pos[0];
+  if (!name) {
+    console.error("Usage: launch run <config-name> [--debug]");
+    process.exit(1);
+  }
+  let url = `/launch/run?name=${encodeURIComponent(name)}`;
+  if (args.includes("--debug")) url += "&debug";
+  const result = await get(url, 30_000);
+  if (result.error) {
+    console.error(result.error);
+    process.exit(1);
+  }
+  console.log(`Launched ${result.name} (${result.mode})`);
+}
+
+export async function launchStop(args) {
+  const pos = extractPositional(args);
+  const name = pos[0];
+  if (!name) {
+    console.error("Usage: launch stop <name>");
+    process.exit(1);
+  }
+  const url = `/launch/stop?name=${encodeURIComponent(name)}`;
+  const result = await get(url);
+  if (result.error) {
+    console.error(result.error);
+    process.exit(1);
+  }
+  console.log(`Stopped ${result.name}`);
+}
+
 export async function launchConsole(args) {
   const pos = extractPositional(args);
   const flags = parseFlags(args);
@@ -73,6 +106,23 @@ export async function launchConsole(args) {
     console.log(text);
   }
 }
+
+export const launchRunHelp = `Launch a saved configuration.
+
+Usage:  jdt launch run <config-name> [--debug]
+
+Flags:
+  --debug    launch in debug mode (default: run)
+
+Examples:
+  jdt launch run m8-server
+  jdt launch run m8-server --debug`;
+
+export const launchStopHelp = `Stop a running launch.
+
+Usage:  jdt launch stop <name>
+
+Example:  jdt launch stop m8-server`;
 
 export const launchConfigsHelp = `List saved launch configurations (Run → Run Configurations).
 

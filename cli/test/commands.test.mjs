@@ -631,6 +631,49 @@ describe("commands (integration)", () => {
     expect(io.logs[0]).toContain("1");
   });
 
+  it("launch run shows launched", async () => {
+    await setupMock((req, res) => {
+      expect(req.url).toContain("name=m8-server");
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true, name: "m8-server", mode: "run" }));
+    });
+    const { launchRun } = await import("../src/commands/launch.mjs");
+    await launchRun(["m8-server"]);
+    expect(io.logs[0]).toContain("Launched");
+    expect(io.logs[0]).toContain("m8-server");
+  });
+
+  it("launch run with debug flag", async () => {
+    await setupMock((req, res) => {
+      expect(req.url).toContain("debug");
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true, name: "m8-server", mode: "debug" }));
+    });
+    const { launchRun } = await import("../src/commands/launch.mjs");
+    await launchRun(["m8-server", "--debug"]);
+    expect(io.logs[0]).toContain("debug");
+  });
+
+  it("launch run missing name exits", async () => {
+    const { launchRun } = await import("../src/commands/launch.mjs");
+    await expect(launchRun([])).rejects.toThrow("exit(1)");
+  });
+
+  it("launch stop shows stopped", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true, name: "m8-server" }));
+    });
+    const { launchStop } = await import("../src/commands/launch.mjs");
+    await launchStop(["m8-server"]);
+    expect(io.logs[0]).toContain("Stopped");
+  });
+
+  it("launch stop missing name exits", async () => {
+    const { launchStop } = await import("../src/commands/launch.mjs");
+    await expect(launchStop([])).rejects.toThrow("exit(1)");
+  });
+
   it("launch console missing name exits", async () => {
     const { launchConsole } = await import("../src/commands/launch.mjs");
     await expect(launchConsole([])).rejects.toThrow("exit(1)");
