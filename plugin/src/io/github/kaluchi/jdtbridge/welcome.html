@@ -103,6 +103,12 @@
 (function() {
   var installed = {{cliInstalled}};
   var version = "{{cliVersion}}";
+  var dismissed = {{dismissed}};
+
+  if (dismissed) {
+    document.getElementById('dismiss-check').checked = true;
+    document.getElementById('dismiss').classList.add('saved');
+  }
 
   if (installed) {
     document.getElementById('cli-ok').style.display = 'flex';
@@ -120,15 +126,19 @@
   });
 
   document.getElementById('dismiss-check').addEventListener('change', function() {
-    if (this.checked) {
-      fetch('/status/dismiss', { method: 'POST' })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          if (data.ok) {
-            document.getElementById('dismiss').classList.add('saved');
+    var action = this.checked ? '/status/dismiss' : '/status/undismiss';
+    var el = document.getElementById('dismiss');
+    fetch(action, { method: 'POST' })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.ok) {
+          if (action === '/status/dismiss') {
+            el.classList.add('saved');
+          } else {
+            el.classList.remove('saved');
           }
-        });
-    }
+        }
+      });
   });
 })();
 </script>

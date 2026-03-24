@@ -31,7 +31,10 @@ public class HttpServer {
     private final EditorHandler editor = new EditorHandler();
     private final TestHandler testHandler = new TestHandler();
     private final ProjectHandler projectInfo = new ProjectHandler();
-    private final WelcomeHandler welcome = new WelcomeHandler();
+    private final ConfigService configService =
+            new ConfigService(Activator.getHome());
+    private final WelcomeHandler welcome =
+            new WelcomeHandler(configService);
     private final ExecutorService executor =
             Executors.newFixedThreadPool(4, r -> {
                 Thread t = new Thread(r, "jdtbridge-req");
@@ -216,6 +219,10 @@ public class HttpServer {
             if ("/status/dismiss".equals(path)
                     && "POST".equals(method)) {
                 return welcome.handleDismiss();
+            }
+            if ("/status/undismiss".equals(path)
+                    && "POST".equals(method)) {
+                return welcome.handleUndismiss();
             }
             return Response.json(Json.error("Not found: " + path));
         } catch (Exception e) {

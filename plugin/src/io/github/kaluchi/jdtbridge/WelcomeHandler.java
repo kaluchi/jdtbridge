@@ -3,9 +3,6 @@ package io.github.kaluchi.jdtbridge;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Map;
 
 /**
  * Serves the welcome/status HTML page and handles the dismiss action.
@@ -16,47 +13,40 @@ import java.util.Map;
  */
 class WelcomeHandler {
 
-    private static final String CONFIG_FILE = "config.json";
     private static final String DISMISSED_KEY = "welcomeDismissed";
+
+    private final ConfigService config;
+
+    WelcomeHandler(ConfigService config) {
+        this.config = config;
+    }
 
     HttpServer.Response handleStatus() throws IOException {
         String template = loadResource("welcome.html");
-        BridgeInfo info = readBridgeInfo();
+        ConfigService.BridgeInfo info = config.readBridgeInfo();
         CliInfo cli = detectCli();
         String html = template
-                .replace("{{version}}", info.version)
-                .replace("{{port}}", String.valueOf(info.port))
+                .replace("{{version}}", info.version())
+                .replace("{{port}}", String.valueOf(info.port()))
                 .replace("{{cliInstalled}}",
                         String.valueOf(cli.installed))
-                .replace("{{cliVersion}}", cli.version);
+                .replace("{{cliVersion}}", cli.version)
+                .replace("{{dismissed}}",
+                        String.valueOf(isDismissed()));
         return HttpServer.Response.html(html);
     }
 
     HttpServer.Response handleDismiss() {
+        return setDismissed(true);
+    }
+
+    HttpServer.Response handleUndismiss() {
+        return setDismissed(false);
+    }
+
+    private HttpServer.Response setDismissed(boolean value) {
         try {
-            Path configFile = Activator.getHome().resolve(CONFIG_FILE);
-            Map<String, Object> config;
-            if (Files.exists(configFile)) {
-                config = Json.parse(Files.readString(configFile,
-                        StandardCharsets.UTF_8));
-            } else {
-                Files.createDirectories(configFile.getParent());
-                config = new java.util.LinkedHashMap<>();
-            }
-            config.put(DISMISSED_KEY, Boolean.TRUE);
-            // Rebuild JSON from map
-            Json builder = Json.object();
-            for (var entry : config.entrySet()) {
-                Object v = entry.getValue();
-                if (v instanceof String s) builder.put(entry.getKey(), s);
-                else if (v instanceof Boolean b) builder.put(entry.getKey(), b);
-                else if (v instanceof Integer i) builder.put(entry.getKey(), i);
-                else if (v instanceof Long l) builder.put(entry.getKey(), l);
-                else if (v instanceof Double d) builder.put(entry.getKey(), d);
-                else if (v == null) builder.put(entry.getKey(), (String) null);
-            }
-            Files.writeString(configFile, builder.toString() + "\n",
-                    StandardCharsets.UTF_8);
+            config.putBoolean(DISMISSED_KEY, value);
             return HttpServer.Response.json("{\"ok\":true}");
         } catch (IOException e) {
             Log.warn("Failed to save dismiss preference", e);
@@ -65,19 +55,11 @@ class WelcomeHandler {
         }
     }
 
-    static boolean isDismissed() {
-        try {
-            Path configFile = Activator.getHome().resolve(CONFIG_FILE);
-            if (!Files.exists(configFile)) return false;
-            var config = Json.parse(Files.readString(configFile,
-                    StandardCharsets.UTF_8));
-            return Json.getBool(config, DISMISSED_KEY, false);
-        } catch (IOException e) {
-            return false;
-        }
+    boolean isDismissed() {
+        return config.getBoolean(DISMISSED_KEY, false);
     }
 
-    static boolean isCliInstalled() {
+    boolean isCliInstalled() {
         return detectCli().installed;
     }
 
@@ -121,40 +103,6 @@ class WelcomeHandler {
     }
 
     private record CliInfo(boolean installed, String version) {
-    }
-
-    /** Read port and version from the first bridge instance file. */
-    private BridgeInfo readBridgeInfo() {
-        try {
-            Path instances = Activator.getHome().resolve("instances");
-            if (!Files.isDirectory(instances)) {
-                return new BridgeInfo(0, "");
-            }
-            try (var files = Files.list(instances)) {
-                return files
-                        .filter(f -> f.toString().endsWith(".json"))
-                        .findFirst()
-                        .map(this::parseBridgeFile)
-                        .orElse(new BridgeInfo(0, ""));
-            }
-        } catch (IOException e) {
-            return new BridgeInfo(0, "");
-        }
-    }
-
-    private BridgeInfo parseBridgeFile(Path file) {
-        try {
-            var map = Json.parse(Files.readString(file,
-                    StandardCharsets.UTF_8));
-            int port = Json.getInt(map, "port", 0);
-            String version = Json.getString(map, "version");
-            return new BridgeInfo(port, version != null ? version : "");
-        } catch (IOException e) {
-            return new BridgeInfo(0, "");
-        }
-    }
-
-    private record BridgeInfo(int port, String version) {
     }
 
     private String loadResource(String name) throws IOException {

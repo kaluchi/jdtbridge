@@ -1,8 +1,5 @@
 package io.github.kaluchi.jdtbridge;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 
 import org.eclipse.core.runtime.IProgressMonitor;
@@ -30,13 +27,17 @@ public class StartupHandler implements IStartup {
 
     private IStatus check(IProgressMonitor monitor) {
         try {
-            if (WelcomeHandler.isDismissed()) {
+            Path home = Activator.getHome();
+            ConfigService config = new ConfigService(home);
+            WelcomeHandler welcome = new WelcomeHandler(config);
+
+            if (welcome.isDismissed()) {
                 return Status.OK_STATUS;
             }
-            if (WelcomeHandler.isCliInstalled()) {
+            if (welcome.isCliInstalled()) {
                 return Status.OK_STATUS;
             }
-            int port = readPortFromBridgeFile();
+            int port = config.readBridgeInfo().port();
             if (port <= 0) {
                 return Status.OK_STATUS;
             }
@@ -45,32 +46,6 @@ public class StartupHandler implements IStartup {
             Log.warn("Welcome check failed", e);
         }
         return Status.OK_STATUS;
-    }
-
-    private int readPortFromBridgeFile() {
-        try {
-            Path instances = Activator.getHome().resolve("instances");
-            if (!Files.isDirectory(instances)) return 0;
-            try (var files = Files.list(instances)) {
-                return files
-                        .filter(f -> f.toString().endsWith(".json"))
-                        .findFirst()
-                        .map(this::extractPort)
-                        .orElse(0);
-            }
-        } catch (IOException e) {
-            return 0;
-        }
-    }
-
-    private int extractPort(Path file) {
-        try {
-            var map = Json.parse(Files.readString(file,
-                    StandardCharsets.UTF_8));
-            return Json.getInt(map, "port", 0);
-        } catch (Exception e) {
-            return 0;
-        }
     }
 
     private void openWelcome(int port) {

@@ -117,26 +117,6 @@ public class WelcomeHandlerTest {
         assertTrue(Json.getBool(map, "welcomeDismissed", false));
     }
 
-    // ---- Config roundtrip: read → add key → write → read ----
-
-    @Test
-    public void configRoundtripAddDismissed() {
-        String original = "{\"eclipse\":\"D:/eclipse\"}";
-        var config = Json.parse(original);
-        config.put("welcomeDismissed", Boolean.TRUE);
-
-        Json builder = Json.object();
-        for (var entry : config.entrySet()) {
-            Object v = entry.getValue();
-            if (v instanceof String s) builder.put(entry.getKey(), s);
-            else if (v instanceof Boolean b)
-                builder.put(entry.getKey(), b);
-        }
-        String written = builder.toString();
-
-        var reread = Json.parse(written);
-        assertEquals("D:/eclipse",
-                Json.getString(reread, "eclipse"));
-        assertTrue(Json.getBool(reread, "welcomeDismissed", false));
-    }
+    // ---- Config roundtrip via ConfigService ----
+    // (Detailed roundtrip tests are in ConfigServiceTest)
 }
