@@ -78,17 +78,18 @@ See [README.md](README.md) for full overview. Key directories:
 
 ## Development workflow
 
-### `jdt build` vs `mvn verify`
+### `jdt build` vs full verify
 
-| | `jdt build` | `mvn clean verify` |
+| | `jdt build` | `jdt launch run jdtbridge-verify -f` |
 |---|---|---|
-| What | Eclipse incremental compiler | Tycho full build |
+| What | Eclipse incremental compiler | Tycho full build (via Eclipse) |
 | Speed | 1-3 seconds | 40-60 seconds |
 | Tests | No | Unit + integration |
 | Output | Compiled classes in Eclipse | p2 site in `site/target/` |
 | When | Quick iteration while coding | Before commit, before `jdt setup` |
 
-For CI without local Eclipse: `mvn clean verify -Pci` (uses p2 target platform).
+The `-f` (follow) flag streams output in real-time and exits with the
+process exit code. For CI without local Eclipse: `mvn clean verify -Pci`.
 
 ### Making changes
 
@@ -100,7 +101,7 @@ For CI without local Eclipse: `mvn clean verify -Pci` (uses p2 target platform).
    jdt build --project io.github.kaluchi.jdtbridge.tests
    jdt test --project io.github.kaluchi.jdtbridge.tests
    ```
-4. **Full Tycho build** — `mvn clean verify`
+4. **Full Tycho build** — `jdt launch run jdtbridge-verify -f`
 5. **Install and verify live** — `jdt setup --skip-build`, then test
 6. **Check ALL docs** if CLI syntax or API changed:
    - `cli/src/cli.mjs` (`jdt help` output)
@@ -117,13 +118,14 @@ For CI without local Eclipse: `mvn clean verify -Pci` (uses p2 target platform).
 - **`jdt setup --skip-build` restarts Eclipse.** Port changes. `jdt` commands
   auto-discover the new port, but raw `curl` URLs break.
 - **`jdt setup` without `--skip-build` runs Maven internally.**
-  After `mvn clean verify`, always add `--skip-build` — never build twice.
+  After `jdt launch run jdtbridge-verify -f`, always add `--skip-build`
+  — never build twice.
 
 ### Test infrastructure
 
 - **CLI tests:** `cd cli && npm test` (vitest)
 - **Plugin unit tests:** `jdt test --project io.github.kaluchi.jdtbridge.tests`
-- **Integration tests:** `mvn clean verify` only — use `@EnabledIfSystemProperty(named = "jdtbridge.integration-tests", matches = "true")`
+- **Integration tests:** `jdt launch run jdtbridge-verify -f` (full Tycho build) — use `@EnabledIfSystemProperty(named = "jdtbridge.integration-tests", matches = "true")`
 - **Test fixture:** `TestFixture.java` creates a project with known classes —
   `test.model.Animal`, `Dog`, `Cat`, `test.edge.Calculator` (overloads),
   `Repository` (generics). Add new test types there.

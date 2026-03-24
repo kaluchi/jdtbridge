@@ -1,7 +1,9 @@
 package io.github.kaluchi.jdtbridge;
 
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.eclipse.debug.core.DebugPlugin;
 import org.eclipse.debug.core.ILaunch;
@@ -18,6 +20,12 @@ import org.eclipse.debug.core.model.IStreamsProxy;
  */
 class LaunchTracker implements ILaunchesListener2 {
 
+    interface OutputListener {
+        /** @param text chunk of output
+         *  @param stderr true if stderr, false if stdout */
+        void onOutput(String text, boolean stderr);
+    }
+
     static class TrackedLaunch {
         final ILaunch launch;
         private final Object lock = new Object();
@@ -26,18 +34,30 @@ class LaunchTracker implements ILaunchesListener2 {
         volatile boolean terminated;
         final Set<IStreamMonitor> attached =
                 ConcurrentHashMap.newKeySet();
+        private final List<OutputListener> listeners =
+                new CopyOnWriteArrayList<>();
 
         TrackedLaunch(ILaunch launch) {
             this.launch = launch;
             this.terminated = launch.isTerminated();
         }
 
+        void addOutputListener(OutputListener l) {
+            listeners.add(l);
+        }
+
+        void removeOutputListener(OutputListener l) {
+            listeners.remove(l);
+        }
+
         void appendOut(String text) {
             synchronized (lock) { stdout.append(text); }
+            for (var l : listeners) l.onOutput(text, false);
         }
 
         void appendErr(String text) {
             synchronized (lock) { stderr.append(text); }
+            for (var l : listeners) l.onOutput(text, true);
         }
 
         String getOutput(String stream) {

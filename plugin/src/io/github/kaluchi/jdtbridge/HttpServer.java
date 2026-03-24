@@ -186,11 +186,78 @@ public class HttpServer {
                 }
             }
 
+            // Streaming endpoint — bypasses dispatch, owns socket
+            if ("/launch/console/stream".equals(path)) {
+                handleConsoleStream(socket, params);
+                return;
+            }
+
             Response resp = dispatch(path, params);
             sendResponse(socket, resp);
         } catch (Exception e) {
             Log.error("Request error", e);
         }
+    }
+
+    /**
+     * Streaming console — bypasses dispatch, writes directly to
+     * socket. HTTP protocol only; business logic in ConsoleStreamer.
+     */
+    private void handleConsoleStream(Socket socket,
+            Map<String, String> params) {
+        String name = params.get("name");
+        if (name == null || name.isBlank()) {
+            try { sendError(socket, 400, "Missing name"); }
+            catch (IOException e) { /* ignore */ }
+            return;
+        }
+
+        LaunchTracker.TrackedLaunch tl = awaitLaunch(name);
+        if (tl == null) {
+            try {
+                sendError(socket, 404,
+                        "Launch not found: " + name);
+            } catch (IOException e) { /* ignore */ }
+            return;
+        }
+
+        String stream = params.get("stream");
+        int tail = -1;
+        String tailStr = params.get("tail");
+        if (tailStr != null) {
+            try { tail = Integer.parseInt(tailStr); }
+            catch (NumberFormatException e) { /* full */ }
+        }
+
+        try {
+            socket.setSoTimeout(0);
+            OutputStream out = socket.getOutputStream();
+            out.write(("HTTP/1.1 200 OK\r\n"
+                    + "Content-Type: text/plain; charset=utf-8\r\n"
+                    + "Connection: close\r\n"
+                    + "Cache-Control: no-cache\r\n\r\n")
+                    .getBytes(StandardCharsets.UTF_8));
+
+            ConsoleStreamer.stream(tl, out, stream, tail);
+        } catch (IOException
+                | ConsoleStreamer.StreamClosedException e) {
+            // Client disconnected — normal for Ctrl+C
+        }
+    }
+
+    /** Wait briefly for a launch to appear in the tracker. */
+    private LaunchTracker.TrackedLaunch awaitLaunch(String name) {
+        for (int i = 0; i < 10; i++) {
+            LaunchTracker.TrackedLaunch tl =
+                    launchTracker.get(name);
+            if (tl != null) return tl;
+            try { Thread.sleep(500); }
+            catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return null;
+            }
+        }
+        return null;
     }
 
     private void sendResponse(Socket socket, Response resp)

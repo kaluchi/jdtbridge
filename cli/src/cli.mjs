@@ -64,7 +64,7 @@ const launchHelp = `Manage launches (running and terminated processes).
 Subcommands:
   jdt launch list                           list all launches
   jdt launch configs                        list saved launch configurations
-  jdt launch run <config> [--debug]         launch a configuration
+  jdt launch run <config> [--debug] [-f]    launch a configuration
   jdt launch stop <name>                    stop a running launch
   jdt launch console <name> [--tail N]      show console output
   jdt launch clear [name]                   remove terminated launches
@@ -174,9 +174,9 @@ Refactoring:
 Launches:
   launch list                                 list launches (running + terminated)
   launch configs                              list saved launch configurations
-  launch run <config> [--debug]               launch a configuration
+  launch run <config> [--debug] [-f]           launch a configuration
   launch stop <name>                          stop a running launch
-  launch console <name> [--tail N]            show console output of a launch
+  launch console <name> [-f] [--tail N]        show console output of a launch
   launch clear [name]                         remove terminated launches
 
 Editor:

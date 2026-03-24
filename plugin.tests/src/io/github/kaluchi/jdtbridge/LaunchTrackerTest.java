@@ -75,6 +75,51 @@ public class LaunchTrackerTest {
             var tl = new LaunchTracker.TrackedLaunch(launch);
             assertFalse(tl.terminated);
         }
+
+        @Test
+        void outputListenerReceivesAppendOut() {
+            ILaunch launch = new org.eclipse.debug.core.Launch(
+                    null, "run", null);
+            var tl = new LaunchTracker.TrackedLaunch(launch);
+            var received = new java.util.ArrayList<String>();
+            tl.addOutputListener(
+                    (text, stderr) -> received.add(text));
+            tl.appendOut("hello");
+            tl.appendErr("world");
+            assertEquals(2, received.size());
+            assertEquals("hello", received.get(0));
+            assertEquals("world", received.get(1));
+        }
+
+        @Test
+        void removeOutputListenerStopsNotifications() {
+            ILaunch launch = new org.eclipse.debug.core.Launch(
+                    null, "run", null);
+            var tl = new LaunchTracker.TrackedLaunch(launch);
+            var received = new java.util.ArrayList<String>();
+            LaunchTracker.OutputListener l =
+                    (text, stderr) -> received.add(text);
+            tl.addOutputListener(l);
+            tl.appendOut("before");
+            tl.removeOutputListener(l);
+            tl.appendOut("after");
+            assertEquals(1, received.size());
+            assertEquals("before", received.get(0));
+        }
+
+        @Test
+        void outputListenerDistinguishesStdoutStderr() {
+            ILaunch launch = new org.eclipse.debug.core.Launch(
+                    null, "run", null);
+            var tl = new LaunchTracker.TrackedLaunch(launch);
+            var flags = new java.util.ArrayList<Boolean>();
+            tl.addOutputListener(
+                    (text, stderr) -> flags.add(stderr));
+            tl.appendOut("out");
+            tl.appendErr("err");
+            assertFalse(flags.get(0));
+            assertTrue(flags.get(1));
+        }
     }
 
     @Nested

@@ -1,4 +1,4 @@
-import { get } from "../client.mjs";
+import { get, getStream } from "../client.mjs";
 import { extractPositional, parseFlags } from "../args.mjs";
 
 export async function launchList() {
@@ -52,7 +52,7 @@ export async function launchRun(args) {
   const pos = extractPositional(args);
   const name = pos[0];
   if (!name) {
-    console.error("Usage: launch run <config-name> [--debug]");
+    console.error("Usage: launch run <config-name> [--debug] [-f|--follow]");
     process.exit(1);
   }
   let url = `/launch/run?name=${encodeURIComponent(name)}`;
@@ -62,7 +62,17 @@ export async function launchRun(args) {
     console.error(result.error);
     process.exit(1);
   }
-  console.log(`Launched ${result.name} (${result.mode})`);
+
+  const follow = args.includes("-f") || args.includes("--follow");
+  if (!follow) {
+    console.log(`Launched ${result.name} (${result.mode})`);
+    return;
+  }
+
+  // Launch + follow: stream console output, exit with process code
+  console.error(`Launched ${result.name} (${result.mode})`);
+  const exitCode = await followConsole(result.name, args);
+  process.exit(exitCode);
 }
 
 export async function launchStop(args) {
@@ -86,9 +96,19 @@ export async function launchConsole(args) {
   const flags = parseFlags(args);
   const name = pos[0];
   if (!name) {
-    console.error("Usage: launch console <name> [--tail N] [--stderr|--stdout]");
+    console.error(
+      "Usage: launch console <name> [-f|--follow] [--tail N] [--stderr|--stdout]",
+    );
     process.exit(1);
   }
+
+  const follow = args.includes("-f") || args.includes("--follow");
+  if (follow) {
+    const exitCode = await followConsole(name, args);
+    process.exit(exitCode);
+  }
+
+  // Snapshot mode (existing behavior)
   let url = `/launch/console?name=${encodeURIComponent(name)}`;
   if (flags.tail !== undefined && flags.tail !== true)
     url += `&tail=${flags.tail}`;
@@ -107,16 +127,69 @@ export async function launchConsole(args) {
   }
 }
 
+/**
+ * Stream console output until process terminates or Ctrl+C.
+ * Returns the process exit code (0 on detach).
+ */
+async function followConsole(name, args) {
+  const flags = parseFlags(args);
+  let url = `/launch/console/stream?name=${encodeURIComponent(name)}`;
+  if (flags.tail !== undefined && flags.tail !== true)
+    url += `&tail=${flags.tail}`;
+  if (args.includes("--stderr")) url += "&stream=stderr";
+  else if (args.includes("--stdout")) url += "&stream=stdout";
+
+  // Ctrl+C = detach, not kill
+  let detached = false;
+  const onSigint = () => {
+    detached = true;
+    process.stdout.write("\n");
+    process.exit(0);
+  };
+  process.on("SIGINT", onSigint);
+
+  try {
+    await getStream(url, process.stdout);
+  } catch (e) {
+    if (!detached) {
+      console.error(e.message);
+      return 1;
+    }
+    return 0;
+  } finally {
+    process.removeListener("SIGINT", onSigint);
+  }
+
+  // Stream ended (process terminated) — fetch exit code
+  try {
+    const info = await get(
+      `/launch/console?name=${encodeURIComponent(name)}`,
+    );
+    if (info && info.terminated) {
+      const list = await get("/launch/list");
+      const entry = Array.isArray(list)
+        ? list.find((l) => l.name === name && l.terminated)
+        : null;
+      return entry?.exitCode ?? 0;
+    }
+  } catch {
+    // best effort
+  }
+  return 0;
+}
+
 export const launchRunHelp = `Launch a saved configuration.
 
-Usage:  jdt launch run <config-name> [--debug]
+Usage:  jdt launch run <config-name> [--debug] [-f|--follow]
 
 Flags:
-  --debug    launch in debug mode (default: run)
+  --debug        launch in debug mode (default: run)
+  -f, --follow   stream console output until process terminates
 
 Examples:
   jdt launch run m8-server
-  jdt launch run m8-server --debug`;
+  jdt launch run jdtbridge-verify --follow
+  jdt launch run m8-server --debug -f | grep ERROR`;
 
 export const launchStopHelp = `Stop a running launch.
 
@@ -144,17 +217,19 @@ Output: name, type, mode, status — one launch per line.`;
 
 export const launchConsoleHelp = `Show console output (stdout/stderr) of a launch.
 
-Returns the full unbounded output. Pipe through tail/grep/head to filter.
+Without --follow, returns the full output as a snapshot.
+With --follow, streams output in real-time until the process terminates.
 
-Usage:  jdt launch console <name> [--tail N] [--stderr] [--stdout]
+Usage:  jdt launch console <name> [-f|--follow] [--tail N] [--stderr] [--stdout]
 
 Flags:
-  --tail <N>    last N lines only (or use: jdt launch console m8-server | tail -50)
-  --stderr      stderr only
-  --stdout      stdout only
+  -f, --follow   stream output until process terminates (Ctrl+C to detach)
+  --tail <N>     last N lines only (snapshot), or start N lines back (follow)
+  --stderr       stderr only
+  --stdout       stdout only
 
 Examples:
   jdt launch console m8-server
-  jdt launch console m8-server | tail -20
-  jdt launch console m8-server | grep ERROR
-  jdt launch console ObjectMapperTest --stderr`;
+  jdt launch console m8-server --follow
+  jdt launch console m8-server -f --tail 20
+  jdt launch console m8-server -f --stdout | grep ERROR`;

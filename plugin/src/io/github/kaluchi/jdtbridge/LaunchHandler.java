@@ -301,7 +301,7 @@ class LaunchHandler {
         if (tailStr != null) {
             try {
                 int tailLines = Integer.parseInt(tailStr);
-                result = tail(result, tailLines);
+                result = ConsoleStreamer.tail(result, tailLines);
             } catch (NumberFormatException e) { /* use full */ }
         }
 
@@ -321,15 +321,6 @@ class LaunchHandler {
             }
         }
         return null;
-    }
-
-    private String tail(String text, int lines) {
-        if (lines <= 0) return text;
-        int pos = text.length();
-        for (int i = 0; i < lines && pos > 0; i++) {
-            pos = text.lastIndexOf('\n', pos - 1);
-        }
-        return pos <= 0 ? text : text.substring(pos + 1);
     }
 
     static String launchName(ILaunch launch) {

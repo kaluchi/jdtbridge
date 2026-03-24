@@ -159,6 +159,44 @@ export function getRaw(path, timeoutMs = 10_000) {
 }
 
 /**
+ * HTTP GET with streaming response. Pipes text/plain chunks to
+ * the provided writable stream (typically process.stdout).
+ * Resolves when the server closes the connection.
+ * Rejects on non-200 status or connection error.
+ * @param {string} path
+ * @param {import('stream').Writable} dest
+ * @returns {Promise<void>}
+ */
+export function getStream(path, dest) {
+  const inst = connect();
+  return new Promise((resolve, reject) => {
+    const req = request(
+      {
+        hostname: "127.0.0.1",
+        port: inst.port,
+        path,
+        method: "GET",
+        timeout: 0, // no timeout for streaming
+        headers: authHeaders(),
+      },
+      (res) => {
+        if (res.statusCode !== 200) {
+          let data = "";
+          res.on("data", (chunk) => (data += chunk));
+          res.on("end", () => reject(new Error(data.trim())));
+          return;
+        }
+        res.pipe(dest, { end: false });
+        res.on("end", resolve);
+        res.on("error", reject);
+      },
+    );
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+/**
  * Check if error is a connection refused error.
  * @param {Error} e
  * @returns {boolean}
