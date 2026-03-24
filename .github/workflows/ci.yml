@@ -74,3 +74,19 @@ jobs:
           MAVEN_OPTS: >-
             -Djdk.xml.totalEntitySizeLimit=0
             -Djdk.xml.maxGeneralEntitySizeLimit=0
+
+  all-green:
+    name: All checks passed
+    if: always()
+    needs: [cli, plugin]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify no failures
+        run: |
+          if [[ "${{ needs.cli.result }}" == "failure" || \
+                "${{ needs.cli.result }}" == "cancelled" || \
+                "${{ needs.plugin.result }}" == "failure" || \
+                "${{ needs.plugin.result }}" == "cancelled" ]]; then
+            echo "One or more jobs failed or were cancelled"
+            exit 1
+          fi
