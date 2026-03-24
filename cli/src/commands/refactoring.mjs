@@ -57,8 +57,7 @@ export async function rename(args) {
   }
   let url = `/rename?class=${encodeURIComponent(fqn)}&newName=${encodeURIComponent(newName)}`;
   if (flags.field) url += `&field=${encodeURIComponent(flags.field)}`;
-  const methodName = parsed.method || flags.method;
-  if (methodName) url += `&method=${encodeURIComponent(methodName)}`;
+  if (parsed.method) url += `&method=${encodeURIComponent(parsed.method)}`;
   if (parsed.paramTypes) {
     url += `&paramTypes=${encodeURIComponent(parsed.paramTypes.join(","))}`;
   }

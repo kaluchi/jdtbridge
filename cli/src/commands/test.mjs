@@ -35,7 +35,6 @@ export async function test(args) {
 export const help = `Run JUnit tests via Eclipse's built-in test runner.
 
 Usage:  jdt test <FQN>[#method]
-        jdt test <FQN> [method]
         jdt test --project <name> [--package <pkg>]
 
 Flags:
@@ -46,5 +45,4 @@ Flags:
 Examples:
   jdt test app.m8ws.utils.ObjectMapperTest
   jdt test app.m8ws.utils.ObjectMapperTest#testSerialize
-  jdt test app.m8ws.utils.ObjectMapperTest testSerialize
   jdt test --project m8-server`;
