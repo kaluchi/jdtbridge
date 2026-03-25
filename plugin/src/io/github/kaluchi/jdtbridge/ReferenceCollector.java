@@ -85,14 +85,20 @@ class ReferenceCollector {
     }
 
     private static boolean isJdkType(String fqn) {
-        return fqn.startsWith("java.");
+        return stripGenerics(fqn).startsWith("java.");
+    }
+
+    private static String stripGenerics(String fqn) {
+        int angle = fqn.indexOf('<');
+        return angle >= 0 ? fqn.substring(0, angle) : fqn;
     }
 
     private static void addField(IVariableBinding vb,
             Map<String, Ref> refs, String declaringFqn) {
         ITypeBinding declType = vb.getDeclaringClass();
         if (declType == null) return;
-        String typeFqn = declType.getQualifiedName();
+        String typeFqn = stripGenerics(
+                declType.getQualifiedName());
         if (isJdkType(typeFqn)) return;
         String fqmn = typeFqn + "#" + vb.getName();
         if (refs.containsKey(fqmn)) return;
@@ -110,7 +116,8 @@ class ReferenceCollector {
             Map<String, Ref> refs, String declaringFqn) {
         ITypeBinding declType = mb.getDeclaringClass();
         if (declType == null) return;
-        String typeFqn = declType.getQualifiedName();
+        String typeFqn = stripGenerics(
+                declType.getQualifiedName());
         if (isJdkType(typeFqn)) return;
         String fqmn = typeFqn + "#" + mb.getName()
                 + "(" + paramSignature(mb) + ")";
@@ -123,7 +130,7 @@ class ReferenceCollector {
     private static void addType(ITypeBinding tb,
             Map<String, Ref> refs, String declaringFqn) {
         if (tb.isPrimitive() || tb.isArray()) return;
-        String fqn = tb.getQualifiedName();
+        String fqn = stripGenerics(tb.getQualifiedName());
         if (fqn.isEmpty() || fqn.equals(declaringFqn)) return;
         if (isJdkType(fqn)) return;
         if (refs.containsKey(fqn)) return;

@@ -63,16 +63,32 @@ function formatMarkdown(result) {
     }
   }
 
-  // Project source — with javadoc + path
+  // Project source — grouped by declaring type
   if (projectRefs.length > 0) {
-    // Group by package
-    const byPkg = groupByPackage(projectRefs);
-    for (const [pkg, refs] of Object.entries(byPkg)) {
+    const byType = groupByType(projectRefs);
+    for (const [typeFqn, group] of Object.entries(byType)) {
       lines.push("");
-      lines.push(`**${pkg}:**`);
+      lines.push(`**${typeFqn}:**`);
+      // Type-level info from first ref with file/doc
+      const typeRef = group.find((r) => !r.fqmn.includes("#"));
+      const memberRefs = group.filter((r) => r.fqmn.includes("#"));
+      if (typeRef) {
+        if (typeRef.file) lines.push(`\`${typeRef.file}\``);
+        if (typeRef.doc) lines.push(typeRef.doc);
+      } else if (group[0].file) {
+        lines.push(`\`${group[0].file}\``);
+      }
       lines.push("");
-      for (const ref of refs) {
-        lines.push(formatProjectRef(ref));
+      for (const ref of memberRefs) {
+        let line = `- \`${ref.fqmn}\``;
+        if (ref.type) line += ` → \`${ref.type}\``;
+        lines.push(line);
+        if (ref.doc) lines.push(`  ${ref.doc}`);
+      }
+      // Type ref without members (just the type itself)
+      if (typeRef && memberRefs.length === 0) {
+        lines.push(`- \`${typeRef.fqmn}\``);
+        if (typeRef.doc) lines.push(`  ${typeRef.doc}`);
       }
     }
   }
@@ -102,16 +118,6 @@ function formatClassRef(ref) {
   return parts.join("\n");
 }
 
-function formatProjectRef(ref) {
-  let line = `- \`${ref.fqmn}\``;
-  if (ref.type) line += ` → \`${ref.type}\``;
-  const parts = [line];
-  if (ref.file) parts.push(`  \`${ref.file}\``);
-  if (ref.doc) parts.push(`  ${ref.doc}`);
-  parts.push("");
-  return parts.join("\n");
-}
-
 function extractClassName(fqmn) {
   const hash = fqmn.indexOf("#");
   const fqn = hash >= 0 ? fqmn.substring(0, hash) : fqmn;
@@ -119,14 +125,12 @@ function extractClassName(fqmn) {
   return dot >= 0 ? fqn.substring(dot + 1) : fqn;
 }
 
-function groupByPackage(refs) {
+function groupByType(refs) {
   const groups = {};
   for (const ref of refs) {
-    const fqn = ref.fqmn.split("#")[0];
-    const dot = fqn.lastIndexOf(".");
-    const pkg = dot >= 0 ? fqn.substring(0, dot) : "";
-    if (!groups[pkg]) groups[pkg] = [];
-    groups[pkg].push(ref);
+    const typeFqn = ref.fqmn.split("#")[0];
+    if (!groups[typeFqn]) groups[typeFqn] = [];
+    groups[typeFqn].push(ref);
   }
   return groups;
 }
