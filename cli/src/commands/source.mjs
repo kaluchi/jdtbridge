@@ -22,7 +22,12 @@ export async function source(args) {
     process.exit(1);
   }
 
-  console.log(formatMarkdown(result));
+  // Multiple overloads → array
+  if (Array.isArray(result)) {
+    console.log(result.map(formatMarkdown).join("\n\n---\n\n"));
+  } else {
+    console.log(formatMarkdown(result));
+  }
 }
 
 function formatMarkdown(result) {

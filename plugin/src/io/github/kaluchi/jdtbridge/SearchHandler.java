@@ -457,22 +457,33 @@ class SearchHandler {
                         absPath, fullSource, params);
             }
 
-            // Multiple overloads — each prefixed with :start-end
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < methods.size(); i++) {
-                if (i > 0) sb.append("\n\n");
-                IMethod method = methods.get(i);
-                String source = method.getSource();
-                if (source == null) continue;
+            // Multiple overloads — JSON array
+            Json arr = Json.array();
+            for (IMethod method : methods) {
+                String src = method.getSource();
+                if (src == null) continue;
                 int[] lines = memberLines(method, fullSource);
-                sb.append(":").append(lines[0])
-                        .append("-").append(lines[1]).append("\n");
-                sb.append(source);
+                String sig = JdtUtils.compactSignature(method);
+                String mFqmn = fqn + "#" + sig;
+                var refs = ReferenceCollector.collect(method);
+                // Inline JSON building for each overload
+                Json entry = Json.object()
+                        .put("fqmn", mFqmn)
+                        .put("file", absPath)
+                        .put("startLine", lines[0])
+                        .put("endLine", lines[1])
+                        .put("source", src);
+                Json refsArr = Json.array();
+                for (var ref : refs.values()) {
+                    refsArr.add(Json.object()
+                            .put("fqmn", ref.fqmn())
+                            .put("kind", ref.kind().name()
+                                    .toLowerCase()));
+                }
+                entry.put("refs", refsArr);
+                arr.add(entry);
             }
-            return HttpServer.Response.text(sb.toString(), Map.of(
-                    "X-File", file,
-                    "X-Start-Line", "-1",
-                    "X-End-Line", "-1"));
+            return HttpServer.Response.json(arr.toString());
         }
 
         // Full class source

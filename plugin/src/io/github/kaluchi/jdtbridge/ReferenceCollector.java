@@ -85,9 +85,7 @@ class ReferenceCollector {
     }
 
     private static boolean isJdkType(String fqn) {
-        return fqn.startsWith("java.lang.")
-                && !fqn.contains(".lang.reflect")
-                && !fqn.contains(".lang.invoke");
+        return fqn.startsWith("java.");
     }
 
     private static void addField(IVariableBinding vb,

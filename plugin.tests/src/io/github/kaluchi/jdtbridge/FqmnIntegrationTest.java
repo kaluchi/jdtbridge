@@ -213,10 +213,10 @@ public class FqmnIntegrationTest {
             HttpServer.Response resp = handler.handleSource(
                     Map.of("class", "test.edge.Calculator",
                             "method", "add"));
-            // Should return all 3 overloads with :-prefixed blocks
-            assertEquals("-1",
-                    resp.headers().get("X-Start-Line"),
-                    "Multiple overloads flag");
+            // Should return JSON array with multiple overloads
+            assertEquals("application/json", resp.contentType());
+            assertTrue(resp.body().startsWith("["),
+                    "Should be JSON array: " + resp.body());
         }
 
         @Test

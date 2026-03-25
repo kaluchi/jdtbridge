@@ -67,9 +67,8 @@ public class EdgeCaseIntegrationTest {
         String body = resp.body();
         assertTrue(body.contains("int a, int b, int c"),
                 "Should contain 3-arg overload: " + body);
-        // Should be a single method, not multiple
-        assertTrue(resp.headers().containsKey("X-Start-Line"),
-                "Should have start line header");
+        assertEquals("application/json", resp.contentType(),
+                "Should be JSON");
     }
 
     @Test
