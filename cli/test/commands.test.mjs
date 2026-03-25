@@ -559,7 +559,21 @@ describe("commands (integration)", () => {
     expect(io.logs[0]).toBe("(no launches)");
   });
 
-  it("launch console shows output", async () => {
+  it("launch logs shows output", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        name: "m8-server",
+        terminated: false,
+        output: "Server started on port 8080\nReady.\n",
+      }));
+    });
+    const { launchLogs } = await import("../src/commands/launch.mjs");
+    await launchLogs(["m8-server"]);
+    expect(io.logs[0]).toContain("Server started");
+  });
+
+  it("launch console alias works", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({
@@ -631,16 +645,29 @@ describe("commands (integration)", () => {
     expect(io.logs[0]).toContain("1");
   });
 
-  it("launch run shows launched", async () => {
+  it("launch run shows launched with guide", async () => {
     await setupMock((req, res) => {
-      expect(req.url).toContain("name=m8-server");
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ ok: true, name: "m8-server", mode: "run" }));
     });
     const { launchRun } = await import("../src/commands/launch.mjs");
     await launchRun(["m8-server"]);
     expect(io.logs[0]).toContain("Launched");
-    expect(io.logs[0]).toContain("m8-server");
+    // Onboarding guide shown
+    const all = io.logs.join("\n");
+    expect(all).toContain("jdt launch logs");
+    expect(all).toContain("jdt launch stop");
+  });
+
+  it("launch run -q suppresses guide", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true, name: "m8-server", mode: "run" }));
+    });
+    const { launchRun } = await import("../src/commands/launch.mjs");
+    await launchRun(["m8-server", "-q"]);
+    expect(io.logs).toHaveLength(1);
+    expect(io.logs[0]).toContain("Launched");
   });
 
   it("launch debug sends debug flag", async () => {

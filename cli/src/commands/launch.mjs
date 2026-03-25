@@ -90,32 +90,36 @@ async function launchWithMode(args, mode) {
   console.log(`Launched ${n} (${result.mode}${pid})`);
 
   if (!quiet) {
-    console.log(`
-  Console output is captured by Eclipse and remains available after
-  the process terminates — nothing is lost. You can read it at any
-  time, filter with grep, or pipe through tail/head.
+    console.log(launchGuide(n));
+  }
+}
+
+function launchGuide(name) {
+  return `
+  Console output is captured by Eclipse and remains available
+  after the process terminates. You can read it at any time,
+  filter with grep, or pipe through tail/head.
 
   View logs:
-    jdt launch logs ${n}                 full output
-    jdt launch logs ${n} --tail 30       last 30 lines
+    jdt launch logs ${name}
+    jdt launch logs ${name} --tail 30
 
   Wait for completion (blocks until process exits):
-    jdt launch logs ${n} -f | tail -20   safe: bounded output
-    jdt launch logs ${n} -f              stream all (can be large)
+    jdt launch logs ${name} -f | tail -20
+    jdt launch logs ${name} -f
 
   Manage:
-    jdt launch list                              status of all launches
-    jdt launch stop ${n}                 terminate process
-    jdt launch clear                             remove finished launches
+    jdt launch list
+    jdt launch stop ${name}
+    jdt launch clear
 
   Run modes:
-    jdt launch run <config>                      run (this output)
-    jdt launch run <config> -f                   run + stream output
-    jdt launch run <config> -f | tail -30        run + wait + bounded
-    jdt launch debug <config>                    run with debugger
+    jdt launch run <config>           launch (this output)
+    jdt launch run <config> -f        launch + stream output
+    jdt launch run <config> -f | tail launch + wait + bounded
+    jdt launch debug <config>         launch with debugger
 
-  Add -q to suppress this guide.`);
-  }
+  Add -q to suppress this guide.`;
 }
 
 export async function launchStop(args) {
