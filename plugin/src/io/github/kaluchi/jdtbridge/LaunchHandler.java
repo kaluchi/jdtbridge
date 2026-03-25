@@ -220,11 +220,13 @@ class LaunchHandler {
                         "Launch configuration not found: " + name);
             }
             ILaunch launch = config.launch(mode, null, true);
-            return Json.object()
+            Json response = Json.object()
                     .put("ok", true)
                     .put("name", launchName(launch))
                     .put("mode", mode)
-                    .toString();
+                    .put("type", launchType(launch));
+            addProcessMetadata(launch, response);
+            return response.toString();
         } catch (Exception e) {
             return Json.error(e.getMessage());
         }
@@ -321,6 +323,32 @@ class LaunchHandler {
             }
         }
         return null;
+    }
+
+    private static void addProcessMetadata(ILaunch launch,
+            Json response) {
+        IProcess[] processes = launch.getProcesses();
+        if (processes.length > 0) {
+            IProcess proc = processes[0];
+            String pid = proc.getAttribute(
+                    IProcess.ATTR_PROCESS_ID);
+            if (pid != null) response.put("pid", pid);
+            String cmdline = proc.getAttribute(
+                    "org.eclipse.debug.core.ATTR_CMDLINE");
+            if (cmdline != null) response.put("cmdline", cmdline);
+        }
+        try {
+            ILaunchConfiguration config =
+                    launch.getLaunchConfiguration();
+            if (config != null) {
+                String workDir = config.getAttribute(
+                        "org.eclipse.debug.core.ATTR_WORKING_DIRECTORY",
+                        (String) null);
+                if (workDir != null) {
+                    response.put("workingDir", workDir);
+                }
+            }
+        } catch (Exception e) { /* ignored */ }
     }
 
     static String launchName(ILaunch launch) {

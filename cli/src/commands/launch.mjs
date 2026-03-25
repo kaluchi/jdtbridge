@@ -79,19 +79,29 @@ async function launchWithMode(args, mode) {
 
   const follow = args.includes("-f") || args.includes("--follow");
   if (follow) {
-    console.error(`Launched ${result.name} (${result.mode})`);
+    console.error(formatLaunched(result));
     const exitCode = await followLogs(result.name, args);
     process.exit(exitCode);
   }
 
   const quiet = args.includes("-q") || args.includes("--quiet");
   const n = result.name;
-  const pid = result.pid ? `, pid ${result.pid}` : "";
-  console.log(`Launched ${n} (${result.mode}${pid})`);
+  console.log(formatLaunched(result));
 
   if (!quiet) {
     console.log(launchGuide(n));
   }
+}
+
+function formatLaunched(result) {
+  const parts = [`Launched ${result.name} (${result.mode})`];
+  if (result.type) parts[0] += ` [${result.type}]`;
+  if (result.pid) parts.push(`  PID:        ${result.pid}`);
+  if (result.workingDir) parts.push(`  Working dir: ${result.workingDir}`);
+  if (result.cmdline) {
+    parts.push(`  Command:    ${result.cmdline}`);
+  }
+  return parts.join("\n");
 }
 
 function launchGuide(name) {
