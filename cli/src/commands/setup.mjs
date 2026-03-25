@@ -357,9 +357,24 @@ export async function setup(args) {
     await runCheck(config);
   } else if (args.includes("--remove")) {
     await runRemove(config);
+  } else if (args.includes("--claude")) {
+    await setupClaude();
   } else {
     await runInstall(config, flags);
   }
+}
+
+async function setupClaude() {
+  const { installClaudeSettings } = await import("../claude-setup.mjs");
+  const { file } = installClaudeSettings();
+
+  console.log(`${green("✓")} Claude Code settings written to ${file}`);
+  console.log();
+  console.log("  Installed:");
+  console.log("  - Bash(jdt *) permission rule");
+  console.log("  - PreToolUse hook for # workaround (issue #34061)");
+  console.log();
+  console.log("  Restart Claude Code to apply.");
 }
 
 export const help = `Set up the Eclipse JDT Bridge plugin.
@@ -370,6 +385,7 @@ Modes:
   (default)       build plugin from source, install into Eclipse
   --check         show status of all components (diagnostic only)
   --remove        uninstall the plugin from Eclipse
+  --claude        configure Claude Code for this project (permissions + hooks)
 
 Options:
   --eclipse <path>    Eclipse installation directory
