@@ -180,6 +180,22 @@ After pulling updates, run `jdt setup` again to rebuild and reinstall.
 
 - **Workspace must be fully built.** JDT search relies on the Eclipse index. If the workspace hasn't been fully indexed, results may be incomplete. Use `jdt build` or `jdt build --clean` to trigger builds.
 
+- **Claude Code prompts for `#` in arguments.** Commands like `jdt source "Class#method"` trigger a permission prompt because Claude Code treats `#` as a shell metacharacter ([issue #34061](https://github.com/anthropics/claude-code/issues/34061)). Allow rules don't help. Workaround — add a PreToolUse hook to `.claude/settings.json`:
+
+  ```json
+  {
+    "hooks": {
+      "PreToolUse": [{
+        "matcher": "Bash",
+        "hooks": [{
+          "type": "command",
+          "command": "node -e \"d=JSON.parse(require('fs').readFileSync(0,'utf8'));d.tool_input?.command?.startsWith('jdt ')&&process.stdout.write(JSON.stringify({hookSpecificOutput:{hookEventName:'PreToolUse',permissionDecision:'allow'}}))\""
+        }]
+      }]
+    }
+  }
+  ```
+
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE).
