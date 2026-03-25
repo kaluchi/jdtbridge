@@ -128,11 +128,23 @@ Returns all saved launch configurations (Run → Run Configurations).
 
 ### `GET /launch/console?name=<config-name>[&tail=<N>][&stream=stdout|stderr]`
 
-Returns console output (stdout + stderr) of a launch. `tail` limits to last N lines. `stream` filters to stdout or stderr only.
+Returns console output (stdout + stderr) of a launch as JSON.
+`tail` limits to last N lines. `stream` filters to stdout or stderr only.
+Returns `{name, terminated, output}`.
+
+### `GET /launch/console/stream?name=<config-name>[&tail=<N>][&stream=stdout|stderr]`
+
+Streams console output as `text/plain`. Connection stays open until the
+process terminates. Writes accumulated content first, then live output.
+Used by `jdt launch logs -f`.
 
 ### `GET /launch/run?name=<config-name>[&debug]`
 
-Launch a saved configuration. Returns immediately (fire-and-forget). Add `&debug` for debug mode.
+Launch a saved configuration. Returns immediately.
+Add `&debug` for debug mode.
+Returns `{ok, name, mode, type, pid, cmdline, workingDir}` — metadata
+fields (`pid`, `cmdline`, `workingDir`) are present when the process
+has started.
 
 ### `GET /launch/stop?name=<name>`
 
@@ -140,7 +152,8 @@ Terminate a running launch.
 
 ### `GET /launch/clear[?name=<config-name>]`
 
-Removes terminated launches and their console output. Without `name`, removes all terminated. With `name`, removes only that one.
+Removes terminated launches and their console output. Without `name`,
+removes all terminated. With `name`, removes only that one.
 
 ## Connection details
 

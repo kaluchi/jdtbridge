@@ -76,11 +76,16 @@ jdt move <FQN> <target.package>                        # move type to another pa
 ```bash
 jdt launch list                                        # list launches (running + terminated)
 jdt launch configs                                     # list saved launch configurations
-jdt launch run <config> [--debug]                      # launch a configuration
+jdt launch run <config> [-f] [-q]                      # launch a configuration
+jdt launch debug <config> [-f] [-q]                    # launch in debug mode
+jdt launch logs <name> [-f] [--tail N]                 # show console output
 jdt launch stop <name>                                 # stop a running launch
-jdt launch console <name> [--tail N]                   # show console output
 jdt launch clear [name]                                # remove terminated launches
 ```
+
+`-f` streams output in real-time until the process terminates.
+Without `-f`, `launch run` prints an onboarding guide with available commands (`-q` to suppress).
+Console output persists in Eclipse and is available via `launch logs` at any time.
 
 ### Editor
 
