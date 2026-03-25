@@ -35,4 +35,4 @@ export const help = `Find implementations of an interface method across all impl
 Usage:  jdt implementors <FQN>#<method>[(param types)]
 
 Examples:
-  jdt implementors app.m8.web.shared.core.HasId#getId`;
+  jdt implementors com.example.core.HasId#getId`;

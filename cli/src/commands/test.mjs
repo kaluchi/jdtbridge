@@ -43,6 +43,6 @@ Flags:
   --timeout <sec>    test run timeout in seconds (default: 120)
 
 Examples:
-  jdt test app.m8ws.utils.ObjectMapperTest
-  jdt test app.m8ws.utils.ObjectMapperTest#testSerialize
+  jdt test com.example.util.ObjectMapperTest
+  jdt test com.example.util.ObjectMapperTest#testSerialize
   jdt test --project m8-server`;

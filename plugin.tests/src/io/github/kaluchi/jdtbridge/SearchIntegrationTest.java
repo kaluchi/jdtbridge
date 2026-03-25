@@ -236,22 +236,24 @@ public class SearchIntegrationTest {
     public void sourceFullClass() throws Exception {
         HttpServer.Response resp = handler.handleSource(
                 Map.of("class", "test.model.Dog"));
-        assertEquals("text/plain", resp.contentType());
+        assertEquals("application/json", resp.contentType());
         assertTrue(resp.body().contains("public class Dog"),
                 "Should contain class body: " + resp.body());
         assertTrue(resp.body().contains("public void bark()"),
                 "Should contain bark method: " + resp.body());
+        assertTrue(resp.body().contains("\"refs\""),
+                "Should have refs: " + resp.body());
     }
 
     @Test
     public void sourceMethod() throws Exception {
         HttpServer.Response resp = handler.handleSource(
                 Map.of("class", "test.model.Dog", "method", "bark"));
-        assertEquals("text/plain", resp.contentType());
+        assertEquals("application/json", resp.contentType());
         assertTrue(resp.body().contains("bark"),
                 "Should contain bark: " + resp.body());
-        assertTrue(resp.headers().containsKey("X-Start-Line"),
-                "Should have line header");
+        assertTrue(resp.body().contains("\"fqmn\""),
+                "Should have fqmn: " + resp.body());
     }
 
     @Test

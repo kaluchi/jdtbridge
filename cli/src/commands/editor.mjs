@@ -50,6 +50,6 @@ export const openHelp = `Open a type or method in the Eclipse editor.
 Usage:  jdt open <FQN>[#method[(param types)]]
 
 Examples:
-  jdt open app.m8.dao.StaffDaoImpl
-  jdt open app.m8.dao.StaffDaoImpl#getStaff
-  jdt open "app.m8.dao.StaffDaoImpl#save(Order)"`;
+  jdt open com.example.dao.UserDaoImpl
+  jdt open com.example.dao.UserDaoImpl#getStaff
+  jdt open "com.example.dao.UserDaoImpl#save(Order)"`;

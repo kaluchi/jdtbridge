@@ -48,7 +48,7 @@ Flags:
   --field <name>   find references to a field
 
 Examples:
-  jdt references app.m8.dto.web.core.IdOrgRoot
-  jdt references app.m8.dao.StaffDaoImpl#getStaff
-  jdt references "app.m8.dao.StaffDaoImpl#save(Order)"
-  jdt references app.m8.dao.StaffDaoImpl --field staffCache`;
+  jdt references com.example.dto.BaseEntity
+  jdt references com.example.dao.UserDaoImpl#getStaff
+  jdt references "com.example.dao.UserDaoImpl#save(Order)"
+  jdt references com.example.dao.UserDaoImpl --field staffCache`;

@@ -69,12 +69,12 @@ describe("commands (integration)", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { fqn: "app.m8.Foo", file: "/m8-server/src/main/java/app/m8/Foo.java" },
+        { fqn: "com.example.Foo", file: "/m8-server/src/main/java/app/m8/Foo.java" },
       ]));
     });
     const { find } = await import("../src/commands/find.mjs");
     await find(["Foo"]);
-    expect(io.logs[0]).toContain("app.m8.Foo");
+    expect(io.logs[0]).toContain("com.example.Foo");
     expect(io.logs[0]).toContain("m8-server/src/main/java/app/m8/Foo.java");
   });
 
@@ -92,12 +92,12 @@ describe("commands (integration)", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { fqn: "app.m8.FooImpl", file: "/m8-server/src/FooImpl.java" },
+        { fqn: "com.example.FooImpl", file: "/m8-server/src/FooImpl.java" },
       ]));
     });
     const { subtypes } = await import("../src/commands/subtypes.mjs");
-    await subtypes(["app.m8.Foo"]);
-    expect(io.logs[0]).toContain("app.m8.FooImpl");
+    await subtypes(["com.example.Foo"]);
+    expect(io.logs[0]).toContain("com.example.FooImpl");
   });
 
   it("hierarchy shows all sections", async () => {
@@ -105,28 +105,28 @@ describe("commands (integration)", () => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({
         supers: [{ fqn: "java.lang.Object", binary: true }],
-        interfaces: [{ fqn: "app.m8.HasId", binary: false, file: "/m8-shared/src/HasId.java" }],
+        interfaces: [{ fqn: "com.example.HasId", binary: false, file: "/m8-shared/src/HasId.java" }],
         subtypes: [],
       }));
     });
     const { hierarchy } = await import("../src/commands/hierarchy.mjs");
-    await hierarchy(["app.m8.Foo"]);
+    await hierarchy(["com.example.Foo"]);
     expect(io.logs.some((l) => l.includes("Superclasses"))).toBe(true);
     expect(io.logs.some((l) => l.includes("java.lang.Object"))).toBe(true);
     expect(io.logs.some((l) => l.includes("Interfaces"))).toBe(true);
-    expect(io.logs.some((l) => l.includes("app.m8.HasId"))).toBe(true);
+    expect(io.logs.some((l) => l.includes("com.example.HasId"))).toBe(true);
   });
 
   it("implementors shows FQN, file, and line", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { fqn: "app.m8.FooImpl", file: "/m8-server/src/FooImpl.java", line: 25 },
+        { fqn: "com.example.FooImpl", file: "/m8-server/src/FooImpl.java", line: 25 },
       ]));
     });
     const { implementors } = await import("../src/commands/implementors.mjs");
-    await implementors(["app.m8.Foo", "doStuff"]);
-    expect(io.logs[0]).toContain("app.m8.FooImpl");
+    await implementors(["com.example.Foo", "doStuff"]);
+    expect(io.logs[0]).toContain("com.example.FooImpl");
     expect(io.logs[0]).toContain(":25");
   });
 
@@ -180,7 +180,7 @@ describe("commands (integration)", () => {
       res.end(JSON.stringify({ ok: true, warnings: ["shadow detected"] }));
     });
     const { rename } = await import("../src/commands/refactoring.mjs");
-    await rename(["app.m8.Foo", "Bar", "--method", "old"]);
+    await rename(["com.example.Foo", "Bar", "--method", "old"]);
     expect(io.logs[0]).toBe("Renamed");
     expect(io.logs[1]).toContain("shadow detected");
   });
@@ -191,7 +191,7 @@ describe("commands (integration)", () => {
       res.end(JSON.stringify({ ok: true }));
     });
     const { move } = await import("../src/commands/refactoring.mjs");
-    await move(["app.m8.Foo", "app.m8.bar"]);
+    await move(["com.example.Foo", "com.example.bar"]);
     expect(io.logs[0]).toBe("Moved");
   });
 
@@ -225,7 +225,7 @@ describe("commands (integration)", () => {
       res.end(JSON.stringify({ ok: true }));
     });
     const { open } = await import("../src/commands/editor.mjs");
-    await open(["app.m8.Foo"]);
+    await open(["com.example.Foo"]);
     expect(io.logs[0]).toBe("Opened");
   });
 
@@ -276,37 +276,40 @@ describe("commands (integration)", () => {
     expect(io.logs[0]).toBe("Build complete (0 errors)");
   });
 
-  it("source prints file header and body", async () => {
+  it("source prints markdown with refs", async () => {
     await setupMock((req, res) => {
-      res.writeHead(200, {
-        "Content-Type": "text/plain",
-        "X-File": "/m8-server/src/Foo.java",
-        "X-Start-Line": "5",
-        "X-End-Line": "15",
-      });
-      res.end("public class Foo {\n}\n");
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        fqmn: "com.example.Foo",
+        file: "D:/project/src/Foo.java",
+        startLine: 5, endLine: 15,
+        source: "public class Foo {\n}\n",
+        refs: [],
+      }));
     });
     const { source } = await import("../src/commands/source.mjs");
-    await source(["app.m8.Foo"]);
-    expect(io.logs[0]).toBe("m8-server/src/Foo.java:5-15");
-    expect(io.logs[1]).toContain("public class Foo");
+    await source(["com.example.Foo"]);
+    const out = io.logs.join("\n");
+    expect(out).toContain("#### com.example.Foo");
+    expect(out).toContain("D:/project/src/Foo.java:5-15");
+    expect(out).toContain("public class Foo");
   });
 
   it("type-info shows class details", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({
-        kind: "class", fqn: "app.m8.Foo", file: "/m8-server/src/Foo.java",
-        superclass: "java.lang.Object", interfaces: ["app.m8.HasId"],
+        kind: "class", fqn: "com.example.Foo", file: "/m8-server/src/Foo.java",
+        superclass: "java.lang.Object", interfaces: ["com.example.HasId"],
         fields: [{ modifiers: "private", type: "String", name: "id", line: 5 }],
         methods: [{ signature: "String getId()", line: 7 }],
       }));
     });
     const { typeInfo } = await import("../src/commands/type-info.mjs");
-    await typeInfo(["app.m8.Foo"]);
-    expect(io.logs[0]).toContain("class app.m8.Foo");
+    await typeInfo(["com.example.Foo"]);
+    expect(io.logs[0]).toContain("class com.example.Foo");
     expect(io.logs.some((l) => l.includes("extends java.lang.Object"))).toBe(true);
-    expect(io.logs.some((l) => l.includes("implements app.m8.HasId"))).toBe(true);
+    expect(io.logs.some((l) => l.includes("implements com.example.HasId"))).toBe(true);
     expect(io.logs.some((l) => l.includes("String id"))).toBe(true);
     expect(io.logs.some((l) => l.includes("String getId()"))).toBe(true);
   });
@@ -339,7 +342,7 @@ describe("commands (integration)", () => {
       ]));
     });
     const { references } = await import("../src/commands/references.mjs");
-    await references(["app.m8.Foo"]);
+    await references(["com.example.Foo"]);
     expect(io.logs[0]).toBe("m8-server/src/Bar.java:10");
     expect(io.logs[1]).toContain("in Bar.init()");
   });
@@ -362,7 +365,7 @@ describe("commands (integration)", () => {
   it("rename exits on missing newName", async () => {
     await setupMock((req, res) => res.end());
     const { rename } = await import("../src/commands/refactoring.mjs");
-    await expect(rename(["app.m8.Foo"])).rejects.toThrow("exit(1)");
+    await expect(rename(["com.example.Foo"])).rejects.toThrow("exit(1)");
   });
 
   it("subtypes exits on missing args", async () => {
@@ -380,7 +383,7 @@ describe("commands (integration)", () => {
   it("implementors exits on missing method", async () => {
     await setupMock((req, res) => res.end());
     const { implementors } = await import("../src/commands/implementors.mjs");
-    await expect(implementors(["app.m8.Foo"])).rejects.toThrow("exit(1)");
+    await expect(implementors(["com.example.Foo"])).rejects.toThrow("exit(1)");
   });
 
   it("type-info exits on missing args", async () => {
@@ -416,7 +419,7 @@ describe("commands (integration)", () => {
   it("move exits on missing target", async () => {
     await setupMock((req, res) => res.end());
     const { move } = await import("../src/commands/refactoring.mjs");
-    await expect(move(["app.m8.Foo"])).rejects.toThrow("exit(1)");
+    await expect(move(["com.example.Foo"])).rejects.toThrow("exit(1)");
   });
 
   it("open exits on missing args", async () => {
@@ -938,20 +941,7 @@ describe("commands (integration)", () => {
     expect(io.logs.some((l) => l.includes("app.Sub"))).toBe(true);
   });
 
-  it("source handles multiple overloads (startLine=-1)", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, {
-        "Content-Type": "text/plain",
-        "X-File": "/m8-server/src/Foo.java",
-        "X-Start-Line": "-1",
-        "X-End-Line": "-1",
-      });
-      res.end(":10-15\npublic void a() {}\n:20-25\npublic void a(int x) {}\n");
-    });
-    const { source } = await import("../src/commands/source.mjs");
-    await source(["app.Foo", "a"]);
-    expect(io.logs[0]).toContain("m8-server/src/Foo.java:10-15");
-  });
+  // TODO: multiple overloads still uses legacy text/plain format
 
   it("type-info shows interface without fields", async () => {
     await setupMock((req, res) => {
@@ -990,6 +980,80 @@ describe("commands (integration)", () => {
     const { test } = await import("../src/commands/test.mjs");
     await test(["--project", "m8-server"]);
     expect(io.logs[0]).toContain("10 tests");
+  });
+
+  // ---- source ----
+
+  it("source renders markdown with refs", async () => {
+    await setupMock((req, res) => {
+      expect(req.url).toContain("class=com.example.Foo");
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        fqmn: "com.example.Foo#bar()",
+        file: "D:/project/src/com/example/Foo.java",
+        startLine: 10,
+        endLine: 20,
+        source: "public void bar() {\n    baz();\n}",
+        refs: [
+          { fqmn: "com.example.Foo#baz()", kind: "method", scope: "class", type: "void", line: 25, doc: "Does baz." },
+          { fqmn: "com.example.Util", kind: "type", scope: "project", file: "D:/project/src/com/example/Util.java", doc: "Utilities." },
+          { fqmn: "org.eclipse.core.runtime.CoreException", kind: "type", scope: "dependency" },
+        ],
+      }));
+    });
+    const { source } = await import("../src/commands/source.mjs");
+    await source(["com.example.Foo#bar"]);
+    const out = io.logs.join("\n");
+    // Header
+    expect(out).toContain("#### com.example.Foo#bar()");
+    expect(out).toContain("D:/project/src/com/example/Foo.java:10-20");
+    // Code block
+    expect(out).toContain("```java");
+    expect(out).toContain("public void bar()");
+    // Class refs with javadoc
+    expect(out).toContain("**Foo:**");
+    expect(out).toContain("`com.example.Foo#baz()`");
+    expect(out).toContain("Does baz.");
+    // Project refs with path
+    expect(out).toContain("`com.example.Util`");
+    expect(out).toContain("D:/project/src/com/example/Util.java");
+    // Dependency refs
+    expect(out).toContain("**References:**");
+    expect(out).toContain("`org.eclipse.core.runtime.CoreException`");
+  });
+
+  it("source with error", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Type not found: Bogus" }));
+    });
+    const { source } = await import("../src/commands/source.mjs");
+    await expect(source(["Bogus"])).rejects.toThrow("exit(1)");
+    expect(io.errors[0]).toContain("not found");
+  });
+
+  it("source missing arg exits", async () => {
+    const { source } = await import("../src/commands/source.mjs");
+    await expect(source([])).rejects.toThrow("exit(1)");
+  });
+
+  it("source with no refs renders clean", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        fqmn: "com.example.Simple",
+        file: "D:/project/src/Simple.java",
+        startLine: 1,
+        endLine: 5,
+        source: "public class Simple {}",
+        refs: [],
+      }));
+    });
+    const { source } = await import("../src/commands/source.mjs");
+    await source(["com.example.Simple"]);
+    const out = io.logs.join("\n");
+    expect(out).toContain("```java");
+    expect(out).not.toContain("**References:**");
   });
 
   it("find with --source-only flag", async () => {

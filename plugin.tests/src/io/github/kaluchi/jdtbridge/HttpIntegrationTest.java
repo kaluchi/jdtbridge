@@ -186,10 +186,10 @@ public class HttpIntegrationTest {
                 "Authorization: Bearer " + TOKEN);
         assertTrue(response.startsWith("HTTP/1.1 200"),
                 "Should be 200: " + response);
-        assertTrue(response.contains("X-File:"),
-                "Should have X-File header: " + response);
+        assertTrue(response.contains("application/json"),
+                "Should be JSON: " + response);
         assertTrue(response.contains("public class Dog"),
-                "Should have source body: " + response);
+                "Should have source in body: " + response);
     }
 
     @Test

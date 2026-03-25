@@ -45,4 +45,4 @@ export const help = `Show full type hierarchy: superclasses, interfaces, and sub
 
 Usage:  jdt hierarchy <FQN>
 
-Example:  jdt hierarchy app.m8.web.client.AGMEntryPoint`;
+Example:  jdt hierarchy com.example.client.AppEntryPoint`;

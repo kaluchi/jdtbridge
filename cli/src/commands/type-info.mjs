@@ -44,4 +44,4 @@ export const help = `Show class overview: fields, methods, modifiers, and line n
 
 Usage:  jdt type-info <FQN>
 
-Example:  jdt type-info app.m8.dto.web.core.IdOrgRoot`;
+Example:  jdt type-info com.example.dto.BaseEntity`;

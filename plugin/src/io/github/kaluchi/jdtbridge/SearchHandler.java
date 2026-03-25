@@ -45,6 +45,15 @@ class SearchHandler {
         return arr.toString();
     }
 
+    /**
+     * Find types by name, wildcard pattern, or package prefix.
+     * Supports exact match, pattern match (`*`, `?`), and dotted
+     * package search. 
+     * 
+     * @param params 
+     * @return JSON array of `{fqn, file}` entries.
+     * @throws CoreException
+     */
     String handleFind(Map<String, String> params) throws CoreException {
         String name = params.get("name");
         if (name == null || name.isBlank()) {
@@ -429,6 +438,7 @@ class SearchHandler {
         }
 
         String file = filePath(type);
+        String absPath = absolutePath(type);
         String fullSource = getFullSource(type);
 
         if (methodName != null && !methodName.isBlank()) {
@@ -442,8 +452,9 @@ class SearchHandler {
             }
 
             if (methods.size() == 1) {
-                return singleMemberResponse(
-                        methods.get(0), file, fullSource);
+                return resolvedResponse(
+                        methods.get(0), fqn, methodName,
+                        absPath, fullSource, params);
             }
 
             // Multiple overloads — each prefixed with :start-end
@@ -465,7 +476,42 @@ class SearchHandler {
         }
 
         // Full class source
-        return singleMemberResponse(type, file, fullSource);
+        return resolvedResponse(type, fqn, null,
+                absPath, fullSource, params);
+    }
+
+    private HttpServer.Response resolvedResponse(IMember member,
+            String fqn, String methodName, String absPath,
+            String fullSource, Map<String, String> params)
+            throws Exception {
+        String source = member.getSource();
+        if (source == null) {
+            return HttpServer.Response.json(
+                    Json.error("Source not available"));
+        }
+        int[] lines = memberLines(member, fullSource);
+        String fqmn = methodName != null
+                ? fqn + "#" + methodName
+                        + JdtUtils.compactSignature((IMethod) member)
+                                .substring(
+                                        ((IMethod) member)
+                                                .getElementName()
+                                                .length())
+                : fqn;
+
+        var refs = ReferenceCollector.collect(member);
+        String json = SourceReport.toJson(
+                fqmn, member, absPath, source,
+                lines[0], lines[1], refs);
+
+        return HttpServer.Response.json(json);
+    }
+
+    private String absolutePath(IType type) {
+        if (type.getResource() != null) {
+            return type.getResource().getLocation().toOSString();
+        }
+        return filePath(type);
     }
 
     // ---- Helpers ----

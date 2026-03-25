@@ -109,11 +109,11 @@ Usage:  jdt rename <FQN>[#method[(param types)]] <newName>
         jdt rename <FQN> <newName> [--field <old>]
 
 Examples:
-  jdt rename app.m8.dto.Foo Bar
-  jdt rename app.m8.dto.Foo#getFoo getBar`;
+  jdt rename com.example.dto.Foo Bar
+  jdt rename com.example.dto.Foo#getFoo getBar`;
 
 export const moveHelp = `Move a type to another package (updates all references).
 
 Usage:  jdt move <FQN> <target.package>
 
-Example:  jdt move app.m8.dto.Foo app.m8.dto.shared`;
+Example:  jdt move com.example.dto.Foo com.example.dto.shared`;

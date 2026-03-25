@@ -381,9 +381,9 @@ describe("parseFqmn", () => {
 
     it("Maven Surefire style — no params", () => {
       expect(
-        parseFqmn("app.m8ws.utils.ObjectMapperTest#testSerialize"),
+        parseFqmn("com.example.util.ObjectMapperTest#testSerialize"),
       ).toEqual({
-        className: "app.m8ws.utils.ObjectMapperTest",
+        className: "com.example.util.ObjectMapperTest",
         method: "testSerialize",
         paramTypes: null,
       });

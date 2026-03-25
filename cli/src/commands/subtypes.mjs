@@ -30,4 +30,4 @@ export const help = `Find all direct and indirect subtypes/implementors of a typ
 
 Usage:  jdt subtypes <FQN>
 
-Example:  jdt subtypes app.m8.web.shared.core.HasId`;
+Example:  jdt subtypes com.example.core.HasId`;
