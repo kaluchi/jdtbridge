@@ -3,31 +3,36 @@ import { extractPositional, parseFqmn } from "../args.mjs";
 
 export async function source(args) {
   const pos = extractPositional(args);
-  const parsed = parseFqmn(pos[0]);
-  const fqn = parsed.className;
-  if (!fqn) {
-    console.error("Usage: source <FQN>[#method[(param types)]]");
+  if (pos.length === 0) {
+    console.error("Usage: source <FQMN> [<FQMN> ...]");
     process.exit(1);
   }
-  const method = parsed.method || pos[1];
-  let url = `/source?class=${encodeURIComponent(fqn)}`;
-  if (method) url += `&method=${encodeURIComponent(method)}`;
+
+  // Batch: multiple FQMNs in parallel
+  const results = await Promise.all(pos.map((arg) => fetchOne(arg)));
+  const blocks = [];
+  for (const r of results) {
+    if (r.error) {
+      console.error(r.error);
+    } else if (Array.isArray(r)) {
+      blocks.push(...r.map(formatMarkdown));
+    } else {
+      blocks.push(formatMarkdown(r));
+    }
+  }
+  if (blocks.length === 0) process.exit(1);
+  console.log(blocks.join("\n\n---\n\n"));
+}
+
+async function fetchOne(fqmn) {
+  const parsed = parseFqmn(fqmn);
+  if (!parsed.className) return { error: `Invalid FQMN: ${fqmn}` };
+  let url = `/source?class=${encodeURIComponent(parsed.className)}`;
+  if (parsed.method) url += `&method=${encodeURIComponent(parsed.method)}`;
   if (parsed.paramTypes) {
     url += `&paramTypes=${encodeURIComponent(parsed.paramTypes.join(","))}`;
   }
-
-  const result = await get(url, 30_000);
-  if (result.error) {
-    console.error(result.error);
-    process.exit(1);
-  }
-
-  // Multiple overloads → array
-  if (Array.isArray(result)) {
-    console.log(result.map(formatMarkdown).join("\n\n---\n\n"));
-  } else {
-    console.log(formatMarkdown(result));
-  }
+  return get(url, 30_000);
 }
 
 function formatMarkdown(result) {
@@ -144,9 +149,12 @@ Returns markdown with source in a code block and references grouped by:
 
 Each reference is a ready argument for the next jdt source call.
 
-Usage:  jdt source <FQN>[#method[(param types)]]
+Usage:  jdt source <FQMN> [<FQMN> ...]
+
+Multiple FQMNs are fetched in parallel (batch navigation).
 
 Examples:
   jdt source com.example.dao.UserDaoImpl
   jdt source com.example.dao.UserDaoImpl#getStaff
-  jdt source "com.example.dao.UserDaoImpl#save(Order)"`;
+  jdt source "com.example.dao.UserDaoImpl#save(Order)"
+  jdt source com.example.Foo#bar com.example.Util com.example.Json`;

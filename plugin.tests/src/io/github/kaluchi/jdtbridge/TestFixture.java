@@ -5,7 +5,9 @@ import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IProjectDescription;
 import org.eclipse.core.resources.IWorkspaceRoot;
 import org.eclipse.core.resources.ResourcesPlugin;
+import org.eclipse.core.runtime.FileLocator;
 import org.eclipse.core.runtime.Path;
+import org.eclipse.core.runtime.Platform;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.jdt.core.IClasspathEntry;
 import org.eclipse.jdt.core.IJavaProject;
@@ -302,9 +304,18 @@ class TestFixture {
                 new Path("org.eclipse.jdt.launching.JRE_CONTAINER"));
         IClasspathEntry junitEntry = JavaCore.newContainerEntry(
                 new Path("org.eclipse.jdt.junit.JUNIT_CONTAINER/5"));
-        javaProject.setRawClasspath(
-                new IClasspathEntry[] { srcEntry, jreEntry,
-                        junitEntry }, null);
+
+        // Add org.eclipse.core.resources for binary source tests
+        IClasspathEntry resEntry = bundleClasspathEntry(
+                "org.eclipse.core.resources",
+                "org.eclipse.core.resources.source");
+
+        IClasspathEntry[] cp = resEntry != null
+                ? new IClasspathEntry[] { srcEntry, jreEntry,
+                        junitEntry, resEntry }
+                : new IClasspathEntry[] { srcEntry, jreEntry,
+                        junitEntry };
+        javaProject.setRawClasspath(cp, null);
 
         // Initialize project preferences (needed by refactoring APIs)
         javaProject.setOption(JavaCore.COMPILER_SOURCE, "21");
@@ -366,6 +377,31 @@ class TestFixture {
         // Wait for auto-build to finish
         Job.getJobManager().join(
                 ResourcesPlugin.FAMILY_AUTO_BUILD, null);
+    }
+
+    /**
+     * Create a classpath entry for an OSGi bundle with optional
+     * source attachment from a source bundle.
+     */
+    private static IClasspathEntry bundleClasspathEntry(
+            String bundleId, String sourceBundleId) {
+        var bundle = Platform.getBundle(bundleId);
+        if (bundle == null) return null;
+        java.io.File file = FileLocator
+                .getBundleFileLocation(bundle).orElse(null);
+        if (file == null) return null;
+        Path srcPath = null;
+        var srcBundle = Platform.getBundle(sourceBundleId);
+        if (srcBundle != null) {
+            java.io.File sf = FileLocator
+                    .getBundleFileLocation(srcBundle)
+                    .orElse(null);
+            if (sf != null)
+                srcPath = new Path(sf.getAbsolutePath());
+        }
+        return JavaCore.newLibraryEntry(
+                new Path(file.getAbsolutePath()),
+                srcPath, null);
     }
 
     static void destroy() throws Exception {

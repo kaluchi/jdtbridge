@@ -2,6 +2,7 @@ package io.github.kaluchi.jdtbridge;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
@@ -254,6 +255,23 @@ public class SearchIntegrationTest {
                 "Should contain bark: " + resp.body());
         assertTrue(resp.body().contains("\"fqmn\""),
                 "Should have fqmn: " + resp.body());
+    }
+
+    @Test
+    public void sourcePreservesLeadingIndent() throws Exception {
+        // Dog.bark() has 4-space indent in TestFixture source.
+        // IMember.getSource() strips it. Our handler must not.
+        HttpServer.Response resp = handler.handleSource(
+                Map.of("class", "test.model.Dog", "method", "bark"));
+        var parsed = Json.parse(resp.body());
+        String source = Json.getString(parsed, "source");
+        assertNotNull(source);
+        assertFalse(source.startsWith("public"),
+                "Should NOT start with 'public' (indent stripped)."
+                + " Starts with: [" + source.substring(0,
+                        Math.min(30, source.length())) + "]");
+        assertTrue(source.contains("    public void bark()"),
+                "Should have 4-space indent before 'public'");
     }
 
     @Test

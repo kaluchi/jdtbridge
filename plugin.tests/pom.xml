@@ -37,6 +37,14 @@
                             <type>eclipse-plugin</type>
                             <artifactId>junit-platform-commons</artifactId>
                         </dependency>
+                        <!-- Source bundle for binary-type indent test
+                             (SourceIndentTest.binaryMethodSourceHasIndent).
+                             TestFixture adds it to the test project classpath
+                             via Platform.getBundle + FileLocator. -->
+                        <dependency>
+                            <type>eclipse-plugin</type>
+                            <artifactId>org.eclipse.core.resources.source</artifactId>
+                        </dependency>
                     </dependencies>
                 </configuration>
             </plugin>

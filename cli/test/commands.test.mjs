@@ -1070,6 +1070,53 @@ describe("commands (integration)", () => {
     expect(out).not.toContain("**References:**");
   });
 
+  it("source batch fetches multiple FQMNs", async () => {
+    let requestCount = 0;
+    await setupMock((req, res) => {
+      requestCount++;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      if (req.url.includes("class=com.example.Foo")) {
+        res.end(JSON.stringify({
+          fqmn: "com.example.Foo", file: "D:/src/Foo.java",
+          startLine: 1, endLine: 10, source: "class Foo {}", refs: [],
+        }));
+      } else {
+        res.end(JSON.stringify({
+          fqmn: "com.example.Bar", file: "D:/src/Bar.java",
+          startLine: 1, endLine: 5, source: "class Bar {}", refs: [],
+        }));
+      }
+    });
+    const { source } = await import("../src/commands/source.mjs");
+    await source(["com.example.Foo", "com.example.Bar"]);
+    const out = io.logs.join("\n");
+    expect(out).toContain("#### com.example.Foo");
+    expect(out).toContain("#### com.example.Bar");
+    expect(out).toContain("---");
+    expect(requestCount).toBe(2);
+  });
+
+  it("source batch skips errors continues others", async () => {
+    let count = 0;
+    await setupMock((req, res) => {
+      count++;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      if (count === 1) {
+        res.end(JSON.stringify({ error: "Not found" }));
+      } else {
+        res.end(JSON.stringify({
+          fqmn: "com.example.Ok", file: "D:/src/Ok.java",
+          startLine: 1, endLine: 3, source: "class Ok {}", refs: [],
+        }));
+      }
+    });
+    const { source } = await import("../src/commands/source.mjs");
+    await source(["com.example.Bad", "com.example.Ok"]);
+    const out = io.logs.join("\n");
+    expect(out).toContain("#### com.example.Ok");
+    expect(io.errors[0]).toContain("Not found");
+  });
+
   it("find with --source-only flag", async () => {
     await setupMock((req, res) => {
       expect(req.url).toContain("source");

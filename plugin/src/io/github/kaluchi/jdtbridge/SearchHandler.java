@@ -437,6 +437,14 @@ class SearchHandler {
                     Json.error("Type not found: " + fqn));
         }
 
+        // Refresh from disk — Claude Code (or other editors) may have
+        // changed the file since Eclipse last synced. DEPTH_ZERO is cheap.
+        if (type.getResource() != null) {
+            type.getResource().refreshLocal(
+                    org.eclipse.core.resources.IResource.DEPTH_ZERO,
+                    null);
+        }
+
         String file = filePath(type);
         String absPath = absolutePath(type);
         String fullSource = getFullSource(type);
@@ -460,9 +468,12 @@ class SearchHandler {
             // Multiple overloads — JSON array
             Json arr = Json.array();
             for (IMethod method : methods) {
-                String src = method.getSource();
-                if (src == null) continue;
                 int[] lines = memberLines(method, fullSource);
+                String src = sourceFromDisk(absPath,
+                        lines[0], lines[1]);
+                if (src == null) src = substringWithIndent(
+                        method, fullSource);
+                if (src == null) continue;
                 String sig = JdtUtils.compactSignature(method);
                 String mFqmn = fqn + "#" + sig;
                 var refs = ReferenceCollector.collect(method);
@@ -495,12 +506,18 @@ class SearchHandler {
             String fqn, String methodName, String absPath,
             String fullSource, Map<String, String> params)
             throws Exception {
-        String source = member.getSource();
+        int[] lines = memberLines(member, fullSource);
+        // Read from disk to preserve indentation
+        String source = sourceFromDisk(absPath,
+                lines[0], lines[1]);
+        if (source == null) {
+            // Fallback: extract from fullSource with indent
+            source = substringWithIndent(member, fullSource);
+        }
         if (source == null) {
             return HttpServer.Response.json(
                     Json.error("Source not available"));
         }
-        int[] lines = memberLines(member, fullSource);
         String fqmn = methodName != null
                 ? fqn + "#" + methodName
                         + JdtUtils.compactSignature((IMethod) member)
@@ -523,6 +540,45 @@ class SearchHandler {
             return type.getResource().getLocation().toOSString();
         }
         return filePath(type);
+    }
+
+    /**
+     * Extract source from fullSource preserving leading indent.
+     * Eclipse's getSourceRange() offset skips leading whitespace.
+     * We back up to the line start to include the indent.
+     */
+    private String substringWithIndent(IMember member,
+            String fullSource) throws Exception {
+        if (fullSource == null) return member.getSource();
+        ISourceRange range = member.getSourceRange();
+        if (range == null || range.getOffset() < 0)
+            return member.getSource();
+        int offset = range.getOffset();
+        int end = Math.min(offset + range.getLength(),
+                fullSource.length());
+        int lineStart = fullSource.lastIndexOf('\n', offset - 1);
+        int from = (lineStart >= 0) ? lineStart + 1 : 0;
+        return fullSource.substring(from, end);
+    }
+
+    /**
+     * Read source lines directly from disk. Eclipse API strips
+     * leading whitespace; reading the file preserves indentation.
+     */
+    private String sourceFromDisk(String absPath,
+            int startLine, int endLine) {
+        if (startLine < 1 || endLine < 1) return null;
+        try {
+            var path = java.nio.file.Path.of(absPath);
+            if (!java.nio.file.Files.exists(path)) return null;
+            var lines = java.nio.file.Files.readAllLines(path);
+            int from = Math.max(0, startLine - 1);
+            int to = Math.min(lines.size(), endLine);
+            return String.join("\n",
+                    lines.subList(from, to)) + "\n";
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // ---- Helpers ----
@@ -734,7 +790,11 @@ class SearchHandler {
         return "?";
     }
 
-    private static String resourcePath(IType type) {
+    /**
+     * Resolve absolute filesystem path for a type. Falls back to
+     * the workspace-relative path for binary types without source.
+     */
+    static String resourcePath(IType type) {
         try {
             ICompilationUnit cu = type.getCompilationUnit();
             if (cu != null && cu.getResource() != null
