@@ -40,7 +40,7 @@ export function mergeJdtSettings(settings) {
   const existing = settings.hooks.PreToolUse.find(
     (h) =>
       h.matcher === "Bash" &&
-      h.hooks?.some((hk) => hk.command?.includes("jdt ")),
+      h.hooks?.some((hk) => hk.command === JDT_HOOK_COMMAND),
   );
   if (!existing) {
     settings.hooks.PreToolUse.push({

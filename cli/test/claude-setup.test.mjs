@@ -39,19 +39,29 @@ describe("mergeJdtSettings", () => {
     expect(settings.hooks.PreToolUse).toHaveLength(1);
   });
 
-  it("does not duplicate hook if jdt hook exists", () => {
+  it("does not duplicate if exact hook already exists", () => {
+    const settings = {};
+    mergeJdtSettings(settings);
+    const hookCommand = settings.hooks.PreToolUse[0].hooks[0].command;
+    // Add same hook manually — should not duplicate
+    mergeJdtSettings(settings);
+    expect(settings.hooks.PreToolUse).toHaveLength(1);
+    expect(settings.hooks.PreToolUse[0].hooks[0].command).toBe(hookCommand);
+  });
+
+  it("adds hook alongside unrelated Bash hook", () => {
     const settings = {
       hooks: {
         PreToolUse: [
           {
             matcher: "Bash",
-            hooks: [{ type: "command", command: "echo jdt check" }],
+            hooks: [{ type: "command", command: "echo other check" }],
           },
         ],
       },
     };
     mergeJdtSettings(settings);
-    expect(settings.hooks.PreToolUse).toHaveLength(1);
+    expect(settings.hooks.PreToolUse).toHaveLength(2);
   });
 });
 
