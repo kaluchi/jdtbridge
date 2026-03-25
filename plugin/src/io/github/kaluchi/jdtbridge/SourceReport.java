@@ -88,13 +88,29 @@ class SourceReport {
     private static String resolveType(ReferenceCollector.Ref ref) {
         try {
             if (ref.element() instanceof IMethod m) {
-                return Signature.toString(m.getReturnType());
+                return resolveTypeSig(
+                        m.getReturnType(), m.getDeclaringType());
             }
             if (ref.element() instanceof IField f) {
-                return Signature.toString(f.getTypeSignature());
+                return resolveTypeSig(
+                        f.getTypeSignature(), f.getDeclaringType());
             }
         } catch (JavaModelException e) { /* ignore */ }
         return null;
+    }
+
+    private static String resolveTypeSig(String sig, IType context)
+            throws JavaModelException {
+        String simple = Signature.toString(sig);
+        if (context == null) return simple;
+        // Try to resolve simple name to FQN
+        String[][] resolved = context.resolveType(simple);
+        if (resolved != null && resolved.length > 0) {
+            String pkg = resolved[0][0];
+            String name = resolved[0][1];
+            return pkg.isEmpty() ? name : pkg + "." + name;
+        }
+        return simple;
     }
 
     private static int[] memberLines(IJavaElement element) {
