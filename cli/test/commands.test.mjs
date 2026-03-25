@@ -643,14 +643,14 @@ describe("commands (integration)", () => {
     expect(io.logs[0]).toContain("m8-server");
   });
 
-  it("launch run with debug flag", async () => {
+  it("launch debug sends debug flag", async () => {
     await setupMock((req, res) => {
       expect(req.url).toContain("debug");
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ ok: true, name: "m8-server", mode: "debug" }));
     });
-    const { launchRun } = await import("../src/commands/launch.mjs");
-    await launchRun(["m8-server", "--debug"]);
+    const { launchDebug } = await import("../src/commands/launch.mjs");
+    await launchDebug(["m8-server"]);
     expect(io.logs[0]).toContain("debug");
   });
 

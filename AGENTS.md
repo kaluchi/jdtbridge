@@ -10,14 +10,24 @@ Required tools (verified by `jdt setup --check`):
 
 ## Environment check (REQUIRED)
 
-**MUST run at the start of every conversation, before any other work.**
+**Run at the start of every conversation, before any other work.**
 
-1. Run `jdt setup --check` — verifies CLI, Node, Java, Maven, Eclipse, bridge
-   - Command not found → `cd cli && npm install && npm link`
+1. `jdt setup --check` — verifies CLI, Node, Java, Maven, Eclipse, bridge.
+   - `jdt: command not found` → `cd cli && npm install && npm link`
    - Plugin not installed → `jdt setup --eclipse <path>`
    - Eclipse not running → start it, re-run check
-2. Verify `jdtbridge.target` exists in repo root (gitignored, per-developer).
-   If missing, create it pointing to the local Eclipse directory:
+
+2. `jdt help` — read available commands. Use `jdt help <command>` for details.
+
+3. `jdt projects` — verify `io.github.kaluchi.jdtbridge` and
+   `io.github.kaluchi.jdtbridge.tests` are listed (imported into Eclipse
+   workspace). If missing: Eclipse → File → Import → Existing Projects
+   into Workspace → select repo root.
+   Note: `jdt projects` only shows Java/plugin projects, not branding/feature/site.
+
+4. Verify `jdtbridge.target` exists in repo root (gitignored, per-developer).
+   Without it, Tycho builds fail. If missing, create it pointing to the
+   local Eclipse directory:
    ```xml
    <?xml version="1.0" encoding="UTF-8" standalone="no"?>
    <?pde version="3.8"?>
@@ -27,14 +37,14 @@ Required tools (verified by `jdt setup --check`):
        </locations>
    </target>
    ```
-3. Run `jdt projects` — should list workspace projects.
 
 ## Use `jdt` for Java analysis
 
 **Prefer `jdt` over grep/glob for Java-specific queries.** Grep returns
 string matches; `jdt` returns semantic results from Eclipse's compiler index.
 
-Run `jdt help` for the full command list. Key examples:
+Run `jdt help` for the full command list. Run `jdt help <command>` for
+detailed usage of any command. Key examples:
 
 ```bash
 jdt refs <FQMN>                  # find call sites (not string matches)
@@ -80,7 +90,7 @@ See [README.md](README.md) for full overview. Key directories:
 
 ### `jdt build` vs full verify
 
-| | `jdt build` | `jdt launch run jdtbridge-verify -f` |
+| | `jdt build` | `jdt launch run jdtbridge-verify` |
 |---|---|---|
 | What | Eclipse incremental compiler | Tycho full build (via Eclipse) |
 | Speed | 1-3 seconds | 40-60 seconds |
@@ -88,8 +98,14 @@ See [README.md](README.md) for full overview. Key directories:
 | Output | Compiled classes in Eclipse | p2 site in `site/target/` |
 | When | Quick iteration while coding | Before commit, before `jdt setup` |
 
-The `-f` (follow) flag streams output in real-time and exits with the
-process exit code. For CI without local Eclipse: `mvn clean verify -Pci`.
+Console output is captured by Eclipse and available via `jdt launch logs`.
+Use `-f` to stream live, or inspect afterwards with `--tail`. Example:
+```bash
+jdt launch run jdtbridge-verify           # launch (prints guide first time)
+jdt launch logs jdtbridge-verify -f | tail -20  # wait + last 20 lines
+jdt launch logs jdtbridge-verify --tail 30      # inspect after completion
+```
+For CI without local Eclipse: `mvn clean verify -Pci`.
 
 ### Making changes
 
@@ -101,7 +117,8 @@ process exit code. For CI without local Eclipse: `mvn clean verify -Pci`.
    jdt build --project io.github.kaluchi.jdtbridge.tests
    jdt test --project io.github.kaluchi.jdtbridge.tests
    ```
-4. **Full Tycho build** — `jdt launch run jdtbridge-verify -f`
+4. **Full Tycho build** — `jdt launch run jdtbridge-verify` then
+   `jdt launch logs jdtbridge-verify -f | tail -20` to wait
 5. **Install and verify live** — `jdt setup --skip-build`, then test
 6. **Check ALL docs** if CLI syntax or API changed:
    - `cli/src/cli.mjs` (`jdt help` output)
@@ -118,14 +135,13 @@ process exit code. For CI without local Eclipse: `mvn clean verify -Pci`.
 - **`jdt setup --skip-build` restarts Eclipse.** Port changes. `jdt` commands
   auto-discover the new port, but raw `curl` URLs break.
 - **`jdt setup` without `--skip-build` runs Maven internally.**
-  After `jdt launch run jdtbridge-verify -f`, always add `--skip-build`
-  — never build twice.
+  After a full build, always add `--skip-build` — never build twice.
 
 ### Test infrastructure
 
 - **CLI tests:** `cd cli && npm test` (vitest)
 - **Plugin unit tests:** `jdt test --project io.github.kaluchi.jdtbridge.tests`
-- **Integration tests:** `jdt launch run jdtbridge-verify -f` (full Tycho build) — use `@EnabledIfSystemProperty(named = "jdtbridge.integration-tests", matches = "true")`
+- **Integration tests:** full Tycho build only (`jdt launch run jdtbridge-verify`) — use `@EnabledIfSystemProperty(named = "jdtbridge.integration-tests", matches = "true")`
 - **Test fixture:** `TestFixture.java` creates a project with known classes —
   `test.model.Animal`, `Dog`, `Cat`, `test.edge.Calculator` (overloads),
   `Repository` (generics). Add new test types there.

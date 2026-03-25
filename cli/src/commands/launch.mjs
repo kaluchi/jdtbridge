@@ -48,15 +48,29 @@ export async function launchClear(args) {
   console.log(`Removed ${result.removed} terminated launch${result.removed !== 1 ? "es" : ""}`);
 }
 
+/**
+ * Launch a configuration. Without -f, prints onboarding guide.
+ * With -f, streams console output until termination.
+ */
 export async function launchRun(args) {
+  return launchWithMode(args, "run");
+}
+
+/** Launch in debug mode. Same interface as run. */
+export async function launchDebug(args) {
+  return launchWithMode(args, "debug");
+}
+
+async function launchWithMode(args, mode) {
   const pos = extractPositional(args);
   const name = pos[0];
   if (!name) {
-    console.error("Usage: launch run <config-name> [--debug] [-f|--follow]");
+    console.error(`Usage: launch ${mode} <config-name> [-f] [-q]`);
     process.exit(1);
   }
+
   let url = `/launch/run?name=${encodeURIComponent(name)}`;
-  if (args.includes("--debug")) url += "&debug";
+  if (mode === "debug") url += "&debug";
   const result = await get(url, 30_000);
   if (result.error) {
     console.error(result.error);
@@ -64,15 +78,44 @@ export async function launchRun(args) {
   }
 
   const follow = args.includes("-f") || args.includes("--follow");
-  if (!follow) {
-    console.log(`Launched ${result.name} (${result.mode})`);
-    return;
+  if (follow) {
+    console.error(`Launched ${result.name} (${result.mode})`);
+    const exitCode = await followLogs(result.name, args);
+    process.exit(exitCode);
   }
 
-  // Launch + follow: stream console output, exit with process code
-  console.error(`Launched ${result.name} (${result.mode})`);
-  const exitCode = await followConsole(result.name, args);
-  process.exit(exitCode);
+  const quiet = args.includes("-q") || args.includes("--quiet");
+  const n = result.name;
+  const pid = result.pid ? `, pid ${result.pid}` : "";
+  console.log(`Launched ${n} (${result.mode}${pid})`);
+
+  if (!quiet) {
+    console.log(`
+  Console output is captured by Eclipse and remains available after
+  the process terminates — nothing is lost. You can read it at any
+  time, filter with grep, or pipe through tail/head.
+
+  View logs:
+    jdt launch logs ${n}                 full output
+    jdt launch logs ${n} --tail 30       last 30 lines
+
+  Wait for completion (blocks until process exits):
+    jdt launch logs ${n} -f | tail -20   safe: bounded output
+    jdt launch logs ${n} -f              stream all (can be large)
+
+  Manage:
+    jdt launch list                              status of all launches
+    jdt launch stop ${n}                 terminate process
+    jdt launch clear                             remove finished launches
+
+  Run modes:
+    jdt launch run <config>                      run (this output)
+    jdt launch run <config> -f                   run + stream output
+    jdt launch run <config> -f | tail -30        run + wait + bounded
+    jdt launch debug <config>                    run with debugger
+
+  Add -q to suppress this guide.`);
+  }
 }
 
 export async function launchStop(args) {
@@ -91,24 +134,28 @@ export async function launchStop(args) {
   console.log(`Stopped ${result.name}`);
 }
 
-export async function launchConsole(args) {
+/**
+ * Show console output. "logs" is the primary name,
+ * "console" is kept as an alias.
+ */
+export async function launchLogs(args) {
   const pos = extractPositional(args);
   const flags = parseFlags(args);
   const name = pos[0];
   if (!name) {
     console.error(
-      "Usage: launch console <name> [-f|--follow] [--tail N] [--stderr|--stdout]",
+      "Usage: launch logs <name> [-f|--follow] [--tail N]",
     );
     process.exit(1);
   }
 
   const follow = args.includes("-f") || args.includes("--follow");
   if (follow) {
-    const exitCode = await followConsole(name, args);
+    const exitCode = await followLogs(name, args);
     process.exit(exitCode);
   }
 
-  // Snapshot mode (existing behavior)
+  // Snapshot mode
   let url = `/launch/console?name=${encodeURIComponent(name)}`;
   if (flags.tail !== undefined && flags.tail !== true)
     url += `&tail=${flags.tail}`;
@@ -127,11 +174,14 @@ export async function launchConsole(args) {
   }
 }
 
+/** Alias: console → logs */
+export const launchConsole = launchLogs;
+
 /**
  * Stream console output until process terminates or Ctrl+C.
  * Returns the process exit code (0 on detach).
  */
-async function followConsole(name, args) {
+async function followLogs(name, args) {
   const flags = parseFlags(args);
   let url = `/launch/console/stream?name=${encodeURIComponent(name)}`;
   if (flags.tail !== undefined && flags.tail !== true)
@@ -160,36 +210,44 @@ async function followConsole(name, args) {
     process.removeListener("SIGINT", onSigint);
   }
 
-  // Stream ended (process terminated) — fetch exit code
+  // Stream ended — fetch exit code
   try {
-    const info = await get(
-      `/launch/console?name=${encodeURIComponent(name)}`,
-    );
-    if (info && info.terminated) {
-      const list = await get("/launch/list");
-      const entry = Array.isArray(list)
-        ? list.find((l) => l.name === name && l.terminated)
-        : null;
-      return entry?.exitCode ?? 0;
-    }
+    const list = await get("/launch/list");
+    const entry = Array.isArray(list)
+      ? list.find((l) => l.name === name && l.terminated)
+      : null;
+    return entry?.exitCode ?? 0;
   } catch {
-    // best effort
+    return 0;
   }
-  return 0;
 }
 
 export const launchRunHelp = `Launch a saved configuration.
 
-Usage:  jdt launch run <config-name> [--debug] [-f|--follow]
+Usage:  jdt launch run <config-name> [-f] [-q]
+
+Without -f, launches and prints a guide with available commands.
+With -f, launches and streams console output until the process terminates.
 
 Flags:
-  --debug        launch in debug mode (default: run)
-  -f, --follow   stream console output until process terminates
+  -f, --follow   stream output (Ctrl+C to detach, process keeps running)
+  -q, --quiet    suppress onboarding guide
 
 Examples:
-  jdt launch run m8-server
-  jdt launch run jdtbridge-verify --follow
-  jdt launch run m8-server --debug -f | grep ERROR`;
+  jdt launch run m8-server                run + show guide
+  jdt launch run m8-server -q             run silently
+  jdt launch run jdtbridge-verify -f      run + stream all output
+  jdt launch run m8-server -f | tail -20  run + wait + bounded output`;
+
+export const launchDebugHelp = `Launch a configuration in debug mode.
+
+Usage:  jdt launch debug <config-name> [-f] [-q]
+
+Same as "launch run" but attaches the Eclipse debugger.
+
+Examples:
+  jdt launch debug m8-server
+  jdt launch debug m8-server -f`;
 
 export const launchStopHelp = `Stop a running launch.
 
@@ -215,21 +273,22 @@ Usage:  jdt launch list
 
 Output: name, type, mode, status — one launch per line.`;
 
-export const launchConsoleHelp = `Show console output (stdout/stderr) of a launch.
+export const launchLogsHelp = `Show console output of a launch.
 
-Without --follow, returns the full output as a snapshot.
-With --follow, streams output in real-time until the process terminates.
+Console output is captured by Eclipse and persists after the process
+terminates. Without -f, returns a snapshot. With -f, streams in real-time.
 
-Usage:  jdt launch console <name> [-f|--follow] [--tail N] [--stderr] [--stdout]
+Usage:  jdt launch logs <name> [-f|--follow] [--tail N]
 
 Flags:
-  -f, --follow   stream output until process terminates (Ctrl+C to detach)
+  -f, --follow   stream until process terminates (Ctrl+C to detach)
   --tail <N>     last N lines only (snapshot), or start N lines back (follow)
-  --stderr       stderr only
-  --stdout       stdout only
 
 Examples:
-  jdt launch console m8-server
-  jdt launch console m8-server --follow
-  jdt launch console m8-server -f --tail 20
-  jdt launch console m8-server -f --stdout | grep ERROR`;
+  jdt launch logs m8-server                full output snapshot
+  jdt launch logs m8-server --tail 30      last 30 lines
+  jdt launch logs m8-server -f             stream live
+  jdt launch logs m8-server -f | tail -20  wait + bounded output`;
+
+// Keep old name for backward compatibility
+export const launchConsoleHelp = launchLogsHelp;

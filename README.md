@@ -126,9 +126,10 @@ Most commands have short aliases for quick typing.
 | `editors` | `ed` | List all open editors (absolute paths) |
 | `launch list` | | List launches (running + terminated) |
 | `launch configs` | | List saved launch configurations (MRU order) |
-| `launch run <config> [-f]` | | Launch a configuration (`-f` to follow) |
+| `launch run <config> [-f]` | | Launch a configuration (`-f` to stream) |
+| `launch debug <config> [-f]` | | Launch in debug mode |
+| `launch logs <name> [-f]` | | Show console output (`-f` to stream) |
 | `launch stop <name>` | | Stop a running launch |
-| `launch console <name> [-f]` | | Show console output (`-f` to stream) |
 | `launch clear [name]` | | Remove terminated launches |
 | `setup [--check\|--remove]` | | Install, check, or remove Eclipse plugin |
 

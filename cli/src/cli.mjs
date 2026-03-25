@@ -33,14 +33,18 @@ import {
   launchList,
   launchConfigs,
   launchRun,
+  launchDebug,
   launchStop,
   launchClear,
+  launchLogs,
   launchConsole,
   launchListHelp,
   launchConfigsHelp,
   launchRunHelp,
+  launchDebugHelp,
   launchStopHelp,
   launchClearHelp,
+  launchLogsHelp,
   launchConsoleHelp,
 } from "./commands/launch.mjs";
 import { setup, help as setupHelp } from "./commands/setup.mjs";
@@ -54,8 +58,10 @@ const launchSubcommands = {
   list: { fn: launchList, help: launchListHelp },
   configs: { fn: launchConfigs, help: launchConfigsHelp },
   run: { fn: launchRun, help: launchRunHelp },
+  debug: { fn: launchDebug, help: launchDebugHelp },
   stop: { fn: launchStop, help: launchStopHelp },
   clear: { fn: launchClear, help: launchClearHelp },
+  logs: { fn: launchLogs, help: launchLogsHelp },
   console: { fn: launchConsole, help: launchConsoleHelp },
 };
 
@@ -64,9 +70,10 @@ const launchHelp = `Manage launches (running and terminated processes).
 Subcommands:
   jdt launch list                           list all launches
   jdt launch configs                        list saved launch configurations
-  jdt launch run <config> [--debug] [-f]    launch a configuration
+  jdt launch run <config> [-f] [-q]         launch a configuration
+  jdt launch debug <config> [-f] [-q]       launch in debug mode
+  jdt launch logs <name> [-f] [--tail N]    show console output
   jdt launch stop <name>                    stop a running launch
-  jdt launch console <name> [--tail N]      show console output
   jdt launch clear [name]                   remove terminated launches
 
 Use "jdt help launch <subcommand>" for details.`;
@@ -174,9 +181,10 @@ Refactoring:
 Launches:
   launch list                                 list launches (running + terminated)
   launch configs                              list saved launch configurations
-  launch run <config> [--debug] [-f]           launch a configuration
+  launch run <config> [-f] [-q]               launch a configuration
+  launch debug <config> [-f] [-q]             launch in debug mode
+  launch logs <name> [-f] [--tail N]          show console output
   launch stop <name>                          stop a running launch
-  launch console <name> [-f] [--tail N]        show console output of a launch
   launch clear [name]                         remove terminated launches
 
 Editor:
