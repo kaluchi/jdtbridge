@@ -232,6 +232,13 @@ class LaunchHandler {
         }
     }
 
+    /**
+     * Terminate a running launch by name. Returns an error if the
+     * launch is not found or already terminated.
+     *
+     * @param params must contain "name"
+     * @return JSON with {@code {ok, name}} or error
+     */
     String handleStop(Map<String, String> params) {
         String name = params.get("name");
         if (name == null || name.isBlank()) {
@@ -314,6 +321,7 @@ class LaunchHandler {
                 .toString();
     }
 
+    /** Find the most recent launch matching the given name. */
     private ILaunch findLaunch(String name) {
         ILaunch[] launches = launchManager().getLaunches();
         // Search newest first
