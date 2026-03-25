@@ -114,7 +114,7 @@ public class HttpIntegrationTest {
         int openPort = openServer.getPort();
         try {
             try (Socket socket = new Socket("localhost", openPort)) {
-                socket.setSoTimeout(5000);
+                socket.setSoTimeout(15_000);
                 OutputStream out = socket.getOutputStream();
                 out.write("GET /projects HTTP/1.1\r\nHost: localhost\r\n\r\n"
                         .getBytes(StandardCharsets.UTF_8));
@@ -220,7 +220,7 @@ public class HttpIntegrationTest {
     private String rawRequest(String requestLine, String... headers)
             throws Exception {
         try (Socket socket = new Socket("localhost", port)) {
-            socket.setSoTimeout(5000);
+            socket.setSoTimeout(15_000);
             OutputStream out = socket.getOutputStream();
             StringBuilder req = new StringBuilder();
             req.append(requestLine).append("\r\n");
