@@ -353,8 +353,6 @@ public class HttpServer {
                         launch.handleRun(params));
                 case "/launch/stop" -> Response.json(
                         launch.handleStop(params));
-                case "/launch/diag" -> Response.json(
-                        launchTracker.handleDiag());
                 default -> Response.json(Json.error(
                         "Unknown path: " + path));
             };

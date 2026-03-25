@@ -941,7 +941,21 @@ describe("commands (integration)", () => {
     expect(io.logs.some((l) => l.includes("app.Sub"))).toBe(true);
   });
 
-  // TODO: multiple overloads still uses legacy text/plain format
+  it("source handles multiple overloads as array", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify([
+        { fqmn: "com.example.Foo#bar()", file: "D:/src/Foo.java", startLine: 10, endLine: 15, source: "void bar() {}", refs: [] },
+        { fqmn: "com.example.Foo#bar(int)", file: "D:/src/Foo.java", startLine: 20, endLine: 25, source: "void bar(int x) {}", refs: [] },
+      ]));
+    });
+    const { source } = await import("../src/commands/source.mjs");
+    await source(["com.example.Foo#bar"]);
+    const out = io.logs.join("\n");
+    expect(out).toContain("#### com.example.Foo#bar()");
+    expect(out).toContain("#### com.example.Foo#bar(int)");
+    expect(out).toContain("---");
+  });
 
   it("type-info shows interface without fields", async () => {
     await setupMock((req, res) => {

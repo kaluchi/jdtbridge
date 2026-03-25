@@ -162,7 +162,7 @@ Search & navigation:
   hierarchy${fmtAliases("hierarchy")} <FQN>                             full hierarchy (supers + interfaces + subtypes)
   implementors${fmtAliases("implementors")} <FQMN>                            implementations of interface method
   type-info${fmtAliases("type-info")} <FQN>                             class overview (fields, methods, line numbers)
-  source${fmtAliases("source")} <FQMN>                              type or method source code (project and libraries)
+  source${fmtAliases("source")} <FQMN>                              source + resolved references (navigation)
 
 Testing & building:
   build${fmtAliases("build")} [--project <name>] [--clean]      build project (incremental or clean)

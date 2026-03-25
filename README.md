@@ -114,7 +114,7 @@ Most commands have short aliases for quick typing.
 | `hierarchy <FQN>` | `hier` | Full type hierarchy (supers + subs) |
 | `implementors <FQMN>` | `impl` | Implementations of an interface method |
 | `type-info <FQN>` | `ti` | Class overview (fields, methods, signatures) |
-| `source <FQMN>` | `src` | Source code — project and library classes |
+| `source <FQMN>` | `src` | Source code + resolved references (hypertext navigation) |
 | `build [--project <name>]` | `b` | Build project (incremental or clean) |
 | `test <FQMN>` | | Run JUnit tests |
 | `errors [--project <name>]` | `err` | Compilation errors and diagnostics |

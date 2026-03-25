@@ -52,7 +52,11 @@ Class overview: kind, superclass, interfaces, fields (with modifiers and types),
 
 ### `GET /source?class=<FQN>[&method=<name>][&paramTypes=<types>]`
 
-Returns source code as `text/plain` with `X-File`, `X-Start-Line`, `X-End-Line` headers. Without `method`, returns the full class source. With `method`, returns method source (or all overloads if multiple match).
+Returns JSON with source code and AST-resolved references:
+`{fqmn, file, startLine, endLine, source, refs[{fqmn, kind, scope, type, line, doc, file}]}`.
+References are grouped by scope: `class` (same class), `project` (workspace source),
+`dependency` (libraries). Multiple overloads return a JSON array.
+All file paths are absolute filesystem paths.
 
 ## Testing
 

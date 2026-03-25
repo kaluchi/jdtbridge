@@ -112,23 +112,6 @@ class LaunchTracker implements ILaunchesListener2 {
         return tracked;
     }
 
-    String handleDiag() {
-        Json result = Json.object()
-                .put("trackedCount", tracked.size());
-        Json entries = Json.array();
-        for (var e : tracked.entrySet()) {
-            TrackedLaunch tl = e.getValue();
-            entries.add(Json.object()
-                    .put("name", e.getKey())
-                    .put("terminated", tl.terminated)
-                    .put("outLen", tl.outLen())
-                    .put("errLen", tl.errLen())
-                    .put("attached", tl.attached.size()));
-        }
-        result.put("tracked", entries);
-        return result.toString();
-    }
-
     // -- ILaunchesListener2 --
 
     @Override

@@ -536,8 +536,9 @@ class SearchHandler {
     }
 
     private String filePath(IType type) {
-        if (type.getResource() != null) {
-            return type.getResource().getFullPath().toString();
+        if (type.getResource() != null
+                && type.getResource().getLocation() != null) {
+            return type.getResource().getLocation().toOSString();
         }
         return type.getFullyQualifiedName().replace('.', '/')
                 + ".java";
@@ -726,16 +727,20 @@ class SearchHandler {
     }
 
     private static String resourcePath(SearchMatch match) {
-        return match.getResource() != null
-                ? match.getResource().getFullPath().toString()
-                : "?";
+        if (match.getResource() != null
+                && match.getResource().getLocation() != null) {
+            return match.getResource().getLocation().toOSString();
+        }
+        return "?";
     }
 
     private static String resourcePath(IType type) {
         try {
             ICompilationUnit cu = type.getCompilationUnit();
-            if (cu != null && cu.getResource() != null) {
-                return cu.getResource().getFullPath().toString();
+            if (cu != null && cu.getResource() != null
+                    && cu.getResource().getLocation() != null) {
+                return cu.getResource().getLocation()
+                        .toOSString();
             }
         } catch (Exception e) { /* fall through */ }
         return type.getPath().toString();
