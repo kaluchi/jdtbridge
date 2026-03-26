@@ -11,7 +11,9 @@ import { implementors, help as implementorsHelp } from "./commands/implementors.
 import { typeInfo, help as typeInfoHelp } from "./commands/type-info.mjs";
 import { source, help as sourceHelp } from "./commands/source.mjs";
 import { build, help as buildHelp } from "./commands/build.mjs";
-import { test, help as testHelp } from "./commands/test.mjs";
+import { testRun, help as testRunHelp } from "./commands/test-run.mjs";
+import { testStatus, help as testStatusHelp } from "./commands/test-status.mjs";
+import { testSessions, help as testSessionsHelp } from "./commands/test-sessions.mjs";
 import { errors, help as errorsHelp } from "./commands/errors.mjs";
 import {
   organizeImports,
@@ -93,6 +95,36 @@ async function launchDispatch(args) {
   await cmd.fn(rest);
 }
 
+const testSubcommands = {
+  run: { fn: testRun, help: testRunHelp },
+  status: { fn: testStatus, help: testStatusHelp },
+  sessions: { fn: testSessions, help: testSessionsHelp },
+};
+
+const testHelp = `Run and monitor JUnit tests via Eclipse's built-in runner.
+
+Subcommands:
+  jdt test run <FQN> [-f] [-q]                launch tests (non-blocking)
+  jdt test status <session> [-f] [--all]      show test progress/results
+  jdt test sessions                           list test sessions
+
+Use "jdt help test <subcommand>" for details.`;
+
+async function testDispatch(args) {
+  const [sub, ...rest] = args;
+  if (!sub || sub === "--help") {
+    console.log(testHelp);
+    return;
+  }
+  const cmd = testSubcommands[sub];
+  if (!cmd) {
+    console.error(`Unknown test subcommand: ${sub}`);
+    console.log(testHelp);
+    process.exit(1);
+  }
+  await cmd.fn(rest);
+}
+
 const commands = {
   projects: { fn: projects, help: projectsHelp },
   "project-info": { fn: projectInfo, help: projectInfoHelp },
@@ -104,7 +136,7 @@ const commands = {
   "type-info": { fn: typeInfo, help: typeInfoHelp },
   source: { fn: source, help: sourceHelp },
   build: { fn: build, help: buildHelp },
-  test: { fn: test, help: testHelp },
+  test: { fn: testDispatch, help: testHelp },
   errors: { fn: errors, help: errorsHelp },
   "organize-imports": { fn: organizeImports, help: organizeImportsHelp },
   format: { fn: format, help: formatHelp },
@@ -166,8 +198,9 @@ Search & navigation:
 
 Testing & building:
   build${fmtAliases("build")} [--project <name>] [--clean]      build project (incremental or clean)
-  test <FQMN>                                 run JUnit test class or method
-  test --project <name> [--package <pkg>]     run tests in project/package
+  test run <FQN> [-f] [-q]                    launch tests (non-blocking)
+  test status <session> [-f] [--all]          show test progress/results
+  test sessions                               list test sessions
 
 Diagnostics:
   errors${fmtAliases("errors")} [--file <path>] [--project <name>]   compilation errors
@@ -215,6 +248,8 @@ export async function run(argv) {
     const resolved = topic ? resolve(topic) : null;
     if (resolved === "launch" && rest[1] && launchSubcommands[rest[1]]) {
       console.log(launchSubcommands[rest[1]].help);
+    } else if (resolved === "test" && rest[1] && testSubcommands[rest[1]]) {
+      console.log(testSubcommands[rest[1]].help);
     } else if (resolved) {
       console.log(commands[resolved].help);
     } else if (topic) {

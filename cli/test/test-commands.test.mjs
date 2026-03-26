@@ -1,0 +1,340 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { createServer } from "node:http";
+import { setColorEnabled } from "../src/color.mjs";
+
+function startServer(handler) {
+  return new Promise((resolve) => {
+    const server = createServer(handler);
+    server.listen(0, "127.0.0.1", () => resolve({ server, port: server.address().port }));
+  });
+}
+function stopServer(server) {
+  return new Promise((resolve) => server.close(resolve));
+}
+
+// Helpers for capturing console output and preventing process.exit
+function captureConsole() {
+  const logs = [];
+  const errors = [];
+  const origLog = console.log;
+  const origError = console.error;
+  const origExit = process.exit;
+  console.log = (...args) => logs.push(args.join(" "));
+  console.error = (...args) => errors.push(args.join(" "));
+  process.exit = (code) => { throw new Error(`exit(${code})`); };
+  return {
+    logs, errors,
+    restore() {
+      console.log = origLog;
+      console.error = origError;
+      process.exit = origExit;
+    },
+  };
+}
+
+describe("test commands", () => {
+  let server, port, io;
+
+  beforeEach(() => {
+    setColorEnabled(false);
+    io = captureConsole();
+  });
+
+  afterEach(async () => {
+    io.restore();
+    if (server) await stopServer(server);
+    server = null;
+    vi.resetModules();
+  });
+
+  async function setupMock(handler) {
+    ({ server, port } = await startServer(handler));
+    vi.doMock("../src/discovery.mjs", () => ({
+      discoverInstances: () => [],
+      findInstance: () => ({ port, token: null, pid: process.pid, workspace: "/test" }),
+      isPidAlive: () => true,
+    }));
+  }
+
+  // --- test run ---
+
+  it("test run sends class param", async () => {
+    await setupMock((req, res) => {
+      if (req.url.includes("/test/run")) {
+        expect(req.url).toContain("class=com.example.FooTest");
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, session: "jdtbridge-test-123", project: "my-project", runner: "JUnit 5" }));
+      } else if (req.url.includes("/test/status")) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ total: 5, label: "FooTest" }));
+      }
+    });
+    const { testRun } = await import("../src/commands/test-run.mjs");
+    await testRun(["com.example.FooTest", "-q"]);
+    expect(io.logs.some((l) => l.includes("jdtbridge-test-123"))).toBe(true);
+  });
+
+  it("test run sends project param", async () => {
+    await setupMock((req, res) => {
+      if (req.url.includes("/test/run")) {
+        expect(req.url).toContain("project=my-project");
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, session: "jdtbridge-test-456" }));
+      } else if (req.url.includes("/test/status")) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ total: 10, label: "my-project" }));
+      }
+    });
+    const { testRun } = await import("../src/commands/test-run.mjs");
+    await testRun(["--project", "my-project", "-q"]);
+    expect(io.logs.some((l) => l.includes("jdtbridge-test-456"))).toBe(true);
+  });
+
+  it("test run prints onboarding guide without -q", async () => {
+    await setupMock((req, res) => {
+      if (req.url.includes("/test/run")) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, session: "jdtbridge-test-789" }));
+      } else if (req.url.includes("/test/status")) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ total: 3, label: "FooTest" }));
+      }
+    });
+    const { testRun } = await import("../src/commands/test-run.mjs");
+    await testRun(["com.example.FooTest"]);
+    const all = io.logs.join("\n");
+    expect(all).toContain("jdt test status");
+    expect(all).toContain("jdt launch logs");
+    expect(all).toContain("jdt launch stop");
+  });
+
+  it("test run exits on missing args", async () => {
+    await setupMock((req, res) => res.end());
+    const { testRun } = await import("../src/commands/test-run.mjs");
+    await expect(testRun([])).rejects.toThrow("exit(1)");
+    expect(io.errors[0]).toContain("Usage");
+  });
+
+  it("test run exits on server error", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Something went wrong" }));
+    });
+    const { testRun } = await import("../src/commands/test-run.mjs");
+    await expect(testRun(["com.example.FooTest", "-q"])).rejects.toThrow("exit(1)");
+  });
+
+  it("test run sends method param with FQMN#method", async () => {
+    await setupMock((req, res) => {
+      if (req.url.includes("/test/run")) {
+        expect(req.url).toContain("class=com.example.FooTest");
+        expect(req.url).toContain("method=testBar");
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, session: "test-method-1" }));
+      } else if (req.url.includes("/test/status")) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ total: 1 }));
+      }
+    });
+    const { testRun } = await import("../src/commands/test-run.mjs");
+    await testRun(["com.example.FooTest#testBar", "-q"]);
+    expect(io.logs.some((l) => l.includes("test-method-1"))).toBe(true);
+  });
+
+  it("test run sends package param", async () => {
+    await setupMock((req, res) => {
+      if (req.url.includes("/test/run")) {
+        expect(req.url).toContain("project=my-project");
+        expect(req.url).toContain("package=com.example.dao");
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, session: "test-pkg-1" }));
+      } else if (req.url.includes("/test/status")) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ total: 5 }));
+      }
+    });
+    const { testRun } = await import("../src/commands/test-run.mjs");
+    await testRun(["--project", "my-project", "--package", "com.example.dao", "-q"]);
+  });
+
+  it("test run sends timeout param", async () => {
+    await setupMock((req, res) => {
+      if (req.url.includes("/test/run")) {
+        expect(req.url).toContain("timeout=60");
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, session: "test-timeout-1" }));
+      } else if (req.url.includes("/test/status")) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ total: 1 }));
+      }
+    });
+    const { testRun } = await import("../src/commands/test-run.mjs");
+    await testRun(["com.example.FooTest", "--timeout", "60", "-q"]);
+  });
+
+  it("test run sends no-refresh param", async () => {
+    await setupMock((req, res) => {
+      if (req.url.includes("/test/run")) {
+        expect(req.url).toContain("no-refresh");
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, session: "test-norefresh-1" }));
+      } else if (req.url.includes("/test/status")) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ total: 1 }));
+      }
+    });
+    const { testRun } = await import("../src/commands/test-run.mjs");
+    await testRun(["com.example.FooTest", "--no-refresh", "-q"]);
+  });
+
+  it("test run -f exits 1 on test failures", async () => {
+    await setupMock((req, res) => {
+      if (req.url.includes("/test/run")) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, session: "test-fail-exit" }));
+      } else if (req.url.includes("/test/status/stream")) {
+        res.writeHead(200, { "Content-Type": "application/x-ndjson" });
+        res.write(JSON.stringify({ event: "finished", total: 2, passed: 1, failed: 1, errors: 0, ignored: 0, time: 1.0 }) + "\n");
+        res.end();
+      } else if (req.url.includes("/test/status")) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ total: 2 }));
+      }
+    });
+    const { testRun } = await import("../src/commands/test-run.mjs");
+    await expect(testRun(["com.example.FooTest", "-f", "-q"])).rejects.toThrow("exit(1)");
+  });
+
+  it("test run -f exits 0 on all passing", async () => {
+    await setupMock((req, res) => {
+      if (req.url.includes("/test/run")) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, session: "test-pass-exit" }));
+      } else if (req.url.includes("/test/status/stream")) {
+        res.writeHead(200, { "Content-Type": "application/x-ndjson" });
+        res.write(JSON.stringify({ event: "finished", total: 2, passed: 2, failed: 0, errors: 0, ignored: 0, time: 1.0 }) + "\n");
+        res.end();
+      } else if (req.url.includes("/test/status")) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ total: 2 }));
+      }
+    });
+    const { testRun } = await import("../src/commands/test-run.mjs");
+    await expect(testRun(["com.example.FooTest", "-f", "-q"])).rejects.toThrow("exit(0)");
+  });
+
+  it("test run -f streams JSONL", async () => {
+    await setupMock((req, res) => {
+      if (req.url.includes("/test/run")) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, session: "test-stream-1" }));
+      } else if (req.url.includes("/test/status/stream")) {
+        res.writeHead(200, { "Content-Type": "application/x-ndjson" });
+        res.write(JSON.stringify({ event: "case", fqmn: "Foo#bar", status: "FAIL", time: 0.1, trace: "err" }) + "\n");
+        res.write(JSON.stringify({ event: "finished", total: 1, passed: 0, failed: 1, errors: 0, ignored: 0, time: 0.1 }) + "\n");
+        res.end();
+      } else if (req.url.includes("/test/status")) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ total: 1, label: "FooTest" }));
+      }
+    });
+    const { testRun } = await import("../src/commands/test-run.mjs");
+    // -f causes process.exit(1) when tests fail
+    await expect(testRun(["com.example.FooTest", "-f", "-q"])).rejects.toThrow("exit(1)");
+    expect(io.logs.some((l) => l.includes("FAIL"))).toBe(true);
+    expect(io.logs.some((l) => l.includes("Foo#bar"))).toBe(true);
+  });
+
+  // --- test status ---
+
+  it("test status sends session param", async () => {
+    await setupMock((req, res) => {
+      expect(req.url).toContain("session=test-123");
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        session: "test-123", state: "finished",
+        total: 5, completed: 5, passed: 4, failed: 1, errors: 0, ignored: 0,
+        time: 2.3,
+        entries: [{ fqmn: "Foo#bar", status: "FAIL", time: 0.1, trace: "err" }],
+      }));
+    });
+    const { testStatus } = await import("../src/commands/test-status.mjs");
+    await testStatus(["test-123"]);
+    expect(io.logs.some((l) => l.includes("5 tests"))).toBe(true);
+  });
+
+  it("test status exits on missing args", async () => {
+    await setupMock((req, res) => res.end());
+    const { testStatus } = await import("../src/commands/test-status.mjs");
+    await expect(testStatus([])).rejects.toThrow("exit(1)");
+  });
+
+  it("test status --ignored sends filter param", async () => {
+    await setupMock((req, res) => {
+      expect(req.url).toContain("filter=ignored");
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ session: "s", state: "finished", total: 0, completed: 0, passed: 0, failed: 0, errors: 0, ignored: 0, time: 0, entries: [] }));
+    });
+    const { testStatus } = await import("../src/commands/test-status.mjs");
+    await testStatus(["s", "--ignored"]);
+  });
+
+  it("test status --all passes filter param", async () => {
+    await setupMock((req, res) => {
+      expect(req.url).toContain("filter=all");
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        session: "s", state: "finished",
+        total: 0, completed: 0, passed: 0, failed: 0, errors: 0, ignored: 0,
+        time: 0, entries: [],
+      }));
+    });
+    const { testStatus } = await import("../src/commands/test-status.mjs");
+    await testStatus(["s", "--all"]);
+  });
+
+  it("test status exits on server error", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Session not found" }));
+    });
+    const { testStatus } = await import("../src/commands/test-status.mjs");
+    await expect(testStatus(["bad-session"])).rejects.toThrow("exit(1)");
+    expect(io.errors[0]).toContain("Session not found");
+  });
+
+  // --- test sessions ---
+
+  it("test sessions lists sessions", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify([{
+        session: "test-1", label: "FooTest", state: "finished",
+        total: 5, completed: 5, passed: 4, failed: 1, errors: 0, ignored: 0, time: 2.3,
+      }]));
+    });
+    const { testSessions } = await import("../src/commands/test-sessions.mjs");
+    await testSessions();
+    expect(io.logs.some((l) => l.includes("test-1"))).toBe(true);
+    expect(io.logs.some((l) => l.includes("FooTest"))).toBe(true);
+  });
+
+  it("test sessions shows empty message", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify([]));
+    });
+    const { testSessions } = await import("../src/commands/test-sessions.mjs");
+    await testSessions();
+    expect(io.logs[0]).toContain("no test sessions");
+  });
+
+  it("test sessions exits on error", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "fail" }));
+    });
+    const { testSessions } = await import("../src/commands/test-sessions.mjs");
+    await expect(testSessions()).rejects.toThrow("exit(1)");
+  });
+});

@@ -45,8 +45,10 @@ jdt source <FQMN>                                      # (alias: src) source cod
 
 ```bash
 jdt build [--project <name>] [--clean]                 # (alias: b) build project
-jdt test <FQMN> [--timeout N]                           # run JUnit test class or method
-jdt test --project <name> [--package <pkg>]            # run tests in project/package
+jdt test run <FQN> [-f] [-q]                            # launch tests (non-blocking)
+jdt test run --project <name> [-f]                     # run tests in project
+jdt test status <session> [-f] [--all] [--ignored]     # show test progress/results
+jdt test sessions                                       # list test sessions
 ```
 
 All commands auto-refresh from disk. `build` is the only command that triggers explicit builds.

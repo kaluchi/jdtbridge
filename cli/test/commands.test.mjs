@@ -241,7 +241,7 @@ describe("commands (integration)", () => {
     await test(["app.FooTest"]);
     expect(io.logs[0]).toContain("3 tests");
     expect(io.logs[0]).toContain("1 failed");
-    expect(io.logs.some((l) => l.includes("app.FooTest.testBar"))).toBe(true);
+    expect(io.logs.some((l) => l.includes("app.FooTest#testBar"))).toBe(true);
   });
 
   it("build shows success with 0 errors", async () => {

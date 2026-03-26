@@ -108,9 +108,9 @@ class SearchHandler {
 
     /**
      * Detect package search patterns:
-     * - "app.m8.core.user" — dots, no wildcards, last segment lowercase
-     * - "app.m8.core.user." — trailing dot
-     * - "app.m8.core.user.*" — package + wildcard
+     * - "com.example.core.user" — dots, no wildcards, last segment lowercase
+     * - "com.example.core.user." — trailing dot
+     * - "com.example.core.user.*" — package + wildcard
      */
     static boolean isPackageSearch(String name) {
         String normalized = normalizePackage(name);

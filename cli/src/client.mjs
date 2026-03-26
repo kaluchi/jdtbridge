@@ -197,6 +197,55 @@ export function getStream(path, dest) {
 }
 
 /**
+ * HTTP GET streaming with line-by-line callback. Designed for
+ * JSONL (newline-delimited JSON) endpoints. Calls onLine for
+ * each complete line received.
+ * Resolves when the server closes the connection.
+ * @param {string} path
+ * @param {(line: string) => void} onLine
+ * @returns {Promise<void>}
+ */
+export function getStreamLines(path, onLine) {
+  const inst = connect();
+  return new Promise((resolve, reject) => {
+    const req = request(
+      {
+        hostname: "127.0.0.1",
+        port: inst.port,
+        path,
+        method: "GET",
+        timeout: 0,
+        headers: authHeaders(),
+      },
+      (res) => {
+        if (res.statusCode !== 200) {
+          let data = "";
+          res.on("data", (chunk) => (data += chunk));
+          res.on("end", () => reject(new Error(data.trim())));
+          return;
+        }
+        let buffer = "";
+        res.on("data", (chunk) => {
+          buffer += chunk;
+          const lines = buffer.split("\n");
+          buffer = lines.pop();
+          for (const line of lines) {
+            if (line.trim()) onLine(line);
+          }
+        });
+        res.on("end", () => {
+          if (buffer.trim()) onLine(buffer);
+          resolve();
+        });
+        res.on("error", reject);
+      },
+    );
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+/**
  * Check if error is a connection refused error.
  * @param {Error} e
  * @returns {boolean}

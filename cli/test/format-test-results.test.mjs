@@ -99,7 +99,7 @@ describe("formatTestResults", () => {
       time: 0.1,
       failures: [{ status: "FAILURE", class: "T", method: "m", trace: null }],
     });
-    expect(logs.some((l) => l.includes("T.m"))).toBe(true);
+    expect(logs.some((l) => l.includes("T#m"))).toBe(true);
   });
 
   it("handles no failures array", () => {

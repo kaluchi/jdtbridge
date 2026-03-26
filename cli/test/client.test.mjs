@@ -244,6 +244,65 @@ describe("client", () => {
     expect(isConnectionError(new Error("generic"))).toBe(false);
   });
 
+  // --- getStreamLines() ---
+
+  it("getStreamLines calls onLine for each JSONL line", async () => {
+    let port;
+    ({ server, port } = await startServer((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/x-ndjson" });
+      res.write('{"a":1}\n');
+      res.write('{"b":2}\n');
+      res.end();
+    }));
+    mockDiscovery(port);
+    const { getStreamLines } = await import("../src/client.mjs");
+    const lines = [];
+    await getStreamLines("/test", (line) => lines.push(line));
+    expect(lines).toEqual(['{"a":1}', '{"b":2}']);
+  });
+
+  it("getStreamLines handles partial chunks", async () => {
+    let port;
+    ({ server, port } = await startServer((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/x-ndjson" });
+      // Send a line split across two chunks
+      res.write('{"split":');
+      res.write('"value"}\n');
+      res.end();
+    }));
+    mockDiscovery(port);
+    const { getStreamLines } = await import("../src/client.mjs");
+    const lines = [];
+    await getStreamLines("/test", (line) => lines.push(line));
+    expect(lines).toEqual(['{"split":"value"}']);
+  });
+
+  it("getStreamLines rejects on non-200 status", async () => {
+    let port;
+    ({ server, port } = await startServer((req, res) => {
+      res.writeHead(404, { "Content-Type": "text/plain" });
+      res.end("Not found");
+    }));
+    mockDiscovery(port);
+    const { getStreamLines } = await import("../src/client.mjs");
+    await expect(getStreamLines("/test", () => {})).rejects.toThrow("Not found");
+  });
+
+  it("getStreamLines handles trailing data without newline", async () => {
+    let port;
+    ({ server, port } = await startServer((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/x-ndjson" });
+      res.write('{"a":1}\n');
+      res.write('{"b":2}');  // no trailing newline
+      res.end();
+    }));
+    mockDiscovery(port);
+    const { getStreamLines } = await import("../src/client.mjs");
+    const lines = [];
+    await getStreamLines("/test", (line) => lines.push(line));
+    expect(lines).toEqual(['{"a":1}', '{"b":2}']);
+  });
+
   // --- connect() ---
 
   it("connect() exits when no instance found", async () => {

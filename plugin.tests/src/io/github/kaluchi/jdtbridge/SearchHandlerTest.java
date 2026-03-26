@@ -19,25 +19,25 @@ public class SearchHandlerTest {
         @Test
         void dottedLowercaseName() {
             assertTrue(SearchHandler.isPackageSearch(
-                    "app.m8.core.user"));
+                    "com.example.core.user"));
         }
 
         @Test
         void trailingDot() {
             assertTrue(SearchHandler.isPackageSearch(
-                    "app.m8.core.user."));
+                    "com.example.core.user."));
         }
 
         @Test
         void trailingDotStar() {
             assertTrue(SearchHandler.isPackageSearch(
-                    "app.m8.core.user.*"));
+                    "com.example.core.user.*"));
         }
 
         @Test
         void trailingDotQuestion() {
             assertTrue(SearchHandler.isPackageSearch(
-                    "app.m8.core.user.?"));
+                    "com.example.core.user.?"));
         }
 
         @Test
@@ -81,30 +81,30 @@ public class SearchHandlerTest {
 
         @Test
         void stripsTrailingDot() {
-            assertEquals("app.m8.core.user",
+            assertEquals("com.example.core.user",
                     SearchHandler.normalizePackage(
-                            "app.m8.core.user."));
+                            "com.example.core.user."));
         }
 
         @Test
         void stripsTrailingDotStar() {
-            assertEquals("app.m8.core.user",
+            assertEquals("com.example.core.user",
                     SearchHandler.normalizePackage(
-                            "app.m8.core.user.*"));
+                            "com.example.core.user.*"));
         }
 
         @Test
         void stripsTrailingDotQuestion() {
-            assertEquals("app.m8.core.user",
+            assertEquals("com.example.core.user",
                     SearchHandler.normalizePackage(
-                            "app.m8.core.user.?"));
+                            "com.example.core.user.?"));
         }
 
         @Test
         void noSuffixUnchanged() {
-            assertEquals("app.m8.core.user",
+            assertEquals("com.example.core.user",
                     SearchHandler.normalizePackage(
-                            "app.m8.core.user"));
+                            "com.example.core.user"));
         }
     }
 }

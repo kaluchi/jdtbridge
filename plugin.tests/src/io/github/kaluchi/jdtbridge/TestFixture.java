@@ -29,6 +29,7 @@ import org.eclipse.jdt.core.JavaCore;
 class TestFixture {
 
     static final String PROJECT_NAME = "jdtbridge-test";
+    static final String NON_JAVA_PROJECT_NAME = "jdtbridge-test-nonjava";
 
     private static final String ANIMAL_SRC = """
             package test.model;
@@ -405,10 +406,27 @@ class TestFixture {
     }
 
     static void destroy() throws Exception {
-        IProject project = ResourcesPlugin.getWorkspace().getRoot()
-                .getProject(PROJECT_NAME);
+        IWorkspaceRoot root =
+                ResourcesPlugin.getWorkspace().getRoot();
+        for (String name : new String[] {
+                PROJECT_NAME, NON_JAVA_PROJECT_NAME }) {
+            IProject p = root.getProject(name);
+            if (p.exists()) {
+                p.delete(true, true, null);
+            }
+        }
+    }
+
+    /** Create a plain project without Java nature. */
+    static void createNonJavaProject() throws Exception {
+        IWorkspaceRoot root =
+                ResourcesPlugin.getWorkspace().getRoot();
+        IProject project = root.getProject(NON_JAVA_PROJECT_NAME);
         if (project.exists()) {
             project.delete(true, true, null);
         }
+        project.create(null);
+        project.open(null);
+        // No Java nature — just a plain project
     }
 }

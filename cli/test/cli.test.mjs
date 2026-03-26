@@ -71,4 +71,24 @@ describe("cli dispatcher", () => {
     expect(output).toContain("err");
     expect(output).toContain("fmt");
   });
+
+  it("'test' with no subcommand shows help", async () => {
+    await run(["test"]);
+    expect(logs.some((l) => l.includes("Subcommands"))).toBe(true);
+  });
+
+  it("'help test' shows test help", async () => {
+    await run(["help", "test"]);
+    expect(logs.some((l) => l.includes("Subcommands"))).toBe(true);
+  });
+
+  it("'help test run' shows test run help", async () => {
+    await run(["help", "test", "run"]);
+    expect(logs.some((l) => l.includes("Launch tests non-blocking"))).toBe(true);
+  });
+
+  it("'help test status' shows test status help", async () => {
+    await run(["help", "test", "status"]);
+    expect(logs.some((l) => l.includes("snapshot or live stream"))).toBe(true);
+  });
 });

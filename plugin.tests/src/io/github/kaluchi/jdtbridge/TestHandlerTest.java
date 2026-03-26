@@ -29,7 +29,7 @@ import org.junit.jupiter.api.Test;
  */
 public class TestHandlerTest {
 
-    private static final TestHandler handler = new TestHandler();
+    private static final TestHandler handler = new TestHandler(new TestSessionTracker());
 
     private static final String TESTABLE =
             "org.junit.platform.commons.annotation.Testable";

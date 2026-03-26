@@ -32,7 +32,12 @@ public class HttpServer {
     private final LaunchTracker launchTracker = new LaunchTracker();
     private final LaunchHandler launch =
             new LaunchHandler(launchTracker);
-    private final TestHandler testHandler = new TestHandler();
+    private final TestSessionTracker testSessionTracker =
+            new TestSessionTracker();
+    private final TestSessionHandler testSessionHandler =
+            new TestSessionHandler(testSessionTracker);
+    private final TestHandler testHandler =
+            new TestHandler(testSessionTracker);
     private final ProjectHandler projectInfo = new ProjectHandler();
     private final ConfigService configService =
             new ConfigService(Activator.getHome());
@@ -66,6 +71,7 @@ public class HttpServer {
 
     public void start() throws IOException {
         launchTracker.start();
+        testSessionTracker.start();
         serverSocket = new ServerSocket(
                 0, 50, InetAddress.getLoopbackAddress());
         running = true;
@@ -85,6 +91,7 @@ public class HttpServer {
 
     public void stop() {
         launchTracker.stop();
+        testSessionTracker.stop();
         running = false;
         try {
             if (serverSocket != null) serverSocket.close();
@@ -186,9 +193,13 @@ public class HttpServer {
                 }
             }
 
-            // Streaming endpoint — bypasses dispatch, owns socket
+            // Streaming endpoints — bypass dispatch, own socket
             if ("/launch/console/stream".equals(path)) {
                 handleConsoleStream(socket, params);
+                return;
+            }
+            if ("/test/status/stream".equals(path)) {
+                handleTestStatusStream(socket, params);
                 return;
             }
 
@@ -241,6 +252,48 @@ public class HttpServer {
             ConsoleStreamer.stream(tl, out, stream, tail);
         } catch (IOException
                 | ConsoleStreamer.StreamClosedException e) {
+            // Client disconnected — normal for Ctrl+C
+        }
+    }
+
+    /**
+     * Streaming test status — bypasses dispatch, writes directly
+     * to socket. JSONL format, one event per line.
+     */
+    private void handleTestStatusStream(Socket socket,
+            Map<String, String> params) {
+        String session = params.get("session");
+        if (session == null || session.isBlank()) {
+            try { sendError(socket, 400, "Missing session"); }
+            catch (IOException e) { /* ignore */ }
+            return;
+        }
+
+        TestSessionTracker.TrackedTestSession ts =
+                testSessionTracker.await(session);
+        if (ts == null) {
+            try {
+                sendError(socket, 404,
+                        "Test session not found: " + session);
+            } catch (IOException e) { /* ignore */ }
+            return;
+        }
+
+        String filter = params.get("filter");
+
+        try {
+            socket.setSoTimeout(0);
+            OutputStream out = socket.getOutputStream();
+            out.write(("HTTP/1.1 200 OK\r\n"
+                    + "Content-Type: application/x-ndjson;"
+                    + " charset=utf-8\r\n"
+                    + "Connection: close\r\n"
+                    + "Cache-Control: no-cache\r\n\r\n")
+                    .getBytes(StandardCharsets.UTF_8));
+
+            TestProgressStreamer.stream(ts, out, filter);
+        } catch (IOException
+                | TestProgressStreamer.StreamClosedException e) {
             // Client disconnected — normal for Ctrl+C
         }
     }
@@ -335,8 +388,12 @@ public class HttpServer {
                         refactoring.handleRename(params));
                 case "/move" -> Response.json(
                         refactoring.handleMove(params));
-                case "/test" -> Response.json(
-                        testHandler.handleTest(params));
+                case "/test/run" -> Response.json(
+                        testHandler.handleTestRun(params));
+                case "/test/status" -> Response.json(
+                        testSessionHandler.handleStatus(params));
+                case "/test/sessions" -> Response.json(
+                        testSessionHandler.handleSessions(params));
                 case "/editors" -> Response.json(
                         editor.handleEditors(params));
                 case "/open" -> Response.json(

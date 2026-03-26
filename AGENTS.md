@@ -76,7 +76,7 @@ detailed usage of any command. Key examples:
 jdt refs <FQMN>                  # find call sites (not string matches)
 jdt source <FQMN>               # source + resolved references (hypertext navigation)
 jdt type-info <FQN>              # class overview without reading 600 lines
-jdt test <FQN>#<method>          # run one test method (not full Maven lifecycle)
+jdt test run <FQN>#<method> -f   # run one test, stream progress
 jdt errors --project <name>      # instant compilation check
 jdt build --project <name>       # incremental build (1-3s, not 40s Maven)
 ```
@@ -153,7 +153,7 @@ For CI without local Eclipse: `mvn clean verify -Pci`.
    ```bash
    jdt build --project io.github.kaluchi.jdtbridge
    jdt build --project io.github.kaluchi.jdtbridge.tests
-   jdt test --project io.github.kaluchi.jdtbridge.tests
+   jdt test run --project io.github.kaluchi.jdtbridge.tests -f
    ```
 4. **Full Tycho build** — `jdt launch run jdtbridge-verify` then
    `jdt launch logs jdtbridge-verify -f | tail -20` to wait
@@ -166,7 +166,7 @@ For CI without local Eclipse: `mvn clean verify -Pci`.
 
 ### Important details
 
-- **New Java files invisible until build.** `jdt test` says "Type not found"
+- **New Java files invisible until build.** `jdt test run` says "Type not found"
   → run `jdt build` for the project first.
 - **Build order matters.** `plugin.tests` is a Fragment-Host of `plugin` —
   sees package-private members, but must build after plugin.
@@ -178,7 +178,7 @@ For CI without local Eclipse: `mvn clean verify -Pci`.
 ### Test infrastructure
 
 - **CLI tests:** `cd cli && npm test` (vitest)
-- **Plugin unit tests:** `jdt test --project io.github.kaluchi.jdtbridge.tests`
+- **Plugin unit tests:** `jdt test run --project io.github.kaluchi.jdtbridge.tests -f`
 - **Integration tests:** full Tycho build only (`jdt launch run jdtbridge-verify`) — use `@EnabledIfSystemProperty(named = "jdtbridge.integration-tests", matches = "true")`
 - **Test fixture:** `TestFixture.java` creates a project with known classes —
   `test.model.Animal`, `Dog`, `Cat`, `test.edge.Calculator` (overloads),

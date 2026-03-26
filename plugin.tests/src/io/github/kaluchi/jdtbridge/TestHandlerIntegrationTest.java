@@ -17,11 +17,12 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 @EnabledIfSystemProperty(named = "jdtbridge.integration-tests", matches = "true")
 public class TestHandlerIntegrationTest {
 
-    private static final TestHandler handler = new TestHandler();
+    private static final TestHandler handler = new TestHandler(new TestSessionTracker());
 
     @BeforeAll
     public static void setUp() throws Exception {
         TestFixture.create();
+        TestFixture.createNonJavaProject();
     }
 
     @AfterAll
@@ -31,7 +32,7 @@ public class TestHandlerIntegrationTest {
 
     @Test
     public void missingParams() throws Exception {
-        String json = handler.handleTest(Map.of());
+        String json = handler.handleTestRun(Map.of());
         assertTrue(json.contains("error"),
                 "Should return error: " + json);
         assertTrue(json.contains("Missing"),
@@ -43,7 +44,7 @@ public class TestHandlerIntegrationTest {
         Map<String, String> params = new HashMap<>();
         params.put("class", "no.such.TestClass");
         params.put("no-refresh", "");
-        String json = handler.handleTest(params);
+        String json = handler.handleTestRun(params);
         assertTrue(json.contains("error"),
                 "Should return error: " + json);
         assertTrue(json.contains("not found"),
@@ -55,9 +56,21 @@ public class TestHandlerIntegrationTest {
         Map<String, String> params = new HashMap<>();
         params.put("project", "nonexistent-project-xyz");
         params.put("no-refresh", "");
-        String json = handler.handleTest(params);
+        String json = handler.handleTestRun(params);
         assertTrue(json.contains("error"),
                 "Should return error: " + json);
+    }
+
+    @Test
+    public void notJavaProject() throws Exception {
+        Map<String, String> params = new HashMap<>();
+        params.put("project", TestFixture.NON_JAVA_PROJECT_NAME);
+        params.put("no-refresh", "");
+        String json = handler.handleTestRun(params);
+        assertTrue(json.contains("error"),
+                "Should return error: " + json);
+        assertTrue(json.contains("Not a Java project"),
+                "Should say not Java: " + json);
     }
 
     @Test

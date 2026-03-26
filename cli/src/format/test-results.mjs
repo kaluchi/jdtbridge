@@ -20,7 +20,7 @@ export function formatTestResults(result) {
     for (const f of result.failures) {
       const status =
         f.status === "FAILURE" ? red(f.status) : bold(red(f.status));
-      console.log(`${status}  ${f.class}.${f.method}`);
+      console.log(`${status} [M] \`${f.class}#${f.method}\``);
       if (f.trace) {
         const traceLines = f.trace.split("\n").slice(0, 10);
         for (const line of traceLines) console.log(`  ${line}`);

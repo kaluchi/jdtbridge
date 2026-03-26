@@ -30,9 +30,9 @@ jdt impl "com.example.core.Repository#save(Order)"
 # supertypes, line numbers — structured overview, not raw source.
 jdt ti com.example.web.OrderController
 
-# Run a single test method in seconds via Eclipse's built-in runner.
-# Maven Surefire takes 30+ seconds of lifecycle overhead for the same thing.
-jdt test com.example.service.OrderServiceTest#testCalculateTotal
+# Run tests with real-time progress streaming.
+# Failures shown immediately — no waiting for full suite to finish.
+jdt test run com.example.service.OrderServiceTest -f
 ```
 
 ## Getting started
