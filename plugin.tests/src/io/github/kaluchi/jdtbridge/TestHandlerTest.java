@@ -16,63 +16,210 @@ import org.junit.jupiter.api.Test;
 /**
  * Unit tests for TestHandler utility methods.
  * Uses dynamic proxies for JDT interfaces — no workspace needed.
+ *
+ * JUnit Platform versioning recap:
+ * <ul>
+ *   <li>JUnit 5 platform bundles use version 1.x (range [1.0, 2.0))
+ *   <li>JUnit 6 platform bundles use version 6.x
+ *   <li>The marker annotation is Testable (in commons) or Suite
+ *       (in suite-api)
+ *   <li>Eclipse uses both OSGi naming (underscore) and Maven naming
+ *       (dash) for jar files
+ * </ul>
  */
 public class TestHandlerTest {
 
     private static final TestHandler handler = new TestHandler();
 
+    private static final String TESTABLE =
+            "org.junit.platform.commons.annotation.Testable";
+    private static final String SUITE =
+            "org.junit.platform.suite.api.Suite";
+    private static final String JUNIT4_KIND =
+            "org.eclipse.jdt.junit.loader.junit4";
+    private static final String JUNIT5_KIND =
+            "org.eclipse.jdt.junit.loader.junit5";
+    private static final String JUNIT6_KIND =
+            "org.eclipse.jdt.junit.loader.junit6";
+
+    // ---- JUnit 5 via Testable marker (version 1.x) ----
+
     @Test
-    public void detectTestKindJunit5FromPlatformCommons() {
+    public void junit5FromTestableOsgiNaming() {
         IJavaProject project = fakeProjectWithMarker(
-                "org.junit.platform.commons.annotation.Testable",
-                "junit-platform-commons-5.12.1.jar");
+                TESTABLE, "junit-platform-commons_1.14.3.jar");
 
-        String kind = handler.detectTestKind(project);
-
-        assertEquals("org.eclipse.jdt.junit.loader.junit5", kind);
+        assertEquals(JUNIT5_KIND, handler.detectTestKind(project));
     }
 
     @Test
-    public void detectTestKindJunit6FromPlatformCommons() {
+    public void junit5FromTestableMavenNaming() {
         IJavaProject project = fakeProjectWithMarker(
-                "org.junit.platform.commons.annotation.Testable",
-                "junit-platform-commons-6.0.3.jar");
+                TESTABLE, "junit-platform-commons-1.14.3.jar");
 
-        String kind = handler.detectTestKind(project);
-
-        assertEquals("org.eclipse.jdt.junit.loader.junit6", kind);
+        assertEquals(JUNIT5_KIND, handler.detectTestKind(project));
     }
 
     @Test
-    public void detectTestKindJunit6FromSuiteApiFallback() {
+    public void junit5FromTestableMinimumVersion() {
+        // 1.0.0 is the earliest JUnit 5 platform release
         IJavaProject project = fakeProjectWithMarker(
-                "org.junit.platform.suite.api.Suite",
-                "junit-platform-suite-api-6.0.3.jar");
+                TESTABLE, "junit-platform-commons_1.0.0.jar");
 
-        String kind = handler.detectTestKind(project);
-
-        assertEquals("org.eclipse.jdt.junit.loader.junit6", kind);
+        assertEquals(JUNIT5_KIND, handler.detectTestKind(project));
     }
 
     @Test
-    public void detectTestKindJunit5FallbackFromJupiterApi() {
+    public void junit5FromTestableHighMinor() {
+        IJavaProject project = fakeProjectWithMarker(
+                TESTABLE, "junit-platform-commons_1.99.0.jar");
+
+        assertEquals(JUNIT5_KIND, handler.detectTestKind(project));
+    }
+
+    @Test
+    public void junit5FromTestableWithQualifier() {
+        // Eclipse/Tycho builds append qualifiers like .v20260101
+        IJavaProject project = fakeProjectWithMarker(
+                TESTABLE,
+                "junit-platform-commons_1.14.3.v20260315.jar");
+
+        assertEquals(JUNIT5_KIND, handler.detectTestKind(project));
+    }
+
+    // ---- JUnit 6 via Testable marker ----
+
+    @Test
+    public void junit6FromTestableOsgiNaming() {
+        IJavaProject project = fakeProjectWithMarker(
+                TESTABLE, "junit-platform-commons_6.0.3.jar");
+
+        assertEquals(JUNIT6_KIND, handler.detectTestKind(project));
+    }
+
+    @Test
+    public void junit6FromTestableMavenNaming() {
+        IJavaProject project = fakeProjectWithMarker(
+                TESTABLE, "junit-platform-commons-6.0.3.jar");
+
+        assertEquals(JUNIT6_KIND, handler.detectTestKind(project));
+    }
+
+    @Test
+    public void junit6FromTestableHighMinor() {
+        IJavaProject project = fakeProjectWithMarker(
+                TESTABLE, "junit-platform-commons_6.5.0.jar");
+
+        assertEquals(JUNIT6_KIND, handler.detectTestKind(project));
+    }
+
+    @Test
+    public void junit6FromTestableWithQualifier() {
+        IJavaProject project = fakeProjectWithMarker(
+                TESTABLE,
+                "junit-platform-commons_6.0.3.v20260315.jar");
+
+        assertEquals(JUNIT6_KIND, handler.detectTestKind(project));
+    }
+
+    // ---- JUnit 5 via Suite marker (version 1.x) ----
+
+    @Test
+    public void junit5FromSuiteOsgiNaming() {
+        IJavaProject project = fakeProjectWithMarker(
+                SUITE, "junit-platform-suite-api_1.14.3.jar");
+
+        assertEquals(JUNIT5_KIND, handler.detectTestKind(project));
+    }
+
+    @Test
+    public void junit5FromSuiteMavenNaming() {
+        IJavaProject project = fakeProjectWithMarker(
+                SUITE, "junit-platform-suite-api-1.14.3.jar");
+
+        assertEquals(JUNIT5_KIND, handler.detectTestKind(project));
+    }
+
+    @Test
+    public void junit5FromSuiteMinimumVersion() {
+        IJavaProject project = fakeProjectWithMarker(
+                SUITE, "junit-platform-suite-api_1.0.0.jar");
+
+        assertEquals(JUNIT5_KIND, handler.detectTestKind(project));
+    }
+
+    // ---- JUnit 6 via Suite marker ----
+
+    @Test
+    public void junit6FromSuiteOsgiNaming() {
+        IJavaProject project = fakeProjectWithMarker(
+                SUITE, "junit-platform-suite-api_6.0.3.jar");
+
+        assertEquals(JUNIT6_KIND, handler.detectTestKind(project));
+    }
+
+    @Test
+    public void junit6FromSuiteMavenNaming() {
+        IJavaProject project = fakeProjectWithMarker(
+                SUITE, "junit-platform-suite-api-6.0.3.jar");
+
+        assertEquals(JUNIT6_KIND, handler.detectTestKind(project));
+    }
+
+    // ---- Unrecognized platform version → JUnit 4 ----
+
+    @Test
+    public void unknownPlatformVersion2FallsToJunit4() {
+        // Version 2.x is neither JUnit 5 (1.x) nor JUnit 6 (6.x)
+        // and no Jupiter API fallback → default JUnit 4
+        IJavaProject project = fakeProjectWithMarker(
+                TESTABLE, "junit-platform-commons_2.0.0.jar");
+
+        assertEquals(JUNIT4_KIND, handler.detectTestKind(project));
+    }
+
+    @Test
+    public void unknownPlatformVersion3FallsToJunit4() {
+        IJavaProject project = fakeProjectWithMarker(
+                TESTABLE, "junit-platform-commons_3.0.0.jar");
+
+        assertEquals(JUNIT4_KIND, handler.detectTestKind(project));
+    }
+
+    // ---- JUnit 6 checked before JUnit 5 ----
+
+    @Test
+    public void junit6TakesPriorityOverJunit5() {
+        // Version 6.x must be detected as JUnit 6, not JUnit 5
+        // (both paths are checked; 6 first)
+        IJavaProject project = fakeProjectWithMarker(
+                TESTABLE, "junit-platform-commons-6.0.0.jar");
+
+        assertEquals(JUNIT6_KIND, handler.detectTestKind(project));
+    }
+
+    // ---- Fallback: Jupiter API without platform markers ----
+
+    @Test
+    public void junit5FallbackFromJupiterApi() {
         // Platform markers not resolvable, but Jupiter API is
+        // (common with M2Eclipse)
         IJavaProject project = fakeProjectWithFallbackOnly(
                 "org.junit.jupiter.api.Test");
 
-        String kind = handler.detectTestKind(project);
-
-        assertEquals("org.eclipse.jdt.junit.loader.junit5", kind);
+        assertEquals(JUNIT5_KIND, handler.detectTestKind(project));
     }
+
+    // ---- Default: nothing found → JUnit 4 ----
 
     @Test
-    public void detectTestKindFallsBackToJunit4WhenNothingFound() {
+    public void fallsBackToJunit4WhenNothingFound() {
         IJavaProject project = fakeProjectWithFallbackOnly(null);
 
-        String kind = handler.detectTestKind(project);
-
-        assertEquals("org.eclipse.jdt.junit.loader.junit4", kind);
+        assertEquals(JUNIT4_KIND, handler.detectTestKind(project));
     }
+
+    // ---- parseTimeout ----
 
     @Test
     public void parseTimeoutDefault() {

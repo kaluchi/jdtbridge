@@ -337,7 +337,8 @@ class TestHandler {
                     JUnitCore.JUNIT5_CONTAINER_PATH)) {
                 return JUNIT6_KIND;
             }
-            if (hasJUnitJupiterMajor(project, 5,
+            // JUnit 5 platform bundles use version 1.x (range [1.0,2.0))
+            if (hasJUnitJupiterMajor(project, 1,
                     JUnitCore.JUNIT3_CONTAINER_PATH,
                     JUnitCore.JUNIT4_CONTAINER_PATH,
                     JUnitCore.JUNIT6_CONTAINER_PATH)) {
