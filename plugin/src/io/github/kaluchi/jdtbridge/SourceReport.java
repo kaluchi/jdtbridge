@@ -16,10 +16,15 @@ import java.util.Map;
  */
 class SourceReport {
 
+    /** An incoming reference (caller). */
+    record IncomingRef(String fqmn, String file, int line,
+            String typeKind, boolean isProjectSource) {}
+
     static String toJson(String fqmn, IMember member,
             String absPath, String source,
             int startLine, int endLine,
-            Map<String, ReferenceCollector.Ref> refs) {
+            Map<String, ReferenceCollector.Ref> refs,
+            java.util.List<IncomingRef> incomingRefs) {
 
         IType declaringType = member instanceof IType t
                 ? t : member.getDeclaringType();
@@ -136,6 +141,29 @@ class SourceReport {
 
             refsArr.add(entry);
         }
+
+        // Incoming refs (callers)
+        if (incomingRefs != null) {
+            for (var inc : incomingRefs) {
+                Json entry = Json.object()
+                        .put("fqmn", inc.fqmn())
+                        .put("direction", "incoming")
+                        .put("kind", "method");
+                if (inc.typeKind() != null) {
+                    entry.put("typeKind", inc.typeKind());
+                }
+                entry.put("scope", inc.isProjectSource()
+                        ? "project" : "dependency");
+                if (inc.file() != null) {
+                    entry.put("file", inc.file());
+                }
+                if (inc.line() > 0) {
+                    entry.put("line", inc.line());
+                }
+                refsArr.add(entry);
+            }
+        }
+
         result.put("refs", refsArr);
 
         return result.toString();

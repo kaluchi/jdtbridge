@@ -79,7 +79,7 @@ public class EnrichedRefTest {
                         .getFullyQualifiedName()
                         + "#" + method.getElementName(),
                 method, "D:/test/Test.java",
-                method.getSource(), 1, 10, refs);
+                method.getSource(), 1, 10, refs, null);
     }
 
     // ============================================================
@@ -517,7 +517,7 @@ public class EnrichedRefTest {
             IMethod method = type.getMethods()[0];
             String json = SourceReport.toJson(
                     "test", method, "D:/t.java", "code", 1, 1,
-                    Map.of(ref.fqmn(), ref));
+                    Map.of(ref.fqmn(), ref), null);
             assertTrue(json.contains(
                     "\"returnTypeFqn\":\"test.model.Dog\""),
                     "Should have Dog FQN: " + json);
@@ -534,7 +534,7 @@ public class EnrichedRefTest {
             IMethod method = type.getMethods()[0];
             String json = SourceReport.toJson(
                     "test", method, "D:/t.java", "code", 1, 1,
-                    Map.of(ref.fqmn(), ref));
+                    Map.of(ref.fqmn(), ref), null);
             assertTrue(json.contains(
                     "\"returnTypeKind\":\"class\""),
                     "Should have returnTypeKind:class: " + json);
@@ -599,7 +599,7 @@ public class EnrichedRefTest {
             String json = SourceReport.toJson(
                     "test.model.Dog", type,
                     "D:/test/Dog.java",
-                    type.getSource(), 1, 20, refs);
+                    type.getSource(), 1, 20, refs, null);
             assertTrue(json.contains("\"supertypes\""),
                     "Type-level should have supertypes: "
                     + json);

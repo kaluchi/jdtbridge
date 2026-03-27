@@ -1,5 +1,6 @@
 package io.github.kaluchi.jdtbridge;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -527,11 +528,80 @@ class SearchHandler {
                 : fqn;
 
         var refs = ReferenceCollector.collect(member);
+        var incoming = collectIncomingRefs(member);
         String json = SourceReport.toJson(
                 fqmn, member, absPath, source,
-                lines[0], lines[1], refs);
+                lines[0], lines[1], refs, incoming);
 
         return HttpServer.Response.json(json);
+    }
+
+    /**
+     * Collect incoming references (callers) for a member using
+     * SearchEngine. Returns enriched refs for the JSON output.
+     */
+    private List<SourceReport.IncomingRef> collectIncomingRefs(
+            IMember member) {
+        var result = new ArrayList<SourceReport.IncomingRef>();
+        try {
+            SearchEngine engine = new SearchEngine();
+            SearchPattern pattern = SearchPattern.createPattern(
+                    member, IJavaSearchConstants.REFERENCES);
+            if (pattern == null) return result;
+
+            engine.search(pattern,
+                    new SearchParticipant[]{
+                            SearchEngine
+                                    .getDefaultSearchParticipant()},
+                    SearchEngine.createWorkspaceScope(),
+                    new SearchRequestor() {
+                        @Override
+                        public void acceptSearchMatch(
+                                SearchMatch match) {
+                            if (match.getAccuracy()
+                                    != SearchMatch.A_ACCURATE)
+                                return;
+                            if (match.isInsideDocComment())
+                                return;
+
+                            String enclosing =
+                                    getEnclosingName(match);
+                            if (enclosing == null) return;
+
+                            String file = getMatchFile(match);
+                            int line = getLine(match);
+
+                            boolean isProject = false;
+                            String typeKind = null;
+                            try {
+                                if (match.getElement()
+                                        instanceof IMember m) {
+                                    IType dt =
+                                            m.getDeclaringType();
+                                    if (dt == null
+                                            && m instanceof IType t)
+                                        dt = t;
+                                    if (dt != null) {
+                                        isProject =
+                                                !dt.isBinary();
+                                        typeKind =
+                                                JdtUtils.typeKind(
+                                                        dt);
+                                    }
+                                }
+                            } catch (Exception e) { /* skip */ }
+
+                            result.add(
+                                    new SourceReport.IncomingRef(
+                                            enclosing, file, line,
+                                            typeKind, isProject));
+                        }
+                    },
+                    null);
+        } catch (Exception e) {
+            Log.warn("collectIncomingRefs failed", e);
+        }
+        return result;
     }
 
     private String absolutePath(IType type) {
