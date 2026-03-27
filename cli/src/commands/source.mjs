@@ -202,7 +202,7 @@ function formatMarkdown(result) {
 
   // Source
   lines.push("```java");
-  lines.push(result.source.trimEnd());
+  lines.push((result.source || "").trimEnd());
   lines.push("```");
 
   // Type-level: hierarchy instead of refs

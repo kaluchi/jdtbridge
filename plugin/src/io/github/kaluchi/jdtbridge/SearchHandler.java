@@ -543,6 +543,7 @@ class SearchHandler {
     private List<SourceReport.IncomingRef> collectIncomingRefs(
             IMember member) {
         var result = new ArrayList<SourceReport.IncomingRef>();
+        var seen = new java.util.HashSet<String>();
         try {
             SearchEngine engine = new SearchEngine();
             SearchPattern pattern = SearchPattern.createPattern(
@@ -591,10 +592,13 @@ class SearchHandler {
                                 }
                             } catch (Exception e) { /* skip */ }
 
-                            result.add(
-                                    new SourceReport.IncomingRef(
-                                            enclosing, file, line,
-                                            typeKind, isProject));
+                            if (seen.add(enclosing)) {
+                                result.add(
+                                        new SourceReport.IncomingRef(
+                                                enclosing, file,
+                                                line, typeKind,
+                                                isProject));
+                            }
                         }
                     },
                     null);
@@ -763,14 +767,14 @@ class SearchHandler {
                         : member.getElementName());
         if (member instanceof IMethod m) {
             try {
-                return typeFqn + "."
+                return typeFqn + "#"
                         + JdtUtils.compactSignature(m);
             } catch (JavaModelException e) {
-                return typeFqn + "." + m.getElementName() + "()";
+                return typeFqn + "#" + m.getElementName() + "()";
             }
         }
         if (member instanceof IField f) {
-            return typeFqn + "." + f.getElementName();
+            return typeFqn + "#" + f.getElementName();
         }
         if (member instanceof IType t) {
             return t.getFullyQualifiedName();

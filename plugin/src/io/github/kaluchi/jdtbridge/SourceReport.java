@@ -70,10 +70,7 @@ class SourceReport {
             String refTypeFqn = extractTypeFqn(ref.fqmn());
 
             // Classify: same-class, project, dependency
-            // Skip same-class refs when viewing full class
-            // (already visible in source)
             if (refTypeFqn.equals(ownFqn)) {
-                if (member instanceof IType) continue;
                 entry.put("scope", "class");
             } else if (isProjectSource(ref.element())) {
                 entry.put("scope", "project");
