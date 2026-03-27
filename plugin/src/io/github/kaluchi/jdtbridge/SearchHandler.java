@@ -39,7 +39,7 @@ import org.eclipse.jdt.core.search.SearchRequestor;
 class SearchHandler {
 
     String handleProjects() throws Exception {
-        Json arr = Json.array();
+        var arr = new JsonArray();
         for (var p : ResourcesPlugin.getWorkspace().getRoot()
                 .getProjects()) {
             if (p.isOpen() && !p.getName().startsWith(".")) {
@@ -77,7 +77,7 @@ class SearchHandler {
                 : SearchPattern.R_EXACT_MATCH
                         | SearchPattern.R_CASE_SENSITIVE;
 
-        Json arr = Json.array();
+        var arr = new JsonArray();
         SearchEngine engine = new SearchEngine();
         SearchPattern pattern = SearchPattern.createPattern(
                 name,
@@ -97,11 +97,12 @@ class SearchHandler {
                     public void acceptSearchMatch(SearchMatch match) {
                         if (match.getElement() instanceof IType type) {
                             if (sourceOnly && type.isBinary()) return;
-                            arr.add(Json.object()
-                                    .put("fqn",
-                                            type.getFullyQualifiedName())
-                                    .put("file",
-                                            resourcePath(match)));
+                            var e = new JsonObject();
+                            e.addProperty("fqn",
+                                    type.getFullyQualifiedName());
+                            e.addProperty("file",
+                                    resourcePath(match));
+                            arr.add(e);
                         }
                     }
                 },
@@ -138,7 +139,7 @@ class SearchHandler {
 
     private String findByPackage(String pkgName, boolean sourceOnly)
             throws CoreException {
-        Json arr = Json.array();
+        var arr = new JsonArray();
         for (IJavaProject jp : JavaCore.create(
                 ResourcesPlugin.getWorkspace().getRoot())
                 .getJavaProjects()) {
@@ -155,21 +156,23 @@ class SearchHandler {
                 for (ICompilationUnit cu
                         : pkg.getCompilationUnits()) {
                     for (IType type : cu.getTypes()) {
-                        arr.add(Json.object()
-                                .put("fqn",
-                                        type.getFullyQualifiedName())
-                                .put("file",
-                                        resourcePath(type)));
+                        var e = new JsonObject();
+                        e.addProperty("fqn",
+                                type.getFullyQualifiedName());
+                        e.addProperty("file",
+                                resourcePath(type));
+                        arr.add(e);
                     }
                 }
                 if (!sourceOnly) {
                     for (var cf : pkg.getOrdinaryClassFiles()) {
                         IType type = cf.getType();
-                        arr.add(Json.object()
-                                .put("fqn",
-                                        type.getFullyQualifiedName())
-                                .put("file", type.getPath()
-                                        .toOSString()));
+                        var e = new JsonObject();
+                        e.addProperty("fqn",
+                                type.getFullyQualifiedName());
+                        e.addProperty("file",
+                                type.getPath().toOSString());
+                        arr.add(e);
                     }
                 }
             }
@@ -212,7 +215,7 @@ class SearchHandler {
             target = type;
         }
 
-        Json arr = Json.array();
+        var arr = new JsonArray();
         SearchEngine engine = new SearchEngine();
         SearchPattern pattern = SearchPattern.createPattern(
                 target, IJavaSearchConstants.REFERENCES);
@@ -232,17 +235,22 @@ class SearchHandler {
                         String enclosing = getEnclosingName(match);
                         String content = getLineContent(match);
 
-                        Json entry = Json.object()
-                                .put("file", getMatchFile(match))
-                                .put("line", getLine(match));
+                        var entry = new JsonObject();
+                        entry.addProperty("file",
+                                getMatchFile(match));
+                        entry.addProperty("line",
+                                getLine(match));
                         if (project != null) {
-                            entry.put("project", project);
+                            entry.addProperty("project",
+                                    project);
                         }
                         if (enclosing != null) {
-                            entry.put("in", enclosing);
+                            entry.addProperty("in",
+                                    enclosing);
                         }
                         if (content != null) {
-                            entry.put("content", content);
+                            entry.addProperty("content",
+                                    content);
                         }
                         arr.add(entry);
                     }
@@ -265,7 +273,7 @@ class SearchHandler {
         }
 
         ITypeHierarchy hierarchy = type.newTypeHierarchy(null);
-        Json arr = Json.array();
+        var arr = new JsonArray();
         for (IType sub : hierarchy.getAllSubtypes(type)) {
             arr.add(typeEntry(sub));
         }
@@ -287,7 +295,7 @@ class SearchHandler {
         ITypeHierarchy hierarchy = type.newTypeHierarchy(null);
 
         // Superclass chain
-        Json supers = Json.array();
+        var supers = new JsonArray();
         IType current = type;
         while (true) {
             IType superType = hierarchy.getSuperclass(current);
@@ -297,22 +305,22 @@ class SearchHandler {
         }
 
         // All super interfaces
-        Json interfaces = Json.array();
+        var interfaces = new JsonArray();
         for (IType iface : hierarchy.getAllSuperInterfaces(type)) {
             interfaces.add(typeEntry(iface));
         }
 
         // Subtypes
-        Json subtypes = Json.array();
+        var subtypes = new JsonArray();
         for (IType sub : hierarchy.getAllSubtypes(type)) {
             subtypes.add(typeEntry(sub));
         }
 
-        return Json.object()
-                .put("supers", supers)
-                .put("interfaces", interfaces)
-                .put("subtypes", subtypes)
-                .toString();
+        var result = new JsonObject();
+        result.add("supers", supers);
+        result.add("interfaces", interfaces);
+        result.add("subtypes", subtypes);
+        return result.toString();
     }
 
     String handleImplementors(Map<String, String> params)
@@ -340,7 +348,7 @@ class SearchHandler {
 
         int arity = method.getNumberOfParameters();
         ITypeHierarchy hierarchy = type.newTypeHierarchy(null);
-        Json arr = Json.array();
+        var arr = new JsonArray();
         for (IType sub : hierarchy.getAllSubtypes(type)) {
             if (sub.isAnonymous()) continue;
             try {
@@ -348,11 +356,14 @@ class SearchHandler {
                     if (m.getElementName().equals(methodName)
                             && m.getNumberOfParameters()
                                     == arity) {
-                        arr.add(Json.object()
-                                .put("fqn",
-                                        sub.getFullyQualifiedName())
-                                .put("file", filePath(sub))
-                                .put("line", getLineOfMember(m)));
+                        var e = new JsonObject();
+                        e.addProperty("fqn",
+                                sub.getFullyQualifiedName());
+                        e.addProperty("file",
+                                filePath(sub));
+                        e.addProperty("line",
+                                getLineOfMember(m));
+                        arr.add(e);
                         break;
                     }
                 }
@@ -375,50 +386,52 @@ class SearchHandler {
             return HttpServer.jsonError("Type not found: " + fqn);
         }
 
-        Json result = Json.object()
-                .put("fqn", type.getFullyQualifiedName())
-                .put("kind", JdtUtils.typeKind(type))
-                .put("file", filePath(type))
-                .putIf(type.isBinary(), "binary", true);
+        var result = new JsonObject();
+        result.addProperty("fqn",
+                type.getFullyQualifiedName());
+        result.addProperty("kind", JdtUtils.typeKind(type));
+        result.addProperty("file", filePath(type));
+        if (type.isBinary())
+            result.addProperty("binary", true);
 
-        // Superclass
         String superSig = type.getSuperclassTypeSignature();
         if (superSig != null) {
-            result.put("superclass", Signature.toString(superSig));
+            result.addProperty("superclass",
+                    Signature.toString(superSig));
         }
 
-        // Interfaces
-        Json interfaces = Json.array();
-        for (String sig : type.getSuperInterfaceTypeSignatures()) {
+        var interfaces = new JsonArray();
+        for (String sig
+                : type.getSuperInterfaceTypeSignatures()) {
             interfaces.add(Signature.toString(sig));
         }
-        result.put("interfaces", interfaces);
+        result.add("interfaces", interfaces);
 
-        // Fields
-        Json fields = Json.array();
+        var fields = new JsonArray();
         for (IField f : type.getFields()) {
             String mods = Flags.toString(f.getFlags());
-            Json field = Json.object()
-                    .put("name", f.getElementName())
-                    .put("type", Signature.toString(
-                            f.getTypeSignature()));
+            var field = new JsonObject();
+            field.addProperty("name", f.getElementName());
+            field.addProperty("type", Signature.toString(
+                    f.getTypeSignature()));
             if (!mods.isEmpty()) {
-                field.put("modifiers", mods);
+                field.addProperty("modifiers", mods);
             }
-            field.put("line", getLineOfMember(f));
+            field.addProperty("line", getLineOfMember(f));
             fields.add(field);
         }
-        result.put("fields", fields);
+        result.add("fields", fields);
 
-        // Methods
-        Json methods = Json.array();
+        var methods = new JsonArray();
         for (IMethod m : type.getMethods()) {
-            methods.add(Json.object()
-                    .put("name", m.getElementName())
-                    .put("signature", buildSignature(m))
-                    .put("line", getLineOfMember(m)));
+            var me = new JsonObject();
+            me.addProperty("name", m.getElementName());
+            me.addProperty("signature",
+                    buildSignature(m));
+            me.addProperty("line", getLineOfMember(m));
+            methods.add(me);
         }
-        result.put("methods", methods);
+        result.add("methods", methods);
 
         return result.toString();
     }
@@ -652,11 +665,13 @@ class SearchHandler {
 
     // ---- Helpers ----
 
-    private Json typeEntry(IType type) {
-        Json obj = Json.object()
-                .put("fqn", type.getFullyQualifiedName())
-                .put("file", filePath(type))
-                .putIf(type.isBinary(), "binary", true);
+    private JsonObject typeEntry(IType type) {
+        var obj = new JsonObject();
+        obj.addProperty("fqn",
+                type.getFullyQualifiedName());
+        obj.addProperty("file", filePath(type));
+        if (type.isBinary())
+            obj.addProperty("binary", true);
         return obj;
     }
 
