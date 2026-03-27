@@ -1,8 +1,8 @@
-import { get, getStreamLines } from "../client.mjs";
+import { get } from "../client.mjs";
 import { extractPositional } from "../args.mjs";
 import {
   formatTestStatus,
-  formatTestEvent,
+  followTestStream,
 } from "../format/test-status.mjs";
 
 /**
@@ -20,7 +20,7 @@ export async function testStatus(args) {
 
   const follow = args.includes("-f") || args.includes("--follow");
   if (follow) {
-    const exitCode = await followStatus(session, args);
+    const exitCode = await followTestStream(session, args);
     process.exit(exitCode);
   }
 
@@ -39,44 +39,6 @@ export async function testStatus(args) {
   }
 
   formatTestStatus(result);
-}
-
-async function followStatus(session, args) {
-  let filter = "failures";
-  if (args.includes("--all")) filter = "all";
-  else if (args.includes("--ignored")) filter = "ignored";
-
-  const url = `/test/status/stream?session=${encodeURIComponent(session)}&filter=${filter}`;
-
-  let detached = false;
-  const onSigint = () => {
-    detached = true;
-    process.stdout.write("\n");
-    process.exit(0);
-  };
-  process.on("SIGINT", onSigint);
-
-  let hasFailed = false;
-  try {
-    await getStreamLines(url, (line) => {
-      formatTestEvent(line);
-      try {
-        const ev = JSON.parse(line);
-        if (ev.event === "finished" && (ev.failed > 0 || ev.errors > 0)) {
-          hasFailed = true;
-        }
-      } catch { /* ignore parse errors */ }
-    });
-  } catch (e) {
-    if (!detached) {
-      console.error(e.message);
-      return 1;
-    }
-    return 0;
-  } finally {
-    process.removeListener("SIGINT", onSigint);
-  }
-  return hasFailed ? 1 : 0;
 }
 
 export const help = `Show test session status (snapshot or live stream).

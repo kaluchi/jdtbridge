@@ -1,9 +1,9 @@
-import { get, getStreamLines } from "../client.mjs";
+import { get } from "../client.mjs";
 import { extractPositional, parseFlags, parseFqmn } from "../args.mjs";
 import {
   formatTestRunHeader,
   testRunGuide,
-  formatTestEvent,
+  followTestStream,
 } from "../format/test-status.mjs";
 
 /**
@@ -36,7 +36,6 @@ export async function testRun(args) {
     process.exit(1);
   }
 
-  if (flags.timeout) url += `&timeout=${flags.timeout}`;
   if (args.includes("--no-refresh")) url += "&no-refresh";
 
   const result = await get(url, 30_000);
@@ -66,7 +65,7 @@ export async function testRun(args) {
   const follow = args.includes("-f") || args.includes("--follow");
   if (follow) {
     console.log();
-    const exitCode = await followTestStatus(session, args);
+    const exitCode = await followTestStream(session, args);
     process.exit(exitCode);
   }
 
@@ -74,47 +73,6 @@ export async function testRun(args) {
   if (!quiet) {
     console.log(testRunGuide(session));
   }
-}
-
-/**
- * Stream test status until session finishes.
- */
-async function followTestStatus(session, args) {
-  let filter = "failures";
-  if (args.includes("--all")) filter = "all";
-  else if (args.includes("--ignored")) filter = "ignored";
-
-  const url = `/test/status/stream?session=${encodeURIComponent(session)}&filter=${filter}`;
-
-  let detached = false;
-  const onSigint = () => {
-    detached = true;
-    process.stdout.write("\n");
-    process.exit(0);
-  };
-  process.on("SIGINT", onSigint);
-
-  let hasFailed = false;
-  try {
-    await getStreamLines(url, (line) => {
-      formatTestEvent(line);
-      try {
-        const ev = JSON.parse(line);
-        if (ev.event === "finished" && (ev.failed > 0 || ev.errors > 0)) {
-          hasFailed = true;
-        }
-      } catch { /* ignore parse errors */ }
-    });
-  } catch (e) {
-    if (!detached) {
-      console.error(e.message);
-      return 1;
-    }
-    return 0;
-  } finally {
-    process.removeListener("SIGINT", onSigint);
-  }
-  return hasFailed ? 1 : 0;
 }
 
 function sleep(ms) {
@@ -134,7 +92,6 @@ Flags:
   -q, --quiet     suppress onboarding guide
   --all           include passed tests in output (with -f)
   --ignored       show only ignored tests (with -f)
-  --timeout <s>   test run timeout in seconds (default: 300)
 
 Examples:
   jdt test run com.example.MyTest                 run + show guide

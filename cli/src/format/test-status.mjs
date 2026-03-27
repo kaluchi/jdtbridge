@@ -173,3 +173,49 @@ export function testRunGuide(session) {
 
 Add \`-q\` to suppress this guide.`;
 }
+
+/**
+ * Stream test status via JSONL and format output.
+ * Shared by test-run -f and test-status -f.
+ * Returns exit code: 0 if all pass, 1 if any failures.
+ */
+export async function followTestStream(session, args) {
+  const { getStreamLines } = await import("../client.mjs");
+
+  let filter = "failures";
+  if (args.includes("--all")) filter = "all";
+  else if (args.includes("--ignored")) filter = "ignored";
+
+  const url = `/test/status/stream?session=${encodeURIComponent(session)}&filter=${filter}`;
+
+  let detached = false;
+  const onSigint = () => {
+    detached = true;
+    process.stdout.write("\n");
+    process.exit(0);
+  };
+  process.on("SIGINT", onSigint);
+
+  let hasFailed = false;
+  try {
+    await getStreamLines(url, (line) => {
+      formatTestEvent(line);
+      try {
+        const ev = JSON.parse(line);
+        if (ev.event === "finished"
+            && (ev.failed > 0 || ev.errors > 0)) {
+          hasFailed = true;
+        }
+      } catch { /* ignore parse errors */ }
+    });
+  } catch (e) {
+    if (!detached) {
+      console.error(e.message);
+      return 1;
+    }
+    return 0;
+  } finally {
+    process.removeListener("SIGINT", onSigint);
+  }
+  return hasFailed ? 1 : 0;
+}

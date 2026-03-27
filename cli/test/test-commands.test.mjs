@@ -157,21 +157,6 @@ describe("test commands", () => {
     await testRun(["--project", "my-project", "--package", "com.example.dao", "-q"]);
   });
 
-  it("test run sends timeout param", async () => {
-    await setupMock((req, res) => {
-      if (req.url.includes("/test/run")) {
-        expect(req.url).toContain("timeout=60");
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: true, session: "test-timeout-1" }));
-      } else if (req.url.includes("/test/status")) {
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ total: 1 }));
-      }
-    });
-    const { testRun } = await import("../src/commands/test-run.mjs");
-    await testRun(["com.example.FooTest", "--timeout", "60", "-q"]);
-  });
-
   it("test run sends no-refresh param", async () => {
     await setupMock((req, res) => {
       if (req.url.includes("/test/run")) {

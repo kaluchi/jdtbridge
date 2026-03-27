@@ -394,6 +394,8 @@ public class HttpServer {
                         testSessionHandler.handleStatus(params));
                 case "/test/sessions" -> Response.json(
                         testSessionHandler.handleSessions(params));
+                case "/test/clear" -> Response.json(
+                        testSessionHandler.handleClear(params));
                 case "/editors" -> Response.json(
                         editor.handleEditors(params));
                 case "/open" -> Response.json(

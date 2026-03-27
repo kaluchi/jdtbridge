@@ -83,6 +83,22 @@ class TestSessionHandler {
                 .toString();
     }
 
+    String handleClear(Map<String, String> params) {
+        String name = params.get("session");
+        int removed = 0;
+        for (var ts : tracker.all()) {
+            if (!"finished".equals(ts.state)
+                    && !"stopped".equals(ts.state)) continue;
+            if (name != null && !name.isBlank()
+                    && !name.equals(ts.name)) continue;
+            tracker.remove(ts.name);
+            removed++;
+        }
+        return Json.object()
+                .put("removed", removed)
+                .toString();
+    }
+
     String handleSessions(Map<String, String> params) {
         Json arr = Json.array();
         for (var ts : tracker.all()) {

@@ -229,21 +229,6 @@ describe("commands (integration)", () => {
     expect(io.logs[0]).toBe("Opened");
   });
 
-  it("test shows summary and failures", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({
-        total: 3, passed: 2, failed: 1, errors: 0, ignored: 0, time: 1.5,
-        failures: [{ status: "FAILURE", class: "app.FooTest", method: "testBar", trace: "AssertionError\n  at ..." }],
-      }));
-    });
-    const { test } = await import("../src/commands/test.mjs");
-    await test(["app.FooTest"]);
-    expect(io.logs[0]).toContain("3 tests");
-    expect(io.logs[0]).toContain("1 failed");
-    expect(io.logs.some((l) => l.includes("app.FooTest#testBar"))).toBe(true);
-  });
-
   it("build shows success with 0 errors", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
@@ -426,12 +411,6 @@ describe("commands (integration)", () => {
     await setupMock((req, res) => res.end());
     const { open } = await import("../src/commands/editor.mjs");
     await expect(open([])).rejects.toThrow("exit(1)");
-  });
-
-  it("test exits on missing args (no FQN, no --project)", async () => {
-    await setupMock((req, res) => res.end());
-    const { test } = await import("../src/commands/test.mjs");
-    await expect(test([])).rejects.toThrow("exit(1)");
   });
 
   // --- Server error responses ---
@@ -854,13 +833,6 @@ describe("commands (integration)", () => {
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
-  it("test exits on server error", async () => {
-    await setupMock(errorServer());
-    const { test } = await import("../src/commands/test.mjs");
-    await expect(test(["app.FooTest"])).rejects.toThrow("exit(1)");
-    expect(io.errors[0]).toContain("Something went wrong");
-  });
-
   // --- Edge cases ---
 
   it("subtypes shows no subtypes message", async () => {
@@ -983,17 +955,6 @@ describe("commands (integration)", () => {
     const { errors } = await import("../src/commands/errors.mjs");
     await errors(["--warnings"]);
     expect(io.logs[0]).toContain("WARN");
-  });
-
-  it("test with --project flag", async () => {
-    await setupMock((req, res) => {
-      expect(req.url).toContain("project=m8-server");
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ total: 10, passed: 10, failed: 0, errors: 0, ignored: 0, time: 5.0, failures: [] }));
-    });
-    const { test } = await import("../src/commands/test.mjs");
-    await test(["--project", "m8-server"]);
-    expect(io.logs[0]).toContain("10 tests");
   });
 
   // ---- source ----

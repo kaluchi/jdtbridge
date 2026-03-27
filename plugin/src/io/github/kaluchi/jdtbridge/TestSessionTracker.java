@@ -91,6 +91,11 @@ class TestSessionTracker extends TestRunListener {
         return sessions.values();
     }
 
+    /** Remove a session by name. */
+    void remove(String name) {
+        sessions.remove(name);
+    }
+
     /** Wait briefly for a session to appear. */
     TrackedTestSession await(String name) {
         for (int i = 0; i < 10; i++) {
