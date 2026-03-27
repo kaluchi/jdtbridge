@@ -127,9 +127,10 @@ class ReferenceCollector {
                 IType ifaceType = ifaceMethod.getDeclaringType();
                 if (ifaceType == null) continue;
 
-                int arity = ifaceMethod.getNumberOfParameters();
                 String methodName =
                         ifaceMethod.getElementName();
+                String ifaceSig =
+                        paramSig(ifaceMethod);
                 ITypeHierarchy hierarchy =
                         ifaceType.newTypeHierarchy(null);
 
@@ -139,7 +140,7 @@ class ReferenceCollector {
                     for (IMethod m : sub.getMethods()) {
                         if (!m.getElementName()
                                 .equals(methodName)) continue;
-                        if (m.getNumberOfParameters() != arity)
+                        if (!paramSig(m).equals(ifaceSig))
                             continue;
 
                         String subFqn =

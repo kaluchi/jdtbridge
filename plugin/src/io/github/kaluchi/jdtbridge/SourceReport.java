@@ -344,7 +344,7 @@ class SourceReport {
             if (declaringType == null) return null;
 
             String methodName = method.getElementName();
-            int arity = method.getNumberOfParameters();
+            String sig = ReferenceCollector.paramSig(method);
 
             ITypeHierarchy hierarchy =
                     declaringType.newSupertypeHierarchy(null);
@@ -353,7 +353,7 @@ class SourceReport {
             for (IType superType
                     : hierarchy.getAllSupertypes(declaringType)) {
                 IMethod found = findMatchingMethod(
-                        superType, methodName, arity);
+                        superType, methodName, sig);
                 if (found != null) {
                     String typeFqn =
                             superType.getFullyQualifiedName();
@@ -370,11 +370,12 @@ class SourceReport {
     }
 
     private static IMethod findMatchingMethod(
-            IType type, String name, int arity)
+            IType type, String name, String paramSig)
             throws JavaModelException {
         for (IMethod m : type.getMethods()) {
             if (m.getElementName().equals(name)
-                    && m.getNumberOfParameters() == arity) {
+                    && ReferenceCollector.paramSig(m)
+                            .equals(paramSig)) {
                 return m;
             }
         }
