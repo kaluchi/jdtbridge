@@ -1,5 +1,7 @@
 package io.github.kaluchi.jdtbridge;
 
+import com.google.gson.JsonObject;
+
 import java.util.Map;
 import java.util.jar.Manifest;
 
@@ -160,20 +162,21 @@ class TestHandler {
         delegate.launch(pl.wc(), ILaunchManager.RUN_MODE,
                 pl.launch(), new NullProgressMonitor());
 
-        Json response = Json.object()
-                .put("ok", true)
-                .put("session", pl.configName())
-                .putIf(pl.project() != null,
-                        "project", pl.project())
-                .putIf(pl.runner() != null,
-                        "runner", pl.runner());
+        var response = new JsonObject();
+        response.addProperty("ok", true);
+        response.addProperty("session", pl.configName());
+        if (pl.project() != null)
+            response.addProperty("project", pl.project());
+        if (pl.runner() != null)
+            response.addProperty("runner", pl.runner());
 
         var processes = pl.launch().getProcesses();
         if (processes.length > 0) {
             String pid = processes[0].getAttribute(
                     org.eclipse.debug.core.model.IProcess
                             .ATTR_PROCESS_ID);
-            if (pid != null) response.put("pid", pid);
+            if (pid != null)
+                response.addProperty("pid", pid);
         }
 
         return response.toString();
