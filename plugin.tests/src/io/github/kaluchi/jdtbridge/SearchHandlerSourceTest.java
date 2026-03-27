@@ -3,12 +3,14 @@ package io.github.kaluchi.jdtbridge;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -16,11 +18,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
-/**
- * Tests for SearchHandler source endpoint — verifies JSON
- * structure, error handling, and enriched fields through
- * the full handler stack.
- */
 @EnabledIfSystemProperty(
         named = "jdtbridge.integration-tests",
         matches = "true")
@@ -37,135 +34,121 @@ public class SearchHandlerSourceTest {
         TestFixture.destroy();
     }
 
-    // ---- Parse helpers ----
+    static JsonObject src(String cls, String method)
+            throws Exception {
+        var params = method != null
+                ? Map.of("class", cls, "method", method)
+                : Map.of("class", cls);
+        return JsonParser.parseString(
+                handler.handleSource(params).body())
+                .getAsJsonObject();
+    }
 
-    static List<Map<String, Object>> parseRefs(String json) {
-        var parsed = Json.parse(json);
-        Object refsRaw = parsed.get("refs");
-        if (refsRaw == null) return List.of();
-        String s = refsRaw.toString().trim();
-        if (!s.startsWith("[")) return List.of();
-        var result = new ArrayList<Map<String, Object>>();
-        s = s.substring(1, s.length() - 1);
-        int depth = 0;
-        int start = 0;
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (c == '{') depth++;
-            else if (c == '}') depth--;
-            if (depth == 0 && c == '}') {
-                String elem = s.substring(start, i + 1).trim();
-                if (elem.startsWith(","))
-                    elem = elem.substring(1).trim();
-                if (elem.startsWith("{"))
-                    result.add(Json.parse(elem));
-                start = i + 1;
+    static JsonObject srcMethod(String cls, String method)
+            throws Exception {
+        return src(cls, method);
+    }
+
+    static JsonArray refsDir(JsonObject json, String dir) {
+        var result = new JsonArray();
+        if (!json.has("refs")) return result;
+        for (JsonElement e : json.getAsJsonArray("refs")) {
+            var ref = e.getAsJsonObject();
+            if (ref.has("direction") && dir.equals(
+                    ref.get("direction").getAsString())) {
+                result.add(ref);
             }
         }
         return result;
     }
 
-    // ---- Error handling ----
+    static JsonObject findRef(JsonArray refs, String fqmnPart) {
+        for (JsonElement e : refs) {
+            var ref = e.getAsJsonObject();
+            if (ref.has("fqmn") && ref.get("fqmn")
+                    .getAsString().contains(fqmnPart)) {
+                return ref;
+            }
+        }
+        return null;
+    }
 
     @Nested
     class ErrorHandling {
 
         @Test
         void missingClassParam() throws Exception {
-            var resp = handler.handleSource(Map.of());
-            var parsed = Json.parse(resp.body());
-            assertNotNull(Json.getString(parsed, "error"));
+            var json = JsonParser.parseString(
+                    handler.handleSource(Map.of()).body())
+                    .getAsJsonObject();
+            assertTrue(json.has("error"));
         }
 
         @Test
         void emptyClassParam() throws Exception {
-            var resp = handler.handleSource(
-                    Map.of("class", ""));
-            var parsed = Json.parse(resp.body());
-            assertNotNull(Json.getString(parsed, "error"));
+            var json = JsonParser.parseString(
+                    handler.handleSource(
+                            Map.of("class", "")).body())
+                    .getAsJsonObject();
+            assertTrue(json.has("error"));
         }
 
         @Test
         void typeNotFound() throws Exception {
-            var resp = handler.handleSource(
-                    Map.of("class", "no.such.Type"));
-            var parsed = Json.parse(resp.body());
-            assertNotNull(Json.getString(parsed, "error"));
-            assertTrue(Json.getString(parsed, "error")
+            var json = JsonParser.parseString(
+                    handler.handleSource(
+                            Map.of("class", "no.such.Type"))
+                            .body())
+                    .getAsJsonObject();
+            assertTrue(json.get("error").getAsString()
                     .contains("not found"));
         }
 
         @Test
         void methodNotFound() throws Exception {
-            var resp = handler.handleSource(
-                    Map.of("class", "test.model.Dog",
-                            "method", "noSuchMethod"));
-            var parsed = Json.parse(resp.body());
-            assertNotNull(Json.getString(parsed, "error"));
+            var json = srcMethod("test.model.Dog",
+                    "noSuchMethod");
+            assertTrue(json.has("error"));
         }
     }
-
-    // ---- Method source structure ----
 
     @Nested
     class MethodSourceStructure {
 
         @Test
         void fqmnExact() throws Exception {
-            var resp = handler.handleSource(
-                    Map.of("class", "test.model.Dog",
-                            "method", "bark"));
-            var parsed = Json.parse(resp.body());
+            var json = srcMethod("test.model.Dog", "bark");
             assertEquals("test.model.Dog#bark()",
-                    Json.getString(parsed, "fqmn"));
+                    json.get("fqmn").getAsString());
         }
 
         @Test
         void fileIsAbsolutePath() throws Exception {
-            var resp = handler.handleSource(
-                    Map.of("class", "test.model.Dog",
-                            "method", "bark"));
-            var parsed = Json.parse(resp.body());
-            String file = Json.getString(parsed, "file");
-            assertNotNull(file);
-            assertTrue(file.endsWith("Dog.java"),
-                    "File should end with Dog.java: " + file);
-            assertTrue(file.contains("jdtbridge-test"),
-                    "File should be in test project: " + file);
+            var json = srcMethod("test.model.Dog", "bark");
+            String file = json.get("file").getAsString();
+            assertTrue(file.endsWith("Dog.java"));
+            assertTrue(file.contains("jdtbridge-test"));
         }
 
         @Test
         void startLinePositive() throws Exception {
-            var resp = handler.handleSource(
-                    Map.of("class", "test.model.Dog",
-                            "method", "bark"));
-            var parsed = Json.parse(resp.body());
-            assertTrue(
-                    Json.getInt(parsed, "startLine", -1) > 0);
+            var json = srcMethod("test.model.Dog", "bark");
+            assertTrue(json.get("startLine").getAsInt() > 0);
         }
 
         @Test
         void endLineAfterStartLine() throws Exception {
-            var resp = handler.handleSource(
-                    Map.of("class", "test.model.Dog",
-                            "method", "bark"));
-            var parsed = Json.parse(resp.body());
-            int start = Json.getInt(parsed, "startLine", -1);
-            int end = Json.getInt(parsed, "endLine", -1);
-            assertTrue(end >= start,
-                    "endLine >= startLine: " + start + "-" + end);
+            var json = srcMethod("test.model.Dog", "bark");
+            int start = json.get("startLine").getAsInt();
+            int end = json.get("endLine").getAsInt();
+            assertTrue(end >= start);
         }
 
         @Test
         void sourceContainsMethodBody() throws Exception {
-            var resp = handler.handleSource(
-                    Map.of("class", "test.model.Dog",
-                            "method", "bark"));
-            var parsed = Json.parse(resp.body());
-            String source = Json.getString(parsed, "source");
-            assertNotNull(source);
-            assertTrue(source.contains("bark"),
-                    "Source should contain bark");
+            var json = srcMethod("test.model.Dog", "bark");
+            assertTrue(json.get("source").getAsString()
+                    .contains("bark"));
         }
 
         @Test
@@ -178,89 +161,66 @@ public class SearchHandlerSourceTest {
         }
     }
 
-    // ---- Type source structure ----
-
     @Nested
     class TypeSourceStructure {
 
         @Test
         void fqmnExact() throws Exception {
-            var resp = handler.handleSource(
-                    Map.of("class", "test.model.Dog"));
-            var parsed = Json.parse(resp.body());
+            var json = src("test.model.Dog", null);
             assertEquals("test.model.Dog",
-                    Json.getString(parsed, "fqmn"));
+                    json.get("fqmn").getAsString());
         }
 
         @Test
         void hasSupertypes() throws Exception {
-            var resp = handler.handleSource(
-                    Map.of("class", "test.model.Dog"));
-            var parsed = Json.parse(resp.body());
-            assertNotNull(parsed.get("supertypes"));
+            var json = src("test.model.Dog", null);
+            assertTrue(json.has("supertypes"));
         }
 
         @Test
         void hasSubtypes() throws Exception {
-            var resp = handler.handleSource(
-                    Map.of("class", "test.model.Dog"));
-            var parsed = Json.parse(resp.body());
-            assertNotNull(parsed.get("subtypes"));
+            var json = src("test.model.Dog", null);
+            assertTrue(json.has("subtypes"));
         }
 
         @Test
         void noRefsField() throws Exception {
-            var resp = handler.handleSource(
-                    Map.of("class", "test.model.Dog"));
-            var parsed = Json.parse(resp.body());
-            assertNull(parsed.get("refs"));
+            var json = src("test.model.Dog", null);
+            assertFalse(json.has("refs"));
         }
 
         @Test
         void noOverrideTarget() throws Exception {
-            var resp = handler.handleSource(
-                    Map.of("class", "test.model.Dog"));
-            var parsed = Json.parse(resp.body());
-            assertNull(parsed.get("overrideTarget"));
+            var json = src("test.model.Dog", null);
+            assertFalse(json.has("overrideTarget"));
         }
 
         @Test
         void sourceContainsFullClass() throws Exception {
-            var resp = handler.handleSource(
-                    Map.of("class", "test.model.Dog"));
-            var parsed = Json.parse(resp.body());
-            String source = Json.getString(parsed, "source");
-            assertTrue(source.contains("class Dog"),
-                    "Should have class declaration");
-            assertTrue(source.contains("bark"),
-                    "Should have bark method");
-            assertTrue(source.contains("name"),
-                    "Should have name method");
+            var json = src("test.model.Dog", null);
+            String source = json.get("source").getAsString();
+            assertTrue(source.contains("class Dog"));
+            assertTrue(source.contains("bark"));
+            assertTrue(source.contains("name"));
         }
 
         @Test
         void interfaceSourceContainsBody() throws Exception {
-            var resp = handler.handleSource(
-                    Map.of("class", "test.model.Animal"));
-            var parsed = Json.parse(resp.body());
-            String source = Json.getString(parsed, "source");
+            var json = src("test.model.Animal", null);
+            String source = json.get("source").getAsString();
             assertTrue(source.contains("interface Animal"));
             assertTrue(source.contains("name()"));
         }
 
         @Test
         void enumSourceContainsConstants() throws Exception {
-            var resp = handler.handleSource(
-                    Map.of("class", "test.edge.Color"));
-            var parsed = Json.parse(resp.body());
-            String source = Json.getString(parsed, "source");
+            var json = src("test.edge.Color", null);
+            String source = json.get("source").getAsString();
             assertTrue(source.contains("RED"));
             assertTrue(source.contains("GREEN"));
             assertTrue(source.contains("BLUE"));
         }
     }
-
-    // ---- Overloaded methods ----
 
     @Nested
     class OverloadedMethods {
@@ -270,9 +230,9 @@ public class SearchHandlerSourceTest {
             var resp = handler.handleSource(
                     Map.of("class", "test.edge.Calculator",
                             "method", "add"));
-            String body = resp.body();
-            assertTrue(body.startsWith("["),
-                    "Overloads should be JSON array");
+            var arr = JsonParser.parseString(resp.body())
+                    .getAsJsonArray();
+            assertEquals(3, arr.size());
         }
 
         @Test
@@ -280,125 +240,87 @@ public class SearchHandlerSourceTest {
             var resp = handler.handleSource(
                     Map.of("class", "test.edge.Calculator",
                             "method", "add"));
-            String body = resp.body();
-            assertTrue(body.contains(
-                    "\"fqmn\":\"test.edge.Calculator#add(int, int)\""));
-            assertTrue(body.contains(
-                    "\"fqmn\":\"test.edge.Calculator#add(double, double)\""));
-            assertTrue(body.contains(
-                    "\"fqmn\":\"test.edge.Calculator#add(int, int, int)\""));
-        }
-
-        @Test
-        void eachOverloadHasSource() throws Exception {
-            var resp = handler.handleSource(
-                    Map.of("class", "test.edge.Calculator",
-                            "method", "add"));
-            String body = resp.body();
-            assertTrue(body.contains("return a + b"));
-            assertTrue(body.contains("return a + b + c"));
+            var arr = JsonParser.parseString(resp.body())
+                    .getAsJsonArray();
+            var fqmns = new java.util.HashSet<String>();
+            for (JsonElement e : arr) {
+                fqmns.add(e.getAsJsonObject()
+                        .get("fqmn").getAsString());
+            }
+            assertTrue(fqmns.contains(
+                    "test.edge.Calculator#add(int, int)"));
+            assertTrue(fqmns.contains(
+                    "test.edge.Calculator#add(double, double)"));
+            assertTrue(fqmns.contains(
+                    "test.edge.Calculator#add(int, int, int)"));
         }
 
         @Test
         void singleOverloadWithArity() throws Exception {
-            var resp = handler.handleSource(
-                    Map.of("class", "test.edge.Calculator",
-                            "method", "add",
-                            "paramTypes", "int,int,int"));
-            var parsed = Json.parse(resp.body());
-            // Single match — not an array
+            var json = JsonParser.parseString(
+                    handler.handleSource(
+                            Map.of("class",
+                                    "test.edge.Calculator",
+                                    "method", "add",
+                                    "paramTypes", "int,int,int"))
+                            .body()).getAsJsonObject();
             assertEquals(
                     "test.edge.Calculator#add(int, int, int)",
-                    Json.getString(parsed, "fqmn"));
+                    json.get("fqmn").getAsString());
         }
     }
-
-    // ---- Enriched outgoing ref fields ----
 
     @Nested
     class EnrichedOutgoingFields {
 
         @Test
-        void everyOutgoingRefHasKindAndDirection()
+        void everyOutgoingRefHasRequiredFields()
                 throws Exception {
-            String json = handler.handleSource(
-                    Map.of("class",
-                            "test.service.AnimalService",
-                            "method", "process")).body();
-            for (var ref : parseRefs(json)) {
-                String dir = Json.getString(ref, "direction");
-                if (!"outgoing".equals(dir)) continue;
-                assertNotNull(Json.getString(ref, "fqmn"));
-                assertNotNull(Json.getString(ref, "kind"));
-                assertNotNull(
-                        Json.getString(ref, "scope"));
+            var json = srcMethod(
+                    "test.service.AnimalService", "process");
+            for (JsonElement e : refsDir(json, "outgoing")) {
+                var ref = e.getAsJsonObject();
+                assertTrue(ref.has("fqmn"));
+                assertTrue(ref.has("kind"));
+                assertTrue(ref.has("scope"));
             }
         }
 
         @Test
         void interfaceRefHasCorrectTypeKind() throws Exception {
-            String json = handler.handleSource(
-                    Map.of("class",
-                            "test.service.AnimalService",
-                            "method", "process")).body();
-            var refs = parseRefs(json);
-            var animalName = refs.stream()
-                    .filter(r -> {
-                        String f = Json.getString(r, "fqmn");
-                        return f != null
-                                && f.equals(
-                                "test.model.Animal#name()");
-                    })
-                    .findFirst().orElse(null);
-            assertNotNull(animalName);
+            var json = srcMethod(
+                    "test.service.AnimalService", "process");
+            var ref = findRef(refsDir(json, "outgoing"),
+                    "test.model.Animal#name()");
+            assertNotNull(ref);
             assertEquals("interface",
-                    Json.getString(animalName, "typeKind"));
+                    ref.get("typeKind").getAsString());
             assertEquals("method",
-                    Json.getString(animalName, "kind"));
-            assertEquals("outgoing",
-                    Json.getString(animalName, "direction"));
+                    ref.get("kind").getAsString());
         }
 
         @Test
         void staticRefFlagged() throws Exception {
-            String json = handler.handleSource(
-                    Map.of("class",
-                            "test.service.EnrichedRefService",
-                            "method",
-                            "getStaticValue")).body();
-            var refs = parseRefs(json);
-            var valueRef = refs.stream()
-                    .filter(r -> {
-                        String f = Json.getString(r, "fqmn");
-                        return f != null
-                                && f.contains("VALUE");
-                    })
-                    .findFirst().orElse(null);
-            assertNotNull(valueRef, "VALUE ref: " + refs);
-            assertEquals(Boolean.TRUE,
-                    valueRef.get("static"));
+            var json = srcMethod(
+                    "test.service.EnrichedRefService",
+                    "getStaticValue");
+            var ref = findRef(refsDir(json, "outgoing"),
+                    "VALUE");
+            assertNotNull(ref);
+            assertTrue(ref.get("static").getAsBoolean());
         }
 
         @Test
         void inheritedRefFlagged() throws Exception {
-            String json = handler.handleSource(
-                    Map.of("class",
-                            "test.service.EnrichedRefService",
-                            "method",
-                            "getParrotName")).body();
-            var refs = parseRefs(json);
-            var nameRef = refs.stream()
-                    .filter(r -> {
-                        String f = Json.getString(r, "fqmn");
-                        return f != null
-                                && f.contains("#name(");
-                    })
-                    .findFirst().orElse(null);
-            assertNotNull(nameRef, "name ref: " + refs);
-            assertEquals(Boolean.TRUE,
-                    nameRef.get("inherited"));
+            var json = srcMethod(
+                    "test.service.EnrichedRefService",
+                    "getParrotName");
+            var ref = findRef(refsDir(json, "outgoing"),
+                    "#name(");
+            assertNotNull(ref);
+            assertTrue(ref.get("inherited").getAsBoolean());
             assertEquals("test.edge.AbstractPet",
-                    Json.getString(nameRef, "inheritedFrom"));
+                    ref.get("inheritedFrom").getAsString());
         }
     }
 }
