@@ -275,7 +275,7 @@ describe("commands (integration)", () => {
     const { source } = await import("../src/commands/source.mjs");
     await source(["com.example.Foo"]);
     const out = io.logs.join("\n");
-    expect(out).toContain("#### com.example.Foo");
+    expect(out).toContain("[C] com.example.Foo");
     expect(out).toContain("D:/project/src/Foo.java:5-15");
     expect(out).toContain("public class Foo");
   });
@@ -924,8 +924,8 @@ describe("commands (integration)", () => {
     const { source } = await import("../src/commands/source.mjs");
     await source(["com.example.Foo#bar"]);
     const out = io.logs.join("\n");
-    expect(out).toContain("#### com.example.Foo#bar()");
-    expect(out).toContain("#### com.example.Foo#bar(int)");
+    expect(out).toContain("[M] com.example.Foo#bar()");
+    expect(out).toContain("[M] com.example.Foo#bar(int)");
     expect(out).toContain("---");
   });
 
@@ -980,20 +980,15 @@ describe("commands (integration)", () => {
     await source(["com.example.Foo#bar"]);
     const out = io.logs.join("\n");
     // Header
-    expect(out).toContain("#### com.example.Foo#bar()");
+    expect(out).toContain("[M] com.example.Foo#bar()");
     expect(out).toContain("D:/project/src/com/example/Foo.java:10-20");
     // Code block
     expect(out).toContain("```java");
     expect(out).toContain("public void bar()");
-    // Class refs with javadoc
-    expect(out).toContain("**Foo:**");
+    // Outgoing calls with badges
+    expect(out).toContain("Outgoing Calls:");
     expect(out).toContain("`com.example.Foo#baz()`");
-    expect(out).toContain("Does baz.");
-    // Project refs with path
     expect(out).toContain("`com.example.Util`");
-    expect(out).toContain("D:/project/src/com/example/Util.java");
-    // Dependency refs
-    expect(out).toContain("**References:**");
     expect(out).toContain("`org.eclipse.core.runtime.CoreException`");
   });
 
@@ -1028,7 +1023,7 @@ describe("commands (integration)", () => {
     await source(["com.example.Simple"]);
     const out = io.logs.join("\n");
     expect(out).toContain("```java");
-    expect(out).not.toContain("**References:**");
+    expect(out).not.toContain("Outgoing Calls:");
   });
 
   it("source batch fetches multiple FQMNs", async () => {
@@ -1051,8 +1046,8 @@ describe("commands (integration)", () => {
     const { source } = await import("../src/commands/source.mjs");
     await source(["com.example.Foo", "com.example.Bar"]);
     const out = io.logs.join("\n");
-    expect(out).toContain("#### com.example.Foo");
-    expect(out).toContain("#### com.example.Bar");
+    expect(out).toContain("[C] com.example.Foo");
+    expect(out).toContain("[C] com.example.Bar");
     expect(out).toContain("---");
     expect(requestCount).toBe(2);
   });
@@ -1074,7 +1069,7 @@ describe("commands (integration)", () => {
     const { source } = await import("../src/commands/source.mjs");
     await source(["com.example.Bad", "com.example.Ok"]);
     const out = io.logs.join("\n");
-    expect(out).toContain("#### com.example.Ok");
+    expect(out).toContain("[C] com.example.Ok");
     expect(io.errors[0]).toContain("Not found");
   });
 

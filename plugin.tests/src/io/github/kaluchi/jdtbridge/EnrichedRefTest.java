@@ -217,16 +217,15 @@ public class EnrichedRefTest {
         }
 
         @Test
-        void noFqnForJdkReturnType() throws Exception {
+        void jdkReturnTypeHasFqn() throws Exception {
             var refs = collectMethod(
                     "test.service.EnrichedRefService",
                     "getAnimalName");
             var ref = find(refs, "Animal#name");
             assertNotNull(ref);
-            // String is java.lang.String → filtered by isJdkType
-            // so resolvedTypeFqn should be null
-            assertNull(ref.resolvedTypeFqn(),
-                    "JDK return types have no FQN");
+            // Server exhaustive: FQN always present
+            assertEquals("java.lang.String",
+                    ref.resolvedTypeFqn());
         }
 
         @Test

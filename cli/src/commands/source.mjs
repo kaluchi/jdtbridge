@@ -2,14 +2,20 @@ import { get } from "../client.mjs";
 import { extractPositional, parseFqmn } from "../args.mjs";
 
 export async function source(args) {
-  const pos = extractPositional(args);
+  const jsonFlag = args.includes("--json");
+  const pos = extractPositional(args).filter((a) => a !== "--json");
   if (pos.length === 0) {
-    console.error("Usage: source <FQMN> [<FQMN> ...]");
+    console.error("Usage: source <FQMN> [<FQMN> ...] [--json]");
     process.exit(1);
   }
 
-  // Batch: multiple FQMNs in parallel
   const results = await Promise.all(pos.map((arg) => fetchOne(arg)));
+
+  if (jsonFlag) {
+    console.log(JSON.stringify(results.length === 1 ? results[0] : results, null, 2));
+    return;
+  }
+
   const blocks = [];
   for (const r of results) {
     if (r.error) {
@@ -35,15 +41,118 @@ async function fetchOne(fqmn) {
   return get(url, 30_000);
 }
 
+// ---- Badge helpers ----
+
+const KIND_BADGE = {
+  method: "[M]",
+  field: "[F]",
+  constant: "[K]",
+  type: "[C]",
+};
+
+const TYPE_KIND_BADGE = {
+  class: "[C]",
+  interface: "[I]",
+  enum: "[E]",
+  annotation: "[A]",
+};
+
+function badge(ref) {
+  if (ref.kind === "type") return TYPE_KIND_BADGE[ref.typeKind] || "[C]";
+  return KIND_BADGE[ref.kind] || "[?]";
+}
+
+function returnTypeBadge(ref) {
+  if (ref.returnTypeKind) return TYPE_KIND_BADGE[ref.returnTypeKind] || "";
+  return "";
+}
+
+// ---- Ref formatting ----
+
+function formatMemberRef(ref) {
+  let line = `${badge(ref)} \`${ref.fqmn}\``;
+
+  // Return / field type
+  if (ref.type) {
+    const rtBadge = returnTypeBadge(ref);
+    const typeName = ref.returnTypeFqn || ref.type;
+    if (ref.isTypeVariable && ref.typeBound) {
+      line += ` → \`${ref.typeBound}\` (bound)`;
+    } else if (rtBadge) {
+      line += ` → ${rtBadge} \`${typeName}\``;
+    } else {
+      line += ` → \`${typeName}\``;
+    }
+  }
+
+  // Annotations
+  const annotations = [];
+  if (ref.static) annotations.push("static");
+  if (ref.inherited) annotations.push("inherited");
+  if (annotations.length > 0) line += ` (${annotations.join(", ")})`;
+
+  // Line number (only for incoming)
+  if (ref.direction === "incoming" && ref.line) line += ` :${ref.line}`;
+
+  // Javadoc inline after —
+  if (ref.doc) line += ` — ${ref.doc}`;
+
+  return line;
+}
+
+function formatTypeHeader(ref) {
+  let line = `${badge(ref)} \`${ref.fqmn}\``;
+  if (ref.doc) line += ` — ${ref.doc}`;
+  return line;
+}
+
+// ---- Grouping ----
+
+function groupByDeclaringType(refs) {
+  const groups = [];
+  const groupMap = {};
+  for (const ref of refs) {
+    const typeFqn = ref.fqmn.split("#")[0];
+    if (!groupMap[typeFqn]) {
+      groupMap[typeFqn] = { typeRef: null, members: [] };
+      groups.push({ typeFqn, group: groupMap[typeFqn] });
+    }
+    if (!ref.fqmn.includes("#")) {
+      groupMap[typeFqn].typeRef = ref;
+    } else {
+      groupMap[typeFqn].members.push(ref);
+    }
+  }
+  return groups;
+}
+
+function formatRefGroup({ typeFqn, group }) {
+  const lines = [];
+  if (group.typeRef) {
+    lines.push(formatTypeHeader(group.typeRef));
+  } else if (group.members.length > 0) {
+    // No explicit type ref — synthesize header from first member
+    const tkBadge = TYPE_KIND_BADGE[group.members[0].typeKind] || "[C]";
+    lines.push(`${tkBadge} \`${typeFqn}\``);
+  }
+  for (const ref of group.members) {
+    lines.push(formatMemberRef(ref));
+  }
+  return lines.join("\n");
+}
+
+// ---- Markdown output ----
+
 function formatMarkdown(result) {
   const lines = [];
 
   // Header
-  lines.push(`#### ${result.fqmn}`);
+  const headerBadge = result.fqmn.includes("#") ? "[M]" : "[C]";
+  lines.push(`#### ${headerBadge} ${result.fqmn}`);
   lines.push(`\`${result.file}:${result.startLine}-${result.endLine}\``);
   lines.push("");
 
-  // Source in code block
+  // Source
   lines.push("```java");
   lines.push(result.source.trimEnd());
   lines.push("```");
@@ -52,109 +161,49 @@ function formatMarkdown(result) {
     return lines.join("\n");
   }
 
-  // Group refs by scope
-  const classRefs = result.refs.filter((r) => r.scope === "class");
-  const projectRefs = result.refs.filter((r) => r.scope === "project");
-  const depRefs = result.refs.filter((r) => r.scope === "dependency");
+  // Split by direction
+  const outgoing = result.refs.filter((r) => r.direction !== "incoming");
+  const incoming = result.refs.filter((r) => r.direction === "incoming");
 
-  // Same-class members — with javadoc
-  if (classRefs.length > 0) {
-    const className = extractClassName(result.fqmn);
+  if (outgoing.length > 0) {
     lines.push("");
-    lines.push(`**${className}:**`);
-    lines.push("");
-    for (const ref of classRefs) {
-      lines.push(formatClassRef(ref));
+    lines.push("#### Outgoing Calls:");
+    const groups = groupByDeclaringType(outgoing);
+    for (const g of groups) {
+      lines.push(formatRefGroup(g));
     }
   }
 
-  // Project source — grouped by declaring type
-  if (projectRefs.length > 0) {
-    const byType = groupByType(projectRefs);
-    for (const [typeFqn, group] of Object.entries(byType)) {
-      lines.push("");
-      lines.push(`**${typeFqn}:**`);
-      // Type-level info from first ref with file/doc
-      const typeRef = group.find((r) => !r.fqmn.includes("#"));
-      const memberRefs = group.filter((r) => r.fqmn.includes("#"));
-      if (typeRef) {
-        if (typeRef.file) lines.push(`\`${typeRef.file}\``);
-        if (typeRef.doc) lines.push(typeRef.doc);
-      } else if (group[0].file) {
-        lines.push(`\`${group[0].file}\``);
-      }
-      lines.push("");
-      for (const ref of memberRefs) {
-        let line = `- \`${ref.fqmn}\``;
-        if (ref.type) line += ` → \`${ref.type}\``;
-        lines.push(line);
-        if (ref.doc) lines.push(`  ${ref.doc}`);
-      }
-      // Type ref without members (just the type itself)
-      if (typeRef && memberRefs.length === 0) {
-        lines.push(`- \`${typeRef.fqmn}\``);
-        if (typeRef.doc) lines.push(`  ${typeRef.doc}`);
-      }
-    }
-  }
-
-  // Dependencies — bare FQMNs
-  if (depRefs.length > 0) {
+  if (incoming.length > 0) {
     lines.push("");
-    lines.push("**References:**");
-    for (const ref of depRefs) {
-      lines.push(`- \`${ref.fqmn}\``);
+    lines.push("#### Incoming Calls:");
+    const groups = groupByDeclaringType(incoming);
+    for (const g of groups) {
+      lines.push(formatRefGroup(g));
     }
   }
 
   return lines.join("\n");
 }
 
-function formatClassRef(ref) {
-  let line = `- \`${ref.fqmn}\``;
-  if (ref.type) line += ` → \`${ref.type}\``;
-  if (ref.line) {
-    line += ` :${ref.line}`;
-    if (ref.endLine) line += `-${ref.endLine}`;
-  }
-  const parts = [line];
-  if (ref.doc) parts.push(`  ${ref.doc}`);
-  parts.push("");
-  return parts.join("\n");
-}
-
-function extractClassName(fqmn) {
-  const hash = fqmn.indexOf("#");
-  const fqn = hash >= 0 ? fqmn.substring(0, hash) : fqmn;
-  const dot = fqn.lastIndexOf(".");
-  return dot >= 0 ? fqn.substring(dot + 1) : fqn;
-}
-
-function groupByType(refs) {
-  const groups = {};
-  for (const ref of refs) {
-    const typeFqn = ref.fqmn.split("#")[0];
-    if (!groups[typeFqn]) groups[typeFqn] = [];
-    groups[typeFqn].push(ref);
-  }
-  return groups;
-}
-
 export const help = `Print source code of a type or method with resolved references.
 
-Returns markdown with source in a code block and references grouped by:
-- Same-class members (with javadoc)
-- Project source (with paths and javadoc)
-- Dependencies (FQMNs for navigation)
+Returns markdown with source in a code block and references split into:
+- Outgoing Calls — what this method/type calls or references
+- Incoming Calls — who calls this method/type (when available)
 
-Each reference is a ready argument for the next jdt source call.
+References are grouped by declaring type. Each has a badge
+([M] method, [C] class, [I] interface, [E] enum, [K] constant,
+[F] field, [A] annotation) and metadata (static, inherited,
+return type with kind).
 
-Usage:  jdt source <FQMN> [<FQMN> ...]
+Usage:  jdt source <FQMN> [<FQMN> ...] [--json]
 
-Multiple FQMNs are fetched in parallel (batch navigation).
+Flags:
+  --json    output raw JSON from the server (for debugging)
 
 Examples:
   jdt source com.example.dao.UserDaoImpl
   jdt source com.example.dao.UserDaoImpl#getStaff
   jdt source "com.example.dao.UserDaoImpl#save(Order)"
-  jdt source com.example.Foo#bar com.example.Util com.example.Json`;
+  jdt source com.example.Foo#bar --json`;

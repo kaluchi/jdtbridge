@@ -168,12 +168,9 @@ class ReferenceCollector {
                 isTypeVariable = true;
                 typeBound = resolveBound(fieldType);
             } else if (!fieldType.isPrimitive()) {
-                String fqn = stripGenerics(
+                resolvedTypeFqn = stripGenerics(
                         fieldType.getQualifiedName());
-                if (!isJdkType(fqn)) {
-                    resolvedTypeFqn = fqn;
-                    resolvedTypeKind = typeKindOf(fieldType);
-                }
+                resolvedTypeKind = typeKindOf(fieldType);
             }
         }
 
@@ -216,12 +213,9 @@ class ReferenceCollector {
                 isTypeVariable = true;
                 typeBound = resolveBound(returnType);
             } else if (!returnType.isPrimitive()) {
-                String fqn = stripGenerics(
+                resolvedTypeFqn = stripGenerics(
                         returnType.getQualifiedName());
-                if (!isJdkType(fqn)) {
-                    resolvedTypeFqn = fqn;
-                    resolvedTypeKind = typeKindOf(returnType);
-                }
+                resolvedTypeKind = typeKindOf(returnType);
             }
         }
 
