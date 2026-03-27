@@ -82,12 +82,12 @@ class EditorHandler {
         String methodName = params.get("method");
 
         if (fqn == null || fqn.isBlank()) {
-            return Json.error("Missing 'class' parameter");
+            return HttpServer.jsonError("Missing 'class' parameter");
         }
 
         IType type = JdtUtils.findType(fqn);
         if (type == null) {
-            return Json.error("Type not found: " + fqn);
+            return HttpServer.jsonError("Type not found: " + fqn);
         }
 
         IJavaElement target = type;
@@ -100,7 +100,7 @@ class EditorHandler {
         }
 
         final IJavaElement element = target;
-        String[] result = {Json.error("Failed to open editor")};
+        String[] result = {HttpServer.jsonError("Failed to open editor")};
         Display.getDefault().syncExec(() -> {
             try {
                 IEditorPart editor = JavaUI.openInEditor(element);
@@ -110,7 +110,7 @@ class EditorHandler {
                 result[0] = Json.object()
                         .put("ok", true).toString();
             } catch (Exception e) {
-                result[0] = Json.error(e.getMessage());
+                result[0] = HttpServer.jsonError(e.getMessage());
             }
         });
         return result[0];

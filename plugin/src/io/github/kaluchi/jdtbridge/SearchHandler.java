@@ -4,6 +4,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
@@ -58,7 +61,7 @@ class SearchHandler {
     String handleFind(Map<String, String> params) throws CoreException {
         String name = params.get("name");
         if (name == null || name.isBlank()) {
-            return Json.error("Missing 'name' parameter");
+            return HttpServer.jsonError("Missing 'name' parameter");
         }
 
         boolean sourceOnly = params.containsKey("source");
@@ -82,7 +85,7 @@ class SearchHandler {
                 IJavaSearchConstants.DECLARATIONS,
                 matchRule);
         if (pattern == null) {
-            return Json.error("Invalid search pattern: " + name);
+            return HttpServer.jsonError("Invalid search pattern: " + name);
         }
 
         engine.search(pattern,
@@ -178,12 +181,12 @@ class SearchHandler {
             throws CoreException {
         String fqn = params.get("class");
         if (fqn == null || fqn.isBlank()) {
-            return Json.error("Missing 'class' parameter");
+            return HttpServer.jsonError("Missing 'class' parameter");
         }
 
         IType type = JdtUtils.findType(fqn);
         if (type == null) {
-            return Json.error("Type not found: " + fqn);
+            return HttpServer.jsonError("Type not found: " + fqn);
         }
 
         String methodName = params.get("method");
@@ -193,7 +196,7 @@ class SearchHandler {
         if (fieldName != null && !fieldName.isBlank()) {
             IField field = type.getField(fieldName);
             if (field == null || !field.exists()) {
-                return Json.error("Field not found: " + fieldName
+                return HttpServer.jsonError("Field not found: " + fieldName
                         + " in " + fqn);
             }
             target = field;
@@ -201,7 +204,7 @@ class SearchHandler {
             IMethod method = JdtUtils.findMethod(type, methodName,
                     params.get("paramTypes"));
             if (method == null) {
-                return Json.error("Method not found: " + methodName
+                return HttpServer.jsonError("Method not found: " + methodName
                         + " in " + fqn);
             }
             target = method;
@@ -253,12 +256,12 @@ class SearchHandler {
             throws CoreException {
         String fqn = params.get("class");
         if (fqn == null || fqn.isBlank()) {
-            return Json.error("Missing 'class' parameter");
+            return HttpServer.jsonError("Missing 'class' parameter");
         }
 
         IType type = JdtUtils.findType(fqn);
         if (type == null) {
-            return Json.error("Type not found: " + fqn);
+            return HttpServer.jsonError("Type not found: " + fqn);
         }
 
         ITypeHierarchy hierarchy = type.newTypeHierarchy(null);
@@ -273,12 +276,12 @@ class SearchHandler {
             throws CoreException {
         String fqn = params.get("class");
         if (fqn == null || fqn.isBlank()) {
-            return Json.error("Missing 'class' parameter");
+            return HttpServer.jsonError("Missing 'class' parameter");
         }
 
         IType type = JdtUtils.findType(fqn);
         if (type == null) {
-            return Json.error("Type not found: " + fqn);
+            return HttpServer.jsonError("Type not found: " + fqn);
         }
 
         ITypeHierarchy hierarchy = type.newTypeHierarchy(null);
@@ -317,21 +320,21 @@ class SearchHandler {
         String fqn = params.get("class");
         String methodName = params.get("method");
         if (fqn == null || fqn.isBlank()) {
-            return Json.error("Missing 'class' parameter");
+            return HttpServer.jsonError("Missing 'class' parameter");
         }
         if (methodName == null || methodName.isBlank()) {
-            return Json.error("Missing 'method' parameter");
+            return HttpServer.jsonError("Missing 'method' parameter");
         }
 
         IType type = JdtUtils.findType(fqn);
         if (type == null) {
-            return Json.error("Type not found: " + fqn);
+            return HttpServer.jsonError("Type not found: " + fqn);
         }
 
         IMethod method = JdtUtils.findMethod(type, methodName,
                 params.get("paramTypes"));
         if (method == null) {
-            return Json.error("Method not found: " + methodName
+            return HttpServer.jsonError("Method not found: " + methodName
                     + " in " + fqn);
         }
 
@@ -364,12 +367,12 @@ class SearchHandler {
     String handleTypeInfo(Map<String, String> params) throws Exception {
         String fqn = params.get("class");
         if (fqn == null || fqn.isBlank()) {
-            return Json.error("Missing 'class' parameter");
+            return HttpServer.jsonError("Missing 'class' parameter");
         }
 
         IType type = JdtUtils.findType(fqn);
         if (type == null) {
-            return Json.error("Type not found: " + fqn);
+            return HttpServer.jsonError("Type not found: " + fqn);
         }
 
         Json result = Json.object()
@@ -429,13 +432,13 @@ class SearchHandler {
 
         if (fqn == null || fqn.isBlank()) {
             return HttpServer.Response.json(
-                    Json.error("Missing 'class' parameter"));
+                    HttpServer.jsonError("Missing 'class' parameter"));
         }
 
         IType type = JdtUtils.findType(fqn);
         if (type == null) {
             return HttpServer.Response.json(
-                    Json.error("Type not found: " + fqn));
+                    HttpServer.jsonError("Type not found: " + fqn));
         }
 
         // Refresh from disk — Claude Code (or other editors) may have
@@ -455,7 +458,7 @@ class SearchHandler {
                     params.get("paramTypes"));
             if (methods.isEmpty()) {
                 return HttpServer.Response.json(
-                        Json.error("Method not found: " + methodName
+                        HttpServer.jsonError("Method not found: " + methodName
                                 + " in " + fqn));
             }
 
@@ -509,7 +512,7 @@ class SearchHandler {
         }
         if (source == null) {
             return HttpServer.Response.json(
-                    Json.error("Source not available"));
+                    HttpServer.jsonError("Source not available"));
         }
         String fqmn = methodName != null
                 ? fqn + "#" + methodName

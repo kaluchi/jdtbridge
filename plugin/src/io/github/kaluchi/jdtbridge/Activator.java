@@ -1,5 +1,7 @@
 package io.github.kaluchi.jdtbridge;
 
+import com.google.gson.JsonObject;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -72,14 +74,14 @@ public class Activator implements BundleActivator {
         String hash = workspaceHash(workspace);
         bridgeFile = instancesDir.resolve(hash + ".json");
 
-        String content = Json.object()
-                .put("port", port)
-                .put("token", token)
-                .put("pid", pid)
-                .put("workspace", workspace)
-                .put("version", version)
-                .put("location", location)
-                .toString() + "\n";
+        var obj = new JsonObject();
+        obj.addProperty("port", port);
+        obj.addProperty("token", token);
+        obj.addProperty("pid", pid);
+        obj.addProperty("workspace", workspace);
+        obj.addProperty("version", version);
+        obj.addProperty("location", location);
+        String content = obj.toString() + "\n";
 
         Files.writeString(bridgeFile, content);
         setPosixOwnerOnly(bridgeFile);

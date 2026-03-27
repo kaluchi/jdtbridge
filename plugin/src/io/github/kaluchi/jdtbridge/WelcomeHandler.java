@@ -51,7 +51,7 @@ class WelcomeHandler {
         } catch (IOException e) {
             Log.warn("Failed to save dismiss preference", e);
             return HttpServer.Response.json(
-                    Json.error("Failed to save: " + e.getMessage()));
+                    HttpServer.jsonError("Failed to save: " + e.getMessage()));
         }
     }
 

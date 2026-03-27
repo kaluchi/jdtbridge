@@ -29,18 +29,18 @@ class ProjectHandler {
             throws Exception {
         String projectName = params.get("project");
         if (projectName == null || projectName.isBlank()) {
-            return Json.error("Missing 'project' parameter");
+            return HttpServer.jsonError("Missing 'project' parameter");
         }
 
         IProject project = ResourcesPlugin.getWorkspace().getRoot()
                 .getProject(projectName);
         if (!project.exists()) {
-            return Json.error("Project not found: " + projectName);
+            return HttpServer.jsonError("Project not found: " + projectName);
         }
 
         IJavaProject javaProject = JavaCore.create(project);
         if (javaProject == null || !javaProject.exists()) {
-            return Json.error(
+            return HttpServer.jsonError(
                     "Not a Java project: " + projectName);
         }
 

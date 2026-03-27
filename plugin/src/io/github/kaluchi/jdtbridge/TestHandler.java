@@ -94,7 +94,7 @@ class TestHandler {
         ILaunchConfigurationType launchType =
                 manager.getLaunchConfigurationType(JUNIT_LAUNCH_TYPE);
         if (launchType == null) {
-            errorOut[0] = Json.error(
+            errorOut[0] = HttpServer.jsonError(
                     "JUnit launch type not available");
             return null;
         }
@@ -197,7 +197,7 @@ class TestHandler {
         if (fqn != null && !fqn.isBlank()) {
             IType type = JdtUtils.findType(fqn);
             if (type == null) {
-                return Json.error("Type not found: " + fqn);
+                return HttpServer.jsonError("Type not found: " + fqn);
             }
 
             IJavaProject jp = type.getJavaProject();
@@ -224,11 +224,11 @@ class TestHandler {
                 var project = ResourcesPlugin.getWorkspace()
                         .getRoot().getProject(projectName);
                 if (project != null && project.exists()) {
-                    return Json.error(
+                    return HttpServer.jsonError(
                             "Not a Java project: "
                                     + projectName);
                 }
-                return Json.error(
+                return HttpServer.jsonError(
                         "Project not found: " + projectName);
             }
 
@@ -242,7 +242,7 @@ class TestHandler {
                 IPackageFragment pkg =
                         findPackage(jp, packageName);
                 if (pkg == null) {
-                    return Json.error(
+                    return HttpServer.jsonError(
                             "Package not found: " + packageName);
                 }
                 wc.setAttribute(ATTR_TEST_CONTAINER,
@@ -252,7 +252,7 @@ class TestHandler {
                         jp.getHandleIdentifier());
             }
         } else {
-            return Json.error(
+            return HttpServer.jsonError(
                     "Missing 'class' or 'project' parameter");
         }
         return null;

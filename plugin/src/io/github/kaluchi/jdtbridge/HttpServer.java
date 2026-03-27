@@ -1,5 +1,7 @@
 package io.github.kaluchi.jdtbridge;
 
+import com.google.gson.JsonObject;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -349,10 +351,10 @@ public class HttpServer {
                     && "POST".equals(method)) {
                 return welcome.handleUndismiss();
             }
-            return Response.json(Json.error("Not found: " + path));
+            return Response.json(jsonError("Not found: " + path));
         } catch (Exception e) {
             Log.error("Status handler error", e);
-            return Response.json(Json.error(e.getMessage()));
+            return Response.json(jsonError(e.getMessage()));
         }
     }
 
@@ -412,13 +414,13 @@ public class HttpServer {
                         launch.handleRun(params));
                 case "/launch/stop" -> Response.json(
                         launch.handleStop(params));
-                default -> Response.json(Json.error(
+                default -> Response.json(jsonError(
                         "Unknown path: " + path));
             };
         } catch (Exception e) {
             Log.error("Handler error on " + path, e);
             String msg = e.getMessage();
-            return Response.json(Json.error(
+            return Response.json(jsonError(
                     msg != null ? msg : e.getClass().getSimpleName()));
         }
     }
@@ -441,9 +443,16 @@ public class HttpServer {
         return params;
     }
 
+    /** Build {"error":"message"} JSON string. */
+    static String jsonError(String message) {
+        var obj = new JsonObject();
+        obj.addProperty("error", message);
+        return obj.toString();
+    }
+
     private void sendError(Socket socket, int code, String message)
             throws IOException {
-        String body = Json.error(message);
+        String body = jsonError(message);
         byte[] bodyBytes = body.getBytes(StandardCharsets.UTF_8);
         String header = "HTTP/1.1 " + code + " " + message + "\r\n"
                 + "Content-Type: application/json; charset=utf-8\r\n"

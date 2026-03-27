@@ -19,11 +19,11 @@ class TestSessionHandler {
     String handleStatus(Map<String, String> params) {
         String name = params.get("session");
         if (name == null || name.isBlank()) {
-            return Json.error("Missing 'session' parameter");
+            return HttpServer.jsonError("Missing 'session' parameter");
         }
         var ts = tracker.get(name);
         if (ts == null) {
-            return Json.error(
+            return HttpServer.jsonError(
                     "Test session not found: " + name);
         }
 

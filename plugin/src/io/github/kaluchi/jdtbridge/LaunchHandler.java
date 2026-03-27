@@ -113,7 +113,7 @@ class LaunchHandler {
 
             return arr.toString();
         } catch (Exception e) {
-            return Json.error(e.getMessage());
+            return HttpServer.jsonError(e.getMessage());
         }
     }
 
@@ -208,7 +208,7 @@ class LaunchHandler {
     String handleRun(Map<String, String> params) {
         String name = params.get("name");
         if (name == null || name.isBlank()) {
-            return Json.error("Missing 'name' parameter");
+            return HttpServer.jsonError("Missing 'name' parameter");
         }
         String mode = params.containsKey("debug")
                 ? ILaunchManager.DEBUG_MODE
@@ -216,7 +216,7 @@ class LaunchHandler {
         try {
             ILaunchConfiguration config = findConfig(name);
             if (config == null) {
-                return Json.error(
+                return HttpServer.jsonError(
                         "Launch configuration not found: " + name);
             }
             ILaunch launch = config.launch(mode, null, true);
@@ -228,7 +228,7 @@ class LaunchHandler {
             addProcessMetadata(launch, response);
             return response.toString();
         } catch (Exception e) {
-            return Json.error(e.getMessage());
+            return HttpServer.jsonError(e.getMessage());
         }
     }
 
@@ -242,14 +242,14 @@ class LaunchHandler {
     String handleStop(Map<String, String> params) {
         String name = params.get("name");
         if (name == null || name.isBlank()) {
-            return Json.error("Missing 'name' parameter");
+            return HttpServer.jsonError("Missing 'name' parameter");
         }
         ILaunch target = findLaunch(name);
         if (target == null) {
-            return Json.error("Launch not found: " + name);
+            return HttpServer.jsonError("Launch not found: " + name);
         }
         if (target.isTerminated()) {
-            return Json.error("Already terminated: " + name);
+            return HttpServer.jsonError("Already terminated: " + name);
         }
         try {
             target.terminate();
@@ -258,7 +258,7 @@ class LaunchHandler {
                     .put("name", name)
                     .toString();
         } catch (Exception e) {
-            return Json.error(
+            return HttpServer.jsonError(
                     "Failed to terminate: " + e.getMessage());
         }
     }
@@ -284,7 +284,7 @@ class LaunchHandler {
     String handleConsole(Map<String, String> params) {
         String name = params.get("name");
         if (name == null || name.isBlank()) {
-            return Json.error("Missing 'name' parameter");
+            return HttpServer.jsonError("Missing 'name' parameter");
         }
 
         String tailStr = params.get("tail");
@@ -296,7 +296,7 @@ class LaunchHandler {
             // Launch exists in manager but tracker missed it?
             ILaunch target = findLaunch(name);
             if (target == null) {
-                return Json.error("Launch not found: " + name);
+                return HttpServer.jsonError("Launch not found: " + name);
             }
             return Json.object()
                     .put("name", name)

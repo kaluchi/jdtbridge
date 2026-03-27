@@ -31,13 +31,13 @@ class DiagnosticsHandler {
         if (filePath != null && !filePath.isBlank()) {
             scope = root.findMember(filePath);
             if (scope == null) {
-                return Json.error(
+                return HttpServer.jsonError(
                         "Resource not found: " + filePath);
             }
         } else if (projectName != null && !projectName.isBlank()) {
             IProject project = root.getProject(projectName);
             if (!project.exists()) {
-                return Json.error(
+                return HttpServer.jsonError(
                         "Project not found: " + projectName);
             }
             scope = project;
@@ -99,7 +99,7 @@ class DiagnosticsHandler {
         if (projectName != null && !projectName.isBlank()) {
             IProject project = root.getProject(projectName);
             if (!project.exists()) {
-                return Json.error(
+                return HttpServer.jsonError(
                         "Project not found: " + projectName);
             }
             scope = project;
@@ -109,7 +109,7 @@ class DiagnosticsHandler {
         }
 
         if (clean && buildProject == null) {
-            return Json.error("clean requires a specific project"
+            return HttpServer.jsonError("clean requires a specific project"
                     + " (use 'project' param)");
         }
 
