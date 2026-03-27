@@ -3,8 +3,11 @@ package io.github.kaluchi.jdtbridge;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.AfterAll;
@@ -259,40 +262,81 @@ public class SearchIntegrationTest {
     }
 
     @Test
-    public void sourceMethodHasOutgoingDirection() throws Exception {
+    public void sourceMethodRefsVerified() throws Exception {
         HttpServer.Response resp = handler.handleSource(
                 Map.of("class", "test.service.AnimalService",
                         "method", "process"));
         var parsed = Json.parse(resp.body());
-        // refs array should exist with outgoing direction
-        String body = resp.body();
-        assertTrue(body.contains("\"direction\":\"outgoing\""),
-                "Should have outgoing refs: " + body);
+        assertEquals("test.service.AnimalService#process(Animal)",
+                Json.getString(parsed, "fqmn"));
+
+        var refs = parseRefs(resp.body());
+        var outgoing = refs.stream()
+                .filter(r -> "outgoing".equals(
+                        Json.getString(r, "direction")))
+                .toList();
+        var incoming = refs.stream()
+                .filter(r -> "incoming".equals(
+                        Json.getString(r, "direction")))
+                .toList();
+
+        // Every ref has direction
+        for (var ref : refs) {
+            assertNotNull(Json.getString(ref, "direction"),
+                    "Every ref must have direction: " + ref);
+        }
+
+        // Outgoing: Animal#name() with interface typeKind
+        var animalName = outgoing.stream()
+                .filter(r -> "test.model.Animal#name()".equals(
+                        Json.getString(r, "fqmn")))
+                .findFirst().orElse(null);
+        assertNotNull(animalName,
+                "Should have Animal#name ref: " + outgoing);
+        assertEquals("interface",
+                Json.getString(animalName, "typeKind"));
+        assertEquals("method",
+                Json.getString(animalName, "kind"));
+
+        // Implementations of Animal#name
+        var impls = outgoing.stream()
+                .filter(r -> r.get("implementationOf") != null)
+                .toList();
+        assertTrue(impls.size() >= 2,
+                "Should have Dog+Cat impls: " + impls);
+        var implFqmns = impls.stream()
+                .map(r -> Json.getString(r, "fqmn"))
+                .toList();
+        assertTrue(implFqmns.stream()
+                .anyMatch(f -> f.contains("Dog#name")),
+                "Dog should be impl: " + implFqmns);
+        assertTrue(implFqmns.stream()
+                .anyMatch(f -> f.contains("Cat#name")),
+                "Cat should be impl: " + implFqmns);
     }
 
     @Test
-    public void sourceMethodInterfaceTypeKind() throws Exception {
-        HttpServer.Response resp = handler.handleSource(
-                Map.of("class", "test.service.AnimalService",
-                        "method", "process"));
-        // process(Animal) calls Animal#name() — interface
-        String body = resp.body();
-        assertTrue(body.contains("\"typeKind\":\"interface\""),
-                "Should have interface typeKind: " + body);
-    }
-
-    @Test
-    public void sourceMethodHasIncomingCallers() throws Exception {
+    public void sourceMethodIncomingCallers() throws Exception {
         HttpServer.Response resp = handler.handleSource(
                 Map.of("class", "test.model.Dog",
                         "method", "bark"));
-        String body = resp.body();
-        assertTrue(body.contains("\"direction\":\"incoming\""),
-                "Should have incoming refs: " + body);
+        var refs = parseRefs(resp.body());
+        var incoming = refs.stream()
+                .filter(r -> "incoming".equals(
+                        Json.getString(r, "direction")))
+                .toList();
+        assertFalse(incoming.isEmpty(),
+                "Should have incoming callers");
         // Caller is AnimalService#createDog
-        assertTrue(body.contains("AnimalService#createDog"),
-                "Caller should be AnimalService#createDog: "
-                + body);
+        var caller = incoming.stream()
+                .filter(r -> Json.getString(r, "fqmn")
+                        .contains("AnimalService#createDog"))
+                .findFirst().orElse(null);
+        assertNotNull(caller,
+                "AnimalService#createDog should call bark: "
+                + incoming);
+        assertEquals("project",
+                Json.getString(caller, "scope"));
     }
 
     @Test
@@ -301,48 +345,36 @@ public class SearchIntegrationTest {
                 Map.of("class", "test.model.Dog",
                         "method", "name"));
         var parsed = Json.parse(resp.body());
-        // overrideTarget is a nested object
-        String body = resp.body();
-        assertTrue(body.contains("\"overrideTarget\""),
-                "Dog#name should have overrideTarget: " + body);
-        assertTrue(body.contains("\"kind\":\"method\""),
-                "overrideTarget kind should be method: " + body);
-        assertTrue(body.contains("test.model.Animal#name"),
-                "Should override Animal#name: " + body);
+        // overrideTarget is a nested JSON object
+        Object otRaw = parsed.get("overrideTarget");
+        assertNotNull(otRaw,
+                "Dog#name should have overrideTarget");
+        var ot = Json.parse(otRaw.toString());
+        assertEquals("method", Json.getString(ot, "kind"));
+        assertTrue(Json.getString(ot, "fqmn")
+                .contains("Animal#name"),
+                "Should override Animal#name: " + ot);
     }
 
     @Test
-    public void sourceMethodImplementations() throws Exception {
-        HttpServer.Response resp = handler.handleSource(
-                Map.of("class", "test.service.AnimalService",
-                        "method", "process"));
-        String body = resp.body();
-        assertTrue(body.contains("\"implementationOf\""),
-                "Should have implementations: " + body);
-        // Dog implements Animal#name
-        assertTrue(body.contains("Dog#name"),
-                "Dog should implement name: " + body);
-        assertTrue(body.contains("Cat#name"),
-                "Cat should implement name: " + body);
-    }
-
-    @Test
-    public void sourceTypeHierarchyNoRefs() throws Exception {
+    public void sourceTypeHierarchyParsed() throws Exception {
         HttpServer.Response resp = handler.handleSource(
                 Map.of("class", "test.model.Animal"));
         var parsed = Json.parse(resp.body());
         assertEquals("test.model.Animal",
                 Json.getString(parsed, "fqmn"));
-        String body = resp.body();
-        assertTrue(body.contains("\"supertypes\""),
-                "Should have supertypes");
-        assertTrue(body.contains("\"subtypes\""),
-                "Should have subtypes");
-        assertTrue(body.contains("\"fqn\":\"test.model.Dog\""),
-                "Dog should be subtype: " + body);
-        assertTrue(body.contains("\"fqn\":\"test.model.Cat\""),
-                "Cat should be subtype: " + body);
-        assertFalse(body.contains("\"refs\""),
+
+        // supertypes/subtypes are raw JSON arrays
+        Object subsRaw = parsed.get("subtypes");
+        assertNotNull(subsRaw, "Should have subtypes");
+        String subsStr = subsRaw.toString();
+        assertTrue(subsStr.contains("test.model.Dog"),
+                "Dog should be subtype: " + subsStr);
+        assertTrue(subsStr.contains("test.model.Cat"),
+                "Cat should be subtype: " + subsStr);
+
+        // No refs array for type-level
+        assertNull(parsed.get("refs"),
                 "Type-level should not have refs");
     }
 
@@ -372,6 +404,39 @@ public class SearchIntegrationTest {
     }
 
     // ---- /projects ----
+
+    // ---- Helpers ----
+
+    /** Parse refs array from source JSON response. */
+    private static List<Map<String, Object>> parseRefs(
+            String json) {
+        var parsed = Json.parse(json);
+        Object refsRaw = parsed.get("refs");
+        if (refsRaw == null) return List.of();
+        String refsStr = refsRaw.toString().trim();
+        if (!refsStr.startsWith("[")) return List.of();
+
+        var result = new ArrayList<Map<String, Object>>();
+        // Split array of objects by },{
+        refsStr = refsStr.substring(1, refsStr.length() - 1);
+        int depth = 0;
+        int start = 0;
+        for (int i = 0; i < refsStr.length(); i++) {
+            char c = refsStr.charAt(i);
+            if (c == '{') depth++;
+            else if (c == '}') depth--;
+            if (depth == 0 && (c == '}' || i == refsStr.length() - 1)) {
+                String elem = refsStr.substring(start,
+                        i + 1).trim();
+                if (elem.startsWith(",")) elem = elem.substring(1).trim();
+                if (elem.startsWith("{")) {
+                    result.add(Json.parse(elem));
+                }
+                start = i + 1;
+            }
+        }
+        return result;
+    }
 
     @Test
     public void projectsIncludesTestProject() throws Exception {
