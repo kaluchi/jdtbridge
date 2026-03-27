@@ -593,15 +593,19 @@ public class EnrichedRefTest {
         }
 
         @Test
-        void fullClassSkipsSameClassRefs() throws Exception {
+        void fullClassHasHierarchyNotRefs() throws Exception {
             IType type = JdtUtils.findType("test.model.Dog");
             var refs = ReferenceCollector.collect(type);
             String json = SourceReport.toJson(
                     "test.model.Dog", type,
                     "D:/test/Dog.java",
                     type.getSource(), 1, 20, refs);
-            assertFalse(json.contains("\"scope\":\"class\""),
-                    "Full class should skip same-class refs");
+            assertTrue(json.contains("\"supertypes\""),
+                    "Type-level should have supertypes: "
+                    + json);
+            assertFalse(json.contains("\"refs\""),
+                    "Type-level should not have refs: "
+                    + json);
         }
     }
 }

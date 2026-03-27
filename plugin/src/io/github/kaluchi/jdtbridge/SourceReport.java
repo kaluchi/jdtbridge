@@ -21,9 +21,6 @@ class SourceReport {
             int startLine, int endLine,
             Map<String, ReferenceCollector.Ref> refs) {
 
-        // Resolve implementations for interface method calls
-        ReferenceCollector.resolveImplementations(refs);
-
         IType declaringType = member instanceof IType t
                 ? t : member.getDeclaringType();
         String ownFqn = declaringType != null
@@ -36,11 +33,20 @@ class SourceReport {
                 .put("endLine", endLine)
                 .put("source", source);
 
-        // Resolve @Override target
+        // Resolve @Override target (method-level only)
         String overrideTarget = resolveOverrideTarget(member);
         if (overrideTarget != null) {
             result.put("overrideTarget", overrideTarget);
         }
+
+        // Type-level: hierarchy instead of outgoing calls
+        if (member instanceof IType viewedType) {
+            addHierarchy(result, viewedType);
+            return result.toString();
+        }
+
+        // Method-level: resolve implementations, emit refs
+        ReferenceCollector.resolveImplementations(refs);
 
         Json refsArr = Json.array();
         for (var ref : refs.values()) {
@@ -237,6 +243,64 @@ class SourceReport {
             }
         } catch (Exception e) { /* ignore */ }
         return false;
+    }
+
+    /**
+     * Add hierarchy info for type-level source: supertypes,
+     * subtypes/implementors, enclosing type.
+     */
+    private static void addHierarchy(Json result, IType type) {
+        try {
+            ITypeHierarchy hierarchy =
+                    type.newTypeHierarchy(null);
+
+            // Supertypes
+            Json supers = Json.array();
+            IType superclass = hierarchy.getSuperclass(type);
+            if (superclass != null) {
+                String fqn = superclass.getFullyQualifiedName();
+                if (!"java.lang.Object".equals(fqn)) {
+                    supers.add(Json.object()
+                            .put("fqn", fqn)
+                            .put("kind", typeKindStr(superclass)));
+                }
+            }
+            for (IType iface
+                    : hierarchy.getSuperInterfaces(type)) {
+                supers.add(Json.object()
+                        .put("fqn",
+                                iface.getFullyQualifiedName())
+                        .put("kind", "interface"));
+            }
+            result.put("supertypes", supers);
+
+            // Subtypes / implementors
+            Json subs = Json.array();
+            for (IType sub : hierarchy.getSubtypes(type)) {
+                if (sub.isAnonymous()) continue;
+                subs.add(Json.object()
+                        .put("fqn",
+                                sub.getFullyQualifiedName())
+                        .put("kind", typeKindStr(sub)));
+            }
+            result.put("subtypes", subs);
+
+            // Enclosing type (for inner/nested types)
+            IType enclosing = type.getDeclaringType();
+            if (enclosing != null) {
+                result.put("enclosingType",
+                        enclosing.getFullyQualifiedName());
+            }
+        } catch (Exception e) { /* ignore */ }
+    }
+
+    private static String typeKindStr(IType type) {
+        try {
+            if (type.isInterface()) return "interface";
+            if (type.isEnum()) return "enum";
+            if (type.isAnnotation()) return "annotation";
+        } catch (Exception e) { /* ignore */ }
+        return "class";
     }
 
     private static String extractTypeFqn(String fqmn) {

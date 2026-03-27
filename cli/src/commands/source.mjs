@@ -159,6 +159,30 @@ function buildImplIndex(refs) {
   return index;
 }
 
+// ---- Hierarchy (type-level) ----
+
+function formatHierarchy(lines, result) {
+  const supers = result.supertypes || [];
+  const subs = result.subtypes || [];
+  if (supers.length > 0 || subs.length > 0) {
+    lines.push("");
+    lines.push("#### Hierarchy:");
+    for (const s of supers) {
+      const b = TYPE_KIND_BADGE[s.kind] || "[C]";
+      lines.push(`↑ ${b} \`${s.fqn}\``);
+    }
+    for (const s of subs) {
+      const b = TYPE_KIND_BADGE[s.kind] || "[C]";
+      lines.push(`↓ ${b} \`${s.fqn}\``);
+    }
+  }
+  if (result.enclosingType) {
+    lines.push("");
+    lines.push("#### Enclosing Type:");
+    lines.push(`[C] \`${result.enclosingType}\``);
+  }
+}
+
 // ---- Markdown output ----
 
 function formatMarkdown(result) {
@@ -180,6 +204,12 @@ function formatMarkdown(result) {
   lines.push("```java");
   lines.push(result.source.trimEnd());
   lines.push("```");
+
+  // Type-level: hierarchy instead of refs
+  if (result.supertypes || result.subtypes) {
+    formatHierarchy(lines, result);
+    return lines.join("\n");
+  }
 
   if (!result.refs || result.refs.length === 0) {
     return lines.join("\n");

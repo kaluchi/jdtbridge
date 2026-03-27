@@ -242,8 +242,8 @@ public class SearchIntegrationTest {
                 "Should contain class body: " + resp.body());
         assertTrue(resp.body().contains("public void bark()"),
                 "Should contain bark method: " + resp.body());
-        assertTrue(resp.body().contains("\"refs\""),
-                "Should have refs: " + resp.body());
+        assertTrue(resp.body().contains("\"supertypes\""),
+                "Should have supertypes: " + resp.body());
     }
 
     @Test
