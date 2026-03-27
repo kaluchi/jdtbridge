@@ -195,9 +195,11 @@ function formatMarkdown(result) {
   const headerBadge = result.fqmn.includes("#") ? "[M]" : "[C]";
   lines.push(`#### ${headerBadge} ${result.fqmn}`);
   if (result.overrideTarget) {
-    // Strip type kind prefix if present ("interface pkg.Type#m" → "pkg.Type#m")
-    const parts = result.overrideTarget.split(" ", 2);
-    const fqmn = parts.length === 2 ? parts[1] : result.overrideTarget;
+    const ot = result.overrideTarget;
+    // Support both object {fqmn, kind} and legacy string format
+    const fqmn = typeof ot === "string"
+      ? (ot.includes(" ") ? ot.split(" ", 2)[1] : ot)
+      : ot.fqmn;
     lines.push(`overrides [M] \`${fqmn}\``);
   }
   lines.push(`\`${result.file}:${result.startLine}-${result.endLine}\``);

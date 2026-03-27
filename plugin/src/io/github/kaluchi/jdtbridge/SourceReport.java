@@ -39,7 +39,7 @@ class SourceReport {
                 .put("source", source);
 
         // Resolve @Override target (method-level only)
-        String overrideTarget = resolveOverrideTarget(member);
+        Json overrideTarget = resolveOverrideTarget(member);
         if (overrideTarget != null) {
             result.put("overrideTarget", overrideTarget);
         }
@@ -337,9 +337,11 @@ class SourceReport {
 
     /**
      * Find the supertype or interface that declares the method
-     * this member overrides. Returns FQMN or null.
+     * this member overrides. Returns null if no override.
+     * Checks superclass chain first (deterministic), then
+     * interfaces.
      */
-    private static String resolveOverrideTarget(IMember member) {
+    private static Json resolveOverrideTarget(IMember member) {
         if (!(member instanceof IMethod method)) return null;
         try {
             IType declaringType = method.getDeclaringType();
@@ -351,24 +353,45 @@ class SourceReport {
             ITypeHierarchy hierarchy =
                     declaringType.newSupertypeHierarchy(null);
 
-            // Check superclasses first, then interfaces
-            for (IType superType
-                    : hierarchy.getAllSupertypes(declaringType)) {
+            // Superclass chain first (deterministic order)
+            IType current = declaringType;
+            while (true) {
+                IType superClass =
+                        hierarchy.getSuperclass(current);
+                if (superClass == null) break;
                 IMethod found = findMatchingMethod(
-                        superType, methodName, sig);
+                        superClass, methodName, sig);
                 if (found != null) {
-                    String typeFqn =
-                            superType.getFullyQualifiedName();
-                    String typeKind = superType.isInterface()
-                            ? "interface" : "class";
-                    return typeKind + " " + typeFqn + "#"
-                            + methodName + "("
-                            + ReferenceCollector.paramSig(found)
-                            + ")";
+                    return overrideJson(superClass, found,
+                            methodName);
+                }
+                current = superClass;
+            }
+
+            // Then interfaces
+            for (IType iface
+                    : hierarchy.getAllSuperInterfaces(
+                            declaringType)) {
+                IMethod found = findMatchingMethod(
+                        iface, methodName, sig);
+                if (found != null) {
+                    return overrideJson(iface, found,
+                            methodName);
                 }
             }
         } catch (Exception e) { /* ignore */ }
         return null;
+    }
+
+    private static Json overrideJson(IType type, IMethod method,
+            String methodName) throws JavaModelException {
+        return Json.object()
+                .put("fqmn", type.getFullyQualifiedName()
+                        + "#" + methodName + "("
+                        + ReferenceCollector.paramSig(method)
+                        + ")")
+                .put("kind", "method")
+                .put("typeKind", typeKindStr(type));
     }
 
     private static IMethod findMatchingMethod(

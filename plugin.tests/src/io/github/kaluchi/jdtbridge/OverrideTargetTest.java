@@ -73,12 +73,16 @@ public class OverrideTargetTest {
         }
 
         @Test
-        void overrideTargetContainsInterfaceKind()
+        void overrideTargetIsStructuredRef()
                 throws Exception {
             String json = sourceJson("test.model.Dog", "name");
-            // overrideTarget format: "interface pkg.Type#method()"
-            assertTrue(json.contains("interface test.model.Animal"),
-                    "overrideTarget should have interface kind: "
+            // overrideTarget is {fqmn, kind, typeKind}
+            assertTrue(json.contains("\"kind\":\"method\""),
+                    "overrideTarget kind should be method: "
+                    + json);
+            assertTrue(json.contains(
+                    "\"typeKind\":\"interface\""),
+                    "declaring type should be interface: "
                     + json);
         }
 
@@ -111,14 +115,14 @@ public class OverrideTargetTest {
         }
 
         @Test
-        void overrideTargetContainsClassKind()
+        void overrideTargetContainsClassTypeKind()
                 throws Exception {
             String json = sourceJson(
                     "test.edge.Parrot", "speak");
             // AbstractPet is a class
             assertTrue(json.contains(
-                    "class test.edge.AbstractPet"),
-                    "overrideTarget should have class kind: "
+                    "\"typeKind\":\"class\""),
+                    "overrideTarget typeKind should be class: "
                     + json);
         }
     }

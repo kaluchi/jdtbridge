@@ -62,7 +62,7 @@ describe("source format", () => {
     startLine: 10,
     endLine: 15,
     source: "public void bar() { baz(); }",
-    overrideTarget: "interface pkg.IFoo#bar()",
+    overrideTarget: { fqmn: "pkg.IFoo#bar()", kind: "method", typeKind: "interface" },
     refs: [
       { fqmn: "pkg.Foo#baz()", direction: "outgoing", kind: "method", typeKind: "class", scope: "class", type: "void" },
       { fqmn: "pkg.Util#helper(String)", direction: "outgoing", kind: "method", typeKind: "class", scope: "project",
