@@ -1,5 +1,7 @@
 package io.github.kaluchi.jdtbridge;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import java.util.Map;
 
 import org.eclipse.core.resources.IFile;
@@ -73,9 +75,10 @@ class RefactoringHandler {
                 cu.commitWorkingCopy(true, null);
             }
 
-            return Json.object()
-                    .put("added", added)
-                    .put("removed", removed).toString();
+            var r = new JsonObject();
+            r.addProperty("added", added);
+            r.addProperty("removed", removed);
+            return r.toString();
         } finally {
             cu.discardWorkingCopy();
         }
@@ -107,10 +110,12 @@ class RefactoringHandler {
                 0, lineSep);
 
         if (edit == null) {
-            return Json.object()
-                    .put("modified", false)
-                    .put("reason", "formatter returned no edits"
-                            + " (syntax error?)").toString();
+            var r = new JsonObject();
+            r.addProperty("modified", false);
+            r.addProperty("reason",
+                    "formatter returned no edits"
+                    + " (syntax error?)");
+            return r.toString();
         }
 
         Document document = new Document(source);
@@ -118,8 +123,9 @@ class RefactoringHandler {
         String formatted = document.get();
 
         if (formatted.equals(source)) {
-            return Json.object()
-                    .put("modified", false).toString();
+            var r = new JsonObject();
+            r.addProperty("modified", false);
+            return r.toString();
         }
 
         cu.becomeWorkingCopy(null);
@@ -130,7 +136,9 @@ class RefactoringHandler {
             cu.discardWorkingCopy();
         }
 
-        return Json.object().put("modified", true).toString();
+        var r = new JsonObject();
+        r.addProperty("modified", true);
+        return r.toString();
     }
 
     String handleRename(Map<String, String> params) throws Exception {
@@ -291,15 +299,16 @@ class RefactoringHandler {
             change.dispose();
         }
 
-        Json result = Json.object().put("ok", true);
+        var result = new JsonObject();
+        result.addProperty("ok", true);
         if (status.hasWarning()) {
-            Json warnings = Json.array();
+            var warnings = new JsonArray();
             for (var entry : status.getEntries()) {
                 if (entry.isWarning()) {
                     warnings.add(entry.getMessage());
                 }
             }
-            result.put("warnings", warnings);
+            result.add("warnings", warnings);
         }
         return result.toString();
     }

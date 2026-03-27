@@ -1,5 +1,8 @@
 package io.github.kaluchi.jdtbridge;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -17,10 +20,6 @@ import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.JavaModelException;
 
-/**
- * Handler for /project-info endpoint: project overview
- * with adaptive detail.
- */
 class ProjectHandler {
 
     private static final int DEFAULT_MEMBERS_THRESHOLD = 200;
@@ -29,13 +28,15 @@ class ProjectHandler {
             throws Exception {
         String projectName = params.get("project");
         if (projectName == null || projectName.isBlank()) {
-            return HttpServer.jsonError("Missing 'project' parameter");
+            return HttpServer.jsonError(
+                    "Missing 'project' parameter");
         }
 
-        IProject project = ResourcesPlugin.getWorkspace().getRoot()
-                .getProject(projectName);
+        IProject project = ResourcesPlugin.getWorkspace()
+                .getRoot().getProject(projectName);
         if (!project.exists()) {
-            return HttpServer.jsonError("Project not found: " + projectName);
+            return HttpServer.jsonError(
+                    "Project not found: " + projectName);
         }
 
         IJavaProject javaProject = JavaCore.create(project);
@@ -45,16 +46,18 @@ class ProjectHandler {
         }
 
         int membersThreshold = DEFAULT_MEMBERS_THRESHOLD;
-        String thresholdParam = params.get("members-threshold");
+        String thresholdParam =
+                params.get("members-threshold");
         if (thresholdParam != null) {
             try {
-                membersThreshold = Integer.parseInt(thresholdParam);
-            } catch (NumberFormatException e) { /* use default */ }
+                membersThreshold =
+                        Integer.parseInt(thresholdParam);
+            } catch (NumberFormatException e) { /* default */ }
         }
 
-        // Quick count pass
         int totalTypes = 0;
-        List<IPackageFragmentRoot> sourceRoots = new ArrayList<>();
+        List<IPackageFragmentRoot> sourceRoots =
+                new ArrayList<>();
         for (IPackageFragmentRoot root
                 : javaProject.getPackageFragmentRoots()) {
             if (root.getKind()
@@ -69,31 +72,29 @@ class ProjectHandler {
                 }
             }
         }
-        boolean includeMembers = totalTypes <= membersThreshold;
+        boolean includeMembers =
+                totalTypes <= membersThreshold;
 
-        // Location
         String location = project.getLocation() != null
                 ? project.getLocation().toOSString() : "?";
 
-        // Natures
-        Json natures = Json.array();
+        var natures = new JsonArray();
         for (String id
                 : project.getDescription().getNatureIds()) {
             natures.add(shortNature(id));
         }
 
-        // Dependencies
-        Json deps = Json.array();
-        for (String dep : javaProject.getRequiredProjectNames()) {
+        var deps = new JsonArray();
+        for (String dep
+                : javaProject.getRequiredProjectNames()) {
             deps.add(dep);
         }
 
-        // Source roots with packages and types
-        Json rootsArr = Json.array();
+        var rootsArr = new JsonArray();
         for (IPackageFragmentRoot root : sourceRoots) {
             String rootPath = root.getResource()
                     .getProjectRelativePath().toString();
-            Json packages = Json.array();
+            var packages = new JsonArray();
             int rootTypeCount = 0;
 
             for (IJavaElement child : root.getChildren()) {
@@ -106,56 +107,59 @@ class ProjectHandler {
                 String pkgName = pkg.getElementName();
                 if (pkgName.isEmpty()) pkgName = "(default)";
 
-                Json types = Json.array();
+                var types = new JsonArray();
                 for (ICompilationUnit unit : units) {
                     for (IType type : unit.getTypes()) {
                         rootTypeCount++;
-                        Json typeObj = Json.object()
-                                .put("name",
-                                        type.getElementName())
-                                .put("kind",
-                                        JdtUtils.typeKind(type))
-                                .put("fields",
-                                        type.getFields().length);
+                        var typeObj = new JsonObject();
+                        typeObj.addProperty("name",
+                                type.getElementName());
+                        typeObj.addProperty("kind",
+                                JdtUtils.typeKind(type));
+                        typeObj.addProperty("fields",
+                                type.getFields().length);
                         if (includeMembers) {
-                            typeObj.put("methods",
+                            typeObj.add("methods",
                                     buildMethodGroups(type));
                         } else {
-                            typeObj.put("methods",
+                            typeObj.addProperty("methods",
                                     type.getMethods().length);
                         }
                         types.add(typeObj);
                     }
                 }
 
-                packages.add(Json.object()
-                        .put("name", pkgName)
-                        .put("types", types));
+                var pkgObj = new JsonObject();
+                pkgObj.addProperty("name", pkgName);
+                pkgObj.add("types", types);
+                packages.add(pkgObj);
             }
 
-            rootsArr.add(Json.object()
-                    .put("path", rootPath)
-                    .put("packages", packages)
-                    .put("typeCount", rootTypeCount));
+            var rootObj = new JsonObject();
+            rootObj.addProperty("path", rootPath);
+            rootObj.add("packages", packages);
+            rootObj.addProperty("typeCount", rootTypeCount);
+            rootsArr.add(rootObj);
         }
 
-        return Json.object()
-                .put("name", projectName)
-                .put("location", location)
-                .put("natures", natures)
-                .put("dependencies", deps)
-                .put("totalTypes", totalTypes)
-                .put("membersIncluded", includeMembers)
-                .put("sourceRoots", rootsArr)
-                .toString();
+        var result = new JsonObject();
+        result.addProperty("name", projectName);
+        result.addProperty("location", location);
+        result.add("natures", natures);
+        result.add("dependencies", deps);
+        result.addProperty("totalTypes", totalTypes);
+        result.addProperty("membersIncluded",
+                includeMembers);
+        result.add("sourceRoots", rootsArr);
+        return result.toString();
     }
 
-    private Json buildMethodGroups(IType type)
+    private JsonObject buildMethodGroups(IType type)
             throws JavaModelException {
-        Json pub = Json.array();
-        Json prot = Json.array();
-        Json def = Json.array();
-        Json priv = Json.array();
+        var pub = new JsonArray();
+        var prot = new JsonArray();
+        var def = new JsonArray();
+        var priv = new JsonArray();
 
         for (IMethod m : type.getMethods()) {
             String sig;
@@ -171,11 +175,12 @@ class ProjectHandler {
             else def.add(sig);
         }
 
-        return Json.object()
-                .put("public", pub)
-                .put("protected", prot)
-                .put("default", def)
-                .put("private", priv);
+        var result = new JsonObject();
+        result.add("public", pub);
+        result.add("protected", prot);
+        result.add("default", def);
+        result.add("private", priv);
+        return result;
     }
 
     static String shortNature(String natureId) {
@@ -187,6 +192,7 @@ class ProjectHandler {
         }
         if (natureId.contains("gradle")) return "gradle";
         int dot = natureId.lastIndexOf('.');
-        return dot >= 0 ? natureId.substring(dot + 1) : natureId;
+        return dot >= 0 ? natureId.substring(dot + 1)
+                : natureId;
     }
 }
