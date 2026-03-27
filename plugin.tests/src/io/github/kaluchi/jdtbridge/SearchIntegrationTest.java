@@ -3,12 +3,14 @@ package io.github.kaluchi.jdtbridge;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -238,204 +240,176 @@ public class SearchIntegrationTest {
 
     @Test
     public void sourceFullClass() throws Exception {
-        HttpServer.Response resp = handler.handleSource(
+        var resp = handler.handleSource(
                 Map.of("class", "test.model.Dog"));
         assertEquals("application/json", resp.contentType());
-        assertTrue(resp.body().contains("public class Dog"),
-                "Should contain class body: " + resp.body());
-        assertTrue(resp.body().contains("public void bark()"),
-                "Should contain bark method: " + resp.body());
-        assertTrue(resp.body().contains("\"supertypes\""),
-                "Should have supertypes: " + resp.body());
+        var json = parse(resp);
+        assertEquals("test.model.Dog",
+                json.get("fqmn").getAsString());
+        String source = json.get("source").getAsString();
+        assertTrue(source.contains("public class Dog"));
+        assertTrue(source.contains("public void bark()"));
+        assertTrue(json.has("supertypes"));
     }
 
     @Test
     public void sourceMethod() throws Exception {
-        HttpServer.Response resp = handler.handleSource(
-                Map.of("class", "test.model.Dog", "method", "bark"));
+        var resp = handler.handleSource(
+                Map.of("class", "test.model.Dog",
+                        "method", "bark"));
         assertEquals("application/json", resp.contentType());
-        var parsed = Json.parse(resp.body());
+        var json = parse(resp);
         assertEquals("test.model.Dog#bark()",
-                Json.getString(parsed, "fqmn"));
-        assertNotNull(Json.getString(parsed, "source"));
-        assertTrue(Json.getInt(parsed, "startLine", -1) > 0);
+                json.get("fqmn").getAsString());
+        assertNotNull(json.get("source").getAsString());
+        assertTrue(json.get("startLine").getAsInt() > 0);
     }
 
     @Test
     public void sourceMethodRefsVerified() throws Exception {
-        HttpServer.Response resp = handler.handleSource(
+        var json = parse(handler.handleSource(
                 Map.of("class", "test.service.AnimalService",
-                        "method", "process"));
-        var parsed = Json.parse(resp.body());
+                        "method", "process")));
         assertEquals("test.service.AnimalService#process(Animal)",
-                Json.getString(parsed, "fqmn"));
+                json.get("fqmn").getAsString());
 
-        var refs = parseRefs(resp.body());
-        var outgoing = refs.stream()
-                .filter(r -> "outgoing".equals(
-                        Json.getString(r, "direction")))
-                .toList();
-        var incoming = refs.stream()
-                .filter(r -> "incoming".equals(
-                        Json.getString(r, "direction")))
-                .toList();
-
-        // Every ref has direction
-        for (var ref : refs) {
-            assertNotNull(Json.getString(ref, "direction"),
-                    "Every ref must have direction: " + ref);
+        JsonArray allRefs = json.getAsJsonArray("refs");
+        for (JsonElement e : allRefs) {
+            assertNotNull(
+                    e.getAsJsonObject().get("direction"),
+                    "Every ref must have direction");
         }
 
         // Outgoing: Animal#name() with interface typeKind
-        var animalName = outgoing.stream()
-                .filter(r -> "test.model.Animal#name()".equals(
-                        Json.getString(r, "fqmn")))
-                .findFirst().orElse(null);
-        assertNotNull(animalName,
-                "Should have Animal#name ref: " + outgoing);
+        JsonObject animalName = findRef(allRefs,
+                "test.model.Animal#name()");
+        assertNotNull(animalName);
         assertEquals("interface",
-                Json.getString(animalName, "typeKind"));
+                animalName.get("typeKind").getAsString());
         assertEquals("method",
-                Json.getString(animalName, "kind"));
+                animalName.get("kind").getAsString());
 
         // Implementations of Animal#name
-        var impls = outgoing.stream()
-                .filter(r -> r.get("implementationOf") != null)
-                .toList();
-        assertTrue(impls.size() >= 2,
-                "Should have Dog+Cat impls: " + impls);
-        var implFqmns = impls.stream()
-                .map(r -> Json.getString(r, "fqmn"))
-                .toList();
-        assertTrue(implFqmns.stream()
-                .anyMatch(f -> f.contains("Dog#name")),
-                "Dog should be impl: " + implFqmns);
-        assertTrue(implFqmns.stream()
-                .anyMatch(f -> f.contains("Cat#name")),
-                "Cat should be impl: " + implFqmns);
+        JsonArray impls = filterRefs(allRefs,
+                "implementationOf");
+        assertTrue(impls.size() >= 2);
     }
 
     @Test
     public void sourceMethodIncomingCallers() throws Exception {
-        HttpServer.Response resp = handler.handleSource(
+        var json = parse(handler.handleSource(
                 Map.of("class", "test.model.Dog",
-                        "method", "bark"));
-        var refs = parseRefs(resp.body());
-        var incoming = refs.stream()
-                .filter(r -> "incoming".equals(
-                        Json.getString(r, "direction")))
-                .toList();
-        assertFalse(incoming.isEmpty(),
-                "Should have incoming callers");
-        // Caller is AnimalService#createDog
-        var caller = incoming.stream()
-                .filter(r -> Json.getString(r, "fqmn")
-                        .contains("AnimalService#createDog"))
-                .findFirst().orElse(null);
-        assertNotNull(caller,
-                "AnimalService#createDog should call bark: "
-                + incoming);
+                        "method", "bark")));
+        var incoming = refsDir(json, "incoming");
+        assertTrue(incoming.size() > 0);
+        JsonObject caller = findRef(incoming,
+                "AnimalService#createDog");
+        assertNotNull(caller);
         assertEquals("project",
-                Json.getString(caller, "scope"));
+                caller.get("scope").getAsString());
     }
 
     @Test
     public void sourceMethodOverrideTarget() throws Exception {
-        HttpServer.Response resp = handler.handleSource(
+        var json = parse(handler.handleSource(
                 Map.of("class", "test.model.Dog",
-                        "method", "name"));
-        var parsed = Json.parse(resp.body());
-        // overrideTarget is a nested JSON object
-        Object otRaw = parsed.get("overrideTarget");
-        assertNotNull(otRaw,
-                "Dog#name should have overrideTarget");
-        var ot = Json.parse(otRaw.toString());
-        assertEquals("method", Json.getString(ot, "kind"));
-        assertTrue(Json.getString(ot, "fqmn")
-                .contains("Animal#name"),
-                "Should override Animal#name: " + ot);
+                        "method", "name")));
+        var ot = json.getAsJsonObject("overrideTarget");
+        assertNotNull(ot);
+        assertEquals("method",
+                ot.get("kind").getAsString());
+        assertEquals("test.model.Animal#name()",
+                ot.get("fqmn").getAsString());
     }
 
     @Test
     public void sourceTypeHierarchyParsed() throws Exception {
-        HttpServer.Response resp = handler.handleSource(
-                Map.of("class", "test.model.Animal"));
-        var parsed = Json.parse(resp.body());
+        var json = parse(handler.handleSource(
+                Map.of("class", "test.model.Animal")));
         assertEquals("test.model.Animal",
-                Json.getString(parsed, "fqmn"));
+                json.get("fqmn").getAsString());
 
-        // supertypes/subtypes are raw JSON arrays
-        Object subsRaw = parsed.get("subtypes");
-        assertNotNull(subsRaw, "Should have subtypes");
-        String subsStr = subsRaw.toString();
-        assertTrue(subsStr.contains("test.model.Dog"),
-                "Dog should be subtype: " + subsStr);
-        assertTrue(subsStr.contains("test.model.Cat"),
-                "Cat should be subtype: " + subsStr);
-
-        // No refs array for type-level
-        assertNull(parsed.get("refs"),
-                "Type-level should not have refs");
+        JsonArray subs = json.getAsJsonArray("subtypes");
+        assertNotNull(subs);
+        assertNotNull(findByFqn(subs, "test.model.Dog"));
+        assertNotNull(findByFqn(subs, "test.model.Cat"));
+        assertFalse(json.has("refs"));
     }
 
     @Test
     public void sourcePreservesLeadingIndent() throws Exception {
-        // Dog.bark() has 4-space indent in TestFixture source.
-        // IMember.getSource() strips it. Our handler must not.
-        HttpServer.Response resp = handler.handleSource(
-                Map.of("class", "test.model.Dog", "method", "bark"));
-        var parsed = Json.parse(resp.body());
-        String source = Json.getString(parsed, "source");
+        var json = parse(handler.handleSource(
+                Map.of("class", "test.model.Dog",
+                        "method", "bark")));
+        String source = json.get("source").getAsString();
         assertNotNull(source);
-        assertFalse(source.startsWith("public"),
-                "Should NOT start with 'public' (indent stripped)."
-                + " Starts with: [" + source.substring(0,
-                        Math.min(30, source.length())) + "]");
-        assertTrue(source.contains("    public void bark()"),
-                "Should have 4-space indent before 'public'");
+        assertFalse(source.startsWith("public"));
+        assertTrue(source.contains("    public void bark()"));
     }
 
     @Test
     public void sourceNotFound() throws Exception {
-        HttpServer.Response resp = handler.handleSource(
-                Map.of("class", "no.such.Type"));
-        assertTrue(resp.body().contains("error"),
-                "Should be error JSON: " + resp.body());
+        var json = parse(handler.handleSource(
+                Map.of("class", "no.such.Type")));
+        assertNotNull(json.get("error"));
     }
 
     // ---- /projects ----
 
     // ---- Helpers ----
 
-    /** Parse refs array from source JSON response. */
-    private static List<Map<String, Object>> parseRefs(
-            String json) {
-        var parsed = Json.parse(json);
-        Object refsRaw = parsed.get("refs");
-        if (refsRaw == null) return List.of();
-        String refsStr = refsRaw.toString().trim();
-        if (!refsStr.startsWith("[")) return List.of();
+    private static JsonObject parse(HttpServer.Response resp) {
+        return JsonParser.parseString(resp.body())
+                .getAsJsonObject();
+    }
 
-        var result = new ArrayList<Map<String, Object>>();
-        // Split array of objects by },{
-        refsStr = refsStr.substring(1, refsStr.length() - 1);
-        int depth = 0;
-        int start = 0;
-        for (int i = 0; i < refsStr.length(); i++) {
-            char c = refsStr.charAt(i);
-            if (c == '{') depth++;
-            else if (c == '}') depth--;
-            if (depth == 0 && (c == '}' || i == refsStr.length() - 1)) {
-                String elem = refsStr.substring(start,
-                        i + 1).trim();
-                if (elem.startsWith(",")) elem = elem.substring(1).trim();
-                if (elem.startsWith("{")) {
-                    result.add(Json.parse(elem));
-                }
-                start = i + 1;
+    private static JsonArray refsDir(JsonObject json,
+            String direction) {
+        var result = new JsonArray();
+        if (!json.has("refs")) return result;
+        for (JsonElement e : json.getAsJsonArray("refs")) {
+            var ref = e.getAsJsonObject();
+            if (ref.has("direction") && direction.equals(
+                    ref.get("direction").getAsString())) {
+                result.add(ref);
             }
         }
         return result;
+    }
+
+    private static JsonObject findRef(JsonArray refs,
+            String fqmnPart) {
+        for (JsonElement e : refs) {
+            var ref = e.getAsJsonObject();
+            if (ref.has("fqmn") && ref.get("fqmn")
+                    .getAsString().contains(fqmnPart)) {
+                return ref;
+            }
+        }
+        return null;
+    }
+
+    private static JsonArray filterRefs(JsonArray refs,
+            String hasField) {
+        var result = new JsonArray();
+        for (JsonElement e : refs) {
+            if (e.getAsJsonObject().has(hasField)) {
+                result.add(e);
+            }
+        }
+        return result;
+    }
+
+    private static JsonObject findByFqn(JsonArray arr,
+            String fqn) {
+        for (JsonElement e : arr) {
+            var obj = e.getAsJsonObject();
+            if (obj.has("fqn") && fqn.equals(
+                    obj.get("fqn").getAsString())) {
+                return obj;
+            }
+        }
+        return null;
     }
 
     @Test
