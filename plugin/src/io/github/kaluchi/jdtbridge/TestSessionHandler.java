@@ -1,13 +1,11 @@
 package io.github.kaluchi.jdtbridge;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
 import java.util.Map;
 
-/**
- * HTTP handlers for test session endpoints: status and sessions.
- * Reads data from {@link TestSessionTracker} — separation of
- * concerns: tracker listens and accumulates, handler queries
- * and serializes.
- */
 class TestSessionHandler {
 
     private final TestSessionTracker tracker;
@@ -19,7 +17,8 @@ class TestSessionHandler {
     String handleStatus(Map<String, String> params) {
         String name = params.get("session");
         if (name == null || name.isBlank()) {
-            return HttpServer.jsonError("Missing 'session' parameter");
+            return HttpServer.jsonError(
+                    "Missing 'session' parameter");
         }
         var ts = tracker.get(name);
         if (ts == null) {
@@ -28,59 +27,67 @@ class TestSessionHandler {
         }
 
         String filter = params.get("filter");
-        Json entries = Json.array();
+        var entries = new JsonArray();
         for (String eventLine : ts.events) {
-            var parsed = Json.parse(eventLine);
-            String event = Json.getString(parsed, "event");
+            var parsed = JsonParser.parseString(eventLine)
+                    .getAsJsonObject();
+            String event = parsed.has("event")
+                    ? parsed.get("event").getAsString() : "";
             if (!"case".equals(event)) continue;
-            String status = Json.getString(parsed, "status");
+            String status = parsed.has("status")
+                    ? parsed.get("status").getAsString() : "";
 
-            // Apply filter
             if ("ignored".equals(filter)) {
                 if (!"IGNORED".equals(status)) continue;
             } else if ("all".equals(filter)) {
                 // show everything
             } else {
-                // default: failures only
                 if ("PASS".equals(status)
                         || "IGNORED".equals(status)) continue;
             }
 
-            Object timeVal = parsed.get("time");
-            double time = timeVal instanceof Number n
-                    ? n.doubleValue() : 0.0;
-            Json f = Json.object()
-                    .put("fqmn",
-                            Json.getString(parsed, "fqmn"))
-                    .put("status", status)
-                    .put("time", time);
-            String trace = Json.getString(parsed, "trace");
-            if (trace != null) f.put("trace", trace);
-            String expected =
-                    Json.getString(parsed, "expected");
-            if (expected != null) f.put("expected", expected);
-            String actual =
-                    Json.getString(parsed, "actual");
-            if (actual != null) f.put("actual", actual);
+            double time = parsed.has("time")
+                    ? parsed.get("time").getAsDouble() : 0.0;
+            var f = new JsonObject();
+            f.addProperty("fqmn",
+                    parsed.has("fqmn")
+                            ? parsed.get("fqmn").getAsString()
+                            : "");
+            f.addProperty("status", status);
+            f.addProperty("time", time);
+            if (parsed.has("trace")
+                    && !parsed.get("trace").isJsonNull())
+                f.addProperty("trace",
+                        parsed.get("trace").getAsString());
+            if (parsed.has("expected")
+                    && !parsed.get("expected").isJsonNull())
+                f.addProperty("expected",
+                        parsed.get("expected").getAsString());
+            if (parsed.has("actual")
+                    && !parsed.get("actual").isJsonNull())
+                f.addProperty("actual",
+                        parsed.get("actual").getAsString());
             entries.add(f);
         }
 
-        return Json.object()
-                .put("session", ts.name)
-                .putIf(ts.label != null, "label", ts.label)
-                .putIf(ts.project != null,
-                        "project", ts.project)
-                .put("state", ts.state)
-                .put("total", ts.total)
-                .put("completed", ts.completed.get())
-                .put("passed", ts.passed.get())
-                .put("failed", ts.failed.get())
-                .put("errors", ts.errors.get())
-                .put("ignored", ts.ignored.get())
-                .put("time", Double.isNaN(ts.time)
-                        ? 0.0 : ts.time)
-                .put("entries", entries)
-                .toString();
+        var result = new JsonObject();
+        result.addProperty("session", ts.name);
+        if (ts.label != null)
+            result.addProperty("label", ts.label);
+        if (ts.project != null)
+            result.addProperty("project", ts.project);
+        result.addProperty("state", ts.state);
+        result.addProperty("total", ts.total);
+        result.addProperty("completed",
+                ts.completed.get());
+        result.addProperty("passed", ts.passed.get());
+        result.addProperty("failed", ts.failed.get());
+        result.addProperty("errors", ts.errors.get());
+        result.addProperty("ignored", ts.ignored.get());
+        result.addProperty("time",
+                Double.isNaN(ts.time) ? 0.0 : ts.time);
+        result.add("entries", entries);
+        return result.toString();
     }
 
     String handleClear(Map<String, String> params) {
@@ -94,26 +101,30 @@ class TestSessionHandler {
             tracker.remove(ts.name);
             removed++;
         }
-        return Json.object()
-                .put("removed", removed)
-                .toString();
+        var result = new JsonObject();
+        result.addProperty("removed", removed);
+        return result.toString();
     }
 
     String handleSessions(Map<String, String> params) {
-        Json arr = Json.array();
+        var arr = new JsonArray();
         for (var ts : tracker.all()) {
-            arr.add(Json.object()
-                    .put("session", ts.name)
-                    .putIf(ts.label != null, "label", ts.label)
-                    .put("state", ts.state)
-                    .put("total", ts.total)
-                    .put("completed", ts.completed.get())
-                    .put("passed", ts.passed.get())
-                    .put("failed", ts.failed.get())
-                    .put("errors", ts.errors.get())
-                    .put("ignored", ts.ignored.get())
-                    .put("time", Double.isNaN(ts.time)
-                            ? 0.0 : ts.time));
+            var obj = new JsonObject();
+            obj.addProperty("session", ts.name);
+            if (ts.label != null)
+                obj.addProperty("label", ts.label);
+            obj.addProperty("state", ts.state);
+            obj.addProperty("total", ts.total);
+            obj.addProperty("completed",
+                    ts.completed.get());
+            obj.addProperty("passed", ts.passed.get());
+            obj.addProperty("failed", ts.failed.get());
+            obj.addProperty("errors", ts.errors.get());
+            obj.addProperty("ignored", ts.ignored.get());
+            obj.addProperty("time",
+                    Double.isNaN(ts.time)
+                            ? 0.0 : ts.time);
+            arr.add(obj);
         }
         return arr.toString();
     }

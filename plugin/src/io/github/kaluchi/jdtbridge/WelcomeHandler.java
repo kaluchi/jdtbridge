@@ -1,5 +1,8 @@
 package io.github.kaluchi.jdtbridge;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -84,15 +87,18 @@ class WelcomeHandler {
                 p.destroyForcibly();
                 return new CliInfo(false, "");
             }
-            var outer = Json.parse(output);
-            String depsRaw = Json.getString(outer, "dependencies");
-            if (depsRaw == null) return new CliInfo(false, "");
-            var deps = Json.parse(depsRaw);
-            String pkgRaw = Json.getString(deps,
+            var outer = JsonParser.parseString(output)
+                    .getAsJsonObject();
+            if (!outer.has("dependencies"))
+                return new CliInfo(false, "");
+            var deps = outer.getAsJsonObject("dependencies");
+            if (!deps.has("@kaluchi/jdtbridge"))
+                return new CliInfo(false, "");
+            var pkg = deps.getAsJsonObject(
                     "@kaluchi/jdtbridge");
-            if (pkgRaw == null) return new CliInfo(false, "");
-            var pkg = Json.parse(pkgRaw);
-            String version = Json.getString(pkg, "version");
+            String version = pkg.has("version")
+                    ? pkg.get("version").getAsString()
+                    : null;
             if (version != null && !version.isEmpty()) {
                 return new CliInfo(true, version);
             }

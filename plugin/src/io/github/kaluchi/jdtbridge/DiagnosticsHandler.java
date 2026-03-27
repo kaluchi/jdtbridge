@@ -1,5 +1,8 @@
 package io.github.kaluchi.jdtbridge;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+
 import java.util.Map;
 
 import org.eclipse.core.resources.IFile;
@@ -10,23 +13,22 @@ import org.eclipse.core.resources.IWorkspaceRoot;
 import org.eclipse.core.resources.IncrementalProjectBuilder;
 import org.eclipse.core.resources.ResourcesPlugin;
 
-/**
- * Handler for /errors and /build endpoints.
- */
 class DiagnosticsHandler {
 
     private static final String JDT_PROBLEM_MARKER =
             "org.eclipse.jdt.core.problem";
 
-    String handleErrors(Map<String, String> params) throws Exception {
+    String handleErrors(Map<String, String> params)
+            throws Exception {
         String filePath = params.get("file");
         String projectName = params.get("project");
-        boolean includeWarnings = params.containsKey("warnings");
+        boolean includeWarnings =
+                params.containsKey("warnings");
         boolean all = params.containsKey("all");
 
-        IWorkspaceRoot root = ResourcesPlugin.getWorkspace().getRoot();
+        IWorkspaceRoot root =
+                ResourcesPlugin.getWorkspace().getRoot();
 
-        // Determine scope
         IResource scope;
         if (filePath != null && !filePath.isBlank()) {
             scope = root.findMember(filePath);
@@ -34,7 +36,8 @@ class DiagnosticsHandler {
                 return HttpServer.jsonError(
                         "Resource not found: " + filePath);
             }
-        } else if (projectName != null && !projectName.isBlank()) {
+        } else if (projectName != null
+                && !projectName.isBlank()) {
             IProject project = root.getProject(projectName);
             if (!project.exists()) {
                 return HttpServer.jsonError(
@@ -45,21 +48,21 @@ class DiagnosticsHandler {
             scope = root;
         }
 
-        // Refresh from disk and wait for auto-build
         int depth = (scope instanceof IFile)
-                ? IResource.DEPTH_ZERO : IResource.DEPTH_INFINITE;
+                ? IResource.DEPTH_ZERO
+                : IResource.DEPTH_INFINITE;
         scope.refreshLocal(depth, null);
         JdtUtils.joinAutoBuild();
 
-        // Read markers
         String markerType = all ? IMarker.PROBLEM
                 : JDT_PROBLEM_MARKER;
         IMarker[] markers = scope.findMarkers(
                 markerType, true, IResource.DEPTH_INFINITE);
 
-        Json arr = Json.array();
+        var arr = new JsonArray();
         for (IMarker marker : markers) {
-            int severity = marker.getAttribute(IMarker.SEVERITY, -1);
+            int severity = marker.getAttribute(
+                    IMarker.SEVERITY, -1);
             if (!includeWarnings
                     && severity != IMarker.SEVERITY_ERROR) {
                 continue;
@@ -70,16 +73,16 @@ class DiagnosticsHandler {
                 default -> "INFO";
             };
 
-            Json entry = Json.object()
-                    .put("file", marker.getResource()
-                            .getFullPath().toString())
-                    .put("line", marker.getAttribute(
-                            IMarker.LINE_NUMBER, -1))
-                    .put("severity", sevStr)
-                    .put("message", marker.getAttribute(
-                            IMarker.MESSAGE, ""));
+            var entry = new JsonObject();
+            entry.addProperty("file", marker.getResource()
+                    .getFullPath().toString());
+            entry.addProperty("line", marker.getAttribute(
+                    IMarker.LINE_NUMBER, -1));
+            entry.addProperty("severity", sevStr);
+            entry.addProperty("message", marker.getAttribute(
+                    IMarker.MESSAGE, ""));
             if (all) {
-                entry.put("source",
+                entry.addProperty("source",
                         shortMarkerType(marker.getType()));
             }
             arr.add(entry);
@@ -87,13 +90,14 @@ class DiagnosticsHandler {
         return arr.toString();
     }
 
-    String handleBuild(Map<String, String> params) throws Exception {
+    String handleBuild(Map<String, String> params)
+            throws Exception {
         String projectName = params.get("project");
         boolean clean = params.containsKey("clean");
 
-        IWorkspaceRoot root = ResourcesPlugin.getWorkspace().getRoot();
+        IWorkspaceRoot root =
+                ResourcesPlugin.getWorkspace().getRoot();
 
-        // Determine scope for refresh and marker counting
         IResource scope;
         IProject buildProject = null;
         if (projectName != null && !projectName.isBlank()) {
@@ -109,31 +113,33 @@ class DiagnosticsHandler {
         }
 
         if (clean && buildProject == null) {
-            return HttpServer.jsonError("clean requires a specific project"
+            return HttpServer.jsonError(
+                    "clean requires a specific project"
                     + " (use 'project' param)");
         }
 
-        // Refresh from disk and let auto-build settle
         scope.refreshLocal(IResource.DEPTH_INFINITE, null);
         JdtUtils.joinAutoBuild();
 
-        // Build
         if (clean) {
             buildProject.build(
-                    IncrementalProjectBuilder.CLEAN_BUILD, null);
+                    IncrementalProjectBuilder.CLEAN_BUILD,
+                    null);
             buildProject.build(
-                    IncrementalProjectBuilder.FULL_BUILD, null);
+                    IncrementalProjectBuilder.FULL_BUILD,
+                    null);
         } else if (buildProject != null) {
             buildProject.build(
-                    IncrementalProjectBuilder.INCREMENTAL_BUILD,
+                    IncrementalProjectBuilder
+                            .INCREMENTAL_BUILD,
                     null);
         } else {
             ResourcesPlugin.getWorkspace().build(
-                    IncrementalProjectBuilder.INCREMENTAL_BUILD,
+                    IncrementalProjectBuilder
+                            .INCREMENTAL_BUILD,
                     null);
         }
 
-        // Count error markers on scope
         IMarker[] markers = scope.findMarkers(
                 JDT_PROBLEM_MARKER, true,
                 IResource.DEPTH_INFINITE);
@@ -145,8 +151,9 @@ class DiagnosticsHandler {
             }
         }
 
-        return Json.object()
-                .put("errors", errorCount).toString();
+        var result = new JsonObject();
+        result.addProperty("errors", errorCount);
+        return result.toString();
     }
 
     String shortMarkerType(String type) {
@@ -157,7 +164,6 @@ class DiagnosticsHandler {
             return "checkstyle";
         if (type.contains("m2e") || type.contains("maven"))
             return "maven";
-        // Last segment: org.foo.bar.Problem → Problem
         int dot = type.lastIndexOf('.');
         return dot >= 0 ? type.substring(dot + 1) : type;
     }
