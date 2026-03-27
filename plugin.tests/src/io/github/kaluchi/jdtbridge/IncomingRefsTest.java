@@ -1,13 +1,17 @@
 package io.github.kaluchi.jdtbridge;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
-import org.eclipse.jdt.core.IMethod;
-import org.eclipse.jdt.core.IType;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
@@ -32,130 +36,182 @@ public class IncomingRefsTest {
         TestFixture.destroy();
     }
 
-    private String handleSource(String fqn, String method)
+    private static String sourceBody(String fqn, String method)
             throws Exception {
         var handler = new SearchHandler();
         var params = method != null
                 ? Map.of("class", fqn, "method", method)
                 : Map.of("class", fqn);
-        var resp = handler.handleSource(params);
-        return resp.body();
+        return handler.handleSource(params).body();
+    }
+
+    private static List<Map<String, Object>> parseRefs(
+            String json) {
+        var parsed = Json.parse(json);
+        Object refsRaw = parsed.get("refs");
+        if (refsRaw == null) return List.of();
+        String refsStr = refsRaw.toString().trim();
+        if (!refsStr.startsWith("[")) return List.of();
+        var result = new ArrayList<Map<String, Object>>();
+        refsStr = refsStr.substring(1, refsStr.length() - 1);
+        int depth = 0;
+        int start = 0;
+        for (int i = 0; i < refsStr.length(); i++) {
+            char c = refsStr.charAt(i);
+            if (c == '{') depth++;
+            else if (c == '}') depth--;
+            if (depth == 0 && c == '}') {
+                String elem = refsStr.substring(start,
+                        i + 1).trim();
+                if (elem.startsWith(","))
+                    elem = elem.substring(1).trim();
+                if (elem.startsWith("{"))
+                    result.add(Json.parse(elem));
+                start = i + 1;
+            }
+        }
+        return result;
+    }
+
+    private static List<Map<String, Object>> incoming(
+            String json) {
+        return parseRefs(json).stream()
+                .filter(r -> "incoming".equals(
+                        Json.getString(r, "direction")))
+                .toList();
+    }
+
+    private static List<Map<String, Object>> outgoing(
+            String json) {
+        return parseRefs(json).stream()
+                .filter(r -> "outgoing".equals(
+                        Json.getString(r, "direction")))
+                .toList();
     }
 
     @Nested
-    class IncomingPresent {
+    class DogBarkIncoming {
 
         @Test
-        void dogBarkHasIncomingFromAnimalService()
-                throws Exception {
-            String json = handleSource(
-                    "test.model.Dog", "bark");
-            // AnimalService.createDog() calls d.bark()
-            assertTrue(json.contains("\"direction\":\"incoming\""),
-                    "Should have incoming refs: " + json);
-            assertTrue(json.contains("AnimalService"),
-                    "Should be called from AnimalService: "
-                    + json);
+        void barkHasIncomingCallers() throws Exception {
+            String json = sourceBody("test.model.Dog", "bark");
+            var inc = incoming(json);
+            assertFalse(inc.isEmpty(),
+                    "bark() should have incoming callers");
         }
 
         @Test
-        void animalNameHasIncomingCallers() throws Exception {
-            String json = handleSource(
-                    "test.model.Animal", "name");
-            // Animal#name() is called from AnimalService.process
-            // and EnrichedRefService.getAnimalName
-            assertTrue(json.contains("\"direction\":\"incoming\""),
-                    "Should have incoming refs: " + json);
+        void barkCalledByCreateDog() throws Exception {
+            String json = sourceBody("test.model.Dog", "bark");
+            var inc = incoming(json);
+            var fqmns = inc.stream()
+                    .map(r -> Json.getString(r, "fqmn"))
+                    .collect(Collectors.toSet());
+            assertTrue(fqmns.stream()
+                    .anyMatch(f -> f.contains(
+                            "AnimalService#createDog")),
+                    "createDog calls bark: " + fqmns);
         }
 
         @Test
-        void incomingRefHasFqmn() throws Exception {
-            String json = handleSource(
-                    "test.model.Dog", "bark");
-            // Incoming ref should have enclosing method FQMN
-            assertTrue(json.contains("\"fqmn\""),
-                    "Incoming ref should have fqmn: " + json);
+        void barkIncomingHasProjectScope() throws Exception {
+            String json = sourceBody("test.model.Dog", "bark");
+            for (var ref : incoming(json)) {
+                assertEquals("project",
+                        Json.getString(ref, "scope"),
+                        "Fixture callers are project: " + ref);
+            }
         }
 
         @Test
-        void incomingRefHasFile() throws Exception {
-            String json = handleSource(
-                    "test.model.Dog", "bark");
-            // Check that incoming refs have file paths
-            // (at least some — project refs do)
-            assertTrue(json.contains("\"file\""),
-                    "Should have file paths: " + json);
+        void barkIncomingHasFile() throws Exception {
+            String json = sourceBody("test.model.Dog", "bark");
+            for (var ref : incoming(json)) {
+                assertNotNull(Json.getString(ref, "file"),
+                        "Incoming should have file: " + ref);
+            }
         }
 
         @Test
-        void incomingRefHasLine() throws Exception {
-            String json = handleSource(
-                    "test.model.Dog", "bark");
-            assertTrue(json.contains("\"line\""),
-                    "Should have line numbers: " + json);
+        void barkIncomingHasLine() throws Exception {
+            String json = sourceBody("test.model.Dog", "bark");
+            for (var ref : incoming(json)) {
+                assertTrue(
+                        Json.getInt(ref, "line", -1) > 0,
+                        "Incoming should have line: " + ref);
+            }
         }
 
         @Test
-        void incomingRefHasScope() throws Exception {
-            String json = handleSource(
-                    "test.model.Dog", "bark");
-            assertTrue(json.contains("\"scope\":\"project\""),
-                    "Caller should be project scope: " + json);
+        void barkIncomingFqmnUsesHash() throws Exception {
+            String json = sourceBody("test.model.Dog", "bark");
+            for (var ref : incoming(json)) {
+                String fqmn = Json.getString(ref, "fqmn");
+                assertTrue(fqmn.contains("#"),
+                        "FQMN should use #: " + fqmn);
+            }
+        }
+
+        @Test
+        void barkIncomingDeduped() throws Exception {
+            String json = sourceBody("test.model.Dog", "bark");
+            var fqmns = incoming(json).stream()
+                    .map(r -> Json.getString(r, "fqmn"))
+                    .toList();
+            assertEquals(fqmns.size(),
+                    Set.copyOf(fqmns).size(),
+                    "Incoming should be deduped: " + fqmns);
+        }
+
+        @Test
+        void barkHasNoOutgoing() throws Exception {
+            // bark() body: System.out.println — all java.* filtered
+            String json = sourceBody("test.model.Dog", "bark");
+            var out = outgoing(json);
+            assertTrue(out.isEmpty(),
+                    "bark() has no non-JDK outgoing: " + out);
         }
     }
 
     @Nested
-    class IncomingDirectionField {
+    class AnimalServiceProcessIncoming {
 
         @Test
-        void incomingPresentForBark() throws Exception {
-            String json = handleSource(
-                    "test.model.Dog", "bark");
-            // bark() body is System.out.println — all java.*
-            // filtered, so no outgoing. But incoming exists.
-            assertTrue(json.contains("\"direction\":\"incoming\""),
-                    "Should have incoming refs: " + json);
-        }
-
-        @Test
-        void outgoingAndIncomingBothPresent() throws Exception {
-            // AnimalService.process calls animal.name() →
-            // outgoing, and is called by tests → incoming
-            String json = handleSource(
+        void processHasIncomingFromCaller() throws Exception {
+            String json = sourceBody(
                     "test.service.AnimalService", "process");
-            assertTrue(json.contains("\"direction\":\"outgoing\""),
-                    "Should have outgoing refs: " + json);
+            var inc = incoming(json);
+            var fqmns = inc.stream()
+                    .map(r -> Json.getString(r, "fqmn"))
+                    .collect(Collectors.toSet());
+            assertTrue(fqmns.stream()
+                    .anyMatch(f -> f.contains(
+                            "CallerService#callProcess")),
+                    "CallerService calls process: " + fqmns);
         }
 
         @Test
-        void allRefsHaveDirection() throws Exception {
-            String json = handleSource(
-                    "test.model.Dog", "bark");
-            // Every ref should have a direction field
-            // Count refs vs direction occurrences
-            int refCount = countOccurrences(json, "\"fqmn\"");
-            int dirCount = countOccurrences(json, "\"direction\"");
-            // refs array contains fqmn for each ref
-            // minus the top-level fqmn
-            assertTrue(dirCount >= refCount - 1,
-                    "All refs should have direction: refs="
-                    + refCount + " dirs=" + dirCount);
+        void processHasBothDirections() throws Exception {
+            String json = sourceBody(
+                    "test.service.AnimalService", "process");
+            assertFalse(outgoing(json).isEmpty(),
+                    "Should have outgoing");
+            assertFalse(incoming(json).isEmpty(),
+                    "Should have incoming");
         }
-    }
-
-    @Nested
-    class NoIncoming {
 
         @Test
-        void unusedMethodHasNoIncoming() throws Exception {
-            // EnrichedRefService.getColor() may not be called
-            // by anyone in the test fixture
-            String json = handleSource(
-                    "test.service.EnrichedRefService",
-                    "getColor");
-            // May or may not have incoming — depends on fixture
-            // At minimum, JSON should be valid
-            assertTrue(json.contains("\"fqmn\""));
+        void everyRefHasDirection() throws Exception {
+            String json = sourceBody(
+                    "test.service.AnimalService", "process");
+            for (var ref : parseRefs(json)) {
+                String dir = Json.getString(ref, "direction");
+                assertTrue(
+                        "outgoing".equals(dir)
+                                || "incoming".equals(dir),
+                        "Direction must be outgoing/incoming: "
+                        + ref);
+            }
         }
     }
 
@@ -163,26 +219,28 @@ public class IncomingRefsTest {
     class TypeLevelNoIncoming {
 
         @Test
-        void classLevelHasNoIncomingRefs() throws Exception {
-            String json = handleSource(
-                    "test.model.Dog", null);
-            // Type-level returns hierarchy, not refs
-            assertFalse(json.contains("\"direction\""),
-                    "Type-level should not have direction: "
-                    + json);
-            assertTrue(json.contains("\"supertypes\""),
-                    "Type-level should have hierarchy: "
-                    + json);
+        void classLevelHasNoRefs() throws Exception {
+            String json = sourceBody("test.model.Dog", null);
+            var parsed = Json.parse(json);
+            assertNull(parsed.get("refs"),
+                    "Type-level should not have refs");
+            assertNotNull(parsed.get("supertypes"),
+                    "Type-level should have hierarchy");
         }
     }
 
-    private static int countOccurrences(String s, String sub) {
-        int count = 0;
-        int idx = 0;
-        while ((idx = s.indexOf(sub, idx)) != -1) {
-            count++;
-            idx += sub.length();
+    @Nested
+    class UnusedMethodNoIncoming {
+
+        @Test
+        void getColorHasNoIncoming() throws Exception {
+            String json = sourceBody(
+                    "test.service.EnrichedRefService",
+                    "getColor");
+            var inc = incoming(json);
+            assertTrue(inc.isEmpty(),
+                    "getColor not called by anyone in fixture: "
+                    + inc);
         }
-        return count;
     }
 }
