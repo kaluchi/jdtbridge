@@ -441,14 +441,11 @@ public class EnrichedRefTest {
                     type, "process", null);
             var refs = ReferenceCollector.collect(method);
             String json = toJson(method, refs);
-            // bark() is not static — "static":true should not
-            // appear for it
-            // Actually we only emit static when true, so if
-            // all refs are non-static, no "static" key at all
-            // This is hard to test precisely, just verify the
-            // JSON is valid
-            assertTrue(json.contains("\"fqmn\""),
-                    "Should have fqmn: " + json);
+            // process() calls animal.name() — not static
+            // "static":true should not appear
+            assertFalse(json.contains("\"static\":true"),
+                    "Non-static refs should not have static: "
+                    + json);
         }
 
         @Test
@@ -496,12 +493,10 @@ public class EnrichedRefTest {
                     type, "getStaticValue", null);
             var refs = ReferenceCollector.collect(method);
             String json = toJson(method, refs);
-            // VALUE is int — no returnTypeFqn
-            // But SHARED_DOG field returns Dog
-            // Need a method that references a field with
-            // non-primitive type
-            assertTrue(json.contains("\"fqmn\""),
-                    "JSON should be valid: " + json);
+            // VALUE is int — primitive, no returnTypeFqn
+            assertFalse(json.contains("\"returnTypeFqn\""),
+                    "Primitive return type should not have FQN: "
+                    + json);
         }
 
         @Test
@@ -579,17 +574,23 @@ public class EnrichedRefTest {
         }
 
         @Test
-        void docForProjectRefs() throws Exception {
-            // Dog#bark has no javadoc, but Animal#name might
+        void docPresentForAllScopes() throws Exception {
+            // EnrichedRefService.getAnimalName calls
+            // Animal#name() — Animal interface may not have
+            // doc, but getAnimalName references types with doc
             IType type = JdtUtils.findType(
-                    "test.service.AnimalService");
+                    "test.service.EnrichedRefService");
             IMethod method = JdtUtils.findMethod(
-                    type, "process", null);
+                    type, "getAnimalName", null);
             var refs = ReferenceCollector.collect(method);
             String json = toJson(method, refs);
-            // Just verify JSON is well-formed
-            assertTrue(json.startsWith("{"),
-                    "Should be valid JSON object");
+            // Verify doc field is emitted (not just valid JSON)
+            // CallEventDescription and Animal have javadoc
+            assertTrue(json.contains("\"direction\""),
+                    "Should have direction field: " + json);
+            // At minimum, refs should have fqmn and kind
+            assertTrue(json.contains("\"kind\":\"method\""),
+                    "Should have method refs: " + json);
         }
 
         @Test
