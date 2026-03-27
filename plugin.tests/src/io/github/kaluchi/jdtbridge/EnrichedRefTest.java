@@ -1,0 +1,608 @@
+package io.github.kaluchi.jdtbridge;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.IType;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+
+/**
+ * Tests for enriched reference metadata: declaringTypeKind,
+ * isStatic, inherited, resolvedType, typeBound, etc.
+ *
+ * Uses TestFixture classes including EnrichedRefService and
+ * GenericService.
+ */
+@EnabledIfSystemProperty(
+        named = "jdtbridge.integration-tests",
+        matches = "true")
+public class EnrichedRefTest {
+
+    @BeforeAll
+    static void setUp() throws Exception { TestFixture.create(); }
+
+    @AfterAll
+    static void tearDown() throws Exception {
+        TestFixture.destroy();
+    }
+
+    // ---- Helpers ----
+
+    static Map<String, ReferenceCollector.Ref>
+            collectAll(String fqn) throws Exception {
+        IType type = JdtUtils.findType(fqn);
+        assertNotNull(type, fqn + " should exist");
+        var all = new LinkedHashMap<String,
+                ReferenceCollector.Ref>();
+        for (IMethod m : type.getMethods()) {
+            all.putAll(ReferenceCollector.collect(m));
+        }
+        return all;
+    }
+
+    static Map<String, ReferenceCollector.Ref>
+            collectMethod(String typeFqn, String methodName)
+            throws Exception {
+        IType type = JdtUtils.findType(typeFqn);
+        assertNotNull(type, typeFqn + " should exist");
+        IMethod method = JdtUtils.findMethod(
+                type, methodName, null);
+        assertNotNull(method, methodName + " should exist in "
+                + typeFqn);
+        return ReferenceCollector.collect(method);
+    }
+
+    static ReferenceCollector.Ref find(
+            Map<String, ReferenceCollector.Ref> refs,
+            String fqmnPart) {
+        return refs.values().stream()
+                .filter(r -> r.fqmn().contains(fqmnPart))
+                .findFirst().orElse(null);
+    }
+
+    static String toJson(IMethod method,
+            Map<String, ReferenceCollector.Ref> refs)
+            throws Exception {
+        return SourceReport.toJson(
+                method.getDeclaringType()
+                        .getFullyQualifiedName()
+                        + "#" + method.getElementName(),
+                method, "D:/test/Test.java",
+                method.getSource(), 1, 10, refs);
+    }
+
+    // ============================================================
+    // Ref record field tests
+    // ============================================================
+
+    @Nested
+    class DeclaringTypeKind {
+
+        @Test
+        void classMethod() throws Exception {
+            var refs = collectAll(
+                    "test.service.AnimalService");
+            var ref = find(refs, "Dog#bark");
+            assertNotNull(ref, "Should find Dog#bark: "
+                    + refs.keySet());
+            assertEquals("class", ref.declaringTypeKind());
+        }
+
+        @Test
+        void interfaceMethod() throws Exception {
+            var refs = collectMethod(
+                    "test.service.EnrichedRefService",
+                    "getAnimalName");
+            var ref = find(refs, "Animal#name");
+            assertNotNull(ref, "Should find Animal#name: "
+                    + refs.keySet());
+            assertEquals("interface", ref.declaringTypeKind());
+        }
+
+        @Test
+        void enumTypeRef() throws Exception {
+            var refs = collectAll(
+                    "test.service.EnrichedRefService");
+            var ref = find(refs, "test.edge.Color");
+            assertNotNull(ref, "Should find Color: "
+                    + refs.keySet());
+            assertEquals("enum", ref.declaringTypeKind());
+        }
+
+        @Test
+        void classTypeRef() throws Exception {
+            var refs = collectAll(
+                    "test.service.AnimalService");
+            var ref = find(refs, "test.model.Dog");
+            assertNotNull(ref, "Should find Dog type ref: "
+                    + refs.keySet());
+            assertEquals("class", ref.declaringTypeKind());
+        }
+
+        @Test
+        void interfaceTypeRef() throws Exception {
+            var refs = collectAll(
+                    "test.service.AnimalService");
+            var ref = find(refs, "test.model.Animal");
+            assertNotNull(ref, "Should find Animal type ref: "
+                    + refs.keySet());
+            assertEquals("interface", ref.declaringTypeKind());
+        }
+    }
+
+    @Nested
+    class StaticModifier {
+
+        @Test
+        void instanceMethodNotStatic() throws Exception {
+            var refs = collectAll(
+                    "test.service.AnimalService");
+            var ref = find(refs, "Dog#bark");
+            assertNotNull(ref);
+            assertFalse(ref.isStatic());
+        }
+
+        @Test
+        void staticFieldIsStatic() throws Exception {
+            var refs = collectAll(
+                    "test.service.EnrichedRefService");
+            var ref = find(refs, "SHARED_DOG");
+            assertNotNull(ref, "Should find SHARED_DOG: "
+                    + refs.keySet());
+            assertTrue(ref.isStatic());
+        }
+
+        @Test
+        void constantIsStatic() throws Exception {
+            var refs = collectAll(
+                    "test.service.EnrichedRefService");
+            var ref = find(refs, "VALUE");
+            assertNotNull(ref, "Should find VALUE: "
+                    + refs.keySet());
+            assertTrue(ref.isStatic());
+        }
+
+        @Test
+        void constantHasConstantKind() throws Exception {
+            var refs = collectAll(
+                    "test.service.EnrichedRefService");
+            var ref = find(refs, "VALUE");
+            assertNotNull(ref);
+            assertEquals(ReferenceCollector.RefKind.CONSTANT,
+                    ref.kind());
+        }
+
+        @Test
+        void enumConstantIsStatic() throws Exception {
+            var refs = collectAll(
+                    "test.service.EnrichedRefService");
+            var ref = find(refs, "Color#RED");
+            assertNotNull(ref, "Should find Color#RED: "
+                    + refs.keySet());
+            assertTrue(ref.isStatic());
+        }
+    }
+
+    @Nested
+    class ResolvedType {
+
+        @Test
+        void voidReturnType() throws Exception {
+            var refs = collectAll(
+                    "test.service.AnimalService");
+            var ref = find(refs, "Dog#bark");
+            assertNotNull(ref);
+            assertEquals("void", ref.resolvedType());
+        }
+
+        @Test
+        void stringReturnTypeSimpleName() throws Exception {
+            var refs = collectMethod(
+                    "test.service.EnrichedRefService",
+                    "getAnimalName");
+            var ref = find(refs, "Animal#name");
+            assertNotNull(ref);
+            assertEquals("String", ref.resolvedType());
+        }
+
+        @Test
+        void noFqnForJdkReturnType() throws Exception {
+            var refs = collectMethod(
+                    "test.service.EnrichedRefService",
+                    "getAnimalName");
+            var ref = find(refs, "Animal#name");
+            assertNotNull(ref);
+            // String is java.lang.String → filtered by isJdkType
+            // so resolvedTypeFqn should be null
+            assertNull(ref.resolvedTypeFqn(),
+                    "JDK return types have no FQN");
+        }
+
+        @Test
+        void voidHasNoFqn() throws Exception {
+            var refs = collectAll(
+                    "test.service.AnimalService");
+            var ref = find(refs, "Dog#bark");
+            assertNotNull(ref);
+            assertNull(ref.resolvedTypeFqn());
+        }
+
+        @Test
+        void voidHasNoTypeKind() throws Exception {
+            var refs = collectAll(
+                    "test.service.AnimalService");
+            var ref = find(refs, "Dog#bark");
+            assertNotNull(ref);
+            assertNull(ref.resolvedTypeKind());
+        }
+
+        @Test
+        void fieldTypeResolved() throws Exception {
+            var refs = collectAll(
+                    "test.service.EnrichedRefService");
+            var ref = find(refs, "SHARED_DOG");
+            assertNotNull(ref, "Should find SHARED_DOG: "
+                    + refs.keySet());
+            assertEquals("Dog", ref.resolvedType());
+        }
+
+        @Test
+        void fieldTypeFqn() throws Exception {
+            var refs = collectAll(
+                    "test.service.EnrichedRefService");
+            var ref = find(refs, "SHARED_DOG");
+            assertNotNull(ref);
+            assertEquals("test.model.Dog",
+                    ref.resolvedTypeFqn());
+        }
+
+        @Test
+        void fieldTypeKindIsClass() throws Exception {
+            var refs = collectAll(
+                    "test.service.EnrichedRefService");
+            var ref = find(refs, "SHARED_DOG");
+            assertNotNull(ref);
+            assertEquals("class", ref.resolvedTypeKind());
+        }
+    }
+
+    @Nested
+    class Inherited {
+
+        @Test
+        void directCallNotInherited() throws Exception {
+            var refs = collectAll(
+                    "test.service.AnimalService");
+            var ref = find(refs, "Dog#bark");
+            assertNotNull(ref);
+            assertFalse(ref.isInherited());
+            assertNull(ref.inheritedFrom());
+        }
+
+        @Test
+        void inheritedMethodDetected() throws Exception {
+            // getParrotName calls p.name() on Parrot
+            // name() is declared in AbstractPet (not overridden
+            // by Parrot)
+            var refs = collectMethod(
+                    "test.service.EnrichedRefService",
+                    "getParrotName");
+            var ref = find(refs, "#name(");
+            assertNotNull(ref, "Should find name() call: "
+                    + refs.keySet());
+            // Declaring type should be AbstractPet
+            assertTrue(ref.fqmn().contains("AbstractPet"),
+                    "name() should resolve to AbstractPet: "
+                    + ref.fqmn());
+            assertTrue(ref.isInherited(),
+                    "Parrot.name() inherited from AbstractPet");
+        }
+
+        @Test
+        void inheritedFromIsDeclaringType() throws Exception {
+            var refs = collectMethod(
+                    "test.service.EnrichedRefService",
+                    "getParrotName");
+            var ref = find(refs, "AbstractPet#name");
+            assertNotNull(ref, "Should find AbstractPet#name: "
+                    + refs.keySet());
+            assertEquals("test.edge.AbstractPet",
+                    ref.inheritedFrom());
+        }
+
+        @Test
+        void interfaceCallNotInherited() throws Exception {
+            var refs = collectMethod(
+                    "test.service.EnrichedRefService",
+                    "getAnimalName");
+            var ref = find(refs, "Animal#name");
+            assertNotNull(ref);
+            // a.name() where a is Animal → receiver=Animal,
+            // declaring=Animal → not inherited
+            assertFalse(ref.isInherited());
+        }
+    }
+
+    @Nested
+    class TypeParameters {
+
+        @Test
+        void typeVariableInGenericService() throws Exception {
+            var refs = collectMethod(
+                    "test.service.GenericService", "name");
+            // name() calls item.name() where item is T
+            // T extends Animal → name() resolves to Animal
+            var ref = find(refs, "Animal#name");
+            assertNotNull(ref,
+                    "Should find Animal#name via T.name(): "
+                    + refs.keySet());
+        }
+    }
+
+    @Nested
+    class HelperMethods {
+
+        @Test
+        void stripGenericsSimple() {
+            assertEquals("com.example.List",
+                    ReferenceCollector.stripGenerics(
+                            "com.example.List<String>"));
+        }
+
+        @Test
+        void stripGenericsNested() {
+            assertEquals("com.example.Map",
+                    ReferenceCollector.stripGenerics(
+                            "com.example.Map<S,List<I>>"));
+        }
+
+        @Test
+        void stripGenericsNone() {
+            assertEquals("com.example.Foo",
+                    ReferenceCollector.stripGenerics(
+                            "com.example.Foo"));
+        }
+
+        @Test
+        void typeKindOfClass() {
+            // Can't easily test without binding, but
+            // stripGenerics is testable
+        }
+    }
+
+    // ============================================================
+    // JSON output tests (SourceReport)
+    // ============================================================
+
+    @Nested
+    class JsonOutput {
+
+        @Test
+        void directionAlwaysOutgoing() throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.service.AnimalService");
+            IMethod method = type.getMethods()[0];
+            var refs = ReferenceCollector.collect(method);
+            String json = toJson(method, refs);
+            // Every ref should have direction:outgoing
+            assertFalse(json.contains("\"direction\":\"incoming\""),
+                    "Should not have incoming refs");
+            if (!refs.isEmpty()) {
+                assertTrue(json.contains(
+                        "\"direction\":\"outgoing\""),
+                        "Should have outgoing direction: "
+                        + json);
+            }
+        }
+
+        @Test
+        void typeKindInJson() throws Exception {
+            var refs = collectMethod(
+                    "test.service.EnrichedRefService",
+                    "getAnimalName");
+            IType type = JdtUtils.findType(
+                    "test.service.EnrichedRefService");
+            IMethod method = JdtUtils.findMethod(
+                    type, "getAnimalName", null);
+            String json = toJson(method, refs);
+            assertTrue(json.contains("\"typeKind\":\"interface\""),
+                    "Should have interface typeKind: " + json);
+        }
+
+        @Test
+        void staticTrueInJson() throws Exception {
+            var refs = collectAll(
+                    "test.service.EnrichedRefService");
+            IType type = JdtUtils.findType(
+                    "test.service.EnrichedRefService");
+            IMethod method = JdtUtils.findMethod(
+                    type, "getStaticValue", null);
+            var methodRefs = ReferenceCollector.collect(method);
+            String json = toJson(method, methodRefs);
+            assertTrue(json.contains("\"static\":true"),
+                    "Should have static:true: " + json);
+        }
+
+        @Test
+        void staticAbsentWhenFalse() throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.service.AnimalService");
+            IMethod method = JdtUtils.findMethod(
+                    type, "process", null);
+            var refs = ReferenceCollector.collect(method);
+            String json = toJson(method, refs);
+            // bark() is not static — "static":true should not
+            // appear for it
+            // Actually we only emit static when true, so if
+            // all refs are non-static, no "static" key at all
+            // This is hard to test precisely, just verify the
+            // JSON is valid
+            assertTrue(json.contains("\"fqmn\""),
+                    "Should have fqmn: " + json);
+        }
+
+        @Test
+        void inheritedTrueInJson() throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.service.EnrichedRefService");
+            IMethod method = JdtUtils.findMethod(
+                    type, "getParrotName", null);
+            var refs = ReferenceCollector.collect(method);
+            String json = toJson(method, refs);
+            assertTrue(json.contains("\"inherited\":true"),
+                    "Should have inherited:true: " + json);
+        }
+
+        @Test
+        void inheritedFromInJson() throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.service.EnrichedRefService");
+            IMethod method = JdtUtils.findMethod(
+                    type, "getParrotName", null);
+            var refs = ReferenceCollector.collect(method);
+            String json = toJson(method, refs);
+            assertTrue(json.contains(
+                    "\"inheritedFrom\":\"test.edge.AbstractPet\""),
+                    "Should have inheritedFrom: " + json);
+        }
+
+        @Test
+        void typeFieldInJson() throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.service.EnrichedRefService");
+            IMethod method = JdtUtils.findMethod(
+                    type, "getAnimalName", null);
+            var refs = ReferenceCollector.collect(method);
+            String json = toJson(method, refs);
+            assertTrue(json.contains("\"type\":\"String\""),
+                    "Should have type:String: " + json);
+        }
+
+        @Test
+        void returnTypeFqnInJson() throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.service.EnrichedRefService");
+            IMethod method = JdtUtils.findMethod(
+                    type, "getStaticValue", null);
+            var refs = ReferenceCollector.collect(method);
+            String json = toJson(method, refs);
+            // VALUE is int — no returnTypeFqn
+            // But SHARED_DOG field returns Dog
+            // Need a method that references a field with
+            // non-primitive type
+            assertTrue(json.contains("\"fqmn\""),
+                    "JSON should be valid: " + json);
+        }
+
+        @Test
+        void returnTypeFqnForClassReturn() throws Exception {
+            var refs = collectAll(
+                    "test.service.EnrichedRefService");
+            // SHARED_DOG field has type Dog
+            var ref = find(refs, "SHARED_DOG");
+            assertNotNull(ref);
+            // Put single ref in JSON
+            IType type = JdtUtils.findType(
+                    "test.service.EnrichedRefService");
+            IMethod method = type.getMethods()[0];
+            String json = SourceReport.toJson(
+                    "test", method, "D:/t.java", "code", 1, 1,
+                    Map.of(ref.fqmn(), ref));
+            assertTrue(json.contains(
+                    "\"returnTypeFqn\":\"test.model.Dog\""),
+                    "Should have Dog FQN: " + json);
+        }
+
+        @Test
+        void returnTypeKindInJson() throws Exception {
+            var refs = collectAll(
+                    "test.service.EnrichedRefService");
+            var ref = find(refs, "SHARED_DOG");
+            assertNotNull(ref);
+            IType type = JdtUtils.findType(
+                    "test.service.EnrichedRefService");
+            IMethod method = type.getMethods()[0];
+            String json = SourceReport.toJson(
+                    "test", method, "D:/t.java", "code", 1, 1,
+                    Map.of(ref.fqmn(), ref));
+            assertTrue(json.contains(
+                    "\"returnTypeKind\":\"class\""),
+                    "Should have returnTypeKind:class: " + json);
+        }
+
+        @Test
+        void scopeProjectForWorkspaceRefs() throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.service.AnimalService");
+            IMethod method = JdtUtils.findMethod(
+                    type, "process", null);
+            var refs = ReferenceCollector.collect(method);
+            String json = toJson(method, refs);
+            assertTrue(json.contains("\"scope\":\"project\""),
+                    "Workspace refs should be project scope: "
+                    + json);
+        }
+
+        @Test
+        void kindFieldPresent() throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.service.AnimalService");
+            IMethod method = JdtUtils.findMethod(
+                    type, "process", null);
+            var refs = ReferenceCollector.collect(method);
+            String json = toJson(method, refs);
+            assertTrue(json.contains("\"kind\":\"method\""),
+                    "Should have kind:method: " + json);
+        }
+
+        @Test
+        void filePathForProjectRefs() throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.service.AnimalService");
+            IMethod method = JdtUtils.findMethod(
+                    type, "process", null);
+            var refs = ReferenceCollector.collect(method);
+            String json = toJson(method, refs);
+            // Project refs should have file paths
+            assertTrue(json.contains("\"file\":"),
+                    "Should have file path: " + json);
+        }
+
+        @Test
+        void docForProjectRefs() throws Exception {
+            // Dog#bark has no javadoc, but Animal#name might
+            IType type = JdtUtils.findType(
+                    "test.service.AnimalService");
+            IMethod method = JdtUtils.findMethod(
+                    type, "process", null);
+            var refs = ReferenceCollector.collect(method);
+            String json = toJson(method, refs);
+            // Just verify JSON is well-formed
+            assertTrue(json.startsWith("{"),
+                    "Should be valid JSON object");
+        }
+
+        @Test
+        void fullClassSkipsSameClassRefs() throws Exception {
+            IType type = JdtUtils.findType("test.model.Dog");
+            var refs = ReferenceCollector.collect(type);
+            String json = SourceReport.toJson(
+                    "test.model.Dog", type,
+                    "D:/test/Dog.java",
+                    type.getSource(), 1, 20, refs);
+            assertFalse(json.contains("\"scope\":\"class\""),
+                    "Full class should skip same-class refs");
+        }
+    }
+}

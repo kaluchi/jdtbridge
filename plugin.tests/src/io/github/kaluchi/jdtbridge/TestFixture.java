@@ -223,6 +223,65 @@ class TestFixture {
             }
             """;
 
+    // ---- Enriched ref testing ----
+
+    private static final String ENRICHED_SERVICE_SRC = """
+            package test.service;
+
+            import test.model.Animal;
+            import test.model.Dog;
+            import test.edge.AbstractPet;
+            import test.edge.Parrot;
+            import test.edge.Color;
+            import test.edge.Outer;
+
+            public class EnrichedRefService {
+                private static final Dog SHARED_DOG = new Dog();
+
+                public static Dog getSharedDog() {
+                    return SHARED_DOG;
+                }
+
+                public String getParrotName(Parrot p) {
+                    return p.name();
+                }
+
+                public String getAnimalName(Animal a) {
+                    return a.name();
+                }
+
+                public int getStaticValue() {
+                    return Outer.StaticNested.VALUE;
+                }
+
+                public Color getColor() {
+                    return Color.RED;
+                }
+            }
+            """;
+
+    private static final String GENERIC_SERVICE_SRC = """
+            package test.service;
+
+            import test.model.Animal;
+
+            public class GenericService<T extends Animal> {
+                private T item;
+
+                public T get() {
+                    return item;
+                }
+
+                public void set(T item) {
+                    this.item = item;
+                }
+
+                public String name() {
+                    return item.name();
+                }
+            }
+            """;
+
     // ---- Refactoring targets (separate classes that can be renamed/moved) ----
 
     private static final String RENAME_TARGET_SRC = """
@@ -337,6 +396,12 @@ class TestFixture {
                 srcRoot.createPackageFragment("test.service", true, null);
         servicePkg.createCompilationUnit(
                 "AnimalService.java", SERVICE_SRC, true, null);
+        servicePkg.createCompilationUnit(
+                "EnrichedRefService.java",
+                ENRICHED_SERVICE_SRC, true, null);
+        servicePkg.createCompilationUnit(
+                "GenericService.java",
+                GENERIC_SERVICE_SRC, true, null);
 
         IPackageFragment brokenPkg =
                 srcRoot.createPackageFragment("test.broken", true, null);

@@ -1,13 +1,10 @@
 package io.github.kaluchi.jdtbridge;
 
-import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IMember;
-import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.ISourceRange;
 import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.JavaModelException;
-import org.eclipse.jdt.core.Signature;
 
 import java.util.Map;
 
@@ -38,7 +35,15 @@ class SourceReport {
         for (var ref : refs.values()) {
             Json entry = Json.object()
                     .put("fqmn", ref.fqmn())
-                    .put("kind", ref.kind().name().toLowerCase());
+                    .put("direction", "outgoing")
+                    .put("kind",
+                            ref.kind().name().toLowerCase());
+
+            // Type kind of declaring type
+            if (ref.declaringTypeKind() != null) {
+                entry.put("typeKind",
+                        ref.declaringTypeKind());
+            }
 
             String refTypeFqn = extractTypeFqn(ref.fqmn());
 
@@ -50,17 +55,50 @@ class SourceReport {
                 entry.put("scope", "class");
             } else if (isProjectSource(ref.element())) {
                 entry.put("scope", "project");
-                String path = absolutePath(ref.element());
-                if (path != null) entry.put("file", path);
             } else {
                 entry.put("scope", "dependency");
             }
 
-            // Type info
-            String type = resolveType(ref);
-            if (type != null) entry.put("type", type);
+            // File path for all scopes (null for binary deps)
+            String path = absolutePath(ref.element());
+            if (path != null) entry.put("file", path);
 
-            // Line range (for same-class members)
+            // Return/field type (call-site resolved from binding)
+            if (ref.resolvedType() != null) {
+                entry.put("type", ref.resolvedType());
+            }
+            if (ref.resolvedTypeFqn() != null) {
+                entry.put("returnTypeFqn",
+                        ref.resolvedTypeFqn());
+            }
+            if (ref.resolvedTypeKind() != null) {
+                entry.put("returnTypeKind",
+                        ref.resolvedTypeKind());
+            }
+
+            // Type variable + bound
+            if (ref.isTypeVariable()) {
+                entry.put("isTypeVariable", true);
+            }
+            if (ref.typeBound() != null) {
+                entry.put("typeBound", ref.typeBound());
+            }
+
+            // Static modifier
+            if (ref.isStatic()) {
+                entry.put("static", true);
+            }
+
+            // Inherited
+            if (ref.isInherited()) {
+                entry.put("inherited", true);
+                if (ref.inheritedFrom() != null) {
+                    entry.put("inheritedFrom",
+                            ref.inheritedFrom());
+                }
+            }
+
+            // Line range
             int[] lines = memberLines(ref.element());
             if (lines != null) {
                 entry.put("line", lines[0]);
@@ -69,15 +107,9 @@ class SourceReport {
                 }
             }
 
-            // Javadoc summary for class + project scope
-            String refScope = refTypeFqn.equals(ownFqn)
-                    ? "class"
-                    : (isProjectSource(ref.element())
-                            ? "project" : "dependency");
-            if (!"dependency".equals(refScope)) {
-                String doc = javadocSummary(ref.element());
-                if (doc != null) entry.put("doc", doc);
-            }
+            // Javadoc summary for ALL scopes
+            String doc = javadocSummary(ref.element());
+            if (doc != null) entry.put("doc", doc);
 
             refsArr.add(entry);
         }
@@ -87,35 +119,6 @@ class SourceReport {
     }
 
     // ---- Helpers ----
-
-    private static String resolveType(ReferenceCollector.Ref ref) {
-        try {
-            if (ref.element() instanceof IMethod m) {
-                if (m.isConstructor()) return null;
-                return resolveTypeSig(
-                        m.getReturnType(), m.getDeclaringType());
-            }
-            if (ref.element() instanceof IField f) {
-                return resolveTypeSig(
-                        f.getTypeSignature(), f.getDeclaringType());
-            }
-        } catch (JavaModelException e) { /* ignore */ }
-        return null;
-    }
-
-    private static String resolveTypeSig(String sig, IType context)
-            throws JavaModelException {
-        String simple = Signature.toString(sig);
-        if (context == null) return simple;
-        // Try to resolve simple name to FQN
-        String[][] resolved = context.resolveType(simple);
-        if (resolved != null && resolved.length > 0) {
-            String pkg = resolved[0][0];
-            String name = resolved[0][1];
-            return pkg.isEmpty() ? name : pkg + "." + name;
-        }
-        return simple;
-    }
 
     private static int[] memberLines(IJavaElement element) {
         try {
@@ -129,7 +132,8 @@ class SourceReport {
                                 ? m.getClassFile().getSource()
                                 : null);
                 if (source == null) return null;
-                int start = offsetToLine(source, range.getOffset());
+                int start = offsetToLine(source,
+                        range.getOffset());
                 int end = offsetToLine(source,
                         range.getOffset() + range.getLength());
                 return new int[]{start, end};
