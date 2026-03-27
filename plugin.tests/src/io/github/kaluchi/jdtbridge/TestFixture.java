@@ -233,8 +233,10 @@ class TestFixture {
             import test.edge.AbstractPet;
             import test.edge.Parrot;
             import test.edge.Color;
+            import test.edge.Marker;
             import test.edge.Outer;
 
+            @Marker("enriched")
             public class EnrichedRefService {
                 private static final Dog SHARED_DOG = new Dog();
 
