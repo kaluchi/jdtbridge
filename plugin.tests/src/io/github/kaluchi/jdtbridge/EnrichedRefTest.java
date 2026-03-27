@@ -349,22 +349,19 @@ public class EnrichedRefTest {
         @Test
         void getMethodReturnTypeIsTypeVariable()
                 throws Exception {
-            // GenericService.get() returns T extends Animal
+            // GenericService.get() returns T, body: return item
+            // item is a field of type T extends Animal
             var refs = collectMethod(
                     "test.service.GenericService", "get");
-            // get() returns T — the field 'item' is accessed
-            // Check if any ref has isTypeVariable
-            // The return of get() is T, but get() is a
-            // same-class method — refs may not include it.
-            // The field 'item' has type T
             var itemRef = find(refs, "item");
-            if (itemRef != null) {
-                assertTrue(itemRef.isTypeVariable(),
-                        "item field should be type variable");
-                assertEquals("test.model.Animal",
-                        itemRef.typeBound(),
-                        "T bound should be Animal");
-            }
+            assertNotNull(itemRef,
+                    "get() accesses item field: "
+                    + refs.keySet());
+            assertTrue(itemRef.isTypeVariable(),
+                    "item field should be type variable");
+            assertEquals("test.model.Animal",
+                    itemRef.typeBound(),
+                    "T bound should be Animal");
         }
 
         @Test

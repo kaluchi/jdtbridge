@@ -1,7 +1,9 @@
 package io.github.kaluchi.jdtbridge;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.eclipse.jdt.core.IMethod;
@@ -31,86 +33,194 @@ public class ReferenceCollectorTest {
     class CollectFromMethod {
 
         @Test
-        void findsReferencesInServiceMethod() throws Exception {
+        void processMethodFindsAnimalName() throws Exception {
             IType type = JdtUtils.findType(
                     "test.service.AnimalService");
-            assertNotNull(type, "AnimalService should exist");
-            IMethod[] methods = type.getMethods();
-            assertTrue(methods.length > 0,
-                    "Should have methods");
+            IMethod method = JdtUtils.findMethod(
+                    type, "process", null);
+            assertNotNull(method);
 
-            var refs = ReferenceCollector.collect(methods[0]);
+            var refs = ReferenceCollector.collect(method);
             assertFalse(refs.isEmpty(),
                     "Should find references");
+            // process(Animal) calls animal.name()
+            assertTrue(refs.containsKey(
+                    "test.model.Animal#name()"),
+                    "Should find Animal#name(): "
+                    + refs.keySet());
         }
 
         @Test
-        void findsMethodCalls() throws Exception {
+        void createDogFindsDogAndBark() throws Exception {
             IType type = JdtUtils.findType(
                     "test.service.AnimalService");
-            IMethod[] methods = type.getMethods();
+            IMethod method = JdtUtils.findMethod(
+                    type, "createDog", null);
+            assertNotNull(method);
 
-            // Collect from all methods
-            var allRefs = new java.util.LinkedHashMap<
-                    String, ReferenceCollector.Ref>();
-            for (IMethod m : methods) {
-                allRefs.putAll(ReferenceCollector.collect(m));
-            }
-
-            // Should find Dog or Animal references
-            assertTrue(allRefs.values().stream()
-                    .anyMatch(r -> r.fqmn().contains("Dog")
-                            || r.fqmn().contains("Animal")),
-                    "Should find Dog/Animal refs: "
-                            + allRefs.keySet());
+            var refs = ReferenceCollector.collect(method);
+            assertTrue(refs.containsKey("test.model.Dog#bark()"),
+                    "Should find Dog#bark: " + refs.keySet());
+            assertTrue(refs.containsKey("test.model.Dog"),
+                    "Should find Dog type: " + refs.keySet());
         }
 
         @Test
-        void skipsJavaLang() throws Exception {
+        void skipsJavaLangTypes() throws Exception {
             IType type = JdtUtils.findType(
                     "test.service.AnimalService");
-            IMethod[] methods = type.getMethods();
-
             var allRefs = new java.util.LinkedHashMap<
                     String, ReferenceCollector.Ref>();
-            for (IMethod m : methods) {
+            for (IMethod m : type.getMethods()) {
                 allRefs.putAll(ReferenceCollector.collect(m));
             }
 
-            assertFalse(allRefs.containsKey("java.lang.String"),
-                    "Should skip java.lang.String");
+            // No java.* type FQMNs as keys
+            for (String key : allRefs.keySet()) {
+                assertFalse(key.startsWith("java."),
+                        "Should skip java.* types: " + key);
+            }
+        }
+
+        @Test
+        void skipsJavaLangMethods() throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.service.AnimalService");
+            var allRefs = new java.util.LinkedHashMap<
+                    String, ReferenceCollector.Ref>();
+            for (IMethod m : type.getMethods()) {
+                allRefs.putAll(ReferenceCollector.collect(m));
+            }
+
+            // System.out.println is java.* — should be skipped
+            assertFalse(allRefs.containsKey(
+                    "java.io.PrintStream#println(String)"),
+                    "Should skip java.io refs");
         }
 
         @Test
         void deduplicatesReferences() throws Exception {
             IType type = JdtUtils.findType(
                     "test.service.AnimalService");
-            IMethod[] methods = type.getMethods();
-
             var refs = new java.util.LinkedHashMap<
                     String, ReferenceCollector.Ref>();
-            for (IMethod m : methods) {
+            for (IMethod m : type.getMethods()) {
                 refs.putAll(ReferenceCollector.collect(m));
             }
-
-            // Each FQMN appears at most once
-            long total = refs.size();
-            long unique = refs.keySet().stream().distinct().count();
-            assertTrue(total == unique,
-                    "All refs should be unique");
+            assertEquals(refs.size(),
+                    refs.keySet().stream().distinct().count(),
+                    "All refs should be unique by FQMN");
         }
+    }
+
+    @Nested
+    class CollectFromType {
 
         @Test
-        void collectFromType() throws Exception {
+        void dogReferencesAnimalExactly() throws Exception {
             IType type = JdtUtils.findType("test.model.Dog");
             assertNotNull(type);
 
             var refs = ReferenceCollector.collect(type);
-            // Dog implements Animal — should reference it
-            assertTrue(refs.values().stream()
-                    .anyMatch(r -> r.fqmn().contains("Animal")),
+            assertTrue(refs.containsKey("test.model.Animal"),
                     "Dog should reference Animal: "
-                            + refs.keySet());
+                    + refs.keySet());
+            var animalRef = refs.get("test.model.Animal");
+            assertEquals(ReferenceCollector.RefKind.TYPE,
+                    animalRef.kind());
+            assertEquals("interface",
+                    animalRef.declaringTypeKind());
+        }
+
+        @Test
+        void dogDoesNotReferenceSelf() throws Exception {
+            IType type = JdtUtils.findType("test.model.Dog");
+            var refs = ReferenceCollector.collect(type);
+            assertFalse(refs.containsKey("test.model.Dog"),
+                    "Dog should not reference itself: "
+                    + refs.keySet());
+        }
+
+        @Test
+        void interfaceHasNoSelfRef() throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.model.Animal");
+            var refs = ReferenceCollector.collect(type);
+            assertFalse(refs.containsKey("test.model.Animal"),
+                    "Animal should not reference itself");
+        }
+    }
+
+    @Nested
+    class RefMetadata {
+
+        @Test
+        void methodRefHasCorrectKind() throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.service.AnimalService");
+            IMethod method = JdtUtils.findMethod(
+                    type, "process", null);
+            var refs = ReferenceCollector.collect(method);
+            var ref = refs.get("test.model.Animal#name()");
+            assertNotNull(ref);
+            assertEquals(ReferenceCollector.RefKind.METHOD,
+                    ref.kind());
+        }
+
+        @Test
+        void typeRefHasCorrectKind() throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.service.AnimalService");
+            IMethod method = JdtUtils.findMethod(
+                    type, "createDog", null);
+            var refs = ReferenceCollector.collect(method);
+            var ref = refs.get("test.model.Dog");
+            assertNotNull(ref, "Dog type ref: " + refs.keySet());
+            assertEquals(ReferenceCollector.RefKind.TYPE,
+                    ref.kind());
+        }
+
+        @Test
+        void everyRefHasElement() throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.service.AnimalService");
+            IMethod method = JdtUtils.findMethod(
+                    type, "process", null);
+            var refs = ReferenceCollector.collect(method);
+            for (var ref : refs.values()) {
+                assertNotNull(ref.element(),
+                        "Ref should have element: "
+                        + ref.fqmn());
+            }
+        }
+
+        @Test
+        void everyRefHasDeclaringTypeKind() throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.service.AnimalService");
+            IMethod method = JdtUtils.findMethod(
+                    type, "process", null);
+            var refs = ReferenceCollector.collect(method);
+            for (var ref : refs.values()) {
+                assertNotNull(ref.declaringTypeKind(),
+                        "Ref should have declaringTypeKind: "
+                        + ref.fqmn());
+            }
+        }
+
+        @Test
+        void noRefHasNullFqmn() throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.service.AnimalService");
+            for (IMethod m : type.getMethods()) {
+                var refs = ReferenceCollector.collect(m);
+                for (var ref : refs.values()) {
+                    assertNotNull(ref.fqmn(),
+                            "Ref fqmn should not be null");
+                    assertFalse(ref.fqmn().isEmpty(),
+                            "Ref fqmn should not be empty");
+                }
+            }
         }
     }
 }
