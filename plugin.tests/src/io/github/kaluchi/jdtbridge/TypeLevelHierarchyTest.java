@@ -214,6 +214,9 @@ public class TypeLevelHierarchyTest {
                     + json);
             assertTrue(json.contains("test.edge.Outer"),
                     "Enclosing should be Outer: " + json);
+            assertTrue(json.contains("\"kind\":\"class\""),
+                    "Enclosing kind should be class: "
+                    + json);
         }
 
         @Test

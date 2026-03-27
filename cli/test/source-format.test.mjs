@@ -105,7 +105,7 @@ describe("source format", () => {
     source: "public class Inner {}",
     supertypes: [],
     subtypes: [],
-    enclosingType: "pkg.Outer",
+    enclosingType: { fqn: "pkg.Outer", kind: "class" },
   };
 
   // ---- Header tests ----

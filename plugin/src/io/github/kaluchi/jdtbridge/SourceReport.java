@@ -313,8 +313,10 @@ class SourceReport {
             // Enclosing type (for inner/nested types)
             IType enclosing = type.getDeclaringType();
             if (enclosing != null) {
-                result.put("enclosingType",
-                        enclosing.getFullyQualifiedName());
+                result.put("enclosingType", Json.object()
+                        .put("fqn",
+                                enclosing.getFullyQualifiedName())
+                        .put("kind", typeKindStr(enclosing)));
             }
         } catch (Exception e) { /* ignore */ }
     }

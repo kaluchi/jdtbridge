@@ -179,7 +179,10 @@ function formatHierarchy(lines, result) {
   if (result.enclosingType) {
     lines.push("");
     lines.push("#### Enclosing Type:");
-    lines.push(`[C] \`${result.enclosingType}\``);
+    const et = result.enclosingType;
+    const fqn = typeof et === "string" ? et : et.fqn;
+    const kind = typeof et === "string" ? "class" : (et.kind || "class");
+    lines.push(`${TYPE_KIND_BADGE[kind] || "[C]"} \`${fqn}\``);
   }
 }
 
