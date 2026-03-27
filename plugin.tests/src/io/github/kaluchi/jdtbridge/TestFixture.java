@@ -284,6 +284,27 @@ class TestFixture {
             }
             """;
 
+    private static final String CALLER_SRC = """
+            package test.service;
+
+            import test.model.Animal;
+            import test.model.Dog;
+
+            public class CallerService {
+                private final AnimalService service =
+                        new AnimalService();
+
+                public void callProcess() {
+                    Animal dog = new Dog();
+                    service.process(dog);
+                }
+
+                public Dog callCreateDog() {
+                    return service.createDog();
+                }
+            }
+            """;
+
     // ---- Refactoring targets (separate classes that can be renamed/moved) ----
 
     private static final String RENAME_TARGET_SRC = """
@@ -404,6 +425,9 @@ class TestFixture {
         servicePkg.createCompilationUnit(
                 "GenericService.java",
                 GENERIC_SERVICE_SRC, true, null);
+        servicePkg.createCompilationUnit(
+                "CallerService.java",
+                CALLER_SRC, true, null);
 
         IPackageFragment brokenPkg =
                 srcRoot.createPackageFragment("test.broken", true, null);
