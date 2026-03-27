@@ -8,6 +8,7 @@
             <repository location="https://download.eclipse.org/eclipse/updates/4.39/"/>
             <unit id="org.eclipse.jdt.feature.group" version="0.0.0"/>
             <unit id="org.eclipse.platform.feature.group" version="0.0.0"/>
+            <unit id="com.google.gson" version="0.0.0"/>
         </location>
     </locations>
 </target>

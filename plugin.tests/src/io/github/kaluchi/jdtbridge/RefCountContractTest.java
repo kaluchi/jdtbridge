@@ -6,12 +6,15 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IType;
@@ -57,39 +60,57 @@ public class RefCountContractTest {
         return refs.keySet();
     }
 
-    static List<Map<String, Object>> parseRefs(String json) {
-        var parsed = Json.parse(json);
-        Object refsRaw = parsed.get("refs");
-        if (refsRaw == null) return List.of();
-        String refsStr = refsRaw.toString().trim();
-        if (!refsStr.startsWith("[")) return List.of();
-        var result = new ArrayList<Map<String, Object>>();
-        refsStr = refsStr.substring(1, refsStr.length() - 1);
-        int depth = 0;
-        int start = 0;
-        for (int i = 0; i < refsStr.length(); i++) {
-            char c = refsStr.charAt(i);
-            if (c == '{') depth++;
-            else if (c == '}') depth--;
-            if (depth == 0 && c == '}') {
-                String elem = refsStr.substring(start,
-                        i + 1).trim();
-                if (elem.startsWith(","))
-                    elem = elem.substring(1).trim();
-                if (elem.startsWith("{"))
-                    result.add(Json.parse(elem));
-                start = i + 1;
+    static JsonObject sourceJson(String typeFqn,
+            String methodName) throws Exception {
+        var handler = new SearchHandler();
+        String body = handler.handleSource(
+                Map.of("class", typeFqn,
+                        "method", methodName)).body();
+        return JsonParser.parseString(body).getAsJsonObject();
+    }
+
+    static JsonObject typeJson(String typeFqn) throws Exception {
+        var handler = new SearchHandler();
+        String body = handler.handleSource(
+                Map.of("class", typeFqn)).body();
+        return JsonParser.parseString(body).getAsJsonObject();
+    }
+
+    static JsonArray refs(JsonObject json) {
+        return json.has("refs") ? json.getAsJsonArray("refs")
+                : new JsonArray();
+    }
+
+    static JsonArray refsWithDirection(JsonObject json,
+            String direction) {
+        var result = new JsonArray();
+        for (JsonElement e : refs(json)) {
+            JsonObject ref = e.getAsJsonObject();
+            if (direction.equals(str(ref, "direction"))) {
+                result.add(ref);
             }
         }
         return result;
     }
 
-    static String sourceJson(String typeFqn, String methodName)
-            throws Exception {
-        var handler = new SearchHandler();
-        return handler.handleSource(
-                Map.of("class", typeFqn,
-                        "method", methodName)).body();
+    static JsonObject findRef(JsonArray refs, String fqmnPart) {
+        for (JsonElement e : refs) {
+            JsonObject ref = e.getAsJsonObject();
+            String fqmn = str(ref, "fqmn");
+            if (fqmn != null && fqmn.contains(fqmnPart)) {
+                return ref;
+            }
+        }
+        return null;
+    }
+
+    static String str(JsonObject obj, String key) {
+        return obj.has(key) && !obj.get(key).isJsonNull()
+                ? obj.get(key).getAsString() : null;
+    }
+
+    static boolean bool(JsonObject obj, String key) {
+        return obj.has(key) && obj.get(key).getAsBoolean();
     }
 
     // ============================================================
@@ -175,12 +196,11 @@ public class RefCountContractTest {
 
         @Test
         void fullJsonAllRefsHaveDirection() throws Exception {
-            String json = sourceJson(
+            var json = sourceJson(
                     "test.service.AnimalService", "process");
-            var refs = parseRefs(json);
-            for (var ref : refs) {
-                String dir = Json.getString(ref, "direction");
-                assertNotNull(dir,
+            for (JsonElement e : refs(json)) {
+                JsonObject ref = e.getAsJsonObject();
+                assertNotNull(str(ref, "direction"),
                         "Every ref must have direction: "
                         + ref);
             }
@@ -188,24 +208,17 @@ public class RefCountContractTest {
 
         @Test
         void incomingCallersFromCallerService() throws Exception {
-            // CallerService.callProcess() calls process()
-            String json = sourceJson(
+            var json = sourceJson(
                     "test.service.AnimalService", "process");
-            var refs = parseRefs(json);
-            var incoming = refs.stream()
-                    .filter(r -> "incoming".equals(
-                            Json.getString(r, "direction")))
-                    .toList();
-            assertFalse(incoming.isEmpty(),
-                    "CallerService calls process: " + refs);
-            var callerFqmns = incoming.stream()
-                    .map(r -> Json.getString(r, "fqmn"))
-                    .toList();
-            assertTrue(callerFqmns.stream()
-                    .anyMatch(f -> f.contains(
-                            "CallerService#callProcess")),
+            var incoming = refsWithDirection(json, "incoming");
+            assertTrue(incoming.size() > 0,
+                    "CallerService calls process");
+            var caller = findRef(incoming,
+                    "CallerService#callProcess");
+            assertNotNull(caller,
                     "CallerService#callProcess should call: "
-                    + callerFqmns);
+                    + incoming);
+            assertEquals("project", str(caller, "scope"));
         }
     }
 
@@ -364,42 +377,29 @@ public class RefCountContractTest {
 
         @Test
         void overrideTargetFqmnExact() throws Exception {
-            String json = sourceJson("test.model.Dog", "name");
-            var parsed = Json.parse(json);
-            Object otRaw = parsed.get("overrideTarget");
-            assertNotNull(otRaw, "Should have overrideTarget");
-            var ot = Json.parse(otRaw.toString());
-            assertEquals("method",
-                    Json.getString(ot, "kind"));
-            assertEquals("interface",
-                    Json.getString(ot, "typeKind"));
-            String fqmn = Json.getString(ot, "fqmn");
-            assertEquals("test.model.Animal#name()", fqmn);
+            var json = sourceJson("test.model.Dog", "name");
+            var ot = json.getAsJsonObject("overrideTarget");
+            assertNotNull(ot, "Should have overrideTarget");
+            assertEquals("method", str(ot, "kind"));
+            assertEquals("interface", str(ot, "typeKind"));
+            assertEquals("test.model.Animal#name()",
+                    str(ot, "fqmn"));
         }
     }
-
-    // ============================================================
-    // Parrot.speak() — override from abstract class
-    // ============================================================
 
     @Nested
     class ParrotSpeakOverride {
 
         @Test
         void overrideTargetFqmnExact() throws Exception {
-            String json = sourceJson(
+            var json = sourceJson(
                     "test.edge.Parrot", "speak");
-            var parsed = Json.parse(json);
-            Object otRaw = parsed.get("overrideTarget");
-            assertNotNull(otRaw, "Should have overrideTarget");
-            var ot = Json.parse(otRaw.toString());
-            assertEquals("method",
-                    Json.getString(ot, "kind"));
-            assertEquals("class",
-                    Json.getString(ot, "typeKind"));
-            String fqmn = Json.getString(ot, "fqmn");
+            var ot = json.getAsJsonObject("overrideTarget");
+            assertNotNull(ot, "Should have overrideTarget");
+            assertEquals("method", str(ot, "kind"));
+            assertEquals("class", str(ot, "typeKind"));
             assertEquals("test.edge.AbstractPet#speak()",
-                    fqmn);
+                    str(ot, "fqmn"));
         }
     }
 
@@ -412,111 +412,91 @@ public class RefCountContractTest {
 
         @Test
         void animalSubtypesExactCount() throws Exception {
-            var handler = new SearchHandler();
-            String json = handler.handleSource(
-                    Map.of("class", "test.model.Animal")).body();
-            var parsed = Json.parse(json);
-            String subsStr = parsed.get("subtypes").toString();
-            // Direct subtypes: Dog, Cat, AbstractPet
-            int count = countOccurrences(subsStr, "\"fqn\"");
-            assertEquals(3, count,
-                    "Animal has 3 direct subtypes: " + subsStr);
+            var json = typeJson("test.model.Animal");
+            var subs = json.getAsJsonArray("subtypes");
+            assertEquals(3, subs.size());
         }
 
         @Test
-        void dogSupertypesExactCount() throws Exception {
-            var handler = new SearchHandler();
-            String json = handler.handleSource(
-                    Map.of("class", "test.model.Dog")).body();
-            var parsed = Json.parse(json);
-            String supersStr =
-                    parsed.get("supertypes").toString();
-            // Dog implements Animal (1 supertype, Object filtered)
-            int count = countOccurrences(supersStr, "\"fqn\"");
-            assertEquals(1, count,
-                    "Dog has 1 supertype (Animal): "
-                    + supersStr);
+        void animalSubtypesFqns() throws Exception {
+            var json = typeJson("test.model.Animal");
+            var subs = json.getAsJsonArray("subtypes");
+            var fqns = StreamSupport.stream(
+                    subs.spliterator(), false)
+                    .map(e -> e.getAsJsonObject()
+                            .get("fqn").getAsString())
+                    .collect(Collectors.toSet());
+            assertEquals(Set.of("test.model.Dog",
+                    "test.model.Cat",
+                    "test.edge.AbstractPet"), fqns);
         }
 
         @Test
-        void parrotSupertypesExactCount() throws Exception {
-            var handler = new SearchHandler();
-            String json = handler.handleSource(
-                    Map.of("class", "test.edge.Parrot")).body();
-            var parsed = Json.parse(json);
-            String supersStr =
-                    parsed.get("supertypes").toString();
-            // Parrot extends AbstractPet (implements Animal)
-            // Direct: AbstractPet + Animal
-            int count = countOccurrences(supersStr, "\"fqn\"");
-            assertTrue(count >= 1,
-                    "Parrot has at least AbstractPet: "
-                    + supersStr);
+        void dogSupertypesExact() throws Exception {
+            var json = typeJson("test.model.Dog");
+            var supers = json.getAsJsonArray("supertypes");
+            assertEquals(1, supers.size());
+            assertEquals("test.model.Animal",
+                    supers.get(0).getAsJsonObject()
+                            .get("fqn").getAsString());
+            assertEquals("interface",
+                    supers.get(0).getAsJsonObject()
+                            .get("kind").getAsString());
+        }
+
+        @Test
+        void parrotSupertypes() throws Exception {
+            var json = typeJson("test.edge.Parrot");
+            var supers = json.getAsJsonArray("supertypes");
+            assertTrue(supers.size() >= 1);
+            var fqns = StreamSupport.stream(
+                    supers.spliterator(), false)
+                    .map(e -> e.getAsJsonObject()
+                            .get("fqn").getAsString())
+                    .collect(Collectors.toSet());
+            assertTrue(fqns.contains(
+                    "test.edge.AbstractPet"));
         }
 
         @Test
         void abstractPetSubtypesExact() throws Exception {
-            var handler = new SearchHandler();
-            String json = handler.handleSource(
-                    Map.of("class",
-                            "test.edge.AbstractPet")).body();
-            var parsed = Json.parse(json);
-            String subsStr = parsed.get("subtypes").toString();
-            // Direct subtype: Parrot only
-            assertTrue(subsStr.contains("Parrot"),
-                    "Parrot should be subtype: " + subsStr);
-            int count = countOccurrences(subsStr, "\"fqn\"");
-            assertEquals(1, count,
-                    "AbstractPet has 1 direct subtype: "
-                    + subsStr);
+            var json = typeJson("test.edge.AbstractPet");
+            var subs = json.getAsJsonArray("subtypes");
+            assertEquals(1, subs.size());
+            assertEquals("test.edge.Parrot",
+                    subs.get(0).getAsJsonObject()
+                            .get("fqn").getAsString());
         }
 
         @Test
         void catHasNoSubtypes() throws Exception {
-            var handler = new SearchHandler();
-            String json = handler.handleSource(
-                    Map.of("class", "test.model.Cat")).body();
-            var parsed = Json.parse(json);
-            assertEquals("[]",
-                    parsed.get("subtypes").toString().trim(),
-                    "Cat has no subtypes");
+            var json = typeJson("test.model.Cat");
+            assertEquals(0,
+                    json.getAsJsonArray("subtypes").size());
         }
 
         @Test
         void colorEnumHasNoSubtypes() throws Exception {
-            var handler = new SearchHandler();
-            String json = handler.handleSource(
-                    Map.of("class", "test.edge.Color")).body();
-            var parsed = Json.parse(json);
-            assertEquals("[]",
-                    parsed.get("subtypes").toString().trim(),
-                    "Color enum has no subtypes");
+            var json = typeJson("test.edge.Color");
+            assertEquals(0,
+                    json.getAsJsonArray("subtypes").size());
         }
 
         @Test
-        void innerClassHasEnclosingType() throws Exception {
-            var handler = new SearchHandler();
-            String json = handler.handleSource(
-                    Map.of("class",
-                            "test.edge.Outer.Inner")).body();
-            var parsed = Json.parse(json);
-            Object encRaw = parsed.get("enclosingType");
-            assertNotNull(encRaw, "Should have enclosingType");
-            var enc = Json.parse(encRaw.toString());
+        void innerClassEnclosingType() throws Exception {
+            var json = typeJson("test.edge.Outer.Inner");
+            var enc = json.getAsJsonObject("enclosingType");
+            assertNotNull(enc);
             assertEquals("test.edge.Outer",
-                    Json.getString(enc, "fqn"));
+                    enc.get("fqn").getAsString());
             assertEquals("class",
-                    Json.getString(enc, "kind"));
+                    enc.get("kind").getAsString());
         }
 
         @Test
-        void topLevelHasNoEnclosingType() throws Exception {
-            var handler = new SearchHandler();
-            String json = handler.handleSource(
-                    Map.of("class", "test.model.Dog")).body();
-            var parsed = Json.parse(json);
-            assertNull(parsed.get("enclosingType"),
-                    "Top-level should not have enclosingType");
+        void topLevelNoEnclosingType() throws Exception {
+            var json = typeJson("test.model.Dog");
+            assertFalse(json.has("enclosingType"));
         }
     }
 
@@ -597,96 +577,59 @@ public class RefCountContractTest {
         @Test
         void dogBarkHasIncomingFromCreateDog()
                 throws Exception {
-            String json = sourceJson(
-                    "test.model.Dog", "bark");
-            var refs = parseRefs(json);
-            var incoming = refs.stream()
-                    .filter(r -> "incoming".equals(
-                            Json.getString(r, "direction")))
-                    .toList();
-            assertFalse(incoming.isEmpty(),
+            var json = sourceJson("test.model.Dog", "bark");
+            var incoming = refsWithDirection(json, "incoming");
+            assertTrue(incoming.size() > 0,
                     "bark() should have incoming callers");
-            var callerFqmns = incoming.stream()
-                    .map(r -> Json.getString(r, "fqmn"))
-                    .collect(Collectors.toSet());
-            assertTrue(callerFqmns.stream()
-                    .anyMatch(f -> f.contains("createDog")),
-                    "AnimalService#createDog calls bark: "
-                    + callerFqmns);
+            assertNotNull(findRef(incoming, "createDog"),
+                    "AnimalService#createDog calls bark");
         }
 
         @Test
         void incomingRefHasProjectScope() throws Exception {
-            String json = sourceJson(
-                    "test.model.Dog", "bark");
-            var refs = parseRefs(json);
-            var incoming = refs.stream()
-                    .filter(r -> "incoming".equals(
-                            Json.getString(r, "direction")))
-                    .toList();
-            for (var ref : incoming) {
+            var json = sourceJson("test.model.Dog", "bark");
+            for (JsonElement e
+                    : refsWithDirection(json, "incoming")) {
                 assertEquals("project",
-                        Json.getString(ref, "scope"),
-                        "Incoming from fixture is project: "
-                        + ref);
+                        str(e.getAsJsonObject(), "scope"));
             }
         }
 
         @Test
         void incomingRefFqmnUsesHashSeparator()
                 throws Exception {
-            String json = sourceJson(
-                    "test.model.Dog", "bark");
-            var refs = parseRefs(json);
-            var incoming = refs.stream()
-                    .filter(r -> "incoming".equals(
-                            Json.getString(r, "direction")))
-                    .toList();
-            for (var ref : incoming) {
-                String fqmn = Json.getString(ref, "fqmn");
-                // Method FQMNs should use # between type and
-                // method: pkg.Type#method(), not pkg.Type.method()
+            var json = sourceJson("test.model.Dog", "bark");
+            for (JsonElement e
+                    : refsWithDirection(json, "incoming")) {
+                String fqmn = str(e.getAsJsonObject(), "fqmn");
                 assertTrue(fqmn.contains("#"),
-                        "FQMN should use # separator: "
-                        + fqmn);
+                        "FQMN should use #: " + fqmn);
             }
         }
 
         @Test
         void incomingRefHasFile() throws Exception {
-            String json = sourceJson(
-                    "test.model.Dog", "bark");
-            var refs = parseRefs(json);
-            var incoming = refs.stream()
-                    .filter(r -> "incoming".equals(
-                            Json.getString(r, "direction")))
-                    .toList();
-            for (var ref : incoming) {
-                assertNotNull(Json.getString(ref, "file"),
-                        "Incoming should have file: " + ref);
+            var json = sourceJson("test.model.Dog", "bark");
+            for (JsonElement e
+                    : refsWithDirection(json, "incoming")) {
+                assertNotNull(
+                        str(e.getAsJsonObject(), "file"),
+                        "Incoming should have file");
             }
         }
 
         @Test
         void incomingRefsDeduped() throws Exception {
-            String json = sourceJson(
-                    "test.model.Dog", "bark");
-            var refs = parseRefs(json);
-            var incomingFqmns = refs.stream()
-                    .filter(r -> "incoming".equals(
-                            Json.getString(r, "direction")))
-                    .map(r -> Json.getString(r, "fqmn"))
+            var json = sourceJson("test.model.Dog", "bark");
+            var fqmns = StreamSupport.stream(
+                    refsWithDirection(json, "incoming")
+                            .spliterator(), false)
+                    .map(e -> str(e.getAsJsonObject(), "fqmn"))
                     .toList();
-            assertEquals(incomingFqmns.size(),
-                    Set.copyOf(incomingFqmns).size(),
-                    "Incoming refs should be deduped: "
-                    + incomingFqmns);
+            assertEquals(fqmns.size(),
+                    Set.copyOf(fqmns).size());
         }
     }
-
-    // ============================================================
-    // Source JSON structure contracts
-    // ============================================================
 
     @Nested
     class JsonStructureContracts {
@@ -694,82 +637,50 @@ public class RefCountContractTest {
         @Test
         void methodSourceHasAllTopLevelFields()
                 throws Exception {
-            String json = sourceJson(
+            var json = sourceJson(
                     "test.service.AnimalService", "process");
-            var parsed = Json.parse(json);
-            assertNotNull(Json.getString(parsed, "fqmn"));
-            assertNotNull(Json.getString(parsed, "file"));
-            assertTrue(
-                    Json.getInt(parsed, "startLine", -1) > 0);
-            assertTrue(
-                    Json.getInt(parsed, "endLine", -1) > 0);
-            assertNotNull(Json.getString(parsed, "source"));
-            assertNotNull(parsed.get("refs"));
+            assertNotNull(str(json, "fqmn"));
+            assertNotNull(str(json, "file"));
+            assertTrue(json.get("startLine").getAsInt() > 0);
+            assertTrue(json.get("endLine").getAsInt() > 0);
+            assertNotNull(str(json, "source"));
+            assertTrue(json.has("refs"));
         }
 
         @Test
         void typeLevelHasNoRefsField() throws Exception {
-            var handler = new SearchHandler();
-            String json = handler.handleSource(
-                    Map.of("class", "test.model.Dog")).body();
-            var parsed = Json.parse(json);
-            assertNull(parsed.get("refs"),
-                    "Type-level: no refs");
-            assertNotNull(parsed.get("supertypes"),
-                    "Type-level: has supertypes");
-            assertNotNull(parsed.get("subtypes"),
-                    "Type-level: has subtypes");
+            var json = typeJson("test.model.Dog");
+            assertFalse(json.has("refs"));
+            assertTrue(json.has("supertypes"));
+            assertTrue(json.has("subtypes"));
         }
 
         @Test
-        void overrideMethodHasOverrideTarget() throws Exception {
-            String json = sourceJson(
-                    "test.model.Dog", "name");
-            var parsed = Json.parse(json);
-            assertNotNull(parsed.get("overrideTarget"),
-                    "Override method should have target");
-        }
-
-        @Test
-        void nonOverrideMethodHasNoOverrideTarget()
+        void overrideMethodHasOverrideTarget()
                 throws Exception {
-            String json = sourceJson(
-                    "test.model.Dog", "bark");
-            var parsed = Json.parse(json);
-            assertNull(parsed.get("overrideTarget"),
-                    "Non-override should not have target");
+            var json = sourceJson("test.model.Dog", "name");
+            assertTrue(json.has("overrideTarget"));
+        }
+
+        @Test
+        void nonOverrideMethodHasNoTarget() throws Exception {
+            var json = sourceJson("test.model.Dog", "bark");
+            assertFalse(json.has("overrideTarget"));
         }
 
         @Test
         void everyOutgoingRefHasRequiredFields()
                 throws Exception {
-            String json = sourceJson(
+            var json = sourceJson(
                     "test.service.AnimalService", "process");
-            var refs = parseRefs(json);
-            for (var ref : refs) {
-                String dir = Json.getString(ref, "direction");
-                if (!"outgoing".equals(dir)) continue;
-                assertNotNull(Json.getString(ref, "fqmn"),
-                        "fqmn required: " + ref);
-                assertNotNull(Json.getString(ref, "kind"),
-                        "kind required: " + ref);
-                assertNotNull(Json.getString(ref, "direction"),
-                        "direction required: " + ref);
-                assertNotNull(Json.getString(ref, "scope"),
-                        "scope required: " + ref);
+            for (JsonElement e
+                    : refsWithDirection(json, "outgoing")) {
+                JsonObject ref = e.getAsJsonObject();
+                assertNotNull(str(ref, "fqmn"));
+                assertNotNull(str(ref, "kind"));
+                assertNotNull(str(ref, "direction"));
+                assertNotNull(str(ref, "scope"));
             }
         }
-    }
-
-    // ---- Utilities ----
-
-    private static int countOccurrences(String s, String sub) {
-        int count = 0;
-        int idx = 0;
-        while ((idx = s.indexOf(sub, idx)) != -1) {
-            count++;
-            idx += sub.length();
-        }
-        return count;
     }
 }
