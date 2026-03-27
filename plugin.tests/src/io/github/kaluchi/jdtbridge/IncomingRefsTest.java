@@ -3,14 +3,17 @@ package io.github.kaluchi.jdtbridge;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -18,11 +21,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
-/**
- * Tests for incoming refs (callers) collected by
- * SearchHandler and emitted in SourceReport JSON
- * with direction:"incoming".
- */
 @EnabledIfSystemProperty(
         named = "jdtbridge.integration-tests",
         matches = "true")
@@ -36,57 +34,33 @@ public class IncomingRefsTest {
         TestFixture.destroy();
     }
 
-    private static String sourceBody(String fqn, String method)
+    static JsonObject source(String fqn, String method)
             throws Exception {
         var handler = new SearchHandler();
         var params = method != null
                 ? Map.of("class", fqn, "method", method)
                 : Map.of("class", fqn);
-        return handler.handleSource(params).body();
+        return JsonParser.parseString(
+                handler.handleSource(params).body())
+                .getAsJsonObject();
     }
 
-    private static List<Map<String, Object>> parseRefs(
-            String json) {
-        var parsed = Json.parse(json);
-        Object refsRaw = parsed.get("refs");
-        if (refsRaw == null) return List.of();
-        String refsStr = refsRaw.toString().trim();
-        if (!refsStr.startsWith("[")) return List.of();
-        var result = new ArrayList<Map<String, Object>>();
-        refsStr = refsStr.substring(1, refsStr.length() - 1);
-        int depth = 0;
-        int start = 0;
-        for (int i = 0; i < refsStr.length(); i++) {
-            char c = refsStr.charAt(i);
-            if (c == '{') depth++;
-            else if (c == '}') depth--;
-            if (depth == 0 && c == '}') {
-                String elem = refsStr.substring(start,
-                        i + 1).trim();
-                if (elem.startsWith(","))
-                    elem = elem.substring(1).trim();
-                if (elem.startsWith("{"))
-                    result.add(Json.parse(elem));
-                start = i + 1;
+    static JsonArray refsDir(JsonObject json, String dir) {
+        var result = new JsonArray();
+        if (!json.has("refs")) return result;
+        for (JsonElement e : json.getAsJsonArray("refs")) {
+            var ref = e.getAsJsonObject();
+            if (ref.has("direction") && dir.equals(
+                    ref.get("direction").getAsString())) {
+                result.add(ref);
             }
         }
         return result;
     }
 
-    private static List<Map<String, Object>> incoming(
-            String json) {
-        return parseRefs(json).stream()
-                .filter(r -> "incoming".equals(
-                        Json.getString(r, "direction")))
-                .toList();
-    }
-
-    private static List<Map<String, Object>> outgoing(
-            String json) {
-        return parseRefs(json).stream()
-                .filter(r -> "outgoing".equals(
-                        Json.getString(r, "direction")))
-                .toList();
+    static String str(JsonObject obj, String key) {
+        return obj.has(key) && !obj.get(key).isJsonNull()
+                ? obj.get(key).getAsString() : null;
     }
 
     @Nested
@@ -94,82 +68,76 @@ public class IncomingRefsTest {
 
         @Test
         void barkHasIncomingCallers() throws Exception {
-            String json = sourceBody("test.model.Dog", "bark");
-            var inc = incoming(json);
-            assertFalse(inc.isEmpty(),
-                    "bark() should have incoming callers");
+            var json = source("test.model.Dog", "bark");
+            assertTrue(refsDir(json, "incoming").size() > 0);
         }
 
         @Test
         void barkCalledByCreateDog() throws Exception {
-            String json = sourceBody("test.model.Dog", "bark");
-            var inc = incoming(json);
-            var fqmns = inc.stream()
-                    .map(r -> Json.getString(r, "fqmn"))
+            var json = source("test.model.Dog", "bark");
+            var inc = refsDir(json, "incoming");
+            var fqmns = StreamSupport.stream(
+                    inc.spliterator(), false)
+                    .map(e -> str(e.getAsJsonObject(), "fqmn"))
                     .collect(Collectors.toSet());
             assertTrue(fqmns.stream()
                     .anyMatch(f -> f.contains(
-                            "AnimalService#createDog")),
-                    "createDog calls bark: " + fqmns);
+                            "AnimalService#createDog")));
         }
 
         @Test
         void barkIncomingHasProjectScope() throws Exception {
-            String json = sourceBody("test.model.Dog", "bark");
-            for (var ref : incoming(json)) {
+            var json = source("test.model.Dog", "bark");
+            for (JsonElement e : refsDir(json, "incoming")) {
                 assertEquals("project",
-                        Json.getString(ref, "scope"),
-                        "Fixture callers are project: " + ref);
+                        str(e.getAsJsonObject(), "scope"));
             }
         }
 
         @Test
         void barkIncomingHasFile() throws Exception {
-            String json = sourceBody("test.model.Dog", "bark");
-            for (var ref : incoming(json)) {
-                assertNotNull(Json.getString(ref, "file"),
-                        "Incoming should have file: " + ref);
+            var json = source("test.model.Dog", "bark");
+            for (JsonElement e : refsDir(json, "incoming")) {
+                assertNotNull(
+                        str(e.getAsJsonObject(), "file"));
             }
         }
 
         @Test
         void barkIncomingHasLine() throws Exception {
-            String json = sourceBody("test.model.Dog", "bark");
-            for (var ref : incoming(json)) {
-                assertTrue(
-                        Json.getInt(ref, "line", -1) > 0,
-                        "Incoming should have line: " + ref);
+            var json = source("test.model.Dog", "bark");
+            for (JsonElement e : refsDir(json, "incoming")) {
+                assertTrue(e.getAsJsonObject()
+                        .get("line").getAsInt() > 0);
             }
         }
 
         @Test
         void barkIncomingFqmnUsesHash() throws Exception {
-            String json = sourceBody("test.model.Dog", "bark");
-            for (var ref : incoming(json)) {
-                String fqmn = Json.getString(ref, "fqmn");
-                assertTrue(fqmn.contains("#"),
-                        "FQMN should use #: " + fqmn);
+            var json = source("test.model.Dog", "bark");
+            for (JsonElement e : refsDir(json, "incoming")) {
+                String fqmn = str(e.getAsJsonObject(), "fqmn");
+                assertTrue(fqmn.contains("#"));
             }
         }
 
         @Test
         void barkIncomingDeduped() throws Exception {
-            String json = sourceBody("test.model.Dog", "bark");
-            var fqmns = incoming(json).stream()
-                    .map(r -> Json.getString(r, "fqmn"))
+            var json = source("test.model.Dog", "bark");
+            var fqmns = StreamSupport.stream(
+                    refsDir(json, "incoming").spliterator(),
+                    false)
+                    .map(e -> str(e.getAsJsonObject(), "fqmn"))
                     .toList();
             assertEquals(fqmns.size(),
-                    Set.copyOf(fqmns).size(),
-                    "Incoming should be deduped: " + fqmns);
+                    Set.copyOf(fqmns).size());
         }
 
         @Test
         void barkHasNoOutgoing() throws Exception {
-            // bark() body: System.out.println — all java.* filtered
-            String json = sourceBody("test.model.Dog", "bark");
-            var out = outgoing(json);
-            assertTrue(out.isEmpty(),
-                    "bark() has no non-JDK outgoing: " + out);
+            var json = source("test.model.Dog", "bark");
+            assertEquals(0,
+                    refsDir(json, "outgoing").size());
         }
     }
 
@@ -178,39 +146,35 @@ public class IncomingRefsTest {
 
         @Test
         void processHasIncomingFromCaller() throws Exception {
-            String json = sourceBody(
+            var json = source(
                     "test.service.AnimalService", "process");
-            var inc = incoming(json);
-            var fqmns = inc.stream()
-                    .map(r -> Json.getString(r, "fqmn"))
+            var inc = refsDir(json, "incoming");
+            var fqmns = StreamSupport.stream(
+                    inc.spliterator(), false)
+                    .map(e -> str(e.getAsJsonObject(), "fqmn"))
                     .collect(Collectors.toSet());
             assertTrue(fqmns.stream()
                     .anyMatch(f -> f.contains(
-                            "CallerService#callProcess")),
-                    "CallerService calls process: " + fqmns);
+                            "CallerService#callProcess")));
         }
 
         @Test
         void processHasBothDirections() throws Exception {
-            String json = sourceBody(
+            var json = source(
                     "test.service.AnimalService", "process");
-            assertFalse(outgoing(json).isEmpty(),
-                    "Should have outgoing");
-            assertFalse(incoming(json).isEmpty(),
-                    "Should have incoming");
+            assertTrue(refsDir(json, "outgoing").size() > 0);
+            assertTrue(refsDir(json, "incoming").size() > 0);
         }
 
         @Test
         void everyRefHasDirection() throws Exception {
-            String json = sourceBody(
+            var json = source(
                     "test.service.AnimalService", "process");
-            for (var ref : parseRefs(json)) {
-                String dir = Json.getString(ref, "direction");
-                assertTrue(
-                        "outgoing".equals(dir)
-                                || "incoming".equals(dir),
-                        "Direction must be outgoing/incoming: "
-                        + ref);
+            for (JsonElement e : json.getAsJsonArray("refs")) {
+                var ref = e.getAsJsonObject();
+                String dir = str(ref, "direction");
+                assertTrue("outgoing".equals(dir)
+                        || "incoming".equals(dir));
             }
         }
     }
@@ -220,12 +184,9 @@ public class IncomingRefsTest {
 
         @Test
         void classLevelHasNoRefs() throws Exception {
-            String json = sourceBody("test.model.Dog", null);
-            var parsed = Json.parse(json);
-            assertNull(parsed.get("refs"),
-                    "Type-level should not have refs");
-            assertNotNull(parsed.get("supertypes"),
-                    "Type-level should have hierarchy");
+            var json = source("test.model.Dog", null);
+            assertFalse(json.has("refs"));
+            assertTrue(json.has("supertypes"));
         }
     }
 
@@ -234,13 +195,11 @@ public class IncomingRefsTest {
 
         @Test
         void getColorHasNoIncoming() throws Exception {
-            String json = sourceBody(
+            var json = source(
                     "test.service.EnrichedRefService",
                     "getColor");
-            var inc = incoming(json);
-            assertTrue(inc.isEmpty(),
-                    "getColor not called by anyone in fixture: "
-                    + inc);
+            assertEquals(0,
+                    refsDir(json, "incoming").size());
         }
     }
 }

@@ -3,10 +3,10 @@ package io.github.kaluchi.jdtbridge;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.Map;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IType;
@@ -16,11 +16,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
-/**
- * Tests for @Override target resolution in SourceReport.
- * Verifies that overrideTarget FQMN appears in JSON when
- * a method has @Override annotation.
- */
 @EnabledIfSystemProperty(
         named = "jdtbridge.integration-tests",
         matches = "true")
@@ -34,69 +29,69 @@ public class OverrideTargetTest {
         TestFixture.destroy();
     }
 
-    private String sourceJson(String typeFqn, String methodName)
-            throws Exception {
+    private JsonObject sourceJson(String typeFqn,
+            String methodName) throws Exception {
         IType type = JdtUtils.findType(typeFqn);
-        assertNotNull(type, typeFqn + " not found");
+        assertNotNull(type);
         IMethod method = JdtUtils.findMethod(
                 type, methodName, null);
-        assertNotNull(method,
-                methodName + " not found in " + typeFqn);
+        assertNotNull(method);
         var refs = ReferenceCollector.collect(method);
-        return SourceReport.toJson(
+        String json = SourceReport.toJson(
                 typeFqn + "#" + methodName,
                 method, "D:/t.java",
                 method.getSource(), 1, 10, refs, null);
+        return JsonParser.parseString(json).getAsJsonObject();
     }
 
     @Nested
     class OverrideFromInterface {
 
         @Test
-        void dogNameOverridesAnimalName() throws Exception {
-            String json = sourceJson("test.model.Dog", "name");
-            assertTrue(json.contains("\"overrideTarget\""),
-                    "Dog#name should have overrideTarget: "
-                    + json);
-            assertTrue(json.contains("Animal#name"),
-                    "overrideTarget should point to Animal: "
-                    + json);
+        void dogNameOverridesAnimal() throws Exception {
+            var json = sourceJson("test.model.Dog", "name");
+            var ot = json.getAsJsonObject("overrideTarget");
+            assertNotNull(ot);
+            assertEquals("test.model.Animal#name()",
+                    ot.get("fqmn").getAsString());
         }
 
         @Test
-        void catNameOverridesAnimalName() throws Exception {
-            String json = sourceJson("test.model.Cat", "name");
-            assertTrue(json.contains("\"overrideTarget\""),
-                    "Cat#name should have overrideTarget: "
-                    + json);
-            assertTrue(json.contains("Animal#name"),
-                    "Should override Animal#name: " + json);
+        void catNameOverridesAnimal() throws Exception {
+            var json = sourceJson("test.model.Cat", "name");
+            var ot = json.getAsJsonObject("overrideTarget");
+            assertNotNull(ot);
+            assertEquals("test.model.Animal#name()",
+                    ot.get("fqmn").getAsString());
         }
 
         @Test
-        void overrideTargetIsStructuredRef()
+        void overrideTargetKindIsMethod() throws Exception {
+            var json = sourceJson("test.model.Dog", "name");
+            var ot = json.getAsJsonObject("overrideTarget");
+            assertEquals("method",
+                    ot.get("kind").getAsString());
+        }
+
+        @Test
+        void overrideTargetTypeKindIsInterface()
                 throws Exception {
-            String json = sourceJson("test.model.Dog", "name");
-            // overrideTarget is {fqmn, kind, typeKind}
-            assertTrue(json.contains("\"kind\":\"method\""),
-                    "overrideTarget kind should be method: "
-                    + json);
-            assertTrue(json.contains(
-                    "\"typeKind\":\"interface\""),
-                    "declaring type should be interface: "
-                    + json);
+            var json = sourceJson("test.model.Dog", "name");
+            var ot = json.getAsJsonObject("overrideTarget");
+            assertEquals("interface",
+                    ot.get("typeKind").getAsString());
         }
 
         @Test
-        void abstractPetNameOverridesAnimalName()
-                throws Exception {
-            String json = sourceJson(
+        void abstractPetNameOverridesAnimal() throws Exception {
+            var json = sourceJson(
                     "test.edge.AbstractPet", "name");
-            assertTrue(json.contains("\"overrideTarget\""),
-                    "AbstractPet#name should override: "
-                    + json);
-            assertTrue(json.contains("Animal#name"),
-                    "Should override Animal#name: " + json);
+            var ot = json.getAsJsonObject("overrideTarget");
+            assertNotNull(ot);
+            assertEquals("test.model.Animal#name()",
+                    ot.get("fqmn").getAsString());
+            assertEquals("interface",
+                    ot.get("typeKind").getAsString());
         }
     }
 
@@ -104,27 +99,21 @@ public class OverrideTargetTest {
     class OverrideFromAbstractClass {
 
         @Test
-        void parrotSpeakOverridesAbstractPetSpeak()
-                throws Exception {
-            String json = sourceJson(
-                    "test.edge.Parrot", "speak");
-            assertTrue(json.contains("\"overrideTarget\""),
-                    "Parrot#speak should override: " + json);
-            assertTrue(json.contains("AbstractPet#speak"),
-                    "Should override AbstractPet#speak: "
-                    + json);
+        void parrotSpeakOverridesAbstractPet() throws Exception {
+            var json = sourceJson("test.edge.Parrot", "speak");
+            var ot = json.getAsJsonObject("overrideTarget");
+            assertNotNull(ot);
+            assertEquals("test.edge.AbstractPet#speak()",
+                    ot.get("fqmn").getAsString());
         }
 
         @Test
-        void overrideTargetContainsClassTypeKind()
+        void parrotSpeakTargetTypeKindIsClass()
                 throws Exception {
-            String json = sourceJson(
-                    "test.edge.Parrot", "speak");
-            // AbstractPet is a class
-            assertTrue(json.contains(
-                    "\"typeKind\":\"class\""),
-                    "overrideTarget typeKind should be class: "
-                    + json);
+            var json = sourceJson("test.edge.Parrot", "speak");
+            var ot = json.getAsJsonObject("overrideTarget");
+            assertEquals("class",
+                    ot.get("typeKind").getAsString());
         }
     }
 
@@ -132,120 +121,95 @@ public class OverrideTargetTest {
     class NoOverride {
 
         @Test
-        void nonOverrideMethodHasNoTarget() throws Exception {
-            String json = sourceJson("test.model.Dog", "bark");
-            var parsed = Json.parse(json);
-            assertNull(parsed.get("overrideTarget"),
-                    "bark() is not @Override");
+        void barkHasNoTarget() throws Exception {
+            var json = sourceJson("test.model.Dog", "bark");
+            assertFalse(json.has("overrideTarget"));
         }
 
         @Test
         void staticMethodHasNoTarget() throws Exception {
-            String json = sourceJson(
+            var json = sourceJson(
                     "test.service.EnrichedRefService",
                     "getSharedDog");
-            var parsed = Json.parse(json);
-            assertNull(parsed.get("overrideTarget"),
-                    "static method has no override");
+            assertFalse(json.has("overrideTarget"));
         }
 
         @Test
-        void serviceProcessHasNoTarget() throws Exception {
-            String json = sourceJson(
+        void processHasNoTarget() throws Exception {
+            var json = sourceJson(
                     "test.service.AnimalService", "process");
-            var parsed = Json.parse(json);
-            assertNull(parsed.get("overrideTarget"),
-                    "process() is not @Override");
+            assertFalse(json.has("overrideTarget"));
         }
     }
 
     @Nested
-    class OverrideTargetParsed {
+    class ParsedOverrideTarget {
 
         @Test
-        void dogNameTargetFqmnExact() throws Exception {
-            String json = sourceJson("test.model.Dog", "name");
-            var parsed = Json.parse(json);
-            var ot = Json.parse(
-                    parsed.get("overrideTarget").toString());
+        void dogNameFqmnExact() throws Exception {
+            var ot = sourceJson("test.model.Dog", "name")
+                    .getAsJsonObject("overrideTarget");
             assertEquals("test.model.Animal#name()",
-                    Json.getString(ot, "fqmn"));
+                    ot.get("fqmn").getAsString());
         }
 
         @Test
-        void dogNameTargetKindIsMethod() throws Exception {
-            String json = sourceJson("test.model.Dog", "name");
-            var parsed = Json.parse(json);
-            var ot = Json.parse(
-                    parsed.get("overrideTarget").toString());
+        void dogNameKindIsMethod() throws Exception {
+            var ot = sourceJson("test.model.Dog", "name")
+                    .getAsJsonObject("overrideTarget");
             assertEquals("method",
-                    Json.getString(ot, "kind"));
+                    ot.get("kind").getAsString());
         }
 
         @Test
-        void dogNameTargetTypeKindIsInterface()
-                throws Exception {
-            String json = sourceJson("test.model.Dog", "name");
-            var parsed = Json.parse(json);
-            var ot = Json.parse(
-                    parsed.get("overrideTarget").toString());
+        void dogNameTypeKindIsInterface() throws Exception {
+            var ot = sourceJson("test.model.Dog", "name")
+                    .getAsJsonObject("overrideTarget");
             assertEquals("interface",
-                    Json.getString(ot, "typeKind"));
+                    ot.get("typeKind").getAsString());
         }
 
         @Test
-        void parrotSpeakTargetFqmnExact() throws Exception {
-            String json = sourceJson(
-                    "test.edge.Parrot", "speak");
-            var parsed = Json.parse(json);
-            var ot = Json.parse(
-                    parsed.get("overrideTarget").toString());
+        void parrotSpeakFqmnExact() throws Exception {
+            var ot = sourceJson("test.edge.Parrot", "speak")
+                    .getAsJsonObject("overrideTarget");
             assertEquals("test.edge.AbstractPet#speak()",
-                    Json.getString(ot, "fqmn"));
+                    ot.get("fqmn").getAsString());
         }
 
         @Test
-        void parrotSpeakTargetTypeKindIsClass()
-                throws Exception {
-            String json = sourceJson(
-                    "test.edge.Parrot", "speak");
-            var parsed = Json.parse(json);
-            var ot = Json.parse(
-                    parsed.get("overrideTarget").toString());
+        void parrotSpeakTypeKindIsClass() throws Exception {
+            var ot = sourceJson("test.edge.Parrot", "speak")
+                    .getAsJsonObject("overrideTarget");
             assertEquals("class",
-                    Json.getString(ot, "typeKind"));
+                    ot.get("typeKind").getAsString());
         }
 
         @Test
-        void catNameTargetFqmnExact() throws Exception {
-            String json = sourceJson("test.model.Cat", "name");
-            var parsed = Json.parse(json);
-            var ot = Json.parse(
-                    parsed.get("overrideTarget").toString());
+        void catNameFqmnExact() throws Exception {
+            var ot = sourceJson("test.model.Cat", "name")
+                    .getAsJsonObject("overrideTarget");
             assertEquals("test.model.Animal#name()",
-                    Json.getString(ot, "fqmn"));
+                    ot.get("fqmn").getAsString());
         }
 
         @Test
-        void abstractPetNameTargetFqmnExact() throws Exception {
-            String json = sourceJson(
-                    "test.edge.AbstractPet", "name");
-            var parsed = Json.parse(json);
-            var ot = Json.parse(
-                    parsed.get("overrideTarget").toString());
+        void abstractPetNameFqmnExact() throws Exception {
+            var ot = sourceJson(
+                    "test.edge.AbstractPet", "name")
+                    .getAsJsonObject("overrideTarget");
             assertEquals("test.model.Animal#name()",
-                    Json.getString(ot, "fqmn"));
+                    ot.get("fqmn").getAsString());
         }
 
         @Test
-        void abstractPetNameTargetTypeKind() throws Exception {
-            String json = sourceJson(
-                    "test.edge.AbstractPet", "name");
-            var parsed = Json.parse(json);
-            var ot = Json.parse(
-                    parsed.get("overrideTarget").toString());
+        void abstractPetNameTypeKindIsInterface()
+                throws Exception {
+            var ot = sourceJson(
+                    "test.edge.AbstractPet", "name")
+                    .getAsJsonObject("overrideTarget");
             assertEquals("interface",
-                    Json.getString(ot, "typeKind"));
+                    ot.get("typeKind").getAsString());
         }
     }
 }

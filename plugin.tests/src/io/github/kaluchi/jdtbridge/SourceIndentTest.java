@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import com.google.gson.JsonParser;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
@@ -95,8 +97,9 @@ public class SourceIndentTest {
         HttpServer.Response resp = handler.handleSource(
                 Map.of("class", "test.model.Dog",
                         "method", "bark"));
-        var parsed = Json.parse(resp.body());
-        String source = Json.getString(parsed, "source");
+        var parsed = JsonParser.parseString(resp.body())
+                .getAsJsonObject();
+        String source = parsed.get("source").getAsString();
         assertNotNull(source);
         assertFalse(source.startsWith("public"),
                 "Must NOT start with 'public' (stripped)");
@@ -129,8 +132,9 @@ public class SourceIndentTest {
     void classSourceStartsAtColumnZero() throws Exception {
         HttpServer.Response resp = handler.handleSource(
                 Map.of("class", "test.model.Dog"));
-        var parsed = Json.parse(resp.body());
-        String source = Json.getString(parsed, "source");
+        var parsed = JsonParser.parseString(resp.body())
+                .getAsJsonObject();
+        String source = parsed.get("source").getAsString();
         assertNotNull(source);
         // Top-level class starts at column 0 — no indent expected
         assertTrue(source.startsWith("package")
@@ -147,8 +151,9 @@ public class SourceIndentTest {
         HttpServer.Response resp = handler.handleSource(
                 Map.of("class", "test.model.Dog",
                         "method", "bark"));
-        var parsed = Json.parse(resp.body());
-        String source = Json.getString(parsed, "source");
+        var parsed = JsonParser.parseString(resp.body())
+                .getAsJsonObject();
+        String source = parsed.get("source").getAsString();
         assertTrue(source.contains("Woof!"),
                 "Should contain method body");
         assertTrue(source.contains("}"),
@@ -160,12 +165,11 @@ public class SourceIndentTest {
         HttpServer.Response resp = handler.handleSource(
                 Map.of("class", "test.model.Dog",
                         "method", "bark"));
-        var parsed = Json.parse(resp.body());
-        String source = Json.getString(parsed, "source");
-        int startLine = ((Number) parsed.get("startLine"))
-                .intValue();
-        int endLine = ((Number) parsed.get("endLine"))
-                .intValue();
+        var parsed = JsonParser.parseString(resp.body())
+                .getAsJsonObject();
+        String source = parsed.get("source").getAsString();
+        int startLine = parsed.get("startLine").getAsInt();
+        int endLine = parsed.get("endLine").getAsInt();
         // Line count in source should match range
         long lineCount = source.chars()
                 .filter(c -> c == '\n').count();
@@ -295,8 +299,9 @@ public class SourceIndentTest {
                 Map.of("class",
                         "org.eclipse.core.resources.IResource",
                         "method", "getLocation"));
-        var parsed = Json.parse(resp.body());
-        String source = Json.getString(parsed, "source");
+        var parsed = JsonParser.parseString(resp.body())
+                .getAsJsonObject();
+        String source = parsed.get("source").getAsString();
         assertNotNull(source, "Should have source");
         assertTrue(source.startsWith("\t"),
                 "Binary method must have tab indent: ["

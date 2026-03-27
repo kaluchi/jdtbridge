@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.gson.JsonParser;
+
 import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IType;
 import org.junit.jupiter.api.AfterAll;
@@ -129,13 +131,12 @@ public class SourceReportTest {
                     "test.model.Dog", type,
                     "D:/test/Dog.java",
                     type.getSource(), 1, 20, refs, null);
-            var parsed = Json.parse(json);
+            var parsed = JsonParser.parseString(json)
+                    .getAsJsonObject();
             assertEquals("test.model.Dog",
-                    Json.getString(parsed, "fqmn"));
-            assertNotNull(parsed.get("supertypes"),
-                    "Should have supertypes");
-            assertNull(parsed.get("refs"),
-                    "Type-level should not have refs");
+                    parsed.get("fqmn").getAsString());
+            assertTrue(parsed.has("supertypes"));
+            assertFalse(parsed.has("refs"));
         }
 
         @Test
@@ -150,13 +151,12 @@ public class SourceReportTest {
                     "test.service.AnimalService#process(Animal)",
                     method, "D:/test/AnimalService.java",
                     method.getSource(), 1, 10, refs, null);
-            var parsed = Json.parse(json);
+            var parsed = JsonParser.parseString(json)
+                    .getAsJsonObject();
             assertEquals(
                     "test.service.AnimalService#process(Animal)",
-                    Json.getString(parsed, "fqmn"));
-            // Refs should exist and have direction
-            assertNotNull(parsed.get("refs"),
-                    "Method should have refs");
+                    parsed.get("fqmn").getAsString());
+            assertTrue(parsed.has("refs"));
             assertTrue(json.contains(
                     "\"direction\":\"outgoing\""),
                     "Refs should have outgoing direction: "
