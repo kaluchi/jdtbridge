@@ -1,12 +1,16 @@
 package io.github.kaluchi.jdtbridge;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IMember;
+import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.ISourceRange;
 import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.core.ITypeHierarchy;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTParser;
@@ -44,7 +48,8 @@ class ReferenceCollector {
             boolean isTypeVariable,
             String typeBound,
             boolean isInherited,
-            String inheritedFrom) {}
+            String inheritedFrom,
+            String implementationOf) {}
 
     enum RefKind { FIELD, METHOD, TYPE, CONSTANT }
 
@@ -101,6 +106,82 @@ class ReferenceCollector {
         });
 
         return refs;
+    }
+
+    /**
+     * For each outgoing interface method call, resolve workspace +
+     * classpath implementations and add them as refs with
+     * implementationOf linking back to the interface method.
+     */
+    static void resolveImplementations(
+            Map<String, Ref> refs) {
+        List<Ref> implRefs = new ArrayList<>();
+        for (Ref ref : refs.values()) {
+            if (ref.kind() != RefKind.METHOD) continue;
+            if (!"interface".equals(ref.declaringTypeKind()))
+                continue;
+            if (ref.element() == null) continue;
+
+            try {
+                IMethod ifaceMethod = (IMethod) ref.element();
+                IType ifaceType = ifaceMethod.getDeclaringType();
+                if (ifaceType == null) continue;
+
+                int arity = ifaceMethod.getNumberOfParameters();
+                String methodName =
+                        ifaceMethod.getElementName();
+                ITypeHierarchy hierarchy =
+                        ifaceType.newTypeHierarchy(null);
+
+                for (IType sub
+                        : hierarchy.getAllSubtypes(ifaceType)) {
+                    if (sub.isAnonymous()) continue;
+                    for (IMethod m : sub.getMethods()) {
+                        if (!m.getElementName()
+                                .equals(methodName)) continue;
+                        if (m.getNumberOfParameters() != arity)
+                            continue;
+
+                        String subFqn =
+                                sub.getFullyQualifiedName();
+                        if (isJdkType(subFqn)) continue;
+                        String implFqmn = subFqn + "#"
+                                + methodName + "("
+                                + paramSig(m) + ")";
+                        if (refs.containsKey(implFqmn)) break;
+
+                        String typeKind = sub.isInterface()
+                                ? "interface"
+                                : sub.isEnum() ? "enum"
+                                : sub.isAnnotation()
+                                ? "annotation" : "class";
+
+                        implRefs.add(new Ref(implFqmn, m,
+                                RefKind.METHOD, typeKind,
+                                false, null, null, null,
+                                false, null, false, null,
+                                ref.fqmn()));
+                        break;
+                    }
+                }
+            } catch (Exception e) { /* skip */ }
+        }
+        for (Ref impl : implRefs) {
+            refs.put(impl.fqmn(), impl);
+        }
+    }
+
+    static String paramSig(IMethod m)
+            throws JavaModelException {
+        var paramTypes = m.getParameterTypes();
+        if (paramTypes.length == 0) return "";
+        var sb = new StringBuilder();
+        for (int i = 0; i < paramTypes.length; i++) {
+            if (i > 0) sb.append(",");
+            sb.append(org.eclipse.jdt.core.Signature.toString(
+                    paramTypes[i]));
+        }
+        return sb.toString();
     }
 
     /** Resolve the receiver type of a method invocation. */
@@ -178,7 +259,7 @@ class ReferenceCollector {
                 isConst ? RefKind.CONSTANT : RefKind.FIELD,
                 declTypeKind, isStatic,
                 resolvedType, resolvedTypeFqn, resolvedTypeKind,
-                isTypeVariable, typeBound, false, null));
+                isTypeVariable, typeBound, false, null, null));
     }
 
     private static void addMethod(IMethodBinding mb,
@@ -232,7 +313,7 @@ class ReferenceCollector {
                 declTypeKind, isStatic,
                 resolvedType, resolvedTypeFqn, resolvedTypeKind,
                 isTypeVariable, typeBound,
-                isInherited, inheritedFrom));
+                isInherited, inheritedFrom, null));
     }
 
     private static void addType(ITypeBinding tb,
@@ -247,7 +328,7 @@ class ReferenceCollector {
         refs.put(fqn, new Ref(fqn, elem, RefKind.TYPE,
                 typeKindOf(tb), false,
                 null, null, null,
-                false, null, false, null));
+                false, null, false, null, null));
     }
 
     /** Resolve upper bound of a type variable, null if Object. */

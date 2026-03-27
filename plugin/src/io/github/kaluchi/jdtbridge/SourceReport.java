@@ -2,8 +2,10 @@ package io.github.kaluchi.jdtbridge;
 
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IMember;
+import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.ISourceRange;
 import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.core.ITypeHierarchy;
 import org.eclipse.jdt.core.JavaModelException;
 
 import java.util.Map;
@@ -19,6 +21,9 @@ class SourceReport {
             int startLine, int endLine,
             Map<String, ReferenceCollector.Ref> refs) {
 
+        // Resolve implementations for interface method calls
+        ReferenceCollector.resolveImplementations(refs);
+
         IType declaringType = member instanceof IType t
                 ? t : member.getDeclaringType();
         String ownFqn = declaringType != null
@@ -30,6 +35,12 @@ class SourceReport {
                 .put("startLine", startLine)
                 .put("endLine", endLine)
                 .put("source", source);
+
+        // Resolve @Override target
+        String overrideTarget = resolveOverrideTarget(member);
+        if (overrideTarget != null) {
+            result.put("overrideTarget", overrideTarget);
+        }
 
         Json refsArr = Json.array();
         for (var ref : refs.values()) {
@@ -96,6 +107,12 @@ class SourceReport {
                     entry.put("inheritedFrom",
                             ref.inheritedFrom());
                 }
+            }
+
+            // Implementation of interface method
+            if (ref.implementationOf() != null) {
+                entry.put("implementationOf",
+                        ref.implementationOf());
             }
 
             // Line range
@@ -225,6 +242,54 @@ class SourceReport {
     private static String extractTypeFqn(String fqmn) {
         int hash = fqmn.indexOf('#');
         return hash >= 0 ? fqmn.substring(0, hash) : fqmn;
+    }
+
+    /**
+     * Find the supertype or interface that declares the method
+     * this member overrides. Returns FQMN or null.
+     */
+    private static String resolveOverrideTarget(IMember member) {
+        if (!(member instanceof IMethod method)) return null;
+        try {
+            IType declaringType = method.getDeclaringType();
+            if (declaringType == null) return null;
+
+            String methodName = method.getElementName();
+            int arity = method.getNumberOfParameters();
+
+            ITypeHierarchy hierarchy =
+                    declaringType.newSupertypeHierarchy(null);
+
+            // Check superclasses first, then interfaces
+            for (IType superType
+                    : hierarchy.getAllSupertypes(declaringType)) {
+                IMethod found = findMatchingMethod(
+                        superType, methodName, arity);
+                if (found != null) {
+                    String typeFqn =
+                            superType.getFullyQualifiedName();
+                    String typeKind = superType.isInterface()
+                            ? "interface" : "class";
+                    return typeKind + " " + typeFqn + "#"
+                            + methodName + "("
+                            + ReferenceCollector.paramSig(found)
+                            + ")";
+                }
+            }
+        } catch (Exception e) { /* ignore */ }
+        return null;
+    }
+
+    private static IMethod findMatchingMethod(
+            IType type, String name, int arity)
+            throws JavaModelException {
+        for (IMethod m : type.getMethods()) {
+            if (m.getElementName().equals(name)
+                    && m.getNumberOfParameters() == arity) {
+                return m;
+            }
+        }
+        return null;
     }
 
     private static int offsetToLine(String source, int offset) {

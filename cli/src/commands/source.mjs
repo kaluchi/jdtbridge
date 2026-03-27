@@ -126,19 +126,37 @@ function groupByDeclaringType(refs) {
   return groups;
 }
 
-function formatRefGroup({ typeFqn, group }) {
+function formatRefGroup({ typeFqn, group }, implIndex) {
   const lines = [];
   if (group.typeRef) {
     lines.push(formatTypeHeader(group.typeRef));
   } else if (group.members.length > 0) {
-    // No explicit type ref — synthesize header from first member
     const tkBadge = TYPE_KIND_BADGE[group.members[0].typeKind] || "[C]";
     lines.push(`${tkBadge} \`${typeFqn}\``);
   }
   for (const ref of group.members) {
     lines.push(formatMemberRef(ref));
+    // Show implementations right after the interface method
+    const impls = implIndex[ref.fqmn];
+    if (impls) {
+      for (const impl of impls) {
+        lines.push(`  → ${badge(impl)} \`${impl.fqmn}\``);
+      }
+    }
   }
   return lines.join("\n");
+}
+
+/** Build index: interfaceFqmn → [impl refs] */
+function buildImplIndex(refs) {
+  const index = {};
+  for (const ref of refs) {
+    if (ref.implementationOf) {
+      if (!index[ref.implementationOf]) index[ref.implementationOf] = [];
+      index[ref.implementationOf].push(ref);
+    }
+  }
+  return index;
 }
 
 // ---- Markdown output ----
@@ -149,6 +167,12 @@ function formatMarkdown(result) {
   // Header
   const headerBadge = result.fqmn.includes("#") ? "[M]" : "[C]";
   lines.push(`#### ${headerBadge} ${result.fqmn}`);
+  if (result.overrideTarget) {
+    // Strip type kind prefix if present ("interface pkg.Type#m" → "pkg.Type#m")
+    const parts = result.overrideTarget.split(" ", 2);
+    const fqmn = parts.length === 2 ? parts[1] : result.overrideTarget;
+    lines.push(`overrides [M] \`${fqmn}\``);
+  }
   lines.push(`\`${result.file}:${result.startLine}-${result.endLine}\``);
   lines.push("");
 
@@ -166,20 +190,24 @@ function formatMarkdown(result) {
   const incoming = result.refs.filter((r) => r.direction === "incoming");
 
   if (outgoing.length > 0) {
+    const implIndex = buildImplIndex(outgoing);
+    const mainRefs = outgoing.filter((r) => !r.implementationOf);
     lines.push("");
     lines.push("#### Outgoing Calls:");
-    const groups = groupByDeclaringType(outgoing);
+    const groups = groupByDeclaringType(mainRefs);
     for (const g of groups) {
-      lines.push(formatRefGroup(g));
+      lines.push(formatRefGroup(g, implIndex));
     }
   }
 
   if (incoming.length > 0) {
+    const implIndex = buildImplIndex(incoming);
+    const mainRefs = incoming.filter((r) => !r.implementationOf);
     lines.push("");
     lines.push("#### Incoming Calls:");
-    const groups = groupByDeclaringType(incoming);
+    const groups = groupByDeclaringType(mainRefs);
     for (const g of groups) {
-      lines.push(formatRefGroup(g));
+      lines.push(formatRefGroup(g, implIndex));
     }
   }
 
