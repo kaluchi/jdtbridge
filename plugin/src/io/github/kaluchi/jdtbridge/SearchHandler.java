@@ -465,8 +465,9 @@ class SearchHandler {
                         absPath, fullSource, params);
             }
 
-            // Multiple overloads — JSON array
-            Json arr = Json.array();
+            // Multiple overloads — JSON array, each fully enriched
+            StringBuilder arrJson = new StringBuilder("[");
+            boolean first = true;
             for (IMethod method : methods) {
                 int[] lines = memberLines(method, fullSource);
                 String src = sourceFromDisk(absPath,
@@ -477,24 +478,16 @@ class SearchHandler {
                 String sig = JdtUtils.compactSignature(method);
                 String mFqmn = fqn + "#" + sig;
                 var refs = ReferenceCollector.collect(method);
-                // Inline JSON building for each overload
-                Json entry = Json.object()
-                        .put("fqmn", mFqmn)
-                        .put("file", absPath)
-                        .put("startLine", lines[0])
-                        .put("endLine", lines[1])
-                        .put("source", src);
-                Json refsArr = Json.array();
-                for (var ref : refs.values()) {
-                    refsArr.add(Json.object()
-                            .put("fqmn", ref.fqmn())
-                            .put("kind", ref.kind().name()
-                                    .toLowerCase()));
-                }
-                entry.put("refs", refsArr);
-                arr.add(entry);
+                var incoming = collectIncomingRefs(method);
+                String json = SourceReport.toJson(
+                        mFqmn, method, absPath, src,
+                        lines[0], lines[1], refs, incoming);
+                if (!first) arrJson.append(",");
+                arrJson.append(json);
+                first = false;
             }
-            return HttpServer.Response.json(arr.toString());
+            arrJson.append("]");
+            return HttpServer.Response.json(arrJson.toString());
         }
 
         // Full class source
