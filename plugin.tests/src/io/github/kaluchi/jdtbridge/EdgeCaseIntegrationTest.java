@@ -1,6 +1,8 @@
 package io.github.kaluchi.jdtbridge;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
@@ -217,6 +219,94 @@ public class EdgeCaseIntegrationTest {
                 "Should find Cat: " + json);
         assertTrue(json.contains("test.edge.AbstractPet"),
                 "Should find AbstractPet: " + json);
+    }
+
+    // ---- Enriched source output ----
+
+    @Test
+    public void sourceOverloadsHaveEnrichedFormat()
+            throws Exception {
+        HttpServer.Response resp = search.handleSource(
+                Map.of("class", "test.edge.Calculator",
+                        "method", "add"));
+        String body = resp.body();
+        // Multiple overloads → JSON array
+        assertTrue(body.startsWith("["),
+                "Overloads should be array: " + body);
+        // Each overload has fqmn, file, source, refs
+        assertTrue(body.contains(
+                "\"fqmn\":\"test.edge.Calculator#add(int, int)\""),
+                "Should have int overload FQMN: " + body);
+        assertTrue(body.contains(
+                "\"fqmn\":\"test.edge.Calculator#add(double, double)\""),
+                "Should have double overload FQMN: " + body);
+        assertTrue(body.contains(
+                "\"fqmn\":\"test.edge.Calculator#add(int, int, int)\""),
+                "Should have 3-arg overload FQMN: " + body);
+        // Each has source and refs array
+        assertTrue(body.contains("\"source\""),
+                "Should have source: " + body);
+        assertTrue(body.contains("\"refs\""),
+                "Should have refs array: " + body);
+    }
+
+    @Test
+    public void sourceEnumHasHierarchy() throws Exception {
+        HttpServer.Response resp = search.handleSource(
+                Map.of("class", "test.edge.Color"));
+        String body = resp.body();
+        assertTrue(body.contains("\"supertypes\""),
+                "Enum should have supertypes: " + body);
+        assertTrue(body.contains("\"subtypes\""),
+                "Enum should have subtypes: " + body);
+        assertFalse(body.contains("\"refs\""),
+                "Type-level enum should not have refs: "
+                + body);
+    }
+
+    @Test
+    public void sourceAnnotationHasHierarchy() throws Exception {
+        HttpServer.Response resp = search.handleSource(
+                Map.of("class", "test.edge.Marker"));
+        String body = resp.body();
+        assertTrue(body.contains("\"supertypes\""),
+                "Annotation should have supertypes: " + body);
+        assertFalse(body.contains("\"refs\""),
+                "Type-level annotation should not have refs: "
+                + body);
+    }
+
+    @Test
+    public void sourceInnerTypeHasEnclosingType() throws Exception {
+        HttpServer.Response resp = search.handleSource(
+                Map.of("class", "test.edge.Outer.Inner"));
+        String body = resp.body();
+        assertTrue(body.contains("\"enclosingType\""),
+                "Inner should have enclosingType: " + body);
+        assertTrue(body.contains("test.edge.Outer"),
+                "Enclosing should be Outer: " + body);
+    }
+
+    @Test
+    public void sourceInheritedMethodFlagged() throws Exception {
+        HttpServer.Response resp = search.handleSource(
+                Map.of("class", "test.service.EnrichedRefService",
+                        "method", "getParrotName"));
+        String body = resp.body();
+        assertTrue(body.contains("\"inherited\":true"),
+                "Should flag inherited call: " + body);
+        assertTrue(body.contains("\"inheritedFrom\""),
+                "Should have inheritedFrom: " + body);
+    }
+
+    @Test
+    public void sourceStaticMethodFlagged() throws Exception {
+        HttpServer.Response resp = search.handleSource(
+                Map.of("class", "test.service.EnrichedRefService",
+                        "method", "getStaticValue"));
+        String body = resp.body();
+        assertTrue(body.contains("\"static\":true"),
+                "Should flag static ref: " + body);
     }
 
     // ---- Project info with edge types ----

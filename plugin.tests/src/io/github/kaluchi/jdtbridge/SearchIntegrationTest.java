@@ -251,10 +251,99 @@ public class SearchIntegrationTest {
         HttpServer.Response resp = handler.handleSource(
                 Map.of("class", "test.model.Dog", "method", "bark"));
         assertEquals("application/json", resp.contentType());
-        assertTrue(resp.body().contains("bark"),
-                "Should contain bark: " + resp.body());
-        assertTrue(resp.body().contains("\"fqmn\""),
-                "Should have fqmn: " + resp.body());
+        var parsed = Json.parse(resp.body());
+        assertEquals("test.model.Dog#bark()",
+                Json.getString(parsed, "fqmn"));
+        assertNotNull(Json.getString(parsed, "source"));
+        assertTrue(Json.getInt(parsed, "startLine", -1) > 0);
+    }
+
+    @Test
+    public void sourceMethodHasOutgoingDirection() throws Exception {
+        HttpServer.Response resp = handler.handleSource(
+                Map.of("class", "test.service.AnimalService",
+                        "method", "process"));
+        var parsed = Json.parse(resp.body());
+        // refs array should exist with outgoing direction
+        String body = resp.body();
+        assertTrue(body.contains("\"direction\":\"outgoing\""),
+                "Should have outgoing refs: " + body);
+    }
+
+    @Test
+    public void sourceMethodInterfaceTypeKind() throws Exception {
+        HttpServer.Response resp = handler.handleSource(
+                Map.of("class", "test.service.AnimalService",
+                        "method", "process"));
+        // process(Animal) calls Animal#name() — interface
+        String body = resp.body();
+        assertTrue(body.contains("\"typeKind\":\"interface\""),
+                "Should have interface typeKind: " + body);
+    }
+
+    @Test
+    public void sourceMethodHasIncomingCallers() throws Exception {
+        HttpServer.Response resp = handler.handleSource(
+                Map.of("class", "test.model.Dog",
+                        "method", "bark"));
+        String body = resp.body();
+        assertTrue(body.contains("\"direction\":\"incoming\""),
+                "Should have incoming refs: " + body);
+        // Caller is AnimalService#createDog
+        assertTrue(body.contains("AnimalService#createDog"),
+                "Caller should be AnimalService#createDog: "
+                + body);
+    }
+
+    @Test
+    public void sourceMethodOverrideTarget() throws Exception {
+        HttpServer.Response resp = handler.handleSource(
+                Map.of("class", "test.model.Dog",
+                        "method", "name"));
+        var parsed = Json.parse(resp.body());
+        // overrideTarget is a nested object
+        String body = resp.body();
+        assertTrue(body.contains("\"overrideTarget\""),
+                "Dog#name should have overrideTarget: " + body);
+        assertTrue(body.contains("\"kind\":\"method\""),
+                "overrideTarget kind should be method: " + body);
+        assertTrue(body.contains("test.model.Animal#name"),
+                "Should override Animal#name: " + body);
+    }
+
+    @Test
+    public void sourceMethodImplementations() throws Exception {
+        HttpServer.Response resp = handler.handleSource(
+                Map.of("class", "test.service.AnimalService",
+                        "method", "process"));
+        String body = resp.body();
+        assertTrue(body.contains("\"implementationOf\""),
+                "Should have implementations: " + body);
+        // Dog implements Animal#name
+        assertTrue(body.contains("Dog#name"),
+                "Dog should implement name: " + body);
+        assertTrue(body.contains("Cat#name"),
+                "Cat should implement name: " + body);
+    }
+
+    @Test
+    public void sourceTypeHierarchyNoRefs() throws Exception {
+        HttpServer.Response resp = handler.handleSource(
+                Map.of("class", "test.model.Animal"));
+        var parsed = Json.parse(resp.body());
+        assertEquals("test.model.Animal",
+                Json.getString(parsed, "fqmn"));
+        String body = resp.body();
+        assertTrue(body.contains("\"supertypes\""),
+                "Should have supertypes");
+        assertTrue(body.contains("\"subtypes\""),
+                "Should have subtypes");
+        assertTrue(body.contains("\"fqn\":\"test.model.Dog\""),
+                "Dog should be subtype: " + body);
+        assertTrue(body.contains("\"fqn\":\"test.model.Cat\""),
+                "Cat should be subtype: " + body);
+        assertFalse(body.contains("\"refs\""),
+                "Type-level should not have refs");
     }
 
     @Test
