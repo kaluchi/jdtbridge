@@ -1,5 +1,7 @@
 package io.github.kaluchi.jdtbridge;
 
+import com.google.gson.JsonObject;
+
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -131,13 +133,15 @@ class TestSessionTracker extends TestRunListener {
 
         sessions.put(name, ts);
 
-        ts.emit(Json.object()
-                .put("event", "started")
-                .put("session", name)
-                .put("total", ts.total)
-                .putIf(ts.label != null, "label", ts.label)
-                .putIf(ts.project != null, "project", ts.project)
-                .toString());
+        var startEvt = new JsonObject();
+        startEvt.addProperty("event", "started");
+        startEvt.addProperty("session", name);
+        startEvt.addProperty("total", ts.total);
+        if (ts.label != null)
+            startEvt.addProperty("label", ts.label);
+        if (ts.project != null)
+            startEvt.addProperty("project", ts.project);
+        ts.emit(startEvt.toString());
     }
 
     @Override
@@ -170,16 +174,18 @@ class TestSessionTracker extends TestRunListener {
         String fqmn = className + "#" + methodName;
         double elapsed = tc.getElapsedTimeInSeconds();
 
-        Json event = Json.object()
-                .put("event", "case")
-                .put("fqmn", fqmn)
-                .put("status", status)
-                .put("time", Double.isNaN(elapsed) ? 0.0 : elapsed);
+        var event = new JsonObject();
+        event.addProperty("event", "case");
+        event.addProperty("fqmn", fqmn);
+        event.addProperty("status", status);
+        event.addProperty("time",
+                Double.isNaN(elapsed) ? 0.0 : elapsed);
 
         // Parent suite name (for grouping)
         ITestElementContainer parent = tc.getParentContainer();
         if (parent instanceof ITestSuiteElement suite) {
-            event.put("suite", suite.getSuiteTypeName());
+            event.addProperty("suite",
+                    suite.getSuiteTypeName());
         }
 
         // Failure trace
@@ -187,12 +193,14 @@ class TestSessionTracker extends TestRunListener {
                 || result == ITestElement.Result.ERROR) {
             FailureTrace ft = tc.getFailureTrace();
             if (ft != null) {
-                event.putIf(ft.getTrace() != null,
-                        "trace", ft.getTrace());
-                event.putIf(ft.getExpected() != null,
-                        "expected", ft.getExpected());
-                event.putIf(ft.getActual() != null,
-                        "actual", ft.getActual());
+                if (ft.getTrace() != null)
+                    event.addProperty("trace", ft.getTrace());
+                if (ft.getExpected() != null)
+                    event.addProperty("expected",
+                            ft.getExpected());
+                if (ft.getActual() != null)
+                    event.addProperty("actual",
+                            ft.getActual());
             }
         }
 
@@ -208,16 +216,17 @@ class TestSessionTracker extends TestRunListener {
         ts.time = session.getElapsedTimeInSeconds();
         ts.state = "finished";
 
-        ts.emit(Json.object()
-                .put("event", "finished")
-                .put("session", name)
-                .put("total", ts.total)
-                .put("passed", ts.passed.get())
-                .put("failed", ts.failed.get())
-                .put("errors", ts.errors.get())
-                .put("ignored", ts.ignored.get())
-                .put("time", Double.isNaN(ts.time) ? 0.0 : ts.time)
-                .toString());
+        var finEvt = new JsonObject();
+        finEvt.addProperty("event", "finished");
+        finEvt.addProperty("session", name);
+        finEvt.addProperty("total", ts.total);
+        finEvt.addProperty("passed", ts.passed.get());
+        finEvt.addProperty("failed", ts.failed.get());
+        finEvt.addProperty("errors", ts.errors.get());
+        finEvt.addProperty("ignored", ts.ignored.get());
+        finEvt.addProperty("time",
+                Double.isNaN(ts.time) ? 0.0 : ts.time);
+        ts.emit(finEvt.toString());
     }
 
     // -- Helpers --
