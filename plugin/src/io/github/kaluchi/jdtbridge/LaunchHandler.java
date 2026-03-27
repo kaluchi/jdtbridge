@@ -1,5 +1,8 @@
 package io.github.kaluchi.jdtbridge;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+
 import java.util.Map;
 
 import org.eclipse.debug.core.DebugPlugin;
@@ -8,9 +11,6 @@ import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.debug.core.ILaunchManager;
 import org.eclipse.debug.core.model.IProcess;
 
-/**
- * Handlers for launch management: list launches, read console output.
- */
 class LaunchHandler {
 
     private final LaunchTracker tracker;
@@ -25,10 +25,9 @@ class LaunchHandler {
 
     String handleList(Map<String, String> params) {
         ILaunch[] launches = launchManager().getLaunches();
-        Json arr = Json.array();
+        var arr = new JsonArray();
         var seen = new java.util.HashSet<String>();
 
-        // Launches from the manager (newest first)
         for (int i = launches.length - 1; i >= 0; i--) {
             ILaunch launch = launches[i];
             String name = launchName(launch);
@@ -36,7 +35,6 @@ class LaunchHandler {
             arr.add(launchEntry(launch, name));
         }
 
-        // Tracked launches not in the manager (disappeared)
         for (var entry : tracker.all().entrySet()) {
             if (seen.contains(entry.getKey())) continue;
             LaunchTracker.TrackedLaunch tl = entry.getValue();
@@ -46,22 +44,23 @@ class LaunchHandler {
         return arr.toString();
     }
 
-    private Json launchEntry(ILaunch launch, String name) {
+    private JsonObject launchEntry(ILaunch launch,
+            String name) {
         String type = launchType(launch);
         String mode = launch.getLaunchMode();
         boolean terminated = launch.isTerminated();
 
-        Json entry = Json.object()
-                .put("name", name)
-                .put("type", type)
-                .put("mode", mode)
-                .put("terminated", terminated);
+        var entry = new JsonObject();
+        entry.addProperty("name", name);
+        entry.addProperty("type", type);
+        entry.addProperty("mode", mode);
+        entry.addProperty("terminated", terminated);
 
         String startedAt = launch.getAttribute(
                 DebugPlugin.ATTR_LAUNCH_TIMESTAMP);
         if (startedAt != null) {
             try {
-                entry.put("started",
+                entry.addProperty("started",
                         Long.parseLong(startedAt));
             } catch (NumberFormatException e) { /* skip */ }
         }
@@ -71,13 +70,14 @@ class LaunchHandler {
             IProcess proc = processes[0];
             if (terminated) {
                 try {
-                    entry.put("exitCode", proc.getExitValue());
+                    entry.addProperty("exitCode",
+                            proc.getExitValue());
                 } catch (Exception e) { /* ignored */ }
             }
             String pid = proc.getAttribute(
                     IProcess.ATTR_PROCESS_ID);
             if (pid != null) {
-                entry.put("pid", pid);
+                entry.addProperty("pid", pid);
             }
         }
 
@@ -88,27 +88,31 @@ class LaunchHandler {
         try {
             var allConfigs =
                     launchManager().getLaunchConfigurations();
-            ILaunchConfiguration[] recent = getRecentConfigs();
+            ILaunchConfiguration[] recent =
+                    getRecentConfigs();
 
-            // Recent first, then remaining alphabetically
-            Json arr = Json.array();
+            var arr = new JsonArray();
             var seen = new java.util.HashSet<String>();
 
             if (recent != null) {
                 for (var config : recent) {
-                    arr.add(Json.object()
-                            .put("name", config.getName())
-                            .put("type",
-                                    config.getType().getName()));
+                    var obj = new JsonObject();
+                    obj.addProperty("name",
+                            config.getName());
+                    obj.addProperty("type",
+                            config.getType().getName());
+                    arr.add(obj);
                     seen.add(config.getName());
                 }
             }
 
             for (var config : allConfigs) {
                 if (seen.contains(config.getName())) continue;
-                arr.add(Json.object()
-                        .put("name", config.getName())
-                        .put("type", config.getType().getName()));
+                var obj = new JsonObject();
+                obj.addProperty("name", config.getName());
+                obj.addProperty("type",
+                        config.getType().getName());
+                arr.add(obj);
             }
 
             return arr.toString();
@@ -127,30 +131,25 @@ class LaunchHandler {
             var debugHistory = mgr.getLaunchHistory(
                     "org.eclipse.debug.ui.launchGroup.debug");
 
-            // Merge: favorites first, then recent from both groups
             var result = new java.util.ArrayList<
                     ILaunchConfiguration>();
             var seen = new java.util.HashSet<String>();
 
-            // Favorites from run group
             if (runHistory != null) {
                 for (var c : runHistory.getFavorites()) {
                     if (seen.add(c.getName())) result.add(c);
                 }
             }
-            // Favorites from debug group
             if (debugHistory != null) {
                 for (var c : debugHistory.getFavorites()) {
                     if (seen.add(c.getName())) result.add(c);
                 }
             }
-            // Recent history (run)
             if (runHistory != null) {
                 for (var c : runHistory.getHistory()) {
                     if (seen.add(c.getName())) result.add(c);
                 }
             }
-            // Recent history (debug)
             if (debugHistory != null) {
                 for (var c : debugHistory.getHistory()) {
                     if (seen.add(c.getName())) result.add(c);
@@ -162,7 +161,6 @@ class LaunchHandler {
                         new ILaunchConfiguration[0]);
             }
         } catch (Throwable e) {
-            // UI plugin not available — fall through
         }
         return null;
     }
@@ -173,7 +171,6 @@ class LaunchHandler {
         int removed = 0;
         var cleared = new java.util.HashSet<String>();
 
-        // Remove terminated launches from the manager
         for (ILaunch launch : launches) {
             if (!launch.isTerminated()) continue;
             String lName = launchName(launch);
@@ -187,7 +184,6 @@ class LaunchHandler {
             removed++;
         }
 
-        // Remove tracked entries not in the manager
         for (var entry : tracker.all().entrySet()) {
             if (cleared.contains(entry.getKey())) continue;
             if (name != null && !name.isBlank()
@@ -200,15 +196,16 @@ class LaunchHandler {
             }
         }
 
-        return Json.object()
-                .put("removed", removed)
-                .toString();
+        var result = new JsonObject();
+        result.addProperty("removed", removed);
+        return result.toString();
     }
 
     String handleRun(Map<String, String> params) {
         String name = params.get("name");
         if (name == null || name.isBlank()) {
-            return HttpServer.jsonError("Missing 'name' parameter");
+            return HttpServer.jsonError(
+                    "Missing 'name' parameter");
         }
         String mode = params.containsKey("debug")
                 ? ILaunchManager.DEBUG_MODE
@@ -217,14 +214,17 @@ class LaunchHandler {
             ILaunchConfiguration config = findConfig(name);
             if (config == null) {
                 return HttpServer.jsonError(
-                        "Launch configuration not found: " + name);
+                        "Launch configuration not found: "
+                        + name);
             }
             ILaunch launch = config.launch(mode, null, true);
-            Json response = Json.object()
-                    .put("ok", true)
-                    .put("name", launchName(launch))
-                    .put("mode", mode)
-                    .put("type", launchType(launch));
+            var response = new JsonObject();
+            response.addProperty("ok", true);
+            response.addProperty("name",
+                    launchName(launch));
+            response.addProperty("mode", mode);
+            response.addProperty("type",
+                    launchType(launch));
             addProcessMetadata(launch, response);
             return response.toString();
         } catch (Exception e) {
@@ -232,41 +232,39 @@ class LaunchHandler {
         }
     }
 
-    /**
-     * Terminate a running launch by name. Returns an error if the
-     * launch is not found or already terminated.
-     *
-     * @param params must contain "name"
-     * @return JSON with {@code {ok, name}} or error
-     */
     String handleStop(Map<String, String> params) {
         String name = params.get("name");
         if (name == null || name.isBlank()) {
-            return HttpServer.jsonError("Missing 'name' parameter");
+            return HttpServer.jsonError(
+                    "Missing 'name' parameter");
         }
         ILaunch target = findLaunch(name);
         if (target == null) {
-            return HttpServer.jsonError("Launch not found: " + name);
+            return HttpServer.jsonError(
+                    "Launch not found: " + name);
         }
         if (target.isTerminated()) {
-            return HttpServer.jsonError("Already terminated: " + name);
+            return HttpServer.jsonError(
+                    "Already terminated: " + name);
         }
         try {
             target.terminate();
-            return Json.object()
-                    .put("ok", true)
-                    .put("name", name)
-                    .toString();
+            var result = new JsonObject();
+            result.addProperty("ok", true);
+            result.addProperty("name", name);
+            return result.toString();
         } catch (Exception e) {
             return HttpServer.jsonError(
-                    "Failed to terminate: " + e.getMessage());
+                    "Failed to terminate: "
+                    + e.getMessage());
         }
     }
 
     private ILaunchConfiguration findConfig(String name) {
         try {
             for (var config
-                    : launchManager().getLaunchConfigurations()) {
+                    : launchManager()
+                            .getLaunchConfigurations()) {
                 if (name.equals(config.getName())) {
                     return config;
                 }
@@ -275,34 +273,29 @@ class LaunchHandler {
         return null;
     }
 
-    /**
-     * Read console output for a launch. The tracker (IStreamMonitor
-     * listeners) is the primary source — it survives ILaunch removal
-     * from the manager and works even when IStreamsProxy.getContents()
-     * is empty (ProcessConsole calls setBuffered(false)).
-     */
     String handleConsole(Map<String, String> params) {
         String name = params.get("name");
         if (name == null || name.isBlank()) {
-            return HttpServer.jsonError("Missing 'name' parameter");
+            return HttpServer.jsonError(
+                    "Missing 'name' parameter");
         }
 
         String tailStr = params.get("tail");
         String stream = params.get("stream");
 
-        // Primary: tracker (survives ILaunch removal from manager)
         LaunchTracker.TrackedLaunch tl = tracker.get(name);
         if (tl == null) {
-            // Launch exists in manager but tracker missed it?
             ILaunch target = findLaunch(name);
             if (target == null) {
-                return HttpServer.jsonError("Launch not found: " + name);
+                return HttpServer.jsonError(
+                        "Launch not found: " + name);
             }
-            return Json.object()
-                    .put("name", name)
-                    .put("terminated", target.isTerminated())
-                    .put("output", "")
-                    .toString();
+            var obj = new JsonObject();
+            obj.addProperty("name", name);
+            obj.addProperty("terminated",
+                    target.isTerminated());
+            obj.addProperty("output", "");
+            return obj.toString();
         }
 
         String output = tl.getOutput(stream);
@@ -310,21 +303,20 @@ class LaunchHandler {
         if (tailStr != null) {
             try {
                 int tailLines = Integer.parseInt(tailStr);
-                result = ConsoleStreamer.tail(result, tailLines);
-            } catch (NumberFormatException e) { /* use full */ }
+                result = ConsoleStreamer.tail(
+                        result, tailLines);
+            } catch (NumberFormatException e) { /* full */ }
         }
 
-        return Json.object()
-                .put("name", name)
-                .put("terminated", tl.terminated)
-                .put("output", result)
-                .toString();
+        var obj = new JsonObject();
+        obj.addProperty("name", name);
+        obj.addProperty("terminated", tl.terminated);
+        obj.addProperty("output", result);
+        return obj.toString();
     }
 
-    /** Find the most recent launch matching the given name. */
     private ILaunch findLaunch(String name) {
         ILaunch[] launches = launchManager().getLaunches();
-        // Search newest first
         for (int i = launches.length - 1; i >= 0; i--) {
             if (name.equals(launchName(launches[i]))) {
                 return launches[i];
@@ -334,26 +326,31 @@ class LaunchHandler {
     }
 
     private static void addProcessMetadata(ILaunch launch,
-            Json response) {
+            JsonObject response) {
         IProcess[] processes = launch.getProcesses();
         if (processes.length > 0) {
             IProcess proc = processes[0];
             String pid = proc.getAttribute(
                     IProcess.ATTR_PROCESS_ID);
-            if (pid != null) response.put("pid", pid);
+            if (pid != null)
+                response.addProperty("pid", pid);
             String cmdline = proc.getAttribute(
-                    "org.eclipse.debug.core.ATTR_CMDLINE");
-            if (cmdline != null) response.put("cmdline", cmdline);
+                    "org.eclipse.debug.core"
+                    + ".ATTR_CMDLINE");
+            if (cmdline != null)
+                response.addProperty("cmdline", cmdline);
         }
         try {
             ILaunchConfiguration config =
                     launch.getLaunchConfiguration();
             if (config != null) {
                 String workDir = config.getAttribute(
-                        "org.eclipse.debug.core.ATTR_WORKING_DIRECTORY",
+                        "org.eclipse.debug.core"
+                        + ".ATTR_WORKING_DIRECTORY",
                         (String) null);
                 if (workDir != null) {
-                    response.put("workingDir", workDir);
+                    response.addProperty(
+                            "workingDir", workDir);
                 }
             }
         } catch (Exception e) { /* ignored */ }
