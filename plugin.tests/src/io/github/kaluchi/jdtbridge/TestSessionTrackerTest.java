@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.ArrayList;
 import java.util.Map;
 
+import com.google.gson.JsonObject;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -174,13 +176,13 @@ public class TestSessionTrackerTest {
         @Test
         void returnsFailuresWithTrace() {
             var ts = tracker.preRegister("fail-session");
-            ts.emit(Json.object()
-                    .put("event", "case")
-                    .put("fqmn", "com.Foo#bar")
-                    .put("status", "FAIL")
-                    .put("time", 0)
-                    .put("trace", "java.lang.AssertionError")
-                    .toString());
+            var ev = new JsonObject();
+            ev.addProperty("event", "case");
+            ev.addProperty("fqmn", "com.Foo#bar");
+            ev.addProperty("status", "FAIL");
+            ev.addProperty("time", 0);
+            ev.addProperty("trace", "java.lang.AssertionError");
+            ts.emit(ev.toString());
 
             String json = handler.handleStatus(
                     Map.of("session", "fail-session"));
@@ -197,12 +199,12 @@ public class TestSessionTrackerTest {
         @Test
         void filterFailuresExcludesIgnored() {
             var ts = tracker.preRegister("ign-session");
-            ts.emit(Json.object()
-                    .put("event", "case")
-                    .put("fqmn", "com.Foo#ignored")
-                    .put("status", "IGNORED")
-                    .put("time", 0)
-                    .toString());
+            var ev = new JsonObject();
+            ev.addProperty("event", "case");
+            ev.addProperty("fqmn", "com.Foo#ignored");
+            ev.addProperty("status", "IGNORED");
+            ev.addProperty("time", 0);
+            ts.emit(ev.toString());
 
             String json = handler.handleStatus(
                     Map.of("session", "ign-session",
@@ -214,12 +216,12 @@ public class TestSessionTrackerTest {
         @Test
         void filterIgnoredExcludesFail() {
             var ts = tracker.preRegister("fail-only");
-            ts.emit(Json.object()
-                    .put("event", "case")
-                    .put("fqmn", "com.Foo#fail")
-                    .put("status", "FAIL")
-                    .put("time", 0)
-                    .toString());
+            var ev = new JsonObject();
+            ev.addProperty("event", "case");
+            ev.addProperty("fqmn", "com.Foo#fail");
+            ev.addProperty("status", "FAIL");
+            ev.addProperty("time", 0);
+            ts.emit(ev.toString());
 
             String json = handler.handleStatus(
                     Map.of("session", "fail-only",
@@ -259,12 +261,12 @@ public class TestSessionTrackerTest {
         @Test
         void filterIgnoredIncludesIgnored() {
             var ts = tracker.preRegister("ign-only");
-            ts.emit(Json.object()
-                    .put("event", "case")
-                    .put("fqmn", "com.Foo#skip")
-                    .put("status", "IGNORED")
-                    .put("time", 0)
-                    .toString());
+            var ev = new JsonObject();
+            ev.addProperty("event", "case");
+            ev.addProperty("fqmn", "com.Foo#skip");
+            ev.addProperty("status", "IGNORED");
+            ev.addProperty("time", 0);
+            ts.emit(ev.toString());
 
             String json = handler.handleStatus(
                     Map.of("session", "ign-only",

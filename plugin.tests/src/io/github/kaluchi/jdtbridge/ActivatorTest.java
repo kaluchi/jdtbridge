@@ -10,87 +10,90 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.regex.Pattern;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
 import org.junit.jupiter.api.Test;
 
-/**
- * Tests for Activator utilities: token generation and bridge file format.
- * Verifies the contract between plugin (writer) and jdt.mjs (reader).
- */
 public class ActivatorTest {
 
     private static final Pattern HEX_32 =
             Pattern.compile("^[0-9a-f]{32}$");
 
-    // ---- generateToken ----
-
     @Test
     public void tokenIs32HexChars() {
         String token = invokeGenerateToken();
-        assertEquals(32, token.length(), "Token should be 32 chars");
-        assertTrue(HEX_32.matcher(token).matches(),
-                "Token should be lowercase hex: " + token);
+        assertEquals(32, token.length());
+        assertTrue(HEX_32.matcher(token).matches());
     }
 
     @Test
     public void tokenIsUnique() {
-        String token1 = invokeGenerateToken();
-        String token2 = invokeGenerateToken();
-        assertNotEquals(token1, token2, "Tokens should differ");
+        assertNotEquals(invokeGenerateToken(),
+                invokeGenerateToken());
     }
 
     @Test
     public void tokenContainsNoUpperCase() {
         String token = invokeGenerateToken();
-        assertEquals(token, token.toLowerCase(),
-                "Should be lowercase");
+        assertEquals(token, token.toLowerCase());
     }
-
-    // ---- Bridge file format ----
 
     @Test
     public void bridgeFileJsonFormat() {
-        String json = Json.object()
-                .put("port", 12345)
-                .put("token", "abcdef0123456789abcdef0123456789")
-                .put("pid", 42L)
-                .put("workspace", "D:\\eclipse-workspace")
-                .put("version", "1.0.0.202603181541")
-                .put("location", "reference:file:plugins/io.github.kaluchi.jdtbridge_1.0.0.jar")
-                .toString();
+        var obj = new JsonObject();
+        obj.addProperty("port", 12345);
+        obj.addProperty("token",
+                "abcdef0123456789abcdef0123456789");
+        obj.addProperty("pid", 42L);
+        obj.addProperty("workspace", "D:\\eclipse-workspace");
+        obj.addProperty("version", "1.0.0.202603181541");
+        obj.addProperty("location",
+                "reference:file:plugins/io.github.kaluchi"
+                + ".jdtbridge_1.0.0.jar");
+        String json = obj.toString();
 
-        var map = Json.parse(json);
-        assertEquals(12345, Json.getInt(map, "port", 0));
+        var parsed = JsonParser.parseString(json)
+                .getAsJsonObject();
+        assertEquals(12345, parsed.get("port").getAsInt());
         assertEquals("abcdef0123456789abcdef0123456789",
-                Json.getString(map, "token"));
+                parsed.get("token").getAsString());
         assertEquals("D:\\eclipse-workspace",
-                Json.getString(map, "workspace"));
+                parsed.get("workspace").getAsString());
         assertEquals("1.0.0.202603181541",
-                Json.getString(map, "version"));
-        assertTrue(Json.getString(map, "location")
+                parsed.get("version").getAsString());
+        assertTrue(parsed.get("location").getAsString()
                 .startsWith("reference:file:plugins/"));
     }
 
     @Test
     public void bridgeFileWriteAndRead() throws IOException {
-        Path tempFile = Files.createTempFile("jdtbridge-test-", ".json");
+        Path tempFile = Files.createTempFile(
+                "jdtbridge-test-", ".json");
         try {
             String token = invokeGenerateToken();
-            String content = Json.object()
-                    .put("port", 54321)
-                    .put("token", token)
-                    .put("pid", ProcessHandle.current().pid())
-                    .put("workspace", "D:/test-workspace")
-                    .put("version", "1.0.0.qualifier")
-                    .put("location", "reference:file:dropins/jdtbridge.jar")
-                    .toString() + "\n";
-            Files.writeString(tempFile, content);
+            var obj = new JsonObject();
+            obj.addProperty("port", 54321);
+            obj.addProperty("token", token);
+            obj.addProperty("pid",
+                    ProcessHandle.current().pid());
+            obj.addProperty("workspace", "D:/test-workspace");
+            obj.addProperty("version", "1.0.0.qualifier");
+            obj.addProperty("location",
+                    "reference:file:dropins/jdtbridge.jar");
+            Files.writeString(tempFile,
+                    obj.toString() + "\n");
 
-            var map = Json.parse(Files.readString(tempFile));
-            assertEquals(54321, Json.getInt(map, "port", 0));
-            assertEquals(token, Json.getString(map, "token"));
+            var parsed = JsonParser.parseString(
+                    Files.readString(tempFile))
+                    .getAsJsonObject();
+            assertEquals(54321,
+                    parsed.get("port").getAsInt());
+            assertEquals(token,
+                    parsed.get("token").getAsString());
             assertEquals("1.0.0.qualifier",
-                    Json.getString(map, "version"));
-            assertTrue(Json.getString(map, "location")
+                    parsed.get("version").getAsString());
+            assertTrue(parsed.get("location").getAsString()
                     .startsWith("reference:file:dropins/"));
         } finally {
             Files.deleteIfExists(tempFile);
@@ -99,25 +102,25 @@ public class ActivatorTest {
 
     @Test
     public void bridgeFileHasAllRequiredKeys() {
-        String json = Json.object()
-                .put("port", 8080)
-                .put("token", "abc")
-                .put("pid", 1L)
-                .put("workspace", "/w")
-                .put("version", "1.0.0")
-                .put("location", "file:plugins/bundle.jar")
-                .toString();
+        var obj = new JsonObject();
+        obj.addProperty("port", 8080);
+        obj.addProperty("token", "abc");
+        obj.addProperty("pid", 1L);
+        obj.addProperty("workspace", "/w");
+        obj.addProperty("version", "1.0.0");
+        obj.addProperty("location",
+                "file:plugins/bundle.jar");
+        String json = obj.toString();
 
-        var map = Json.parse(json);
-        assertNotEquals(0, Json.getInt(map, "port", 0), "Must have port");
-        assertNotNull(Json.getString(map, "token"), "Must have token");
-        assertTrue(map.containsKey("pid"), "Must have pid");
-        assertNotNull(Json.getString(map, "workspace"), "Must have workspace");
-        assertNotNull(Json.getString(map, "version"), "Must have version");
-        assertNotNull(Json.getString(map, "location"), "Must have location");
+        var parsed = JsonParser.parseString(json)
+                .getAsJsonObject();
+        assertNotEquals(0, parsed.get("port").getAsInt());
+        assertNotNull(parsed.get("token").getAsString());
+        assertTrue(parsed.has("pid"));
+        assertNotNull(parsed.get("workspace").getAsString());
+        assertNotNull(parsed.get("version").getAsString());
+        assertNotNull(parsed.get("location").getAsString());
     }
-
-    // ---- Helpers ----
 
     private String invokeGenerateToken() {
         try {

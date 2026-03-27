@@ -3,17 +3,15 @@ package io.github.kaluchi.jdtbridge;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import org.junit.jupiter.api.Test;
 
-/**
- * Tests for WelcomeHandler — CLI detection parsing via Json.parse(),
- * bridge file parsing, and config logic.
- */
 public class WelcomeHandlerTest {
-
-    // ---- npm list JSON → CLI detection ----
 
     @Test
     public void npmListDetectsInstalledPackage() {
@@ -28,93 +26,94 @@ public class WelcomeHandlerTest {
                   }
                 }
                 """;
-        var outer = Json.parse(npmOutput);
-        String depsRaw = Json.getString(outer, "dependencies");
-        assertNotNull(depsRaw);
-        var deps = Json.parse(depsRaw);
-        String pkgRaw = Json.getString(deps, "@kaluchi/jdtbridge");
-        assertNotNull(pkgRaw);
-        var pkg = Json.parse(pkgRaw);
-        assertEquals("1.1.1", Json.getString(pkg, "version"));
+        var json = JsonParser.parseString(npmOutput)
+                .getAsJsonObject();
+        var deps = json.getAsJsonObject("dependencies");
+        assertNotNull(deps);
+        var pkg = deps.getAsJsonObject("@kaluchi/jdtbridge");
+        assertNotNull(pkg);
+        assertEquals("1.1.1",
+                pkg.get("version").getAsString());
     }
 
     @Test
     public void npmListEmptyDependencies() {
-        var outer = Json.parse("{\"dependencies\":{}}");
-        String depsRaw = Json.getString(outer, "dependencies");
-        assertNotNull(depsRaw);
-        var deps = Json.parse(depsRaw);
-        assertTrue(deps.isEmpty());
+        var json = JsonParser.parseString(
+                "{\"dependencies\":{}}").getAsJsonObject();
+        var deps = json.getAsJsonObject("dependencies");
+        assertEquals(0, deps.size());
     }
 
     @Test
     public void npmListNoDependenciesKey() {
-        var outer = Json.parse("{\"name\":\"npm\"}");
-        String depsRaw = Json.getString(outer, "dependencies");
-        // "dependencies" not present — getString returns null
-        assertEquals(null, depsRaw);
+        var json = JsonParser.parseString(
+                "{\"name\":\"npm\"}").getAsJsonObject();
+        assertFalse(json.has("dependencies"));
     }
-
-    // ---- Bridge file parsing ----
 
     @Test
     public void bridgeFileExtractsPortAndVersion() {
-        String json = Json.object()
-                .put("port", 54321)
-                .put("token", "abc")
-                .put("pid", 100L)
-                .put("workspace", "/ws")
-                .put("version", "1.1.0.202603231744")
-                .put("location", "file:plugins/bundle.jar")
-                .toString();
-        var map = Json.parse(json);
-        assertEquals(54321, Json.getInt(map, "port", 0));
+        var obj = new JsonObject();
+        obj.addProperty("port", 54321);
+        obj.addProperty("token", "abc");
+        obj.addProperty("pid", 100L);
+        obj.addProperty("workspace", "/ws");
+        obj.addProperty("version", "1.1.0.202603231744");
+        obj.addProperty("location",
+                "file:plugins/bundle.jar");
+
+        var parsed = JsonParser.parseString(obj.toString())
+                .getAsJsonObject();
+        assertEquals(54321, parsed.get("port").getAsInt());
         assertEquals("1.1.0.202603231744",
-                Json.getString(map, "version"));
+                parsed.get("version").getAsString());
     }
 
     @Test
     public void bridgeFileMissingVersionReturnsNull() {
-        String json = Json.object()
-                .put("port", 8080)
-                .put("token", "abc")
-                .toString();
-        var map = Json.parse(json);
-        assertEquals(8080, Json.getInt(map, "port", 0));
-        assertEquals(null, Json.getString(map, "version"));
-    }
+        var obj = new JsonObject();
+        obj.addProperty("port", 8080);
+        obj.addProperty("token", "abc");
 
-    // ---- Config / dismiss detection ----
+        var parsed = JsonParser.parseString(obj.toString())
+                .getAsJsonObject();
+        assertEquals(8080, parsed.get("port").getAsInt());
+        assertNull(parsed.get("version"));
+    }
 
     @Test
     public void configDismissedTrue() {
-        String config = "{\"eclipse\":\"D:/eclipse\","
-                + "\"welcomeDismissed\":true}";
-        var map = Json.parse(config);
-        assertTrue(Json.getBool(map, "welcomeDismissed", false));
+        var json = JsonParser.parseString(
+                "{\"eclipse\":\"D:/eclipse\","
+                + "\"welcomeDismissed\":true}")
+                .getAsJsonObject();
+        assertTrue(json.get("welcomeDismissed")
+                .getAsBoolean());
     }
 
     @Test
     public void configDismissedFalse() {
-        String config = "{\"welcomeDismissed\":false}";
-        var map = Json.parse(config);
-        assertFalse(Json.getBool(map, "welcomeDismissed", false));
+        var json = JsonParser.parseString(
+                "{\"welcomeDismissed\":false}")
+                .getAsJsonObject();
+        assertFalse(json.get("welcomeDismissed")
+                .getAsBoolean());
     }
 
     @Test
     public void configDismissedMissing() {
-        String config = "{\"eclipse\":\"D:/eclipse\"}";
-        var map = Json.parse(config);
-        assertFalse(Json.getBool(map, "welcomeDismissed", false));
+        var json = JsonParser.parseString(
+                "{\"eclipse\":\"D:/eclipse\"}")
+                .getAsJsonObject();
+        assertFalse(json.has("welcomeDismissed"));
     }
 
     @Test
     public void configDismissedWithWhitespace() {
-        String config = "{ \"welcomeDismissed\" : true }";
-        var map = Json.parse(config);
-        assertTrue(Json.getBool(map, "welcomeDismissed", false));
+        var json = JsonParser.parseString(
+                "{ \"welcomeDismissed\" : true }")
+                .getAsJsonObject();
+        assertTrue(json.get("welcomeDismissed")
+                .getAsBoolean());
     }
-
-    // ---- Config roundtrip via ConfigService ----
-    // (Detailed roundtrip tests are in ConfigServiceTest)
 }

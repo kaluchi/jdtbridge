@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
 
+import com.google.gson.JsonParser;
+
 import org.eclipse.debug.core.DebugPlugin;
 import org.eclipse.debug.core.ILaunch;
 import org.eclipse.debug.core.ILaunchManager;
@@ -322,12 +324,14 @@ public class LaunchHandlerTest {
                         Map.of("name", "java -version",
                                 "tail", "1"));
 
-                var fullMap = Json.parse(fullJson);
-                var tailMap = Json.parse(tailJson);
+                var fullObj = JsonParser.parseString(fullJson)
+                        .getAsJsonObject();
+                var tailObj = JsonParser.parseString(tailJson)
+                        .getAsJsonObject();
                 String fullOut =
-                        Json.getString(fullMap, "output");
+                        fullObj.get("output").getAsString();
                 String tailOut =
-                        Json.getString(tailMap, "output");
+                        tailObj.get("output").getAsString();
 
                 assertNotNull(fullOut, "Should have full output");
                 assertNotNull(tailOut, "Should have tail output");
