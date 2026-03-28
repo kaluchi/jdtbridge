@@ -502,6 +502,10 @@ class SearchHandler {
             String fullSource, Map<String, String> params)
             throws Exception {
         int[] lines = memberLines(member, fullSource);
+        // Top-level type: include package + imports (from line 1)
+        if (member instanceof IType && methodName == null) {
+            lines[0] = 1;
+        }
         // Read from disk to preserve indentation
         String source = sourceFromDisk(absPath,
                 lines[0], lines[1]);

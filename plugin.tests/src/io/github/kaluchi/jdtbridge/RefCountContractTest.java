@@ -548,6 +548,60 @@ public class RefCountContractTest {
             var json = typeJson("test.model.Dog");
             assertFalse(json.has("enclosingType"));
         }
+
+        // ---- Type-level source includes imports ----
+
+        @Test
+        void topLevelSourceStartsAtLine1() throws Exception {
+            var json = typeJson("test.model.Dog");
+            assertEquals(1, json.get("startLine").getAsInt(),
+                    "Top-level type should start at line 1");
+        }
+
+        @Test
+        void topLevelSourceIncludesPackage() throws Exception {
+            var json = typeJson("test.model.Dog");
+            String source = json.get("source").getAsString();
+            assertTrue(source.startsWith("package test.model"),
+                    "Source should start with package: "
+                    + source.substring(0,
+                            Math.min(40, source.length())));
+        }
+
+        @Test
+        void topLevelSourceIncludesImports() throws Exception {
+            // Dog has no imports, use AnimalService which
+            // imports Animal and Dog
+            var json = typeJson(
+                    "test.service.AnimalService");
+            String source = json.get("source").getAsString();
+            assertTrue(source.contains("import test.model"),
+                    "Source should contain imports: "
+                    + source.substring(0,
+                            Math.min(100, source.length())));
+        }
+
+        @Test
+        void topLevelSourceIncludesClassBody()
+                throws Exception {
+            var json = typeJson("test.model.Dog");
+            String source = json.get("source").getAsString();
+            assertTrue(source.contains("class Dog"),
+                    "Source should contain class declaration");
+            assertTrue(source.contains("public String name()"),
+                    "Source should contain methods");
+        }
+
+        @Test
+        void methodLevelDoesNotStartAtLine1()
+                throws Exception {
+            // Method source should NOT start at line 1
+            var json = sourceJson(
+                    "test.service.AnimalService", "process");
+            assertTrue(
+                    json.get("startLine").getAsInt() > 1,
+                    "Method should not start at line 1");
+        }
     }
 
     // ============================================================
