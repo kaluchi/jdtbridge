@@ -8,6 +8,7 @@ import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.ITypeHierarchy;
 import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.JavaModelException;
@@ -157,5 +158,50 @@ class JdtUtils {
         }
         sig.append(")");
         return sig.toString();
+    }
+
+    /**
+     * Find all implementations of an interface/abstract method
+     * via type hierarchy. Returns FQMN → IMethod map.
+     * Shared by SourceReport and SearchHandler.
+     */
+    static java.util.LinkedHashMap<String, IMethod>
+            findImplementations(IMethod method)
+            throws JavaModelException {
+        var result =
+                new java.util.LinkedHashMap<String, IMethod>();
+        IType declaringType = method.getDeclaringType();
+        if (declaringType == null) return result;
+        if (!declaringType.isInterface()
+                && !java.lang.reflect.Modifier.isAbstract(
+                        declaringType.getFlags()))
+            return result;
+
+        String methodName = method.getElementName();
+        String paramSig;
+        try {
+            paramSig = ReferenceCollector.paramSig(method);
+        } catch (Exception e) { return result; }
+
+        ITypeHierarchy hierarchy =
+                declaringType.newTypeHierarchy(null);
+
+        for (IType sub
+                : hierarchy.getAllSubtypes(declaringType)) {
+            try {
+                for (IMethod m : sub.getMethods()) {
+                    if (!m.getElementName()
+                            .equals(methodName)) continue;
+                    if (!ReferenceCollector.paramSig(m)
+                            .equals(paramSig)) continue;
+                    result.put(
+                            sub.getFullyQualifiedName()
+                            + "#" + compactSignature(m),
+                            m);
+                    break;
+                }
+            } catch (Exception e) { /* skip */ }
+        }
+        return result;
     }
 }

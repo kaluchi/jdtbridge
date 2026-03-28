@@ -49,7 +49,18 @@ class ReferenceCollector {
             String typeBound,
             boolean isInherited,
             String inheritedFrom,
-            String implementationOf) {}
+            String implementationOf) {
+
+        /** Return a copy with implementationOf set. */
+        Ref withImplementationOf(String implOf) {
+            return new Ref(fqmn, element, kind,
+                    declaringTypeKind, isStatic,
+                    resolvedType, resolvedTypeFqn,
+                    resolvedTypeKind, isTypeVariable,
+                    typeBound, isInherited, inheritedFrom,
+                    implOf);
+        }
+    }
 
     enum RefKind { FIELD, METHOD, TYPE, CONSTANT }
 
@@ -209,20 +220,9 @@ class ReferenceCollector {
                     Ref existing = refs.get(subFqn);
                     if (existing != null) {
                         if (existing.implementationOf() == null) {
-                            subtypeRefs.add(new Ref(
-                                    existing.fqmn(),
-                                    existing.element(),
-                                    existing.kind(),
-                                    existing.declaringTypeKind(),
-                                    existing.isStatic(),
-                                    existing.resolvedType(),
-                                    existing.resolvedTypeFqn(),
-                                    existing.resolvedTypeKind(),
-                                    existing.isTypeVariable(),
-                                    existing.typeBound(),
-                                    existing.isInherited(),
-                                    existing.inheritedFrom(),
-                                    ref.fqmn()));
+                            subtypeRefs.add(existing
+                                    .withImplementationOf(
+                                            ref.fqmn()));
                         }
                         continue;
                     }

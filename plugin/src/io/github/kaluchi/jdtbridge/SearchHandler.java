@@ -332,31 +332,18 @@ class SearchHandler {
                     + " in " + fqn);
         }
 
-        int arity = method.getNumberOfParameters();
-        ITypeHierarchy hierarchy = type.newTypeHierarchy(null);
+        var impls = JdtUtils.findImplementations(method);
         var arr = new JsonArray();
-        for (IType sub : hierarchy.getAllSubtypes(type)) {
+        for (var entry : impls.entrySet()) {
+            IMethod m = entry.getValue();
+            IType sub = m.getDeclaringType();
             if (sub.isAnonymous()) continue;
-            try {
-                for (IMethod m : sub.getMethods()) {
-                    if (m.getElementName().equals(methodName)
-                            && m.getNumberOfParameters()
-                                    == arity) {
-                        var e = new JsonObject();
-                        e.addProperty("fqn",
-                                sub.getFullyQualifiedName());
-                        e.addProperty("file",
-                                filePath(sub));
-                        e.addProperty("line",
-                                getLineOfMember(m));
-                        arr.add(e);
-                        break;
-                    }
-                }
-            } catch (JavaModelException e) {
-                Log.warn("Skipping type "
-                        + sub.getFullyQualifiedName(), e);
-            }
+            var e = new JsonObject();
+            e.addProperty("fqn",
+                    sub.getFullyQualifiedName());
+            e.addProperty("file", filePath(sub));
+            e.addProperty("line", getLineOfMember(m));
+            arr.add(e);
         }
         return arr.toString();
     }

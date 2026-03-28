@@ -226,51 +226,17 @@ class SourceReport {
     }
 
     /**
-     * For interface/abstract methods, collect FQMNs of all
-     * implementations via type hierarchy. Used to partition
-     * incoming refs into implementations vs usages.
-     */
-    /**
-     * For interface/abstract methods, collect implementations
-     * via type hierarchy. Returns FQMN → IMethod map.
+     * Delegate to shared JdtUtils.findImplementations.
      */
     private static java.util.LinkedHashMap<String, IMethod>
             collectImpls(IMember member) {
-        var result =
-                new java.util.LinkedHashMap<String, IMethod>();
-        if (!(member instanceof IMethod method)) return result;
+        if (!(member instanceof IMethod method))
+            return new java.util.LinkedHashMap<>();
         try {
-            IType declaringType = method.getDeclaringType();
-            if (declaringType == null) return result;
-            if (!declaringType.isInterface()
-                    && !java.lang.reflect.Modifier.isAbstract(
-                            declaringType.getFlags()))
-                return result;
-
-            String methodName = method.getElementName();
-            String sig = ReferenceCollector.paramSig(method);
-            ITypeHierarchy hierarchy =
-                    declaringType.newTypeHierarchy(null);
-
-            for (IType sub
-                    : hierarchy.getAllSubtypes(declaringType)) {
-                try {
-                    for (IMethod m : sub.getMethods()) {
-                        if (!m.getElementName()
-                                .equals(methodName)) continue;
-                        if (!ReferenceCollector.paramSig(m)
-                                .equals(sig)) continue;
-                        result.put(
-                                sub.getFullyQualifiedName()
-                                + "#" + JdtUtils
-                                        .compactSignature(m),
-                                m);
-                        break;
-                    }
-                } catch (Exception e) { /* skip */ }
-            }
-        } catch (Exception e) { /* skip */ }
-        return result;
+            return JdtUtils.findImplementations(method);
+        } catch (Exception e) {
+            return new java.util.LinkedHashMap<>();
+        }
     }
 
     // ---- Helpers ----
@@ -407,12 +373,13 @@ class SourceReport {
 
     static void addSupersRecursive(JsonArray arr,
             ITypeHierarchy h, IType type, int depth) {
-        // Direct interfaces first
+        // Direct interfaces (and recurse into their supers)
         try {
             for (IType iface : h.getSuperInterfaces(type)) {
                 var s = hierEntry(iface);
                 s.addProperty("depth", depth);
                 arr.add(s);
+                addSupersRecursive(arr, h, iface, depth + 1);
             }
         } catch (Exception e) { /* skip */ }
         // Superclass chain

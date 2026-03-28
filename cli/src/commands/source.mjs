@@ -138,11 +138,11 @@ function formatRefGroup({ typeFqn, group }, implIndex, viewScope) {
     const impls = implIndex[group.typeRef.fqmn];
     if (impls && !(viewScope === "project" && group.typeRef.scope === "dependency")) {
       for (const impl of impls) {
+        let implLine = `  ${badge(impl)} \`${impl.fqmn}\``;
         if (impl.anonymous && impl.enclosingFqmn) {
-          lines.push(`  ↓ ${badge(impl)} \`${impl.fqmn}\` — in \`${impl.enclosingFqmn}\``);
-        } else {
-          lines.push(`  ↓ ${badge(impl)} \`${impl.fqmn}\``);
+          implLine += ` — in \`${impl.enclosingFqmn}\``;
         }
+        lines.push(implLine);
       }
     }
   }
