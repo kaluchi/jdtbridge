@@ -503,7 +503,9 @@ class SearchHandler {
             throws Exception {
         int[] lines = memberLines(member, fullSource);
         // Top-level type: include package + imports (from line 1)
-        if (member instanceof IType && methodName == null) {
+        // Inner classes keep their declaration range
+        if (member instanceof IType t && methodName == null
+                && t.getDeclaringType() == null) {
             lines[0] = 1;
         }
         // Read from disk to preserve indentation

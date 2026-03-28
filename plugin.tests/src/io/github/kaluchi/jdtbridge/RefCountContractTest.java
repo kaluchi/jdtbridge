@@ -595,12 +595,63 @@ public class RefCountContractTest {
         @Test
         void methodLevelDoesNotStartAtLine1()
                 throws Exception {
-            // Method source should NOT start at line 1
             var json = sourceJson(
                     "test.service.AnimalService", "process");
             assertTrue(
                     json.get("startLine").getAsInt() > 1,
                     "Method should not start at line 1");
+        }
+
+        // ---- REGRESSION: inner class must NOT start at 1 ----
+
+        @Test
+        void innerClassDoesNotStartAtLine1()
+                throws Exception {
+            // Outer.Inner is an inner class — should NOT
+            // include Outer's package/imports/body
+            var json = typeJson("test.edge.Outer.Inner");
+            assertTrue(
+                    json.get("startLine").getAsInt() > 1,
+                    "Inner class should not start at line 1: "
+                    + json.get("startLine"));
+        }
+
+        @Test
+        void innerClassSourceDoesNotContainPackage()
+                throws Exception {
+            var json = typeJson("test.edge.Outer.Inner");
+            String source = json.get("source").getAsString();
+            assertFalse(source.contains("package test"),
+                    "Inner class source should not have "
+                    + "package declaration");
+        }
+
+        @Test
+        void staticNestedDoesNotStartAtLine1()
+                throws Exception {
+            var json = typeJson(
+                    "test.edge.Outer.StaticNested");
+            assertTrue(
+                    json.get("startLine").getAsInt() > 1,
+                    "Static nested should not start at 1: "
+                    + json.get("startLine"));
+        }
+
+        @Test
+        void enumStillStartsAtLine1() throws Exception {
+            // Color is a top-level enum — should start at 1
+            var json = typeJson("test.edge.Color");
+            assertEquals(1,
+                    json.get("startLine").getAsInt(),
+                    "Top-level enum should start at line 1");
+        }
+
+        @Test
+        void interfaceStillStartsAtLine1() throws Exception {
+            var json = typeJson("test.model.Animal");
+            assertEquals(1,
+                    json.get("startLine").getAsInt(),
+                    "Top-level interface should start at 1");
         }
     }
 
