@@ -92,6 +92,18 @@ Compilation diagnostics. Refreshes from disk and waits for auto-build before rea
 | `warnings` | Include warnings (default: errors only) |
 | `all` | All marker types (jdt + checkstyle + maven + ...) |
 
+### `GET /refresh?[file=<path>][&project=<name>]`
+
+Explicitly notify Eclipse that files changed on disk. No build wait, no markers. Automatic for `.java` edits when the PostToolUse hook is installed (`jdt setup --claude`).
+
+| Parameter | Description |
+|-----------|-------------|
+| `file` | Absolute filesystem path to refresh (DEPTH_ZERO) |
+| `project` | Project name to refresh (DEPTH_INFINITE) |
+| _(none)_ | Refresh entire workspace (DEPTH_INFINITE) |
+
+Returns `{"refreshed":true, ...}` or `{"refreshed":false, "reason":"not in workspace"}`.
+
 ## Refactoring
 
 ### `GET /organize-imports?file=<path>`

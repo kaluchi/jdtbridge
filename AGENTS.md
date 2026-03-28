@@ -79,6 +79,7 @@ jdt type-info <FQN>              # class overview without reading 600 lines
 jdt test run <FQN>#<method> -f   # run one test, stream progress
 jdt errors --project <name>      # instant compilation check
 jdt build --project <name>       # incremental build (1-3s, not 40s Maven)
+jdt refresh <file>               # explicitly notify Eclipse of file changes
 ```
 
 ### `jdt source` — hypertext navigation
@@ -163,6 +164,30 @@ For CI without local Eclipse: `mvn clean verify -Pci`.
    - `cli/src/commands/*.mjs` (per-command help)
    - `README.md`, `cli/README.md`, `plugin/README.md`, this file
 7. **Commit → push → PR → squash merge → delete branch**
+
+### Pull requests
+
+Use `gh pr create` / `gh pr edit` / `gh pr merge`. **Always pass `--body`
+via HEREDOC** to avoid shell escaping issues. Do NOT use markdown formatting
+characters (`*`, `#`, `` ` ``) in `--body` — they break `gh` argument parsing.
+Use plain text or `- [x]` checklists only.
+
+```bash
+# Create
+gh pr create --title "Short title" --body "$(cat <<'EOF'
+Summary line.
+
+- [x] Tests pass
+- [x] Docs updated
+EOF
+)"
+
+# Edit (ignore GraphQL Projects Classic deprecation warning)
+gh pr edit 55 --body "new body text" 2>&1 | grep -v GraphQL
+
+# Merge + cleanup
+gh pr merge 55 --squash --delete-branch
+```
 
 ### Important details
 

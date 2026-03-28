@@ -156,6 +156,75 @@ class DiagnosticsHandler {
         return result.toString();
     }
 
+    /**
+     * Lightweight refresh: notify Eclipse that files changed on disk.
+     * No build wait, no markers — just refreshLocal.
+     *
+     * Scope (pick one or omit for workspace):
+     *   file=<absolute-path>   single file (DEPTH_ZERO)
+     *   project=<name>         entire project (DEPTH_INFINITE)
+     *   (none)                 entire workspace (DEPTH_INFINITE)
+     */
+    String handleRefresh(Map<String, String> params)
+            throws Exception {
+        String filePath = params.get("file");
+        String projectName = params.get("project");
+
+        IWorkspaceRoot root =
+                ResourcesPlugin.getWorkspace().getRoot();
+
+        if (filePath != null && !filePath.isBlank()) {
+            // Absolute path → workspace file
+            var path = org.eclipse.core.runtime.Path
+                    .fromOSString(filePath);
+            IFile[] files = root.findFilesForLocationURI(
+                    path.toFile().toURI());
+
+            if (files.length == 0) {
+                var result = new JsonObject();
+                result.addProperty("refreshed", false);
+                result.addProperty("reason",
+                        "not in workspace");
+                return result.toString();
+            }
+
+            for (IFile file : files) {
+                file.refreshLocal(
+                        IResource.DEPTH_ZERO, null);
+            }
+
+            var result = new JsonObject();
+            result.addProperty("refreshed", true);
+            result.addProperty("files", files.length);
+            return result.toString();
+
+        } else if (projectName != null
+                && !projectName.isBlank()) {
+            IProject project = root.getProject(projectName);
+            if (!project.exists()) {
+                return HttpServer.jsonError(
+                        "Project not found: " + projectName);
+            }
+            project.refreshLocal(
+                    IResource.DEPTH_INFINITE, null);
+
+            var result = new JsonObject();
+            result.addProperty("refreshed", true);
+            result.addProperty("project", projectName);
+            return result.toString();
+
+        } else {
+            // Workspace-wide
+            root.refreshLocal(
+                    IResource.DEPTH_INFINITE, null);
+
+            var result = new JsonObject();
+            result.addProperty("refreshed", true);
+            result.addProperty("scope", "workspace");
+            return result.toString();
+        }
+    }
+
     String shortMarkerType(String type) {
         if (type == null) return "unknown";
         if (type.contains("jdt")) return "jdt";

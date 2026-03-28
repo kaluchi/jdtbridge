@@ -27,7 +27,9 @@ describe("mergeJdtSettings", () => {
         PostToolUse: [{ matcher: "Write", hooks: [] }],
       },
     });
-    expect(result.hooks.PostToolUse).toHaveLength(1);
+    // Existing Write hook + new jdt refresh hook
+    expect(result.hooks.PostToolUse).toHaveLength(2);
+    expect(result.hooks.PostToolUse[0].matcher).toBe("Write");
     expect(result.hooks.PreToolUse).toHaveLength(1);
   });
 
@@ -37,6 +39,15 @@ describe("mergeJdtSettings", () => {
     mergeJdtSettings(settings);
     expect(settings.permissions.allow.filter((r) => r === "Bash(jdt *)")).toHaveLength(1);
     expect(settings.hooks.PreToolUse).toHaveLength(1);
+    expect(settings.hooks.PostToolUse).toHaveLength(1);
+  });
+
+  it("adds PostToolUse refresh hook for Edit|Write", () => {
+    const result = mergeJdtSettings({});
+    expect(result.hooks.PostToolUse).toHaveLength(1);
+    expect(result.hooks.PostToolUse[0].matcher).toBe("Edit|Write");
+    expect(result.hooks.PostToolUse[0].hooks[0].command).toContain("jdt");
+    expect(result.hooks.PostToolUse[0].hooks[0].command).toContain("refresh");
   });
 
   it("does not duplicate if exact hook already exists", () => {

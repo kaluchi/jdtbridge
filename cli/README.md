@@ -58,9 +58,16 @@ All commands auto-refresh from disk. `build` is the only command that triggers e
 ```bash
 jdt errors [--project <name>] [--file <path>]          # (alias: err) compilation errors
 jdt errors --warnings --all                            # include warnings and all marker types
+jdt refresh <file> [<file> ...]                        # (alias: r) notify Eclipse of file changes
+jdt refresh --project <name>                           # refresh entire project
+jdt refresh                                            # refresh entire workspace
 ```
 
-File paths are workspace-relative: `my-app/src/main/java/.../Foo.java`.
+`errors` file paths are workspace-relative: `my-app/src/main/java/.../Foo.java`.
+`refresh` accepts absolute paths (converted to workspace resources automatically).
+
+A PostToolUse hook (`jdt setup --claude`) calls `jdt refresh` automatically
+after every Edit/Write — Eclipse stays in sync without manual intervention.
 
 ### Refactoring
 

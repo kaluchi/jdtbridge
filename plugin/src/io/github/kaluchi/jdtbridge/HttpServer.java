@@ -379,6 +379,8 @@ public class HttpServer {
                         diagnostics.handleErrors(params));
                 case "/build" -> Response.json(
                         diagnostics.handleBuild(params));
+                case "/refresh" -> Response.json(
+                        diagnostics.handleRefresh(params));
                 case "/type-info" -> Response.json(
                         search.handleTypeInfo(params));
                 case "/source" -> search.handleSource(params);

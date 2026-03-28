@@ -6,6 +6,8 @@ import { execSync } from "node:child_process";
 
 const JDT_HOOK_COMMAND = `node -e "d=JSON.parse(require('fs').readFileSync(0,'utf8'));d.tool_input?.command?.startsWith('jdt ')&&process.stdout.write(JSON.stringify({hookSpecificOutput:{hookEventName:'PreToolUse',permissionDecision:'allow'}}))"`;
 
+const JDT_REFRESH_HOOK_COMMAND = `node -e "const d=JSON.parse(require('fs').readFileSync(0,'utf8'));const f=d.tool_input?.file_path;if(f){try{require('child_process').execSync('jdt refresh '+JSON.stringify(f),{timeout:5000,stdio:'ignore',shell:true})}catch{}}"`;
+
 /**
  * Find the project root (git root or cwd).
  * @returns {string}
@@ -49,6 +51,19 @@ export function mergeJdtSettings(settings) {
     });
   }
 
+  // PostToolUse: refresh Eclipse on Edit/Write of .java files
+  if (!settings.hooks.PostToolUse) settings.hooks.PostToolUse = [];
+  // Remove any old jdt refresh hooks (command may have changed)
+  settings.hooks.PostToolUse = settings.hooks.PostToolUse.filter(
+    (h) =>
+      !(h.matcher === "Edit|Write" &&
+        h.hooks?.some((hk) => hk.command?.includes("jdt") && hk.command?.includes("refresh"))),
+  );
+  settings.hooks.PostToolUse.push({
+    matcher: "Edit|Write",
+    hooks: [{ type: "command", command: JDT_REFRESH_HOOK_COMMAND }],
+  });
+
   return settings;
 }
 
@@ -80,4 +95,54 @@ export function installClaudeSettings(root) {
   writeFileSync(file, JSON.stringify(settings, null, 2) + "\n");
 
   return { file, settings };
+}
+
+/**
+ * Remove JDT Bridge settings from Claude Code.
+ * Removes permission rules and hooks, preserves unrelated settings.
+ * @param {string} [root] project root (default: git root or cwd)
+ * @returns {{ file: string, removed: boolean }}
+ */
+export function uninstallClaudeSettings(root) {
+  if (!root) root = findProjectRoot();
+
+  const file = join(root, ".claude", "settings.json");
+  if (!existsSync(file)) return { file, removed: false };
+
+  let settings;
+  try {
+    settings = JSON.parse(readFileSync(file, "utf8"));
+  } catch {
+    return { file, removed: false };
+  }
+
+  // Remove jdt permission
+  if (settings.permissions?.allow) {
+    settings.permissions.allow = settings.permissions.allow
+      .filter((r) => r !== "Bash(jdt *)");
+  }
+
+  // Remove PreToolUse jdt hooks
+  if (settings.hooks?.PreToolUse) {
+    settings.hooks.PreToolUse = settings.hooks.PreToolUse
+      .filter((h) => !h.hooks?.some(
+        (hk) => hk.command?.includes("jdt ")));
+  }
+
+  // Remove PostToolUse jdt refresh hooks
+  if (settings.hooks?.PostToolUse) {
+    settings.hooks.PostToolUse = settings.hooks.PostToolUse
+      .filter((h) => !h.hooks?.some(
+        (hk) => hk.command?.includes("jdt") && hk.command?.includes("refresh")));
+  }
+
+  // Clean empty arrays
+  if (settings.hooks?.PreToolUse?.length === 0) delete settings.hooks.PreToolUse;
+  if (settings.hooks?.PostToolUse?.length === 0) delete settings.hooks.PostToolUse;
+  if (settings.hooks && Object.keys(settings.hooks).length === 0) delete settings.hooks;
+  if (settings.permissions?.allow?.length === 0) delete settings.permissions.allow;
+  if (settings.permissions && Object.keys(settings.permissions).length === 0) delete settings.permissions;
+
+  writeFileSync(file, JSON.stringify(settings, null, 2) + "\n");
+  return { file, removed: true };
 }

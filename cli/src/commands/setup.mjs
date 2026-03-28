@@ -1,6 +1,6 @@
 // Setup command — install/update/remove the Eclipse JDT Bridge plugin.
 
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execSync } from "node:child_process";
@@ -168,6 +168,31 @@ async function runCheck(config) {
     (built ? ok : info)(built ? "p2 site: built" : "Not built yet");
   } else {
     info("Repo not found (CLI not in cloned repo)");
+  }
+  console.log();
+
+  // Claude Code hooks
+  console.log(bold("Claude Code"));
+  try {
+    const cwd = process.cwd();
+    const settingsPath = join(cwd, ".claude", "settings.json");
+    if (existsSync(settingsPath)) {
+      const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
+      const hasPre = settings.hooks?.PreToolUse?.some(
+        (h) => h.hooks?.some((hk) => hk.command?.includes("jdt ")));
+      const hasPost = settings.hooks?.PostToolUse?.some(
+        (h) => h.hooks?.some(
+          (hk) => hk.command?.includes("jdt") && hk.command?.includes("refresh")));
+      (hasPre ? ok : info)(`PreToolUse hook: ${hasPre ? "installed" : "not installed"}`);
+      (hasPost ? ok : info)(`PostToolUse hook: ${hasPost ? "installed" : "not installed"}`);
+      if (!hasPre || !hasPost) {
+        info("Run: jdt setup --claude");
+      }
+    } else {
+      info("No .claude/settings.json — run: jdt setup --claude");
+    }
+  } catch {
+    info("Could not read .claude/settings.json");
   }
   console.log();
 }
@@ -357,10 +382,24 @@ export async function setup(args) {
     await runCheck(config);
   } else if (args.includes("--remove")) {
     await runRemove(config);
+  } else if (args.includes("--remove-claude")) {
+    await removeClaude();
   } else if (args.includes("--claude")) {
     await setupClaude();
   } else {
     await runInstall(config, flags);
+  }
+}
+
+async function removeClaude() {
+  const { uninstallClaudeSettings } = await import("../claude-setup.mjs");
+  const { file, removed } = uninstallClaudeSettings();
+  if (removed) {
+    console.log(`${green("✓")} JDT Bridge hooks removed from ${file}`);
+    console.log();
+    console.log("  Restart Claude Code to apply.");
+  } else {
+    console.log("No Claude Code settings found.");
   }
 }
 
@@ -373,6 +412,7 @@ async function setupClaude() {
   console.log("  Installed:");
   console.log("  - Bash(jdt *) permission rule");
   console.log("  - PreToolUse hook for # workaround (issue #34061)");
+  console.log("  - PostToolUse hook for Eclipse refresh on Edit/Write");
   console.log();
   console.log("  Restart Claude Code to apply.");
 }
@@ -386,6 +426,7 @@ Modes:
   --check         show status of all components (diagnostic only)
   --remove        uninstall the plugin from Eclipse
   --claude        configure Claude Code for this project (permissions + hooks)
+  --remove-claude remove JDT Bridge hooks from Claude Code settings
 
 Options:
   --eclipse <path>    Eclipse installation directory

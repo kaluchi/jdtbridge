@@ -113,4 +113,64 @@ public class DiagnosticsIntegrationTest {
         assertTrue(json.contains("error"),
                 "Should return error: " + json);
     }
+
+    // ---- handleRefresh ----
+
+    @Test
+    public void refreshWorkspaceFile() throws Exception {
+        // Get absolute path of a file in the test project
+        var root = org.eclipse.core.resources.ResourcesPlugin
+                .getWorkspace().getRoot();
+        var file = root.getProject(TestFixture.PROJECT_NAME)
+                .getFile("src/test/model/Dog.java");
+        assertTrue(file.exists(), "Dog.java should exist");
+        String absPath = file.getLocation().toOSString();
+
+        Map<String, String> params = new HashMap<>();
+        params.put("file", absPath);
+        String json = handler.handleRefresh(params);
+        assertTrue(json.contains("\"refreshed\":true"),
+                "Should refresh: " + json);
+    }
+
+    @Test
+    public void refreshNonWorkspaceFile() throws Exception {
+        Map<String, String> params = new HashMap<>();
+        params.put("file", "C:/nonexistent/Foo.java");
+        String json = handler.handleRefresh(params);
+        assertTrue(json.contains("\"refreshed\":false"),
+                "Should not refresh: " + json);
+        assertTrue(json.contains("not in workspace"),
+                "Reason: " + json);
+    }
+
+    @Test
+    public void refreshProject() throws Exception {
+        Map<String, String> params = new HashMap<>();
+        params.put("project", TestFixture.PROJECT_NAME);
+        String json = handler.handleRefresh(params);
+        assertTrue(json.contains("\"refreshed\":true"),
+                "Should refresh project: " + json);
+        assertTrue(json.contains(TestFixture.PROJECT_NAME),
+                "Should name project: " + json);
+    }
+
+    @Test
+    public void refreshProjectNotFound() throws Exception {
+        Map<String, String> params = new HashMap<>();
+        params.put("project", "nonexistent-xyz");
+        String json = handler.handleRefresh(params);
+        assertTrue(json.contains("error"),
+                "Should return error: " + json);
+    }
+
+    @Test
+    public void refreshWorkspace() throws Exception {
+        Map<String, String> params = new HashMap<>();
+        String json = handler.handleRefresh(params);
+        assertTrue(json.contains("\"refreshed\":true"),
+                "Should refresh workspace: " + json);
+        assertTrue(json.contains("workspace"),
+                "Should say workspace scope: " + json);
+    }
 }

@@ -15,6 +15,7 @@ import { testRun, help as testRunHelp } from "./commands/test-run.mjs";
 import { testStatus, help as testStatusHelp } from "./commands/test-status.mjs";
 import { testSessions, help as testSessionsHelp } from "./commands/test-sessions.mjs";
 import { errors, help as errorsHelp } from "./commands/errors.mjs";
+import { refresh, help as refreshHelp } from "./commands/refresh.mjs";
 import {
   organizeImports,
   format,
@@ -138,6 +139,7 @@ const commands = {
   build: { fn: build, help: buildHelp },
   test: { fn: testDispatch, help: testHelp },
   errors: { fn: errors, help: errorsHelp },
+  refresh: { fn: refresh, help: refreshHelp },
   "organize-imports": { fn: organizeImports, help: organizeImportsHelp },
   format: { fn: format, help: formatHelp },
   rename: { fn: rename, help: renameHelp },
@@ -161,6 +163,7 @@ const aliases = {
   src: "source",
   b: "build",
   err: "errors",
+  r: "refresh",
   fmt: "format",
 };
 
@@ -204,6 +207,7 @@ Testing & building:
 
 Diagnostics:
   errors${fmtAliases("errors")} [--file <path>] [--project <name>]   compilation errors
+  refresh${fmtAliases("refresh")} [<file> ...] [--project <name>]  explicitly notify Eclipse of file changes
 
 Refactoring:
   organize-imports${fmtAliases("organize-imports")} <file>                     organize imports

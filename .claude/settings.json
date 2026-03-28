@@ -15,6 +15,17 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const d=JSON.parse(require('fs').readFileSync(0,'utf8'));const f=d.tool_input?.file_path;if(f){try{require('child_process').execSync('jdt refresh '+JSON.stringify(f),{timeout:5000,stdio:'ignore',shell:true})}catch{}}\""
+          }
+        ]
+      }
     ]
   }
 }
