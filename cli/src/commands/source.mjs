@@ -244,6 +244,20 @@ function formatMarkdown(result) {
 
   const viewScope = result.viewScope;
 
+  // Implementations section (interface/abstract methods)
+  const impls = result.implementations || [];
+  if (impls.length > 0) {
+    lines.push("");
+    lines.push("#### Implementations:");
+    for (const impl of impls) {
+      let line = `[M] \`${impl.fqmn}\``;
+      if (impl.anonymous && impl.enclosingFqmn) {
+        line += ` — in \`${impl.enclosingFqmn}\``;
+      }
+      lines.push(line);
+    }
+  }
+
   if (outgoing.length > 0) {
     const implIndex = buildImplIndex(outgoing);
     const mainRefs = outgoing.filter((r) => !r.implementationOf);

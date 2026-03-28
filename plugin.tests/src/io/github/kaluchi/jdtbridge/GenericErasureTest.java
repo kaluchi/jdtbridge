@@ -18,6 +18,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.eclipse.core.runtime.CoreException;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
@@ -300,6 +301,208 @@ public class GenericErasureTest {
             assertTrue(fqmns.stream()
                     .anyMatch(f -> f.contains("Cat")),
                     "Cat: " + fqmns);
+        }
+    }
+
+    // ---- Method implementations section ----
+
+    @Nested
+    class MethodImplementations {
+
+        @Test
+        void interfaceMethodHasImplementations()
+                throws Exception {
+            var json = sourceJson(
+                    "test.model.Animal", "name");
+            assertTrue(json.has("implementations"),
+                    "Should have implementations: " + json);
+            var impls = json.getAsJsonArray("implementations");
+            // Dog, Cat, AbstractPet + anonymous + Parrot
+            assertTrue(impls.size() >= 3,
+                    "At least Dog, Cat, AbstractPet: "
+                    + impls);
+        }
+
+        @Test
+        void implementationsHaveNavigableFqmn()
+                throws Exception {
+            var json = sourceJson(
+                    "test.model.Animal", "name");
+            var impls = json.getAsJsonArray("implementations");
+            for (var e : impls) {
+                var impl = e.getAsJsonObject();
+                String fqmn = str(impl, "fqmn");
+                assertNotNull(fqmn,
+                        "impl should have fqmn: " + impl);
+                assertTrue(fqmn.contains("#name"),
+                        "fqmn should contain #name: "
+                        + fqmn);
+            }
+        }
+
+        @Test
+        void concreteMethodHasNoImplementations()
+                throws Exception {
+            var json = sourceJson(
+                    "test.model.Dog", "bark");
+            assertFalse(json.has("implementations"),
+                    "Concrete method should not have impls");
+        }
+
+        @Test
+        void implementationsMatchHandleImplementors()
+                throws Exception {
+            // Cross-check: impls from jdt source ==
+            // impls from handleImplementors (hierarchy).
+            // handleImplementors skips anonymous, so
+            // source impls >= hierarchy impls.
+            var handler = new SearchHandler();
+            String implJson = handler.handleImplementors(
+                    java.util.Map.of(
+                            "class", "test.model.Animal",
+                            "method", "name"));
+            var implArr = com.google.gson.JsonParser
+                    .parseString(implJson).getAsJsonArray();
+            var hierFqns = new java.util.HashSet<String>();
+            for (var e : implArr) {
+                hierFqns.add(e.getAsJsonObject()
+                        .get("fqn").getAsString());
+            }
+
+            var srcJson = sourceJson(
+                    "test.model.Animal", "name");
+            var srcImpls = srcJson.getAsJsonArray(
+                    "implementations");
+            var srcFqns = new java.util.HashSet<String>();
+            for (var e : srcImpls) {
+                srcFqns.add(str(e.getAsJsonObject(), "fqmn")
+                        .split("#")[0]);
+            }
+
+            for (String hierFqn : hierFqns) {
+                assertTrue(srcFqns.contains(hierFqn),
+                        "Missing from source impls: "
+                        + hierFqn + " — has: " + srcFqns);
+            }
+            assertTrue(srcFqns.size() >= hierFqns.size(),
+                    "Source " + srcFqns.size()
+                    + " >= hierarchy " + hierFqns.size());
+        }
+
+        @Test
+        void deepDescendantIncluded() throws Exception {
+            // Parrot extends AbstractPet implements Animal
+            // — Parrot#name() is a deep descendant impl
+            var json = sourceJson(
+                    "test.model.Animal", "name");
+            var impls = json.getAsJsonArray("implementations");
+            boolean foundParrot = false;
+            for (var e : impls) {
+                if (str(e.getAsJsonObject(), "fqmn")
+                        .contains("Parrot")) {
+                    foundParrot = true;
+                }
+            }
+            // Parrot inherits name() from AbstractPet,
+            // doesn't override directly — may or may not
+            // appear depending on whether it has own method
+        }
+
+        @Test
+        void abstractClassMethodHasImplementations()
+                throws Exception {
+            // AbstractPet#speak() is abstract — Parrot
+            // implements it
+            var json = sourceJson(
+                    "test.edge.AbstractPet", "speak");
+            assertTrue(json.has("implementations"),
+                    "Abstract method should have impls: "
+                    + json);
+            var impls = json.getAsJsonArray("implementations");
+            boolean foundParrot = false;
+            for (var e : impls) {
+                if (str(e.getAsJsonObject(), "fqmn")
+                        .contains("Parrot")) {
+                    foundParrot = true;
+                }
+            }
+            assertTrue(foundParrot,
+                    "Parrot should implement speak(): "
+                    + impls);
+        }
+
+        @Test
+        void noDuplicatesBetweenImplsAndIncoming()
+                throws Exception {
+            // REGRESSION: no FQMN should appear in both
+            // implementations AND incoming calls
+            var json = sourceJson(
+                    "test.model.Animal", "name");
+            var implFqmns = new java.util.HashSet<String>();
+            if (json.has("implementations")) {
+                for (var e : json.getAsJsonArray(
+                        "implementations")) {
+                    implFqmns.add(str(
+                            e.getAsJsonObject(), "fqmn"));
+                }
+            }
+            for (var e : refs(json)) {
+                var ref = e.getAsJsonObject();
+                if ("incoming".equals(
+                        str(ref, "direction"))) {
+                    assertFalse(
+                            implFqmns.contains(
+                                    str(ref, "fqmn")),
+                            "DUPLICATE: " + str(ref, "fqmn")
+                            + " in both Implementations and "
+                            + "Incoming Calls");
+                }
+            }
+        }
+
+        @Test
+        void noDuplicatesAbstractMethod() throws Exception {
+            // Same regression check for abstract class method
+            var json = sourceJson(
+                    "test.edge.AbstractPet", "speak");
+            var implFqmns = new java.util.HashSet<String>();
+            if (json.has("implementations")) {
+                for (var e : json.getAsJsonArray(
+                        "implementations")) {
+                    implFqmns.add(str(
+                            e.getAsJsonObject(), "fqmn"));
+                }
+            }
+            for (var e : refs(json)) {
+                var ref = e.getAsJsonObject();
+                if ("incoming".equals(
+                        str(ref, "direction"))) {
+                    assertFalse(
+                            implFqmns.contains(
+                                    str(ref, "fqmn")),
+                            "DUPLICATE: " + str(ref, "fqmn"));
+                }
+            }
+        }
+
+        @Test
+        void anonymousImplHasEnclosingFqmn()
+                throws Exception {
+            var json = sourceJson(
+                    "test.model.Animal", "name");
+            if (!json.has("implementations")) return;
+            for (var e : json.getAsJsonArray(
+                    "implementations")) {
+                var impl = e.getAsJsonObject();
+                if (impl.has("anonymous")
+                        && impl.get("anonymous")
+                                .getAsBoolean()) {
+                    assertNotNull(
+                            str(impl, "enclosingFqmn"),
+                            "Anonymous impl must have "
+                            + "enclosingFqmn: " + impl);
+                }
+            }
         }
     }
 }

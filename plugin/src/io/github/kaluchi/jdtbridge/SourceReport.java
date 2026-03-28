@@ -167,18 +167,49 @@ class SourceReport {
             refsArr.add(entry);
         }
 
-        // Incoming refs (callers)
+        // Resolve implementations from hierarchy (SearchEngine
+        // REFERENCES search doesn't include override declarations)
+        var impls = collectImpls(member);
+        if (!impls.isEmpty()) {
+            var implArr = new JsonArray();
+            for (var e : impls.entrySet()) {
+                var entry = new JsonObject();
+                entry.addProperty("fqmn", e.getKey());
+                try {
+                    IType dt = e.getValue().getDeclaringType();
+                    if (dt != null && dt.isAnonymous()) {
+                        entry.addProperty("anonymous", true);
+                        var parent = dt.getParent();
+                        if (parent instanceof IMethod em) {
+                            entry.addProperty("enclosingFqmn",
+                                    em.getDeclaringType()
+                                            .getFullyQualifiedName()
+                                    + "#" + JdtUtils
+                                            .compactSignature(em));
+                        }
+                    }
+                } catch (Exception ex) { /* skip */ }
+                implArr.add(entry);
+            }
+            result.add("implementations", implArr);
+        }
+
+        // Incoming refs (callers) — exclude any that match
+        // an implementation FQMN (rare: impl also calls super)
         if (incomingRefs != null) {
             for (var inc : incomingRefs) {
+                if (impls.containsKey(inc.fqmn())) continue;
                 var entry = new JsonObject();
                 entry.addProperty("fqmn", inc.fqmn());
                 entry.addProperty("direction", "incoming");
                 entry.addProperty("kind", "method");
                 if (inc.typeKind() != null) {
-                    entry.addProperty("typeKind", inc.typeKind());
+                    entry.addProperty("typeKind",
+                            inc.typeKind());
                 }
-                entry.addProperty("scope", inc.isProjectSource()
-                        ? "project" : "dependency");
+                entry.addProperty("scope",
+                        inc.isProjectSource()
+                                ? "project" : "dependency");
                 if (inc.file() != null) {
                     entry.addProperty("file", inc.file());
                 }
@@ -192,6 +223,54 @@ class SourceReport {
         result.add("refs", refsArr);
 
         return result.toString();
+    }
+
+    /**
+     * For interface/abstract methods, collect FQMNs of all
+     * implementations via type hierarchy. Used to partition
+     * incoming refs into implementations vs usages.
+     */
+    /**
+     * For interface/abstract methods, collect implementations
+     * via type hierarchy. Returns FQMN → IMethod map.
+     */
+    private static java.util.LinkedHashMap<String, IMethod>
+            collectImpls(IMember member) {
+        var result =
+                new java.util.LinkedHashMap<String, IMethod>();
+        if (!(member instanceof IMethod method)) return result;
+        try {
+            IType declaringType = method.getDeclaringType();
+            if (declaringType == null) return result;
+            if (!declaringType.isInterface()
+                    && !java.lang.reflect.Modifier.isAbstract(
+                            declaringType.getFlags()))
+                return result;
+
+            String methodName = method.getElementName();
+            String sig = ReferenceCollector.paramSig(method);
+            ITypeHierarchy hierarchy =
+                    declaringType.newTypeHierarchy(null);
+
+            for (IType sub
+                    : hierarchy.getAllSubtypes(declaringType)) {
+                try {
+                    for (IMethod m : sub.getMethods()) {
+                        if (!m.getElementName()
+                                .equals(methodName)) continue;
+                        if (!ReferenceCollector.paramSig(m)
+                                .equals(sig)) continue;
+                        result.put(
+                                sub.getFullyQualifiedName()
+                                + "#" + JdtUtils
+                                        .compactSignature(m),
+                                m);
+                        break;
+                    }
+                } catch (Exception e) { /* skip */ }
+            }
+        } catch (Exception e) { /* skip */ }
+        return result;
     }
 
     // ---- Helpers ----
