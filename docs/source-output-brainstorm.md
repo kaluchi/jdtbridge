@@ -28,6 +28,10 @@
 
 13. **Each Command Has One Job**: `jdt source` = source code + references. `jdt type-info` = compact structural overview. Don't mix them.
 
+14. **Same-Domain Implementation Display**: Server resolves ALL implementations (exhaustive). CLI filters by domain: when `viewScope` is `"project"`, dependency interface implementations are hidden. This prevents library noise (e.g. 5 SLF4J Logger impls) while keeping the data available for alternative views.
+
+15. **Incoming Calls Are Links, Not Locations**: Incoming callers are shown as navigable FQMNs only — no line numbers. The caller's source is one `jdt source` away; a bare line number without file context is noise.
+
 ## Badge Legend
 
 ```
@@ -53,6 +57,7 @@ Implementation: `ReferenceCollector` (outgoing refs via AST), `SearchHandler.col
   "endLine":   55,
   "source":    "..byte-exact source..",
   "overrideTarget": "interface pkg.Interface#method(Param)",
+  "viewScope":  "project",
   "refs": [ ...ref objects... ]
 }
 ```
@@ -95,16 +100,19 @@ Every ref in the `refs` array carries all metadata. Client never needs a second 
 - **`inherited`** + **`inheritedFrom`**: method declared in ancestor, called on subtype. Detected by comparing receiver type with declaring class at call site.
 - **`implementationOf`**: links implementation ref back to the interface method FQMN. Null for non-implementation refs.
 - **`overrideTarget`**: top-level field (not per-ref). Format: `"interface pkg.Type#method()"` or `"class pkg.Type#method()"`. Resolved via supertype hierarchy walk.
+- **`viewScope`**: top-level field. `"project"` when the viewed member is workspace source, `"dependency"` when binary/library. Used by CLI for domain-scoped filtering (e.g. hiding dependency interface implementations).
 
 ### Implementation resolution
 
-For each outgoing ref where `typeKind: "interface"` and `kind: "method"`, the server resolves implementations via `IType.newTypeHierarchy(null)` → `getAllSubtypes()`. Scope: workspace + classpath. JDK interfaces filtered by `isJdkType`. No cardinality caps.
+For each outgoing ref where `typeKind: "interface"` and `kind: "method"`, the server resolves implementations via `IType.newTypeHierarchy(null)` → `getAllSubtypes()`. JDK interfaces filtered by `isJdkType`. No cardinality caps.
+
+**Domain scoping** (server-exhaustive, client-filters): the server always resolves ALL implementations — no filtering, no caps. The response includes `viewScope` (`"project"` or `"dependency"`) so the CLI can decide what to show. Default CLI behavior: when `viewScope` is `"project"`, implementations for dependency-scope interface refs are hidden (e.g. `org.slf4j.Logger` impls). When `viewScope` is `"dependency"`, all implementations are shown. This keeps implementation data available for future use (e.g. filtering by JAR, showing on demand) while keeping default output clean.
 
 ### Server responsibilities
 
 - Collects outgoing refs (AST visitor in `ReferenceCollector`)
 - Collects incoming refs (SearchEngine in `SearchHandler.collectIncomingRefs`)
-- Resolves implementations for interface method calls
+- Resolves implementations for interface method calls (domain-scoped)
 - Resolves @Override target
 - Resolves type hierarchy for type-level requests
 - No grouping, no ordering, no filtering, no formatting

@@ -91,8 +91,8 @@ function formatMemberRef(ref) {
   if (ref.inherited) annotations.push("inherited");
   if (annotations.length > 0) line += ` (${annotations.join(", ")})`;
 
-  // Line number (only for incoming)
-  if (ref.direction === "incoming" && ref.line) line += ` :${ref.line}`;
+  // Line number: server sends it but we don't render for incoming —
+  // callers are navigable by FQMN, line numbers just add noise
 
   // Javadoc inline after —
   if (ref.doc) line += ` — ${ref.doc}`;
@@ -126,7 +126,7 @@ function groupByDeclaringType(refs) {
   return groups;
 }
 
-function formatRefGroup({ typeFqn, group }, implIndex) {
+function formatRefGroup({ typeFqn, group }, implIndex, viewScope) {
   const lines = [];
   if (group.typeRef) {
     lines.push(formatTypeHeader(group.typeRef));
@@ -136,9 +136,10 @@ function formatRefGroup({ typeFqn, group }, implIndex) {
   }
   for (const ref of group.members) {
     lines.push(formatMemberRef(ref));
-    // Show implementations right after the interface method
+    // Show implementations — skip dependency interface impls
+    // when viewing project source (domain scoping)
     const impls = implIndex[ref.fqmn];
-    if (impls) {
+    if (impls && !(viewScope === "project" && ref.scope === "dependency")) {
       for (const impl of impls) {
         lines.push(`  → ${badge(impl)} \`${impl.fqmn}\``);
       }
@@ -224,6 +225,8 @@ function formatMarkdown(result) {
   const outgoing = result.refs.filter((r) => r.direction !== "incoming");
   const incoming = result.refs.filter((r) => r.direction === "incoming");
 
+  const viewScope = result.viewScope;
+
   if (outgoing.length > 0) {
     const implIndex = buildImplIndex(outgoing);
     const mainRefs = outgoing.filter((r) => !r.implementationOf);
@@ -231,7 +234,7 @@ function formatMarkdown(result) {
     lines.push("#### Outgoing Calls:");
     const groups = groupByDeclaringType(mainRefs);
     for (const g of groups) {
-      lines.push(formatRefGroup(g, implIndex));
+      lines.push(formatRefGroup(g, implIndex, viewScope));
     }
   }
 
@@ -242,7 +245,7 @@ function formatMarkdown(result) {
     lines.push("#### Incoming Calls:");
     const groups = groupByDeclaringType(mainRefs);
     for (const g of groups) {
-      lines.push(formatRefGroup(g, implIndex));
+      lines.push(formatRefGroup(g, implIndex, viewScope));
     }
   }
 

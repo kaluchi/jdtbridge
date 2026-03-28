@@ -58,10 +58,28 @@ class JdtUtils {
         return result;
     }
 
+    /**
+     * Split comma-separated param types, respecting generics.
+     * {@code "Map<String,Integer>,int"} → {@code ["Map<String,Integer>", "int"]}.
+     */
     static String[] parseParamTypes(String s) {
         if (s == null) return null;
         if (s.isEmpty()) return new String[0];
-        return s.split(",");
+        var params = new java.util.ArrayList<String>();
+        int depth = 0;
+        int start = 0;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '<') depth++;
+            else if (c == '>') depth--;
+            else if (c == ',' && depth == 0) {
+                params.add(s.substring(start, i).trim());
+                start = i + 1;
+            }
+        }
+        String last = s.substring(start).trim();
+        if (!last.isEmpty()) params.add(last);
+        return params.toArray(String[]::new);
     }
 
     private static boolean matchesParamTypes(IMethod m,
@@ -134,7 +152,8 @@ class JdtUtils {
         String[] paramTypes = m.getParameterTypes();
         for (int i = 0; i < paramTypes.length; i++) {
             if (i > 0) sig.append(", ");
-            sig.append(Signature.toString(paramTypes[i]));
+            sig.append(Signature.toString(
+                    Signature.getTypeErasure(paramTypes[i])));
         }
         sig.append(")");
         return sig.toString();

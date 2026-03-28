@@ -56,6 +56,11 @@ class SourceReport {
         // Method-level: resolve implementations, emit refs
         ReferenceCollector.resolveImplementations(refs);
 
+        // viewScope: lets CLI filter impls by domain
+        result.addProperty("viewScope",
+                isProjectSource(member)
+                        ? "project" : "dependency");
+
         var refsArr = new JsonArray();
         for (var ref : refs.values()) {
             var entry = new JsonObject();

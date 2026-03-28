@@ -180,7 +180,8 @@ class ReferenceCollector {
         for (int i = 0; i < paramTypes.length; i++) {
             if (i > 0) sb.append(",");
             sb.append(org.eclipse.jdt.core.Signature.toString(
-                    paramTypes[i]));
+                    org.eclipse.jdt.core.Signature
+                            .getTypeErasure(paramTypes[i])));
         }
         return sb.toString();
     }
@@ -351,7 +352,7 @@ class ReferenceCollector {
         var sb = new StringBuilder();
         for (int i = 0; i < params.length; i++) {
             if (i > 0) sb.append(",");
-            sb.append(params[i].getName());
+            sb.append(params[i].getErasure().getName());
         }
         return sb.toString();
     }

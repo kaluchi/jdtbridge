@@ -201,24 +201,27 @@ describe("parseFqmn", () => {
     });
   });
 
-  // ---- Generics handling ----
+  // ---- Generics erasure ----
+  // Generics are stripped from param types (type erasure).
+  // Map<String,Integer> → Map. This ensures FQMNs are canonical
+  // and match regardless of generic info.
 
-  describe("generics in parameters", () => {
-    it("simple generic param — angle brackets preserved", () => {
+  describe("generics erasure in parameters", () => {
+    it("simple generic param — erased", () => {
       expect(parseFqmn("com.example.Foo#bar(List<String>)")).toEqual({
         className: "com.example.Foo",
         method: "bar",
-        paramTypes: ["List<String>"],
+        paramTypes: ["List"],
       });
     });
 
-    it("generic with comma inside — not split", () => {
+    it("generic with comma inside — single erased param", () => {
       expect(
         parseFqmn("com.example.Foo#bar(Map<String, Integer>)"),
       ).toEqual({
         className: "com.example.Foo",
         method: "bar",
-        paramTypes: ["Map<String, Integer>"],
+        paramTypes: ["Map"],
       });
     });
 
@@ -228,17 +231,17 @@ describe("parseFqmn", () => {
       ).toEqual({
         className: "com.example.Foo",
         method: "bar",
-        paramTypes: ["Map<String, Integer>", "int"],
+        paramTypes: ["Map", "int"],
       });
     });
 
-    it("nested generics", () => {
+    it("nested generics — fully erased", () => {
       expect(
         parseFqmn("com.example.Foo#bar(Map<String, List<Integer>>)"),
       ).toEqual({
         className: "com.example.Foo",
         method: "bar",
-        paramTypes: ["Map<String, List<Integer>>"],
+        paramTypes: ["Map"],
       });
     });
 
@@ -250,7 +253,45 @@ describe("parseFqmn", () => {
       ).toEqual({
         className: "com.example.Foo",
         method: "bar",
-        paramTypes: ["List<String>", "Map<String, Integer>", "int"],
+        paramTypes: ["List", "Map", "int"],
+      });
+    });
+
+    it("generic array — erased but array preserved", () => {
+      expect(parseFqmn("Foo#bar(List<String>[])")).toEqual({
+        className: "Foo",
+        method: "bar",
+        paramTypes: ["List[]"],
+      });
+    });
+
+    it("FQN generic — erased", () => {
+      expect(
+        parseFqmn("Foo#bar(java.util.Map<java.lang.String, java.lang.Integer>)"),
+      ).toEqual({
+        className: "Foo",
+        method: "bar",
+        paramTypes: ["java.util.Map"],
+      });
+    });
+
+    it("Eclipse Copy Qualified Name with generics", () => {
+      expect(
+        parseFqmn(
+          "io.github.kaluchi.jdtbridge.SearchHandler.handleFind(Map<String, String>)",
+        ),
+      ).toEqual({
+        className: "io.github.kaluchi.jdtbridge.SearchHandler",
+        method: "handleFind",
+        paramTypes: ["Map"],
+      });
+    });
+
+    it("no generics — unchanged", () => {
+      expect(parseFqmn("Foo#bar(String, int)")).toEqual({
+        className: "Foo",
+        method: "bar",
+        paramTypes: ["String", "int"],
       });
     });
   });

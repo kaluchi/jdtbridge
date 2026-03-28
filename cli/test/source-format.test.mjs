@@ -315,7 +315,7 @@ describe("source format", () => {
     expect(out).toContain("`pkg.OtherTest#verify()`");
   });
 
-  it("incoming calls have line numbers", async () => {
+  it("incoming calls have no line numbers — FQMNs only", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(METHOD_RESPONSE));
@@ -323,8 +323,11 @@ describe("source format", () => {
     const { source } = await import("../src/commands/source.mjs");
     await source(["pkg.Foo#bar"]);
     const out = io.logs.join("\n");
-    expect(out).toContain(":42");
-    expect(out).toContain(":18");
+    // Line numbers are noise for incoming calls — navigable by FQMN
+    expect(out).not.toContain(":42");
+    expect(out).not.toContain(":18");
+    expect(out).toContain("`pkg.Caller#test()`");
+    expect(out).toContain("`pkg.OtherTest#verify()`");
   });
 
   // ---- Type-level hierarchy ----

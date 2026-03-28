@@ -46,10 +46,8 @@ public class JdtUtilsTest {
 
         @Test
         void typesWithSpaces() {
-            // Spaces are NOT trimmed by parseParamTypes — that's
-            // done by matchesParamTypes. Parse is raw split.
             assertArrayEquals(
-                    new String[]{"String", " int"},
+                    new String[]{"String", "int"},
                     JdtUtils.parseParamTypes("String, int"));
         }
 
@@ -67,6 +65,59 @@ public class JdtUtilsTest {
                             "java.util.List"},
                     JdtUtils.parseParamTypes(
                             "java.lang.String,java.util.List"));
+        }
+
+        // ---- Generics-aware splitting ----
+
+        @Test
+        void simpleGenericNotSplit() {
+            assertArrayEquals(
+                    new String[]{"Map<String,String>"},
+                    JdtUtils.parseParamTypes(
+                            "Map<String,String>"));
+        }
+
+        @Test
+        void genericFollowedByPrimitive() {
+            assertArrayEquals(
+                    new String[]{"Map<String,Integer>", "int"},
+                    JdtUtils.parseParamTypes(
+                            "Map<String,Integer>,int"));
+        }
+
+        @Test
+        void nestedGenerics() {
+            assertArrayEquals(
+                    new String[]{
+                            "Map<String,List<Integer>>", "int"},
+                    JdtUtils.parseParamTypes(
+                            "Map<String,List<Integer>>,int"));
+        }
+
+        @Test
+        void multipleGenericParams() {
+            assertArrayEquals(
+                    new String[]{"List<String>",
+                            "Map<String,Integer>", "int"},
+                    JdtUtils.parseParamTypes(
+                            "List<String>,Map<String,Integer>"
+                            + ",int"));
+        }
+
+        @Test
+        void genericWithSpaces() {
+            assertArrayEquals(
+                    new String[]{"Map<String, Integer>", "int"},
+                    JdtUtils.parseParamTypes(
+                            "Map<String, Integer>, int"));
+        }
+
+        @Test
+        void noGenericsUnchanged() {
+            assertArrayEquals(
+                    new String[]{"String", "int", "boolean"},
+                    JdtUtils.parseParamTypes(
+                            "String,int,boolean"));
         }
     }
 

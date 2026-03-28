@@ -307,6 +307,30 @@ class TestFixture {
 
     // ---- Refactoring targets (separate classes that can be renamed/moved) ----
 
+    // ---- Generic erasure testing ----
+
+    private static final String GENERIC_CALLER_SRC = """
+            package test.service;
+
+            import java.util.List;
+            import java.util.Map;
+            import test.edge.Repository;
+
+            public class GenericCallerService {
+                private final Repository repo = new Repository();
+
+                public void saveItems(List<String> items) {
+                    repo.save(items);
+                }
+
+                public Map<String, Object> lookup(String[] ids) {
+                    return repo.findByIds(ids);
+                }
+            }
+            """;
+
+    // ---- Refactoring targets (separate classes that can be renamed/moved) ----
+
     private static final String RENAME_TARGET_SRC = """
             package test.refactor;
 
@@ -428,6 +452,9 @@ class TestFixture {
         servicePkg.createCompilationUnit(
                 "CallerService.java",
                 CALLER_SRC, true, null);
+        servicePkg.createCompilationUnit(
+                "GenericCallerService.java",
+                GENERIC_CALLER_SRC, true, null);
 
         IPackageFragment brokenPkg =
                 srcRoot.createPackageFragment("test.broken", true, null);

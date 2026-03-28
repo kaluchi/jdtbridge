@@ -103,5 +103,17 @@ function splitParams(str) {
   }
   const last = str.substring(start).trim();
   if (last) params.push(last);
-  return params;
+  return params.map(eraseGenerics);
+}
+
+/** Strip generics: Map<String,Integer> → Map, List<String>[] → List[] */
+function eraseGenerics(type) {
+  let result = "";
+  let depth = 0;
+  for (const ch of type) {
+    if (ch === "<") depth++;
+    else if (ch === ">") depth--;
+    else if (depth === 0) result += ch;
+  }
+  return result;
 }
