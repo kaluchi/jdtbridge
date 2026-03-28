@@ -182,14 +182,13 @@ public class EdgeCaseIntegrationTest {
     public void hierarchyOfParrot() throws Exception {
         String json = search.handleHierarchy(
                 Map.of("class", "test.edge.Parrot"));
-        // Parrot -> AbstractPet -> Object
+        // Parrot -> AbstractPet (in supertypes)
         assertTrue(json.contains("test.edge.AbstractPet"),
-                "Should have AbstractPet in supers: " + json);
-        assertTrue(json.contains("java.lang.Object"),
-                "Should have Object in supers: " + json);
+                "Should have AbstractPet in supertypes: "
+                + json);
         // Parrot implements Animal (through AbstractPet)
         assertTrue(json.contains("test.model.Animal"),
-                "Should have Animal in interfaces: " + json);
+                "Should have Animal in supertypes: " + json);
     }
 
     @Test

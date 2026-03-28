@@ -348,7 +348,7 @@ describe("source format", () => {
     expect(out).not.toContain("Incoming Calls:");
   });
 
-  it("subtypes shown with arrows", async () => {
+  it("subtypes shown as markdown list", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(TYPE_RESPONSE));
@@ -356,8 +356,8 @@ describe("source format", () => {
     const { source } = await import("../src/commands/source.mjs");
     await source(["pkg.Animal"]);
     const out = io.logs.join("\n");
-    expect(out).toContain("↓ [C] `pkg.Dog`");
-    expect(out).toContain("↓ [C] `pkg.Cat`");
+    expect(out).toContain("[C] `pkg.Dog`");
+    expect(out).toContain("[C] `pkg.Cat`");
   });
 
   it("enclosing type shown", async () => {

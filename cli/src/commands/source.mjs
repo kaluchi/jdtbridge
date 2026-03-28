@@ -1,5 +1,6 @@
 import { get } from "../client.mjs";
 import { extractPositional, parseFqmn } from "../args.mjs";
+import { formatHierEntry } from "../format/hierarchy.mjs";
 
 export async function source(args) {
   const jsonFlag = args.includes("--json");
@@ -174,29 +175,7 @@ function buildImplIndex(refs) {
 
 // ---- Hierarchy (type-level) ----
 
-function formatHierEntry(arrow, s) {
-  const depth = s.depth || 0;
-  const indent = "  ".repeat(depth);
-  const b = TYPE_KIND_BADGE[s.kind] || "[C]";
-  let line = `${indent}${arrow} ${b} \`${s.fqn}\``;
-  if (s.anonymous && s.enclosingFqmn) {
-    line += ` — in \`${s.enclosingFqmn}\``;
-  }
-  const lines = [line];
-  // File + line range on second line (when available)
-  if (s.file) {
-    let loc = `\`${s.file}`;
-    if (s.line) {
-      loc += `:${s.line}`;
-      if (s.endLine && s.endLine !== s.line) loc += `-${s.endLine}`;
-    }
-    loc += "`";
-    lines.push(`${indent}  ${loc}`);
-  }
-  return lines;
-}
-
-function formatHierarchy(lines, result) {
+function formatHierarchySection(lines, result) {
   const supers = result.supertypes || [];
   const subs = result.subtypes || [];
   if (supers.length > 0 || subs.length > 0) {
@@ -206,7 +185,7 @@ function formatHierarchy(lines, result) {
       lines.push(...formatHierEntry("↑", s));
     }
     for (const s of subs) {
-      lines.push(...formatHierEntry("↓", s));
+      lines.push(...formatHierEntry("", s));
     }
   }
   if (result.enclosingType) {
@@ -245,7 +224,7 @@ function formatMarkdown(result) {
 
   // Type-level: hierarchy instead of refs
   if (result.supertypes || result.subtypes) {
-    formatHierarchy(lines, result);
+    formatHierarchySection(lines, result);
     return lines.join("\n");
   }
 

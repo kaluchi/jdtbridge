@@ -1,7 +1,6 @@
 import { get } from "../client.mjs";
 import { extractPositional } from "../args.mjs";
-import { stripProject } from "../paths.mjs";
-import { bold } from "../color.mjs";
+import { formatHierarchy } from "../format/hierarchy.mjs";
 
 export async function hierarchy(args) {
   const pos = extractPositional(args);
@@ -18,26 +17,16 @@ export async function hierarchy(args) {
     console.error(result.error);
     process.exit(1);
   }
-  if (result.supers.length > 0) {
-    console.log(bold("Superclasses:"));
-    for (const s of result.supers) {
-      const loc = s.binary ? "(binary)" : stripProject(s.file);
-      console.log(`  ${s.fqn}  ${loc}`);
-    }
-  }
-  if (result.interfaces.length > 0) {
-    console.log(bold("Interfaces:"));
-    for (const s of result.interfaces) {
-      const loc = s.binary ? "(binary)" : stripProject(s.file);
-      console.log(`  ${s.fqn}  ${loc}`);
-    }
-  }
-  if (result.subtypes.length > 0) {
-    console.log(bold("Subtypes:"));
-    for (const s of result.subtypes) {
-      const loc = s.binary ? "(binary)" : stripProject(s.file);
-      console.log(`  ${s.fqn}  ${loc}`);
-    }
+
+  const lines = [];
+  lines.push(`#### ${result.fqn || fqn}`);
+  lines.push("");
+  lines.push(...formatHierarchy(result));
+
+  if (lines.length > 2) {
+    console.log(lines.join("\n"));
+  } else {
+    console.log("No hierarchy found.");
   }
 }
 

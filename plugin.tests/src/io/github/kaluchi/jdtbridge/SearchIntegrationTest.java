@@ -143,14 +143,12 @@ public class SearchIntegrationTest {
     public void hierarchyOfDog() throws Exception {
         String json = handler.handleHierarchy(
                 Map.of("class", "test.model.Dog"));
-        // Dog extends Object
-        assertTrue(json.contains("java.lang.Object"),
-                "Should have Object in supers: " + json);
-        // Dog implements Animal
+        // Dog implements Animal (in supertypes)
         assertTrue(json.contains("test.model.Animal"),
-                "Should have Animal in interfaces: " + json);
+                "Should have Animal in supertypes: " + json);
         // Dog has no subtypes
-        assertTrue(json.contains("\"subtypes\":[]"),
+        assertFalse(
+                json.contains("\"subtypes\":[{"),
                 "Should have empty subtypes: " + json);
     }
 

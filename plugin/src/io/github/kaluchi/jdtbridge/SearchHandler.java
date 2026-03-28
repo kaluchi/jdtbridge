@@ -294,31 +294,17 @@ class SearchHandler {
 
         ITypeHierarchy hierarchy = type.newTypeHierarchy(null);
 
-        // Superclass chain
         var supers = new JsonArray();
-        IType current = type;
-        while (true) {
-            IType superType = hierarchy.getSuperclass(current);
-            if (superType == null) break;
-            supers.add(typeEntry(superType));
-            current = superType;
-        }
+        SourceReport.addSupersRecursive(
+                supers, hierarchy, type, 0);
 
-        // All super interfaces
-        var interfaces = new JsonArray();
-        for (IType iface : hierarchy.getAllSuperInterfaces(type)) {
-            interfaces.add(typeEntry(iface));
-        }
-
-        // Subtypes
         var subtypes = new JsonArray();
-        for (IType sub : hierarchy.getAllSubtypes(type)) {
-            subtypes.add(typeEntry(sub));
-        }
+        SourceReport.addSubsRecursive(
+                subtypes, hierarchy, type, 0);
 
         var result = new JsonObject();
-        result.add("supers", supers);
-        result.add("interfaces", interfaces);
+        result.addProperty("fqn", fqn);
+        result.add("supertypes", supers);
         result.add("subtypes", subtypes);
         return result.toString();
     }

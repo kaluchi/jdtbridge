@@ -326,7 +326,7 @@ class SourceReport {
         } catch (Exception e) { /* ignore */ }
     }
 
-    private static void addSupersRecursive(JsonArray arr,
+    static void addSupersRecursive(JsonArray arr,
             ITypeHierarchy h, IType type, int depth) {
         // Direct interfaces first
         try {
@@ -349,7 +349,7 @@ class SourceReport {
         addSupersRecursive(arr, h, superclass, depth + 1);
     }
 
-    private static void addSubsRecursive(JsonArray arr,
+    static void addSubsRecursive(JsonArray arr,
             ITypeHierarchy h, IType type, int depth) {
         for (IType sub : h.getSubtypes(type)) {
             var s = hierEntry(sub);
@@ -372,7 +372,7 @@ class SourceReport {
      * Build a hierarchy entry with full metadata: fqn, kind,
      * file, line range, anonymous + enclosingFqmn.
      */
-    private static JsonObject hierEntry(IType t) {
+    static JsonObject hierEntry(IType t) {
         var s = new JsonObject();
         try {
             s.addProperty("fqn", t.getFullyQualifiedName());

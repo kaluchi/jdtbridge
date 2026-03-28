@@ -104,17 +104,20 @@ describe("commands (integration)", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({
-        supers: [{ fqn: "java.lang.Object", binary: true }],
-        interfaces: [{ fqn: "com.example.HasId", binary: false, file: "/m8-shared/src/HasId.java" }],
-        subtypes: [],
+        fqn: "com.example.Foo",
+        supertypes: [{ fqn: "com.example.Base", kind: "class", depth: 0 },
+                     { fqn: "com.example.HasId", kind: "interface", depth: 0 }],
+        subtypes: [{ fqn: "com.example.Bar", kind: "class", depth: 0 }],
       }));
     });
     const { hierarchy } = await import("../src/commands/hierarchy.mjs");
     await hierarchy(["com.example.Foo"]);
-    expect(io.logs.some((l) => l.includes("Superclasses"))).toBe(true);
-    expect(io.logs.some((l) => l.includes("java.lang.Object"))).toBe(true);
-    expect(io.logs.some((l) => l.includes("Interfaces"))).toBe(true);
-    expect(io.logs.some((l) => l.includes("com.example.HasId"))).toBe(true);
+    const out = io.logs.join("\n");
+    expect(out).toContain("Supertypes");
+    expect(out).toContain("com.example.Base");
+    expect(out).toContain("com.example.HasId");
+    expect(out).toContain("Subtypes");
+    expect(out).toContain("com.example.Bar");
   });
 
   it("implementors shows FQN, file, and line", async () => {
