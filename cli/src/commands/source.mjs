@@ -174,6 +174,26 @@ function buildImplIndex(refs) {
 
 // ---- Hierarchy (type-level) ----
 
+function formatHierEntry(arrow, s) {
+  const b = TYPE_KIND_BADGE[s.kind] || "[C]";
+  let line = `${arrow} ${b} \`${s.fqn}\``;
+  if (s.anonymous && s.enclosingFqmn) {
+    line += ` — in \`${s.enclosingFqmn}\``;
+  }
+  const lines = [line];
+  // File + line range on second line (when available)
+  if (s.file) {
+    let loc = `\`${s.file}`;
+    if (s.line) {
+      loc += `:${s.line}`;
+      if (s.endLine && s.endLine !== s.line) loc += `-${s.endLine}`;
+    }
+    loc += "`";
+    lines.push(`  ${loc}`);
+  }
+  return lines;
+}
+
 function formatHierarchy(lines, result) {
   const supers = result.supertypes || [];
   const subs = result.subtypes || [];
@@ -181,12 +201,10 @@ function formatHierarchy(lines, result) {
     lines.push("");
     lines.push("#### Hierarchy:");
     for (const s of supers) {
-      const b = TYPE_KIND_BADGE[s.kind] || "[C]";
-      lines.push(`↑ ${b} \`${s.fqn}\``);
+      lines.push(...formatHierEntry("↑", s));
     }
     for (const s of subs) {
-      const b = TYPE_KIND_BADGE[s.kind] || "[C]";
-      lines.push(`↓ ${b} \`${s.fqn}\``);
+      lines.push(...formatHierEntry("↓", s));
     }
   }
   if (result.enclosingType) {
@@ -195,7 +213,7 @@ function formatHierarchy(lines, result) {
     const et = result.enclosingType;
     const fqn = typeof et === "string" ? et : et.fqn;
     const kind = typeof et === "string" ? "class" : (et.kind || "class");
-    lines.push(`${TYPE_KIND_BADGE[kind] || "[C]"} \`${fqn}\``);
+    lines.push(...formatHierEntry("", { fqn, kind, ...et }));
   }
 }
 

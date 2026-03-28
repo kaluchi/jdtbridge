@@ -313,31 +313,19 @@ class SourceReport {
             if (superclass != null) {
                 String fqn = superclass.getFullyQualifiedName();
                 if (!"java.lang.Object".equals(fqn)) {
-                    var s = new JsonObject();
-                    s.addProperty("fqn", fqn);
-                    s.addProperty("kind",
-                            typeKindStr(superclass));
+                    var s = hierEntry(superclass);
                     supers.add(s);
                 }
             }
             for (IType iface
                     : hierarchy.getSuperInterfaces(type)) {
-                var s = new JsonObject();
-                s.addProperty("fqn",
-                        iface.getFullyQualifiedName());
-                s.addProperty("kind", "interface");
-                supers.add(s);
+                supers.add(hierEntry(iface));
             }
             result.add("supertypes", supers);
 
             var subs = new JsonArray();
             for (IType sub : hierarchy.getSubtypes(type)) {
-                if (sub.isAnonymous()) continue;
-                var s = new JsonObject();
-                s.addProperty("fqn",
-                        sub.getFullyQualifiedName());
-                s.addProperty("kind", typeKindStr(sub));
-                subs.add(s);
+                subs.add(hierEntry(sub));
             }
             result.add("subtypes", subs);
 
@@ -360,6 +348,37 @@ class SourceReport {
             if (type.isAnnotation()) return "annotation";
         } catch (Exception e) { /* ignore */ }
         return "class";
+    }
+
+    /**
+     * Build a hierarchy entry with full metadata: fqn, kind,
+     * file, line range, anonymous + enclosingFqmn.
+     */
+    private static JsonObject hierEntry(IType t) {
+        var s = new JsonObject();
+        try {
+            s.addProperty("fqn", t.getFullyQualifiedName());
+            s.addProperty("kind", typeKindStr(t));
+            String path = absolutePath(t);
+            if (path != null) s.addProperty("file", path);
+            int[] lines = memberLines(t);
+            if (lines != null) {
+                s.addProperty("line", lines[0]);
+                s.addProperty("endLine", lines[1]);
+            }
+            if (t.isAnonymous()) {
+                s.addProperty("anonymous", true);
+                var parent = t.getParent();
+                if (parent instanceof IMethod m) {
+                    s.addProperty("enclosingFqmn",
+                            m.getDeclaringType()
+                                    .getFullyQualifiedName()
+                            + "#" + JdtUtils
+                                    .compactSignature(m));
+                }
+            }
+        } catch (Exception e) { /* skip */ }
+        return s;
     }
 
     private static String extractTypeFqn(String fqmn) {

@@ -414,7 +414,9 @@ public class RefCountContractTest {
         void animalSubtypesExactCount() throws Exception {
             var json = typeJson("test.model.Animal");
             var subs = json.getAsJsonArray("subtypes");
-            assertEquals(3, subs.size());
+            // Dog, Cat, AbstractPet + anonymous in
+            // AnonymousCallerService
+            assertEquals(4, subs.size());
         }
 
         @Test
@@ -426,9 +428,56 @@ public class RefCountContractTest {
                     .map(e -> e.getAsJsonObject()
                             .get("fqn").getAsString())
                     .collect(Collectors.toSet());
-            assertEquals(Set.of("test.model.Dog",
-                    "test.model.Cat",
-                    "test.edge.AbstractPet"), fqns);
+            assertTrue(fqns.contains("test.model.Dog"),
+                    "Dog: " + fqns);
+            assertTrue(fqns.contains("test.model.Cat"),
+                    "Cat: " + fqns);
+            assertTrue(fqns.contains("test.edge.AbstractPet"),
+                    "AbstractPet: " + fqns);
+            // Anonymous subtype from AnonymousCallerService
+            assertTrue(fqns.stream()
+                    .anyMatch(f -> f.contains("$")),
+                    "Anonymous: " + fqns);
+        }
+
+        @Test
+        void anonymousSubtypeHasMetadata() throws Exception {
+            var json = typeJson("test.model.Animal");
+            var subs = json.getAsJsonArray("subtypes");
+            for (var e : subs) {
+                var sub = e.getAsJsonObject();
+                if (sub.has("anonymous")
+                        && sub.get("anonymous").getAsBoolean()) {
+                    assertNotNull(str(sub, "enclosingFqmn"),
+                            "Anonymous should have enclosingFqmn");
+                    assertTrue(str(sub, "enclosingFqmn")
+                            .contains("createAnonymous"),
+                            "Enclosing: "
+                            + str(sub, "enclosingFqmn"));
+                    assertNotNull(str(sub, "file"),
+                            "Should have file path");
+                    assertTrue(sub.has("line"),
+                            "Should have line");
+                }
+            }
+        }
+
+        @Test
+        void namedSubtypeHasFileAndLines() throws Exception {
+            var json = typeJson("test.model.Animal");
+            var subs = json.getAsJsonArray("subtypes");
+            for (var e : subs) {
+                var sub = e.getAsJsonObject();
+                String fqn = str(sub, "fqn");
+                if ("test.model.Dog".equals(fqn)) {
+                    assertNotNull(str(sub, "file"),
+                            "Dog should have file");
+                    assertTrue(sub.has("line"),
+                            "Dog should have line");
+                    assertTrue(sub.has("endLine"),
+                            "Dog should have endLine");
+                }
+            }
         }
 
         @Test
