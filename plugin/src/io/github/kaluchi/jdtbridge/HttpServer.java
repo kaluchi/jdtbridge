@@ -28,6 +28,7 @@ public class HttpServer {
     private final SearchHandler search = new SearchHandler();
     private final DiagnosticsHandler diagnostics =
             new DiagnosticsHandler();
+    private final MavenHandler maven = new MavenHandler();
     private final RefactoringHandler refactoring =
             new RefactoringHandler();
     private final EditorHandler editor = new EditorHandler();
@@ -381,6 +382,8 @@ public class HttpServer {
                         diagnostics.handleBuild(params));
                 case "/refresh" -> Response.json(
                         diagnostics.handleRefresh(params));
+                case "/maven/update" -> Response.json(
+                        maven.handleUpdate(params));
                 case "/type-info" -> Response.json(
                         search.handleTypeInfo(params));
                 case "/source" -> search.handleSource(params);

@@ -147,6 +147,32 @@ class JdtUtils {
                 ResourcesPlugin.FAMILY_AUTO_BUILD, monitor);
     }
 
+    static final String JDT_PROBLEM_MARKER =
+            "org.eclipse.jdt.core.problem";
+
+    /**
+     * Count JDT compilation errors in the given resource scope.
+     */
+    static int countErrors(
+            org.eclipse.core.resources.IResource scope)
+            throws org.eclipse.core.runtime.CoreException {
+        var markers = scope.findMarkers(
+                JDT_PROBLEM_MARKER, true,
+                org.eclipse.core.resources.IResource
+                        .DEPTH_INFINITE);
+        int count = 0;
+        for (var m : markers) {
+            if (m.getAttribute(
+                    org.eclipse.core.resources.IMarker
+                            .SEVERITY, -1)
+                    == org.eclipse.core.resources.IMarker
+                            .SEVERITY_ERROR) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     static String compactSignature(IMethod m) throws JavaModelException {
         StringBuilder sig = new StringBuilder();
         sig.append(m.getElementName()).append("(");

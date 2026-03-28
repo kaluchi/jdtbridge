@@ -16,6 +16,7 @@ import { testStatus, help as testStatusHelp } from "./commands/test-status.mjs";
 import { testSessions, help as testSessionsHelp } from "./commands/test-sessions.mjs";
 import { errors, help as errorsHelp } from "./commands/errors.mjs";
 import { refresh, help as refreshHelp } from "./commands/refresh.mjs";
+import { maven, help as mavenHelp } from "./commands/maven.mjs";
 import {
   organizeImports,
   format,
@@ -140,6 +141,7 @@ const commands = {
   test: { fn: testDispatch, help: testHelp },
   errors: { fn: errors, help: errorsHelp },
   refresh: { fn: refresh, help: refreshHelp },
+  maven: { fn: maven, help: mavenHelp },
   "organize-imports": { fn: organizeImports, help: organizeImportsHelp },
   format: { fn: format, help: formatHelp },
   rename: { fn: rename, help: renameHelp },
@@ -208,6 +210,9 @@ Testing & building:
 Diagnostics:
   errors${fmtAliases("errors")} [--file <path>] [--project <name>]   compilation errors
   refresh${fmtAliases("refresh")} [<file> ...] [--project <name>]  explicitly notify Eclipse of file changes
+
+Maven:
+  maven update [--project <name>]             update Maven project (Alt+F5)
 
 Refactoring:
   organize-imports${fmtAliases("organize-imports")} <file>                     organize imports

@@ -119,6 +119,7 @@ Most commands have short aliases for quick typing.
 | `test run <FQN> [-f]` | | Run JUnit tests with progress streaming |
 | `errors [--project <name>]` | `err` | Compilation errors and diagnostics |
 | `refresh [<file>] [--project <name>]` | `r` | Manually notify Eclipse of file changes |
+| `maven update [--project <name>]` | | Update Maven project (Alt+F5 equivalent) |
 | `organize-imports <file>` | `oi` | Organize imports (Eclipse settings) |
 | `format <file>` | `fmt` | Format code (Eclipse settings) |
 | `rename <FQMN> <new>` | | Rename type, method, or field across workspace |

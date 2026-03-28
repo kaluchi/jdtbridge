@@ -69,6 +69,15 @@ jdt refresh                                            # refresh entire workspac
 A PostToolUse hook (`jdt setup --claude`) calls `jdt refresh` automatically
 after every Edit/Write — Eclipse stays in sync without manual intervention.
 
+### Maven
+
+```bash
+jdt maven update                                       # update all Maven projects (Alt+F5)
+jdt maven update --project m8-server                   # update specific project
+jdt maven update -f                                    # wait for auto-build, show error count
+jdt maven update --force --offline                     # force snapshots, offline mode
+```
+
 ### Refactoring
 
 ```bash

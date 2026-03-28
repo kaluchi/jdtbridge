@@ -104,6 +104,22 @@ Explicitly notify Eclipse that files changed on disk. No build wait, no markers.
 
 Returns `{"refreshed":true, ...}` or `{"refreshed":false, "reason":"not in workspace"}`.
 
+### `GET /maven/update?[project=<name>][&offline][&force][&no-config][&no-clean][&no-refresh][&wait]`
+
+Maven Update Project (Alt+F5 equivalent). Uses m2e core API.
+
+| Parameter | Description |
+|-----------|-------------|
+| `project` | Project name (default: all Maven projects) |
+| `offline` | Offline mode |
+| `force` | Force update of snapshots/releases |
+| `no-config` | Skip update project configuration from pom.xml |
+| `no-clean` | Skip clean projects |
+| `no-refresh` | Skip refresh workspace resources |
+| `wait` | Wait for auto-build, include `errors` count in response |
+
+Returns `{"updated":N, "projects":[...], "ok":true/false, "errors":N}`.
+
 ## Refactoring
 
 ### `GET /organize-imports?file=<path>`

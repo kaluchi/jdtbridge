@@ -45,6 +45,15 @@
                             <type>eclipse-plugin</type>
                             <artifactId>org.eclipse.core.resources.source</artifactId>
                         </dependency>
+                        <!-- m2e core for MavenIntegrationTest -->
+                        <dependency>
+                            <type>eclipse-plugin</type>
+                            <artifactId>org.eclipse.m2e.core</artifactId>
+                        </dependency>
+                        <dependency>
+                            <type>eclipse-plugin</type>
+                            <artifactId>org.eclipse.m2e.maven.runtime</artifactId>
+                        </dependency>
                     </dependencies>
                 </configuration>
             </plugin>

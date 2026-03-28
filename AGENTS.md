@@ -80,6 +80,7 @@ jdt test run <FQN>#<method> -f   # run one test, stream progress
 jdt errors --project <name>      # instant compilation check
 jdt build --project <name>       # incremental build (1-3s, not 40s Maven)
 jdt refresh <file>               # explicitly notify Eclipse of file changes
+jdt maven update --project <name> -f  # update Maven project (Alt+F5)
 ```
 
 ### `jdt source` — hypertext navigation
