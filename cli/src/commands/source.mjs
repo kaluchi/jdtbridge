@@ -175,8 +175,10 @@ function buildImplIndex(refs) {
 // ---- Hierarchy (type-level) ----
 
 function formatHierEntry(arrow, s) {
+  const depth = s.depth || 0;
+  const indent = "  ".repeat(depth);
   const b = TYPE_KIND_BADGE[s.kind] || "[C]";
-  let line = `${arrow} ${b} \`${s.fqn}\``;
+  let line = `${indent}${arrow} ${b} \`${s.fqn}\``;
   if (s.anonymous && s.enclosingFqmn) {
     line += ` — in \`${s.enclosingFqmn}\``;
   }
@@ -189,7 +191,7 @@ function formatHierEntry(arrow, s) {
       if (s.endLine && s.endLine !== s.line) loc += `-${s.endLine}`;
     }
     loc += "`";
-    lines.push(`  ${loc}`);
+    lines.push(`${indent}  ${loc}`);
   }
   return lines;
 }

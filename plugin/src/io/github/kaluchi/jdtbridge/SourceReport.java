@@ -302,43 +302,61 @@ class SourceReport {
      * Add hierarchy info for type-level source: supertypes,
      * subtypes/implementors, enclosing type.
      */
-    private static void addHierarchy(JsonObject result, IType type) {
+    private static void addHierarchy(JsonObject result,
+            IType type) {
         try {
             ITypeHierarchy hierarchy =
                     type.newTypeHierarchy(null);
 
-            // Supertypes
+            // Supertypes — recursive up the chain
             var supers = new JsonArray();
-            IType superclass = hierarchy.getSuperclass(type);
-            if (superclass != null) {
-                String fqn = superclass.getFullyQualifiedName();
-                if (!"java.lang.Object".equals(fqn)) {
-                    var s = hierEntry(superclass);
-                    supers.add(s);
-                }
-            }
-            for (IType iface
-                    : hierarchy.getSuperInterfaces(type)) {
-                supers.add(hierEntry(iface));
-            }
+            addSupersRecursive(supers, hierarchy, type, 0);
             result.add("supertypes", supers);
 
+            // Subtypes — recursive down the tree
             var subs = new JsonArray();
-            for (IType sub : hierarchy.getSubtypes(type)) {
-                subs.add(hierEntry(sub));
-            }
+            addSubsRecursive(subs, hierarchy, type, 0);
             result.add("subtypes", subs);
 
             IType enclosing = type.getDeclaringType();
             if (enclosing != null) {
-                var enc = new JsonObject();
-                enc.addProperty("fqn",
-                        enclosing.getFullyQualifiedName());
-                enc.addProperty("kind",
-                        typeKindStr(enclosing));
-                result.add("enclosingType", enc);
+                result.add("enclosingType",
+                        hierEntry(enclosing));
             }
         } catch (Exception e) { /* ignore */ }
+    }
+
+    private static void addSupersRecursive(JsonArray arr,
+            ITypeHierarchy h, IType type, int depth) {
+        // Direct interfaces first
+        try {
+            for (IType iface : h.getSuperInterfaces(type)) {
+                var s = hierEntry(iface);
+                s.addProperty("depth", depth);
+                arr.add(s);
+            }
+        } catch (Exception e) { /* skip */ }
+        // Superclass chain
+        IType superclass = h.getSuperclass(type);
+        if (superclass == null) return;
+        String fqn;
+        try { fqn = superclass.getFullyQualifiedName(); }
+        catch (Exception e) { return; }
+        if ("java.lang.Object".equals(fqn)) return;
+        var s = hierEntry(superclass);
+        s.addProperty("depth", depth);
+        arr.add(s);
+        addSupersRecursive(arr, h, superclass, depth + 1);
+    }
+
+    private static void addSubsRecursive(JsonArray arr,
+            ITypeHierarchy h, IType type, int depth) {
+        for (IType sub : h.getSubtypes(type)) {
+            var s = hierEntry(sub);
+            s.addProperty("depth", depth);
+            arr.add(s);
+            addSubsRecursive(arr, h, sub, depth + 1);
+        }
     }
 
     private static String typeKindStr(IType type) {

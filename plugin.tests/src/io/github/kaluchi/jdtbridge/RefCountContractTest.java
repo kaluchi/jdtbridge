@@ -414,9 +414,10 @@ public class RefCountContractTest {
         void animalSubtypesExactCount() throws Exception {
             var json = typeJson("test.model.Animal");
             var subs = json.getAsJsonArray("subtypes");
-            // Dog, Cat, AbstractPet + anonymous in
-            // AnonymousCallerService
-            assertEquals(4, subs.size());
+            // Dog, Cat, AbstractPet, Parrot (under AbstractPet)
+            // + anonymous in AnonymousCallerService
+            // (recursive hierarchy now includes grandchildren)
+            assertEquals(5, subs.size());
         }
 
         @Test
