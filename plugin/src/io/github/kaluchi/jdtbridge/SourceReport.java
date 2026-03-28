@@ -132,6 +132,25 @@ class SourceReport {
                         ref.implementationOf());
             }
 
+            // Anonymous type: mark + resolve enclosing member
+            if (ref.kind() == ReferenceCollector.RefKind.TYPE
+                    && ref.element() instanceof IType t) {
+                try {
+                    if (t.isAnonymous()) {
+                        entry.addProperty("anonymous", true);
+                        var parent = t.getParent();
+                        if (parent instanceof IMethod m) {
+                            String encTypeFqn =
+                                    m.getDeclaringType()
+                                            .getFullyQualifiedName();
+                            entry.addProperty("enclosingFqmn",
+                                    encTypeFqn + "#"
+                                    + JdtUtils.compactSignature(m));
+                        }
+                    }
+                } catch (Exception e) { /* skip */ }
+            }
+
             // Line range
             int[] lines = memberLines(ref.element());
             if (lines != null) {

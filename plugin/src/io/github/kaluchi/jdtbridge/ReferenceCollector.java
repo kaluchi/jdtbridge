@@ -199,7 +199,6 @@ class ReferenceCollector {
                 ITypeHierarchy hierarchy =
                         type.newTypeHierarchy(null);
                 for (IType sub : hierarchy.getSubtypes(type)) {
-                    if (sub.isAnonymous()) continue;
                     String subFqn =
                             sub.getFullyQualifiedName();
                     if (isJdkType(subFqn)) continue;

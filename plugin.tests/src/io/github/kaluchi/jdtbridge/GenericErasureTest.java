@@ -209,4 +209,97 @@ public class GenericErasureTest {
                     "Workspace source should have viewScope=project");
         }
     }
+
+    // ---- Type subtypes + anonymous ----
+
+    @Nested
+    class TypeSubtypes {
+
+        @Test
+        void interfaceTypeRefHasImplementations()
+                throws Exception {
+            // AnonymousCallerService.createAnonymous() returns
+            // Animal — an interface. Subtypes should be resolved.
+            var json = sourceJson(
+                    "test.service.AnonymousCallerService",
+                    "createAnonymous");
+            var impls = new java.util.ArrayList<JsonObject>();
+            for (JsonElement e : refs(json)) {
+                JsonObject ref = e.getAsJsonObject();
+                if (ref.has("implementationOf")
+                        && str(ref, "implementationOf")
+                                .contains("Animal")) {
+                    impls.add(ref);
+                }
+            }
+            // Dog, Cat, AbstractPet + anonymous $1
+            assertTrue(impls.size() >= 4,
+                    "At least 4 impls of Animal (incl anonymous): "
+                    + impls);
+        }
+
+        @Test
+        void anonymousSubtypeHasFlag() throws Exception {
+            var json = sourceJson(
+                    "test.service.AnonymousCallerService",
+                    "createAnonymous");
+            boolean foundAnon = false;
+            for (JsonElement e : refs(json)) {
+                JsonObject ref = e.getAsJsonObject();
+                if (ref.has("anonymous")
+                        && ref.get("anonymous").getAsBoolean()) {
+                    foundAnon = true;
+                    assertTrue(
+                            str(ref, "fqmn").contains("$"),
+                            "Anonymous FQMN should contain $: "
+                            + str(ref, "fqmn"));
+                }
+            }
+            assertTrue(foundAnon,
+                    "Should find anonymous subtype");
+        }
+
+        @Test
+        void anonymousSubtypeHasEnclosingFqmn()
+                throws Exception {
+            var json = sourceJson(
+                    "test.service.AnonymousCallerService",
+                    "createAnonymous");
+            for (JsonElement e : refs(json)) {
+                JsonObject ref = e.getAsJsonObject();
+                if (ref.has("anonymous")
+                        && ref.get("anonymous").getAsBoolean()) {
+                    String enc = str(ref, "enclosingFqmn");
+                    assertNotNull(enc,
+                            "Anonymous should have enclosingFqmn: "
+                            + ref);
+                    assertTrue(enc.contains(
+                            "AnonymousCallerService"
+                            + "#createAnonymous"),
+                            "Enclosing should be createAnonymous: "
+                            + enc);
+                }
+            }
+        }
+
+        @Test
+        void namedSubtypesPresent() throws Exception {
+            var json = sourceJson(
+                    "test.service.AnonymousCallerService",
+                    "createAnonymous");
+            var fqmns = new java.util.ArrayList<String>();
+            for (JsonElement e : refs(json)) {
+                JsonObject ref = e.getAsJsonObject();
+                if (ref.has("implementationOf")) {
+                    fqmns.add(str(ref, "fqmn"));
+                }
+            }
+            assertTrue(fqmns.stream()
+                    .anyMatch(f -> f.contains("Dog")),
+                    "Dog: " + fqmns);
+            assertTrue(fqmns.stream()
+                    .anyMatch(f -> f.contains("Cat")),
+                    "Cat: " + fqmns);
+        }
+    }
 }
