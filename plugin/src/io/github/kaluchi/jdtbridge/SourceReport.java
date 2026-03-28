@@ -53,10 +53,11 @@ class SourceReport {
             return result.toString();
         }
 
-        // Method-level: resolve implementations, emit refs
+        // Method-level: resolve implementations + type subtypes
         ReferenceCollector.resolveImplementations(refs);
+        ReferenceCollector.resolveTypeSubtypes(refs);
 
-        // viewScope: lets CLI filter impls by domain
+        // viewScope: lets CLI filter impls/subtypes by domain
         result.addProperty("viewScope",
                 isProjectSource(member)
                         ? "project" : "dependency");
@@ -125,7 +126,7 @@ class SourceReport {
                 }
             }
 
-            // Implementation of interface method
+            // Implementation of interface method or type
             if (ref.implementationOf() != null) {
                 entry.addProperty("implementationOf",
                         ref.implementationOf());

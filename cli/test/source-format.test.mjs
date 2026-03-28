@@ -158,7 +158,7 @@ describe("source format", () => {
 
   // ---- Outgoing calls grouping ----
 
-  it("outgoing calls grouped by declaring type", async () => {
+  it("outgoing calls — no redundant type headers when members present", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(METHOD_RESPONSE));
@@ -167,10 +167,11 @@ describe("source format", () => {
     await source(["pkg.Foo#bar"]);
     const out = io.logs.join("\n");
     expect(out).toContain("#### Outgoing Calls:");
-    // Foo group header
-    expect(out).toContain("[C] `pkg.Foo`");
-    // Util group
-    expect(out).toContain("[C] `pkg.Util`");
+    // Members visible by FQMN — no separate type headers
+    expect(out).toContain("[M] `pkg.Foo#baz()`");
+    expect(out).toContain("[M] `pkg.Util#helper(String)`");
+    // Self-reference type ref filtered
+    expect(out).not.toMatch(/\[C\] `pkg\.Foo`\n/);
   });
 
   // ---- Badges ----
@@ -197,7 +198,7 @@ describe("source format", () => {
     expect(out).toContain("[K] `pkg.Constants#MAX`");
   });
 
-  it("interface type ref has [I] badge", async () => {
+  it("type header suppressed when group has members", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(METHOD_RESPONSE));
@@ -205,7 +206,9 @@ describe("source format", () => {
     const { source } = await import("../src/commands/source.mjs");
     await source(["pkg.Foo#bar"]);
     const out = io.logs.join("\n");
-    expect(out).toContain("[I] `org.slf4j.Logger`");
+    // Logger type header suppressed — method ref sufficient
+    expect(out).not.toContain("[I] `org.slf4j.Logger`\n");
+    expect(out).toContain("`org.slf4j.Logger#info(String)`");
   });
 
   // ---- Return types ----

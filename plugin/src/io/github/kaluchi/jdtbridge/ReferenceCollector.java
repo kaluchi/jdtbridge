@@ -172,6 +172,81 @@ class ReferenceCollector {
         }
     }
 
+    /**
+     * For each outgoing interface/abstract type ref, resolve
+     * direct subtypes and add them as refs with implementationOf
+     * linking back to the interface type FQN. If a subtype
+     * already exists in refs, updates it with the link.
+     */
+    static void resolveTypeSubtypes(
+            Map<String, Ref> refs) {
+        List<Ref> subtypeRefs = new ArrayList<>();
+        for (Ref ref : refs.values()) {
+            if (ref.kind() != RefKind.TYPE) continue;
+            String dk = ref.declaringTypeKind();
+            if (!"interface".equals(dk)
+                    && !"class".equals(dk)) continue;
+            if (ref.element() == null) continue;
+
+            try {
+                IType type = (IType) ref.element();
+                // Only resolve for interfaces and abstract classes
+                if (!type.isInterface()
+                        && !java.lang.reflect.Modifier.isAbstract(
+                                type.getFlags()))
+                    continue;
+
+                ITypeHierarchy hierarchy =
+                        type.newTypeHierarchy(null);
+                for (IType sub : hierarchy.getSubtypes(type)) {
+                    if (sub.isAnonymous()) continue;
+                    String subFqn =
+                            sub.getFullyQualifiedName();
+                    if (isJdkType(subFqn)) continue;
+
+                    // If subtype already in refs (e.g. used as
+                    // a local var type), update it with the
+                    // implementationOf link instead of skipping
+                    Ref existing = refs.get(subFqn);
+                    if (existing != null) {
+                        if (existing.implementationOf() == null) {
+                            subtypeRefs.add(new Ref(
+                                    existing.fqmn(),
+                                    existing.element(),
+                                    existing.kind(),
+                                    existing.declaringTypeKind(),
+                                    existing.isStatic(),
+                                    existing.resolvedType(),
+                                    existing.resolvedTypeFqn(),
+                                    existing.resolvedTypeKind(),
+                                    existing.isTypeVariable(),
+                                    existing.typeBound(),
+                                    existing.isInherited(),
+                                    existing.inheritedFrom(),
+                                    ref.fqmn()));
+                        }
+                        continue;
+                    }
+
+                    String typeKind = sub.isInterface()
+                            ? "interface"
+                            : sub.isEnum() ? "enum"
+                            : sub.isAnnotation()
+                            ? "annotation" : "class";
+
+                    subtypeRefs.add(new Ref(subFqn, sub,
+                            RefKind.TYPE, typeKind,
+                            false, null, null, null,
+                            false, null, false, null,
+                            ref.fqmn()));
+                }
+            } catch (Exception e) { /* skip */ }
+        }
+        for (Ref st : subtypeRefs) {
+            refs.put(st.fqmn(), st);
+        }
+    }
+
     static String paramSig(IMethod m)
             throws JavaModelException {
         var paramTypes = m.getParameterTypes();

@@ -128,11 +128,18 @@ function groupByDeclaringType(refs) {
 
 function formatRefGroup({ typeFqn, group }, implIndex, viewScope) {
   const lines = [];
-  if (group.typeRef) {
+  // Type header: only show for standalone type refs (no members).
+  // When members exist, the type is already visible in their FQMNs.
+  const standalone = group.members.length === 0;
+  if (standalone && group.typeRef) {
     lines.push(formatTypeHeader(group.typeRef));
-  } else if (group.members.length > 0) {
-    const tkBadge = TYPE_KIND_BADGE[group.members[0].typeKind] || "[C]";
-    lines.push(`${tkBadge} \`${typeFqn}\``);
+    // Show type implementations (domain-scoped)
+    const impls = implIndex[group.typeRef.fqmn];
+    if (impls && !(viewScope === "project" && group.typeRef.scope === "dependency")) {
+      for (const impl of impls) {
+        lines.push(`  ↓ ${badge(impl)} \`${impl.fqmn}\``);
+      }
+    }
   }
   for (const ref of group.members) {
     lines.push(formatMemberRef(ref));
@@ -159,6 +166,7 @@ function buildImplIndex(refs) {
   }
   return index;
 }
+
 
 // ---- Hierarchy (type-level) ----
 
@@ -221,8 +229,14 @@ function formatMarkdown(result) {
     return lines.join("\n");
   }
 
-  // Split by direction
-  const outgoing = result.refs.filter((r) => r.direction !== "incoming");
+  // Self-reference: the viewed member's declaring type
+  const selfFqn = result.fqmn.includes("#")
+    ? result.fqmn.split("#")[0] : null;
+
+  // Split by direction, filter self-reference type refs
+  const outgoing = result.refs.filter((r) =>
+    r.direction !== "incoming"
+    && !(r.kind === "type" && r.fqmn === selfFqn));
   const incoming = result.refs.filter((r) => r.direction === "incoming");
 
   const viewScope = result.viewScope;
