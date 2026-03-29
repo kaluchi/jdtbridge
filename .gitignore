@@ -14,6 +14,9 @@ coverage/
 !jdtbridge-ci.target
 *.class
 
+# PDE JUnit test runtime workspace
+plugin.tests/workspace/
+
 # OS
 .DS_Store
 Thumbs.db
