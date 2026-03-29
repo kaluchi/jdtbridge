@@ -114,6 +114,13 @@ public class MavenIntegrationTest {
                 + "<artifactId>" + artifactId
                 + "</artifactId>"
                 + "<version>0.0.1</version>"
+                + "<build>"
+                + "<sourceDirectory>src</sourceDirectory>"
+                + "<resources><resource>"
+                + "<directory>src</directory>"
+                + "<excludes><exclude>**/*.java</exclude>"
+                + "</excludes></resource></resources>"
+                + "</build>"
                 + "</project>")
                 .getBytes()), true, null);
 
