@@ -42,10 +42,10 @@ function authHeaders() {
 
 /**
  * Build request options. If http_proxy is set and host is not
- * in no_proxy, route through the proxy (HTTP CONNECT-style:
- * send full URL as path, connect to proxy host:port).
+ * in no_proxy, route through the proxy: connect to proxy
+ * host:port and use full URL as request path.
  */
-function requestOptions(inst, path, method, timeoutMs) {
+export function requestOptions(inst, path, method, timeoutMs) {
   const proxy = process.env.http_proxy || process.env.HTTP_PROXY;
   const noProxy = (process.env.no_proxy || process.env.NO_PROXY || "").split(",").map(s => s.trim());
   const needsProxy = proxy && !noProxy.includes(inst.host);

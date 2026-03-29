@@ -161,6 +161,44 @@ describe("discovery", () => {
       expect(instances).toHaveLength(1);
       expect(instances[0].host).toBe("127.0.0.1");
     });
+
+    it("includes remote instance without probe", async () => {
+      // Remote host — no HTTP server needed, file trusted
+      writeInstance("remote.json", {
+        port: 9999, token: "t", pid: 1, workspace: "/ws",
+        host: "host.docker.internal",
+      });
+      const instances = await discoverInstances();
+      expect(instances).toHaveLength(1);
+      expect(instances[0].host).toBe("host.docker.internal");
+      expect(instances[0].port).toBe(9999);
+    });
+
+    it("mixes local probed and remote trusted", async () => {
+      const port = await startMock();
+      writeInstance("local.json", {
+        port, token: "t1", pid: process.pid, workspace: "/ws/local",
+      });
+      writeInstance("remote.json", {
+        port: 9999, token: "t2", pid: 1, workspace: "/ws/remote",
+        host: "host.docker.internal",
+      });
+      const instances = await discoverInstances();
+      expect(instances).toHaveLength(2);
+    });
+
+    it("filters dead local but keeps remote", async () => {
+      writeInstance("dead.json", {
+        port: 19999, token: "t1", pid: 1, workspace: "/ws/dead",
+      });
+      writeInstance("remote.json", {
+        port: 9999, token: "t2", pid: 1, workspace: "/ws/remote",
+        host: "host.docker.internal",
+      });
+      const instances = await discoverInstances();
+      expect(instances).toHaveLength(1);
+      expect(instances[0].host).toBe("host.docker.internal");
+    });
   });
 
   describe("findInstance", () => {
