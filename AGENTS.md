@@ -80,7 +80,8 @@ jdt source <FQMN>               # source + resolved references (hypertext naviga
 jdt type-info <FQN>              # class overview without reading 600 lines
 jdt test run <FQN>#<method> -f   # run one test, stream progress
 jdt errors --project <name>      # instant compilation check
-jdt build --project <name>       # incremental build (1-3s, not 40s Maven)
+jdt build --project <name>       # clean build (default, reliable)
+jdt build --project <name> --incremental  # fast incremental (1-3s)
 jdt refresh <file>               # explicitly notify Eclipse of file changes
 jdt maven update --project <name> -f  # update Maven project (Alt+F5)
 ```
@@ -157,8 +158,8 @@ See [README.md](README.md) for full overview. Key directories:
 
 | | `jdt build` | `jdt launch run jdtbridge-verify` |
 |---|---|---|
-| What | Eclipse incremental compiler | Tycho full build (via Eclipse) |
-| Speed | 1-3 seconds | 40-60 seconds |
+| What | Eclipse clean+full build (or `--incremental`) | Tycho full build (via Eclipse) |
+| Speed | 3-10 seconds (incremental: 1-3s) | 40-60 seconds |
 | Tests | No | Unit + integration |
 | Output | Compiled classes in Eclipse | p2 site in `site/target/` |
 | When | Quick iteration while coding | Before commit, before `jdt setup` |
