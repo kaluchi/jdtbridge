@@ -40,7 +40,8 @@ import org.eclipse.text.edits.TextEdit;
  */
 class RefactoringHandler {
 
-    private static final String JDT_UI_NODE = "org.eclipse.jdt.ui";
+    private static final String MANIPULATION_NODE =
+            "org.eclipse.jdt.core.manipulation";
 
     static {
         ensurePreferencesInitialized();
@@ -48,24 +49,20 @@ class RefactoringHandler {
 
     /**
      * JavaManipulation.fgPreferenceNodeId is normally set by
-     * JavaPlugin.start() (JDT UI activator). In headless PDE
-     * test runtime, JDT UI may not start — causing
-     * ProjectScope.getNode(null) to hang indefinitely.
+     * JavaPlugin.start() (JDT UI). In headless environments
+     * (Tycho CI without JDT UI, PDE headless), the ID stays
+     * null — causing ProjectScope.getNode(null) to hang.
      *
-     * Try to force-start the JDT UI bundle first. If that
-     * fails (headless, no UI), set the preference node ID
-     * and defaults manually.
+     * Use org.eclipse.jdt.core.manipulation as the node ID
+     * (always available) and set import order defaults.
      */
     private static void ensurePreferencesInitialized() {
         if (JavaManipulation.getPreferenceNodeId() != null) {
             return;
         }
-        // In headless PDE, JDT UI can't start (needs Display).
-        // Set the preference node ID and defaults that
-        // JavaPlugin.start() would normally provide.
-        JavaManipulation.setPreferenceNodeId(JDT_UI_NODE);
+        JavaManipulation.setPreferenceNodeId(MANIPULATION_NODE);
         var defaults = DefaultScope.INSTANCE.getNode(
-                JDT_UI_NODE);
+                MANIPULATION_NODE);
         defaults.put(
                 CodeStyleConfiguration.ORGIMPORTS_IMPORTORDER,
                 "java;javax;org;com");
