@@ -9,7 +9,6 @@ import org.eclipse.core.resources.IResource;
 import org.eclipse.core.resources.IWorkspaceRoot;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.NullProgressMonitor;
-import org.eclipse.core.runtime.Platform;
 import org.eclipse.core.runtime.preferences.DefaultScope;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IField;
@@ -61,31 +60,23 @@ class RefactoringHandler {
         if (JavaManipulation.getPreferenceNodeId() != null) {
             return;
         }
-        // Try starting JDT UI bundle (activates preferences)
-        try {
-            var bundle = Platform.getBundle(JDT_UI_NODE);
-            if (bundle != null) bundle.start();
-        } catch (Exception e) {
-            // headless — no UI bundle or can't start
-        }
-        // If bundle start didn't set it, set manually
-        if (JavaManipulation.getPreferenceNodeId() == null) {
-            JavaManipulation.setPreferenceNodeId(JDT_UI_NODE);
-            var defaults = DefaultScope.INSTANCE.getNode(
-                    JDT_UI_NODE);
-            defaults.put(
-                    CodeStyleConfiguration
-                            .ORGIMPORTS_IMPORTORDER,
-                    "java;javax;org;com");
-            defaults.put(
-                    CodeStyleConfiguration
-                            .ORGIMPORTS_ONDEMANDTHRESHOLD,
-                    "99");
-            defaults.put(
-                    CodeStyleConfiguration
-                            .ORGIMPORTS_STATIC_ONDEMANDTHRESHOLD,
-                    "99");
-        }
+        // In headless PDE, JDT UI can't start (needs Display).
+        // Set the preference node ID and defaults that
+        // JavaPlugin.start() would normally provide.
+        JavaManipulation.setPreferenceNodeId(JDT_UI_NODE);
+        var defaults = DefaultScope.INSTANCE.getNode(
+                JDT_UI_NODE);
+        defaults.put(
+                CodeStyleConfiguration.ORGIMPORTS_IMPORTORDER,
+                "java;javax;org;com");
+        defaults.put(
+                CodeStyleConfiguration
+                        .ORGIMPORTS_ONDEMANDTHRESHOLD,
+                "99");
+        defaults.put(
+                CodeStyleConfiguration
+                        .ORGIMPORTS_STATIC_ONDEMANDTHRESHOLD,
+                "99");
     }
 
     String handleOrganizeImports(Map<String, String> params)
