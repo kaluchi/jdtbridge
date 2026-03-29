@@ -25,6 +25,8 @@ export async function testRun(args) {
     url += `class=${encodeURIComponent(fqn)}`;
     const method = parsed.method;
     if (method) url += `&method=${encodeURIComponent(method)}`;
+    if (flags.project)
+      url += `&project=${encodeURIComponent(flags.project)}`;
   } else if (flags.project) {
     url += `project=${encodeURIComponent(flags.project)}`;
     if (flags.package)
@@ -81,20 +83,25 @@ function sleep(ms) {
 
 export const help = `Launch tests non-blocking with real-time progress.
 
-Usage:  jdt test run <FQN>[#method] [-f] [-q]
+Usage:  jdt test run <FQN>[#method] [--project <name>] [-f] [-q]
         jdt test run --project <name> [--package <pkg>] [-f] [-q]
 
 Without -f, launches and prints a guide with available commands.
 With -f, launches and streams test progress until completion.
 
+When --project is used with <FQN>, the test class is resolved by name
+but launched using the specified project's classpath. This is useful when
+test sources live in one project but need dependencies from another.
+
 Flags:
-  -f, --follow    stream test status (only failures by default)
-  -q, --quiet     suppress onboarding guide
-  --all           include passed tests in output (with -f)
-  --ignored       show only ignored tests (with -f)
+  --project <name>  override the project for classpath resolution
+  -f, --follow      stream test status (only failures by default)
+  -q, --quiet       suppress onboarding guide
+  --all             include passed tests in output (with -f)
+  --ignored         show only ignored tests (with -f)
 
 Examples:
-  jdt test run com.example.MyTest                 run + show guide
-  jdt test run com.example.MyTest -f              run + stream failures
-  jdt test run com.example.MyTest -f --all        run + stream all tests
-  jdt test run --project my-project -f             run project tests + stream`;
+  jdt test run com.example.MyTest                       run + show guide
+  jdt test run com.example.MyTest --project Build -f    run with Build classpath
+  jdt test run com.example.MyTest -f --all              run + stream all tests
+  jdt test run --project my-project -f                  run project tests + stream`;

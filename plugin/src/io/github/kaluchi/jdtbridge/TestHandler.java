@@ -151,9 +151,22 @@ class TestHandler {
         if (fqn != null && !fqn.isBlank()) {
             IType type = JdtUtils.findType(fqn);
             if (type != null) {
-                resolvedProject =
-                        type.getJavaProject().getElementName();
-                testKind = detectTestKind(type);
+                // Prefer explicit project over type's project
+                if (projectName != null
+                        && !projectName.isBlank()) {
+                    resolvedProject = projectName;
+                    var model = JavaCore.create(
+                            ResourcesPlugin.getWorkspace()
+                                    .getRoot());
+                    IJavaProject jp =
+                            model.getJavaProject(projectName);
+                    testKind = detectTestKind(jp);
+                } else {
+                    resolvedProject =
+                            type.getJavaProject()
+                                    .getElementName();
+                    testKind = detectTestKind(type);
+                }
             }
         } else if (projectName != null
                 && !projectName.isBlank()) {
@@ -230,17 +243,31 @@ class TestHandler {
                 return HttpServer.jsonError("Type not found: " + fqn);
             }
 
-            IJavaProject jp = type.getJavaProject();
+            // Use explicit project if provided, otherwise
+            // fall back to the project that owns the type.
+            // This is needed when the test class lives in
+            // project A but must run from project B's classpath
+            // (e.g. test in Grinbel, classpath from Build).
+            String effectiveProject = projectName;
+            if (effectiveProject == null
+                    || effectiveProject.isBlank()) {
+                effectiveProject =
+                        type.getJavaProject().getElementName();
+            }
+
+            IJavaProject jp = JavaCore.create(
+                    ResourcesPlugin.getWorkspace().getRoot())
+                    .getJavaProject(effectiveProject);
             wc.setAttribute(
                     IJavaLaunchConfigurationConstants
                             .ATTR_PROJECT_NAME,
-                    jp.getElementName());
+                    effectiveProject);
             wc.setAttribute(
                     IJavaLaunchConfigurationConstants
                             .ATTR_MAIN_TYPE_NAME,
                     fqn);
             wc.setAttribute(ATTR_TEST_KIND,
-                    detectTestKind(type));
+                    detectTestKind(jp));
 
             if (methodName != null && !methodName.isBlank()) {
                 wc.setAttribute(ATTR_TEST_NAME, methodName);
