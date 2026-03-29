@@ -2,6 +2,7 @@
 
 import { request } from "node:http";
 import { findInstance } from "./discovery.mjs";
+import { proxyAwareOptions } from "./proxy.mjs";
 import { red, bold } from "./color.mjs";
 
 /** @type {import('./discovery.mjs').Instance|null} */
@@ -40,35 +41,9 @@ function authHeaders() {
     : {};
 }
 
-/**
- * Build request options. If http_proxy is set and host is not
- * in no_proxy, route through the proxy: connect to proxy
- * host:port and use full URL as request path.
- */
-export function requestOptions(inst, path, method, timeoutMs) {
-  const proxy = process.env.http_proxy || process.env.HTTP_PROXY;
-  const noProxy = (process.env.no_proxy || process.env.NO_PROXY || "").split(",").map(s => s.trim());
-  const needsProxy = proxy && !noProxy.includes(inst.host);
-
-  if (needsProxy) {
-    const proxyUrl = new URL(proxy);
-    return {
-      hostname: proxyUrl.hostname,
-      port: parseInt(proxyUrl.port, 10),
-      path: `http://${inst.host}:${inst.port}${path}`,
-      method,
-      timeout: timeoutMs,
-      headers: { ...authHeaders(), Host: `${inst.host}:${inst.port}` },
-    };
-  }
-  return {
-    hostname: inst.host,
-    port: inst.port,
-    path,
-    method,
-    timeout: timeoutMs,
-    headers: authHeaders(),
-  };
+function requestOpts(inst, path, method, timeoutMs) {
+  return proxyAwareOptions(
+    inst.host, inst.port, path, method, timeoutMs, authHeaders());
 }
 
 /**
@@ -102,7 +77,7 @@ export async function get(path, timeoutMs = 10_000) {
   const inst = await connect();
   return new Promise((resolve, reject) => {
     const req = request(
-      requestOptions(inst, path, "GET", timeoutMs),
+      requestOpts(inst, path, "GET", timeoutMs),
       (res) => {
         let data = "";
         res.on("data", (chunk) => (data += chunk));
@@ -139,7 +114,7 @@ export async function getRaw(path, timeoutMs = 10_000) {
   const inst = await connect();
   return new Promise((resolve, reject) => {
     const req = request(
-      requestOptions(inst, path, "GET", timeoutMs),
+      requestOpts(inst, path, "GET", timeoutMs),
       (res) => {
         let data = "";
         res.on("data", (chunk) => (data += chunk));
@@ -188,7 +163,7 @@ export async function getStream(path, dest) {
   const inst = await connect();
   return new Promise((resolve, reject) => {
     const req = request(
-      requestOptions(inst, path, "GET", 0),
+      requestOpts(inst, path, "GET", 0),
       (res) => {
         if (res.statusCode !== 200) {
           let data = "";
@@ -219,7 +194,7 @@ export async function getStreamLines(path, onLine) {
   const inst = await connect();
   return new Promise((resolve, reject) => {
     const req = request(
-      requestOptions(inst, path, "GET", 0),
+      requestOpts(inst, path, "GET", 0),
       (res) => {
         if (res.statusCode !== 200) {
           let data = "";

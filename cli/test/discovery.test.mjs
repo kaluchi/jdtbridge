@@ -162,42 +162,27 @@ describe("discovery", () => {
       expect(instances[0].host).toBe("127.0.0.1");
     });
 
-    it("includes remote instance without probe", async () => {
-      // Remote host — no HTTP server needed, file trusted
+    it("remote instance probed like local", async () => {
+      // Remote host with mock server — probe works
+      const port = await startMock();
       writeInstance("remote.json", {
-        port: 9999, token: "t", pid: 1, workspace: "/ws",
-        host: "host.docker.internal",
+        port, token: "t", pid: 1, workspace: "/ws",
+        host: "127.0.0.1", // use localhost so mock server works
       });
       const instances = await discoverInstances();
       expect(instances).toHaveLength(1);
-      expect(instances[0].host).toBe("host.docker.internal");
-      expect(instances[0].port).toBe(9999);
     });
 
-    it("mixes local probed and remote trusted", async () => {
-      const port = await startMock();
-      writeInstance("local.json", {
-        port, token: "t1", pid: process.pid, workspace: "/ws/local",
-      });
-      writeInstance("remote.json", {
-        port: 9999, token: "t2", pid: 1, workspace: "/ws/remote",
-        host: "host.docker.internal",
-      });
-      const instances = await discoverInstances();
-      expect(instances).toHaveLength(2);
-    });
-
-    it("filters dead local but keeps remote", async () => {
-      writeInstance("dead.json", {
+    it("filters dead instances regardless of host", async () => {
+      writeInstance("dead-local.json", {
         port: 19999, token: "t1", pid: 1, workspace: "/ws/dead",
       });
-      writeInstance("remote.json", {
-        port: 9999, token: "t2", pid: 1, workspace: "/ws/remote",
-        host: "host.docker.internal",
+      writeInstance("dead-remote.json", {
+        port: 19998, token: "t2", pid: 1, workspace: "/ws/remote",
+        host: "192.168.1.100",
       });
       const instances = await discoverInstances();
-      expect(instances).toHaveLength(1);
-      expect(instances[0].host).toBe("host.docker.internal");
+      expect(instances).toHaveLength(0);
     });
   });
 

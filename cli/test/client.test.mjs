@@ -339,10 +339,9 @@ describe("client", () => {
     vi.resetModules();
     delete process.env.http_proxy;
     delete process.env.HTTP_PROXY;
-    const { requestOptions } = await import("../src/client.mjs");
-    const opts = requestOptions(
-      { host: "host.docker.internal", port: 61180, token: "tok" },
-      "/projects", "GET", 10000);
+    const { proxyAwareOptions } = await import("../src/proxy.mjs");
+    const opts = proxyAwareOptions(
+      "host.docker.internal", 61180, "/projects", "GET", 10000);
     expect(opts.hostname).toBe("host.docker.internal");
     expect(opts.port).toBe(61180);
     expect(opts.path).toBe("/projects");
@@ -352,10 +351,9 @@ describe("client", () => {
     vi.resetModules();
     process.env.http_proxy = "http://proxy.local:3128";
     process.env.no_proxy = "localhost,127.0.0.1";
-    const { requestOptions } = await import("../src/client.mjs");
-    const opts = requestOptions(
-      { host: "host.docker.internal", port: 61180, token: "tok" },
-      "/projects", "GET", 10000);
+    const { proxyAwareOptions } = await import("../src/proxy.mjs");
+    const opts = proxyAwareOptions(
+      "host.docker.internal", 61180, "/projects", "GET", 10000);
     expect(opts.hostname).toBe("proxy.local");
     expect(opts.port).toBe(3128);
     expect(opts.path).toBe("http://host.docker.internal:61180/projects");
@@ -367,10 +365,9 @@ describe("client", () => {
     vi.resetModules();
     process.env.http_proxy = "http://proxy.local:3128";
     process.env.no_proxy = "localhost,127.0.0.1,host.docker.internal";
-    const { requestOptions } = await import("../src/client.mjs");
-    const opts = requestOptions(
-      { host: "host.docker.internal", port: 61180, token: "tok" },
-      "/projects", "GET", 10000);
+    const { proxyAwareOptions } = await import("../src/proxy.mjs");
+    const opts = proxyAwareOptions(
+      "host.docker.internal", 61180, "/projects", "GET", 10000);
     expect(opts.hostname).toBe("host.docker.internal");
     expect(opts.port).toBe(61180);
     expect(opts.path).toBe("/projects");
