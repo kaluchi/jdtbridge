@@ -60,16 +60,23 @@ export async function sandboxRun(args) {
     "--allow-host", "localhost",
   ], { stdio: "ignore" });
 
-  // 4. Install CLI if missing
-  const check = spawnSync("docker", [
+  // 4. Install or update CLI to match plugin version
+  const wantVersion = (inst.version || "").replace(/\.\d{12,}$/, "");
+  const have = spawnSync("docker", [
     "sandbox", "exec", name,
-    "bash", "-c", "command -v jdt",
+    "bash", "-c", "jdt --version 2>/dev/null || echo none",
   ], { encoding: "utf8" });
-  if (check.status !== 0) {
-    console.log(dim("Installing jdt CLI..."));
+  const sandboxVersion = (have.stdout || "").trim();
+  if (sandboxVersion !== wantVersion) {
+    const pkg = wantVersion
+      ? `@kaluchi/jdtbridge@${wantVersion}`
+      : "@kaluchi/jdtbridge";
+    console.log(dim(sandboxVersion === "none"
+      ? `Installing jdt CLI ${wantVersion}...`
+      : `Updating jdt CLI ${sandboxVersion} → ${wantVersion}...`));
     spawnSync("docker", [
       "sandbox", "exec", name,
-      "npm", "install", "-g", "@kaluchi/jdtbridge",
+      "npm", "install", "-g", pkg,
     ], { stdio: "inherit" });
   }
 
