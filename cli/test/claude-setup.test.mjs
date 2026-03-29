@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { mergeJdtSettings, installClaudeSettings } from "../src/claude-setup.mjs";
+import { mergeJdtSettings, installClaudeSettings, uninstallClaudeSettings } from "../src/claude-setup.mjs";
 
 describe("mergeJdtSettings", () => {
   it("adds permission and hook to empty object", () => {
@@ -99,7 +99,7 @@ describe("installClaudeSettings", () => {
     const dir = join(tmpDir, ".claude");
     mkdirSync(dir, { recursive: true });
     writeFileSync(
-      join(dir, "settings.json"),
+      join(dir, "settings.local.json"),
       JSON.stringify({ permissions: { allow: ["Bash(git *)"] } }),
     );
 
@@ -111,9 +111,137 @@ describe("installClaudeSettings", () => {
   it("is idempotent on disk", () => {
     installClaudeSettings(tmpDir);
     installClaudeSettings(tmpDir);
-    const file = join(tmpDir, ".claude", "settings.json");
+    const file = join(tmpDir, ".claude", "settings.local.json");
     const content = JSON.parse(readFileSync(file, "utf8"));
     expect(content.permissions.allow.filter((r) => r === "Bash(jdt *)")).toHaveLength(1);
     expect(content.hooks.PreToolUse).toHaveLength(1);
+  });
+
+  it("writes to settings.local.json not settings.json", () => {
+    installClaudeSettings(tmpDir);
+    expect(existsSync(join(tmpDir, ".claude", "settings.local.json"))).toBe(true);
+  });
+
+  // ---- Agent installation ----
+
+  it("installs Explore and Plan agents", () => {
+    installClaudeSettings(tmpDir);
+    const agentsDir = join(tmpDir, ".claude", "agents");
+    expect(existsSync(join(agentsDir, "Explore.md"))).toBe(true);
+    expect(existsSync(join(agentsDir, "Plan.md"))).toBe(true);
+  });
+
+  it("agents contain jdtbridge marker", () => {
+    installClaudeSettings(tmpDir);
+    const explore = readFileSync(
+      join(tmpDir, ".claude", "agents", "Explore.md"), "utf8");
+    expect(explore).toContain("jdtbridge-managed");
+  });
+
+  it("agents contain jdt commands", () => {
+    installClaudeSettings(tmpDir);
+    const explore = readFileSync(
+      join(tmpDir, ".claude", "agents", "Explore.md"), "utf8");
+    expect(explore).toContain("jdt refs");
+    expect(explore).toContain("jdt src");
+    const plan = readFileSync(
+      join(tmpDir, ".claude", "agents", "Plan.md"), "utf8");
+    expect(plan).toContain("jdt src");
+    expect(plan).toContain("jdt hierarchy");
+  });
+
+  it("does not overwrite non-jdt agent", () => {
+    const agentsDir = join(tmpDir, ".claude", "agents");
+    mkdirSync(agentsDir, { recursive: true });
+    writeFileSync(join(agentsDir, "Explore.md"), "custom agent\n");
+
+    installClaudeSettings(tmpDir);
+    const content = readFileSync(
+      join(agentsDir, "Explore.md"), "utf8");
+    expect(content).toBe("custom agent\n");
+  });
+
+  it("updates existing jdt agent", () => {
+    installClaudeSettings(tmpDir);
+    // Simulate older version
+    const agentFile = join(tmpDir, ".claude", "agents", "Explore.md");
+    writeFileSync(agentFile, "old jdt agent\n<!-- jdtbridge-managed -->\n");
+
+    installClaudeSettings(tmpDir);
+    const content = readFileSync(agentFile, "utf8");
+    expect(content).toContain("jdt refs");
+    expect(content).toContain("jdtbridge-managed");
+  });
+
+  // ---- Migration from settings.json ----
+
+  it("migrates hooks from settings.json to local", () => {
+    const dir = join(tmpDir, ".claude");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "settings.json"), JSON.stringify({
+      permissions: { allow: ["Bash(jdt *)", "Bash(git *)"] },
+      hooks: {
+        PreToolUse: [{
+          matcher: "Bash",
+          hooks: [{ type: "command", command: "jdt check" }],
+        }],
+      },
+    }));
+
+    installClaudeSettings(tmpDir);
+
+    // settings.json should have jdt removed
+    const main = JSON.parse(readFileSync(
+      join(dir, "settings.json"), "utf8"));
+    expect(main.permissions.allow).not.toContain("Bash(jdt *)");
+    expect(main.permissions.allow).toContain("Bash(git *)");
+    expect(main.hooks?.PreToolUse || []).toHaveLength(0);
+
+    // settings.local.json should have jdt
+    const local = JSON.parse(readFileSync(
+      join(dir, "settings.local.json"), "utf8"));
+    expect(local.permissions.allow).toContain("Bash(jdt *)");
+  });
+});
+
+// ---- uninstall ----
+
+describe("uninstallClaudeSettings", () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "jdt-claude-test-"));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("removes hooks from settings.local.json", () => {
+    installClaudeSettings(tmpDir);
+    uninstallClaudeSettings(tmpDir);
+    const file = join(tmpDir, ".claude", "settings.local.json");
+    const content = JSON.parse(readFileSync(file, "utf8"));
+    expect(content.hooks).toBeUndefined();
+    expect(content.permissions).toBeUndefined();
+  });
+
+  it("removes jdt agents", () => {
+    installClaudeSettings(tmpDir);
+    uninstallClaudeSettings(tmpDir);
+    expect(existsSync(
+      join(tmpDir, ".claude", "agents", "Explore.md"))).toBe(false);
+    expect(existsSync(
+      join(tmpDir, ".claude", "agents", "Plan.md"))).toBe(false);
+  });
+
+  it("preserves non-jdt agents", () => {
+    installClaudeSettings(tmpDir);
+    const custom = join(tmpDir, ".claude", "agents", "Custom.md");
+    writeFileSync(custom, "my agent\n");
+
+    uninstallClaudeSettings(tmpDir);
+    expect(existsSync(custom)).toBe(true);
+    expect(readFileSync(custom, "utf8")).toBe("my agent\n");
   });
 });

@@ -175,9 +175,10 @@ async function runCheck(config) {
   console.log(bold("Claude Code"));
   try {
     const cwd = process.cwd();
-    const settingsPath = join(cwd, ".claude", "settings.json");
-    if (existsSync(settingsPath)) {
-      const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
+    // Check settings.local.json for hooks
+    const localPath = join(cwd, ".claude", "settings.local.json");
+    if (existsSync(localPath)) {
+      const settings = JSON.parse(readFileSync(localPath, "utf8"));
       const hasPre = settings.hooks?.PreToolUse?.some(
         (h) => h.hooks?.some((hk) => hk.command?.includes("jdt ")));
       const hasPost = settings.hooks?.PostToolUse?.some(
@@ -189,10 +190,16 @@ async function runCheck(config) {
         info("Run: jdt setup --claude");
       }
     } else {
-      info("No .claude/settings.json — run: jdt setup --claude");
+      info("No .claude/settings.local.json — run: jdt setup --claude");
     }
+    // Check agents
+    const agentsDir = join(cwd, ".claude", "agents");
+    const hasExplore = existsSync(join(agentsDir, "Explore.md"));
+    const hasPlan = existsSync(join(agentsDir, "Plan.md"));
+    (hasExplore ? ok : info)(`Explore agent: ${hasExplore ? "installed" : "not installed"}`);
+    (hasPlan ? ok : info)(`Plan agent: ${hasPlan ? "installed" : "not installed"}`);
   } catch {
-    info("Could not read .claude/settings.json");
+    info("Could not read .claude/settings.local.json");
   }
   console.log();
 }
@@ -409,10 +416,14 @@ async function setupClaude() {
 
   console.log(`${green("✓")} Claude Code settings written to ${file}`);
   console.log();
-  console.log("  Installed:");
+  console.log("  Installed (settings.local.json):");
   console.log("  - Bash(jdt *) permission rule");
   console.log("  - PreToolUse hook for # workaround (issue #34061)");
   console.log("  - PostToolUse hook for Eclipse refresh on Edit/Write");
+  console.log();
+  console.log("  Installed (.claude/agents/):");
+  console.log("  - Explore agent with jdt semantic search");
+  console.log("  - Plan agent with jdt code navigation");
   console.log();
   console.log("  Restart Claude Code to apply.");
 }

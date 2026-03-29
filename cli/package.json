@@ -9,7 +9,8 @@
   },
   "files": [
     "bin/",
-    "src/"
+    "src/",
+    "agents/"
   ],
   "scripts": {
     "test": "vitest run",

@@ -36,7 +36,9 @@ and paths to your Eclipse installation.
 
 ## Environment check (REQUIRED)
 
-**Run at the start of every conversation, before any other work.**
+**Run at the start of every conversation, before any other work.
+Subagents (Explore, Plan, etc.) skip this section — jdt is already
+verified by the main agent.**
 
 1. `jdt setup --check` — verifies CLI, Node, Java, Maven, Eclipse, bridge.
    - `jdt: command not found` → `cd cli && npm install && npm link`
@@ -117,6 +119,29 @@ jdt refs io.github.kaluchi.jdtbridge.JdtUtils#findMethod | wc -l # count, not 51
 jdt errors --project my-server | head -5                         # one error at a time
 jdt src org.springframework.jdbc.core.JdbcTemplate#query | grep -n throw  # throws in library code
 ```
+
+### Subagents (Explore, Plan)
+
+Custom jdt-aware agents are installed in `.claude/agents/` by
+`jdt setup --claude`. They have `jdt` commands in their system prompt
+and auto-allow hooks — no setup needed.
+
+**When to use subagents:**
+- `Explore` — finding types, tracing references, understanding
+  hierarchies, reading source. Fast (haiku model). Use for research
+  that doesn't require writing code.
+- `Plan` — designing implementation strategy with code understanding.
+  Inherits parent model. Read-only.
+
+**When NOT to use subagents:**
+- Writing code, editing files — do it yourself, not subagents.
+- Simple `jdt` queries (one command) — call `jdt` directly, don't
+  spawn a subagent for `jdt refs Foo#bar`.
+- Non-Java exploration — subagents add jdt overhead, use plain
+  Grep/Glob for config files, scripts, docs.
+
+Subagents skip environment check (CLAUDE.md switch). They assume
+jdt is already verified by the main agent.
 
 ## Project structure
 
