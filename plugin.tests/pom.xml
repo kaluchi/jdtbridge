@@ -45,6 +45,16 @@
                             <type>eclipse-plugin</type>
                             <artifactId>org.eclipse.core.resources.source</artifactId>
                         </dependency>
+                        <!-- JUnit runtime for ProjectOverrideTest
+                             (launch delegate checks Platform.getBundle) -->
+                        <dependency>
+                            <type>eclipse-plugin</type>
+                            <artifactId>org.eclipse.jdt.junit5.runtime</artifactId>
+                        </dependency>
+                        <dependency>
+                            <type>eclipse-plugin</type>
+                            <artifactId>org.eclipse.jdt.junit.runtime</artifactId>
+                        </dependency>
                         <!-- m2e core for MavenIntegrationTest -->
                         <dependency>
                             <type>eclipse-plugin</type>

@@ -136,6 +136,14 @@ class TestHandler {
             wc.setAttribute(PDE_DEFAULT_AUTO_START, true);
             wc.setAttribute(PDE_DEFAULT_START_LEVEL, 4);
             wc.setAttribute(PDE_INCLUDE_OPTIONAL, true);
+            // Fresh temp workspace per run — avoids corrupt
+            // state from previous launches
+            wc.setAttribute("location",
+                    System.getProperty("java.io.tmpdir")
+                            + "/jdtbridge-test-ws-"
+                            + System.currentTimeMillis());
+            wc.setAttribute("askclear", false);
+            wc.setAttribute("clearws", true);
         }
 
         String configError = configureLaunch(
@@ -258,6 +266,11 @@ class TestHandler {
             IJavaProject jp = JavaCore.create(
                     ResourcesPlugin.getWorkspace().getRoot())
                     .getJavaProject(effectiveProject);
+            if (jp == null || !jp.exists()) {
+                return HttpServer.jsonError(
+                        "Project not found: "
+                                + effectiveProject);
+            }
             wc.setAttribute(
                     IJavaLaunchConfigurationConstants
                             .ATTR_PROJECT_NAME,
