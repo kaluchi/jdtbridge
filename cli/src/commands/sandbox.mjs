@@ -21,7 +21,7 @@ import { bold, red, dim } from "../color.mjs";
  * 1. Find live bridge on host
  * 2. Ensure sandbox exists (create if needed)
  * 3. Allow localhost through sandbox network proxy
- * 4. Install jdt CLI if missing
+ * 4. Install or update jdt CLI to match plugin version
  * 5. Write bridge instance file via stdin
  * 6. Run sandbox with agent args
  */
@@ -144,7 +144,7 @@ Steps performed automatically:
   1. Find running Eclipse bridge on host
   2. Create Docker sandbox (if not exists)
   3. Allow localhost in sandbox network policy
-  4. Install @kaluchi/jdtbridge via npm (if not installed)
+  4. Install or update @kaluchi/jdtbridge to match plugin version
   5. Write bridge instance file (~/.jdtbridge/instances/)
   6. Run the agent
 
