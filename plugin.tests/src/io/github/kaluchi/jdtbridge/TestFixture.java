@@ -531,18 +531,44 @@ class TestFixture {
         java.io.File file = FileLocator
                 .getBundleFileLocation(bundle).orElse(null);
         if (file == null) return null;
-        Path srcPath = null;
+        Path srcPath = findSourceBundle(sourceBundleId, file);
+        return JavaCore.newLibraryEntry(
+                new Path(file.getAbsolutePath()),
+                srcPath, null);
+    }
+
+    /**
+     * Find source bundle — first via Platform.getBundle(),
+     * then by looking for a .source jar next to the binary
+     * bundle (handles PDE headless where source bundles may
+     * not be resolved by OSGi).
+     */
+    private static Path findSourceBundle(String sourceBundleId,
+            java.io.File binaryFile) {
+        // Try OSGi registry first
         var srcBundle = Platform.getBundle(sourceBundleId);
         if (srcBundle != null) {
             java.io.File sf = FileLocator
                     .getBundleFileLocation(srcBundle)
                     .orElse(null);
             if (sf != null)
-                srcPath = new Path(sf.getAbsolutePath());
+                return new Path(sf.getAbsolutePath());
         }
-        return JavaCore.newLibraryEntry(
-                new Path(file.getAbsolutePath()),
-                srcPath, null);
+        // Fallback: find .source jar in same directory
+        java.io.File dir = binaryFile.getParentFile();
+        if (dir == null) return null;
+        String name = binaryFile.getName();
+        // binary: org.eclipse.core.resources_3.23.200.v123.jar
+        // source: org.eclipse.core.resources.source_3.23.200.v123.jar
+        int verIdx = name.indexOf('_');
+        if (verIdx < 0) return null;
+        String baseName = name.substring(0, verIdx);
+        String version = name.substring(verIdx);
+        java.io.File srcFile = new java.io.File(dir,
+                baseName + ".source" + version);
+        if (srcFile.exists())
+            return new Path(srcFile.getAbsolutePath());
+        return null;
     }
 
     static void destroy() throws Exception {
