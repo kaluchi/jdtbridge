@@ -50,6 +50,15 @@ class TestHandler {
     private static final String PDE_CORE_TEST_APP =
             "org.eclipse.pde.junit.runtime"
                     + ".coretestapplication";
+    private static final String PDE_USE_DEFAULT = "default";
+    private static final String PDE_AUTOMATIC_ADD =
+            "automaticAdd";
+    private static final String PDE_DEFAULT_AUTO_START =
+            "default_auto_start";
+    private static final String PDE_DEFAULT_START_LEVEL =
+            "default_start_level";
+    private static final String PDE_INCLUDE_OPTIONAL =
+            "includeOptional";
     private static final String ATTR_TEST_KIND =
             "org.eclipse.jdt.junit.TEST_KIND";
     private static final String ATTR_TEST_NAME =
@@ -122,11 +131,11 @@ class TestHandler {
             wc.setAttribute(PDE_RUN_IN_UI_THREAD, false);
             wc.setAttribute(PDE_APPLICATION, PDE_CORE_TEST_APP);
             // Include all workspace + target bundles, auto-start
-            wc.setAttribute("default", true);
-            wc.setAttribute("automaticAdd", true);
-            wc.setAttribute("default_auto_start", true);
-            wc.setAttribute("default_start_level", 4);
-            wc.setAttribute("includeOptional", true);
+            wc.setAttribute(PDE_USE_DEFAULT, true);
+            wc.setAttribute(PDE_AUTOMATIC_ADD, true);
+            wc.setAttribute(PDE_DEFAULT_AUTO_START, true);
+            wc.setAttribute(PDE_DEFAULT_START_LEVEL, 4);
+            wc.setAttribute(PDE_INCLUDE_OPTIONAL, true);
         }
 
         String configError = configureLaunch(

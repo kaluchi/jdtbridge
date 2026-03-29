@@ -177,7 +177,7 @@ For CI without local Eclipse: `mvn clean verify -Pci`.
 
 1. **Create a branch** — never commit directly to master
 2. **Write code + tests** — every change needs tests
-3. **Build incrementally** — plugin first, tests second:
+3. **Build** — plugin first, tests second (default is clean build):
    ```bash
    jdt build --project io.github.kaluchi.jdtbridge
    jdt build --project io.github.kaluchi.jdtbridge.tests

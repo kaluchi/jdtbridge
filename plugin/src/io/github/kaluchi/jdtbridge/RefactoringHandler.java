@@ -9,6 +9,7 @@ import org.eclipse.core.resources.IResource;
 import org.eclipse.core.resources.IWorkspaceRoot;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.NullProgressMonitor;
+import org.eclipse.core.runtime.Platform;
 import org.eclipse.core.runtime.preferences.DefaultScope;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IField;
@@ -62,16 +63,8 @@ class RefactoringHandler {
         }
         // Try starting JDT UI bundle (activates preferences)
         try {
-            var ctx = org.osgi.framework.FrameworkUtil
-                    .getBundle(RefactoringHandler.class)
-                    .getBundleContext();
-            for (var b : ctx.getBundles()) {
-                if (JDT_UI_NODE.equals(
-                        b.getSymbolicName())) {
-                    b.start();
-                    break;
-                }
-            }
+            var bundle = Platform.getBundle(JDT_UI_NODE);
+            if (bundle != null) bundle.start();
         } catch (Exception e) {
             // headless — no UI bundle or can't start
         }
