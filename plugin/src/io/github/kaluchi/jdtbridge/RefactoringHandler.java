@@ -43,37 +43,41 @@ class RefactoringHandler {
     private static final String MANIPULATION_NODE =
             "org.eclipse.jdt.core.manipulation";
 
-    static {
-        ensurePreferencesInitialized();
-    }
-
     /**
-     * JavaManipulation.fgPreferenceNodeId is normally set by
-     * JavaPlugin.start() (JDT UI). In headless environments
-     * (Tycho CI without JDT UI, PDE headless), the ID stays
-     * null — causing ProjectScope.getNode(null) to hang.
+     * Ensure import order defaults exist. In headless PDE,
+     * JDT UI may not start and ProjectScope.getNode(null)
+     * hangs if no preference node ID is set.
      *
-     * Use org.eclipse.jdt.core.manipulation as the node ID
-     * (always available) and set import order defaults.
+     * We only set the node ID when it's null — if JDT UI
+     * is available, its JavaPlugin.start() sets it first
+     * and we leave it alone.
      */
-    private static void ensurePreferencesInitialized() {
-        if (JavaManipulation.getPreferenceNodeId() != null) {
-            return;
+    static void ensurePreferencesInitialized() {
+        String nodeId = JavaManipulation.getPreferenceNodeId();
+        if (nodeId == null) {
+            // Headless — JDT UI not started. Use manipulation
+            // bundle as preference scope (always available).
+            nodeId = MANIPULATION_NODE;
+            JavaManipulation.setPreferenceNodeId(nodeId);
         }
-        JavaManipulation.setPreferenceNodeId(MANIPULATION_NODE);
-        var defaults = DefaultScope.INSTANCE.getNode(
-                MANIPULATION_NODE);
-        defaults.put(
+        // Ensure import defaults exist regardless of scope
+        var defaults = DefaultScope.INSTANCE.getNode(nodeId);
+        if (defaults.get(
                 CodeStyleConfiguration.ORGIMPORTS_IMPORTORDER,
-                "java;javax;org;com");
-        defaults.put(
-                CodeStyleConfiguration
-                        .ORGIMPORTS_ONDEMANDTHRESHOLD,
-                "99");
-        defaults.put(
-                CodeStyleConfiguration
-                        .ORGIMPORTS_STATIC_ONDEMANDTHRESHOLD,
-                "99");
+                null) == null) {
+            defaults.put(
+                    CodeStyleConfiguration
+                            .ORGIMPORTS_IMPORTORDER,
+                    "java;javax;org;com");
+            defaults.put(
+                    CodeStyleConfiguration
+                            .ORGIMPORTS_ONDEMANDTHRESHOLD,
+                    "99");
+            defaults.put(
+                    CodeStyleConfiguration
+                            .ORGIMPORTS_STATIC_ONDEMANDTHRESHOLD,
+                    "99");
+        }
     }
 
     String handleOrganizeImports(Map<String, String> params)
@@ -89,6 +93,7 @@ class RefactoringHandler {
         }
 
         cu.getResource().refreshLocal(IResource.DEPTH_ZERO, null);
+        ensurePreferencesInitialized();
 
         OrganizeImportsOperation.IChooseImportQuery query =
                 (openChoices, ranges) -> {
