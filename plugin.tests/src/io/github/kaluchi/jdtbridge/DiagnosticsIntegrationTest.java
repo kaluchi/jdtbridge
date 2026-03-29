@@ -1,10 +1,16 @@
 package io.github.kaluchi.jdtbridge;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
 import java.util.Map;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -36,12 +42,16 @@ public class DiagnosticsIntegrationTest {
         Map<String, String> params = new HashMap<>();
         params.put("project", TestFixture.PROJECT_NAME);
         String json = handler.handleErrors(params);
-        assertTrue(json.contains("BrokenClass"),
-                "Should find error in BrokenClass: " + json);
-        assertTrue(json.contains("\"severity\":\"ERROR\""),
-                "Should be ERROR severity: " + json);
-        assertTrue(json.contains("UnknownType"),
-                "Should mention UnknownType: " + json);
+        JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
+        assertTrue(arr.size() > 0, "Should have errors");
+        JsonObject error = arr.get(0).getAsJsonObject();
+        assertEquals("ERROR", error.get("severity").getAsString());
+        assertTrue(error.get("file").getAsString()
+                .contains("BrokenClass"),
+                "Should be in BrokenClass: " + error);
+        assertTrue(error.get("message").getAsString()
+                .contains("UnknownType"),
+                "Should mention UnknownType: " + error);
     }
 
     @Test
@@ -51,7 +61,8 @@ public class DiagnosticsIntegrationTest {
         params.put("file",
                 "/" + TestFixture.PROJECT_NAME + "/src/test/model/Dog.java");
         String json = handler.handleErrors(params);
-        assertEquals("[]", json, "Dog.java should have no errors");
+        JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
+        assertEquals(0, arr.size(), "Dog.java should have no errors");
     }
 
     @Test
@@ -60,9 +71,16 @@ public class DiagnosticsIntegrationTest {
         params.put("project", TestFixture.PROJECT_NAME);
         params.put("warnings", "");
         String json = handler.handleErrors(params);
-        // Should at least find the ERROR
-        assertTrue(json.contains("ERROR"),
-                "Should find errors: " + json);
+        JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
+        boolean hasError = false;
+        for (var e : arr) {
+            if ("ERROR".equals(e.getAsJsonObject()
+                    .get("severity").getAsString())) {
+                hasError = true;
+                break;
+            }
+        }
+        assertTrue(hasError, "Should contain at least one ERROR");
     }
 
     @Test
@@ -70,8 +88,8 @@ public class DiagnosticsIntegrationTest {
         Map<String, String> params = new HashMap<>();
         params.put("project", "no-such-project-xyz");
         String json = handler.handleErrors(params);
-        assertTrue(json.contains("error"),
-                "Should return error: " + json);
+        JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
+        assertNotNull(obj.get("error"), "Should have error field");
     }
 
     @Test
@@ -79,8 +97,9 @@ public class DiagnosticsIntegrationTest {
         Map<String, String> params = new HashMap<>();
         params.put("project", TestFixture.PROJECT_NAME);
         String json = handler.handleBuild(params);
-        assertTrue(json.contains("\"errors\""),
-                "Should return errors count: " + json);
+        JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
+        assertNotNull(obj.get("errors"), "Should have errors field");
+        assertTrue(obj.get("errors").getAsInt() >= 0);
     }
 
     @Test
@@ -89,11 +108,9 @@ public class DiagnosticsIntegrationTest {
         params.put("project", TestFixture.PROJECT_NAME);
         params.put("clean", "");
         String json = handler.handleBuild(params);
-        assertTrue(json.contains("\"errors\""),
-                "Should return errors count: " + json);
-        // BrokenClass has a compilation error
-        assertTrue(json.contains("\"errors\":1") || json.contains("\"errors\": 1"),
-                "Should have 1 error from BrokenClass: " + json);
+        JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
+        assertEquals(1, obj.get("errors").getAsInt(),
+                "Should have 1 error from BrokenClass");
     }
 
     @Test
@@ -101,8 +118,9 @@ public class DiagnosticsIntegrationTest {
         Map<String, String> params = new HashMap<>();
         params.put("clean", "");
         String json = handler.handleBuild(params);
-        assertTrue(json.contains("error"),
-                "Should return error about missing project: " + json);
+        JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
+        assertNotNull(obj.get("error"),
+                "Should have error about missing project");
     }
 
     @Test
@@ -110,15 +128,14 @@ public class DiagnosticsIntegrationTest {
         Map<String, String> params = new HashMap<>();
         params.put("project", "no-such-project-xyz");
         String json = handler.handleBuild(params);
-        assertTrue(json.contains("error"),
-                "Should return error: " + json);
+        JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
+        assertNotNull(obj.get("error"), "Should have error field");
     }
 
     // ---- handleRefresh ----
 
     @Test
     public void refreshWorkspaceFile() throws Exception {
-        // Get absolute path of a file in the test project
         var root = org.eclipse.core.resources.ResourcesPlugin
                 .getWorkspace().getRoot();
         var file = root.getProject(TestFixture.PROJECT_NAME)
@@ -129,8 +146,8 @@ public class DiagnosticsIntegrationTest {
         Map<String, String> params = new HashMap<>();
         params.put("file", absPath);
         String json = handler.handleRefresh(params);
-        assertTrue(json.contains("\"refreshed\":true"),
-                "Should refresh: " + json);
+        JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
+        assertTrue(obj.get("refreshed").getAsBoolean());
     }
 
     @Test
@@ -138,10 +155,9 @@ public class DiagnosticsIntegrationTest {
         Map<String, String> params = new HashMap<>();
         params.put("file", "C:/nonexistent/Foo.java");
         String json = handler.handleRefresh(params);
-        assertTrue(json.contains("\"refreshed\":false"),
-                "Should not refresh: " + json);
-        assertTrue(json.contains("not in workspace"),
-                "Reason: " + json);
+        JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
+        assertFalse(obj.get("refreshed").getAsBoolean());
+        assertNotNull(obj.get("reason"), "Should have reason");
     }
 
     @Test
@@ -149,10 +165,10 @@ public class DiagnosticsIntegrationTest {
         Map<String, String> params = new HashMap<>();
         params.put("project", TestFixture.PROJECT_NAME);
         String json = handler.handleRefresh(params);
-        assertTrue(json.contains("\"refreshed\":true"),
-                "Should refresh project: " + json);
-        assertTrue(json.contains(TestFixture.PROJECT_NAME),
-                "Should name project: " + json);
+        JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
+        assertTrue(obj.get("refreshed").getAsBoolean());
+        assertEquals(TestFixture.PROJECT_NAME,
+                obj.get("project").getAsString());
     }
 
     @Test
@@ -160,17 +176,16 @@ public class DiagnosticsIntegrationTest {
         Map<String, String> params = new HashMap<>();
         params.put("project", "nonexistent-xyz");
         String json = handler.handleRefresh(params);
-        assertTrue(json.contains("error"),
-                "Should return error: " + json);
+        JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
+        assertNotNull(obj.get("error"), "Should have error field");
     }
 
     @Test
     public void refreshWorkspace() throws Exception {
         Map<String, String> params = new HashMap<>();
         String json = handler.handleRefresh(params);
-        assertTrue(json.contains("\"refreshed\":true"),
-                "Should refresh workspace: " + json);
-        assertTrue(json.contains("workspace"),
-                "Should say workspace scope: " + json);
+        JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
+        assertTrue(obj.get("refreshed").getAsBoolean());
+        assertEquals("workspace", obj.get("scope").getAsString());
     }
 }

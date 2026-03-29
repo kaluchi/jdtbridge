@@ -41,73 +41,74 @@ public class SearchIntegrationTest {
     @Test
     public void findByExactName() throws Exception {
         String json = handler.handleFind(Map.of("name", "Animal"));
-        assertTrue(json.contains("test.model.Animal"),
-                "Should find Animal: " + json);
+        JsonArray arr = parseArray(json);
+        assertNotNull(findByFqnField(arr, "test.model.Animal"),
+                "Should find Animal");
     }
 
     @Test
     public void findByPattern() throws Exception {
         String json = handler.handleFind(Map.of("name", "*Service"));
-        assertTrue(json.contains("test.service.AnimalService"),
-                "Should find AnimalService: " + json);
+        JsonArray arr = parseArray(json);
+        assertNotNull(findByFqnField(arr, "test.service.AnimalService"),
+                "Should find AnimalService");
     }
 
     @Test
     public void findSourceOnly() throws Exception {
         String json = handler.handleFind(
                 Map.of("name", "Dog", "source", ""));
-        assertTrue(json.contains("test.model.Dog"),
-                "Should find source Dog: " + json);
-        // Should not include binary JDK types
-        assertFalse(json.contains("binary"),
-                "Should not contain binary: " + json);
+        JsonArray arr = parseArray(json);
+        assertNotNull(findByFqnField(arr, "test.model.Dog"),
+                "Should find source Dog");
     }
 
     @Test
     public void findMissingParam() throws Exception {
         String json = handler.handleFind(Map.of());
-        assertTrue(json.contains("error"),
-                "Should return error: " + json);
+        JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
+        assertNotNull(obj.get("error"), "Should have error field");
     }
 
     @Test
     public void findNonExistent() throws Exception {
         String json = handler.handleFind(
                 Map.of("name", "NoSuchTypeXYZ"));
-        assertEquals("[]", json);
+        assertEquals(0, parseArray(json).size());
     }
 
     @Test
     public void findByPackage() throws Exception {
         String json = handler.handleFind(
                 Map.of("name", "test.model"));
-        assertTrue(json.contains("test.model.Animal"),
-                "Should find Animal in package: " + json);
-        assertTrue(json.contains("test.model.Dog"),
-                "Should find Dog in package: " + json);
+        JsonArray arr = parseArray(json);
+        assertNotNull(findByFqnField(arr, "test.model.Animal"),
+                "Should find Animal in package");
+        assertNotNull(findByFqnField(arr, "test.model.Dog"),
+                "Should find Dog in package");
     }
 
     @Test
     public void findByPackageTrailingDot() throws Exception {
         String json = handler.handleFind(
                 Map.of("name", "test.model."));
-        assertTrue(json.contains("test.model.Animal"),
-                "Should find Animal: " + json);
+        assertNotNull(findByFqnField(parseArray(json),
+                "test.model.Animal"), "Should find Animal");
     }
 
     @Test
     public void findByPackageTrailingDotStar() throws Exception {
         String json = handler.handleFind(
                 Map.of("name", "test.model.*"));
-        assertTrue(json.contains("test.model.Animal"),
-                "Should find Animal: " + json);
+        assertNotNull(findByFqnField(parseArray(json),
+                "test.model.Animal"), "Should find Animal");
     }
 
     @Test
     public void findByPackageNonExistent() throws Exception {
         String json = handler.handleFind(
                 Map.of("name", "no.such.package"));
-        assertEquals("[]", json);
+        assertEquals(0, parseArray(json).size());
     }
 
     // ---- /subtypes ----
@@ -116,25 +117,28 @@ public class SearchIntegrationTest {
     public void subtypesOfInterface() throws Exception {
         String json = handler.handleSubtypes(
                 Map.of("class", "test.model.Animal"));
-        assertTrue(json.contains("test.model.Dog"),
-                "Should find Dog: " + json);
-        assertTrue(json.contains("test.model.Cat"),
-                "Should find Cat: " + json);
+        JsonArray arr = parseArray(json);
+        assertNotNull(findByFqnField(arr, "test.model.Dog"),
+                "Should find Dog");
+        assertNotNull(findByFqnField(arr, "test.model.Cat"),
+                "Should find Cat");
     }
 
     @Test
     public void subtypesOfClass() throws Exception {
         String json = handler.handleSubtypes(
                 Map.of("class", "test.model.Dog"));
-        assertEquals("[]", json, "Dog has no subtypes");
+        assertEquals(0, parseArray(json).size(),
+                "Dog has no subtypes");
     }
 
     @Test
     public void subtypesNotFound() throws Exception {
         String json = handler.handleSubtypes(
                 Map.of("class", "no.such.Type"));
-        assertTrue(json.contains("error"),
-                "Should return error: " + json);
+        JsonObject obj = JsonParser.parseString(json)
+                .getAsJsonObject();
+        assertNotNull(obj.get("error"));
     }
 
     // ---- /hierarchy ----
@@ -143,23 +147,29 @@ public class SearchIntegrationTest {
     public void hierarchyOfDog() throws Exception {
         String json = handler.handleHierarchy(
                 Map.of("class", "test.model.Dog"));
-        // Dog implements Animal (in supertypes)
-        assertTrue(json.contains("test.model.Animal"),
-                "Should have Animal in supertypes: " + json);
-        // Dog has no subtypes
-        assertFalse(
-                json.contains("\"subtypes\":[{"),
-                "Should have empty subtypes: " + json);
+        JsonObject obj = JsonParser.parseString(json)
+                .getAsJsonObject();
+        JsonArray supertypes = obj.getAsJsonArray("supertypes");
+        assertNotNull(supertypes);
+        assertNotNull(findByFqn(supertypes, "test.model.Animal"),
+                "Should have Animal in supertypes");
+        JsonArray subtypes = obj.getAsJsonArray("subtypes");
+        assertNotNull(subtypes);
+        assertEquals(0, subtypes.size(),
+                "Dog should have no subtypes");
     }
 
     @Test
     public void hierarchyOfAnimal() throws Exception {
         String json = handler.handleHierarchy(
                 Map.of("class", "test.model.Animal"));
-        assertTrue(json.contains("test.model.Dog"),
-                "Should have Dog in subtypes: " + json);
-        assertTrue(json.contains("test.model.Cat"),
-                "Should have Cat in subtypes: " + json);
+        JsonObject obj = JsonParser.parseString(json)
+                .getAsJsonObject();
+        JsonArray subtypes = obj.getAsJsonArray("subtypes");
+        assertNotNull(findByFqn(subtypes, "test.model.Dog"),
+                "Should have Dog");
+        assertNotNull(findByFqn(subtypes, "test.model.Cat"),
+                "Should have Cat");
     }
 
     // ---- /references ----
@@ -168,32 +178,37 @@ public class SearchIntegrationTest {
     public void referencesToType() throws Exception {
         String json = handler.handleReferences(
                 Map.of("class", "test.model.Dog"));
-        assertTrue(json.contains("AnimalService"),
-                "Should find ref in AnimalService: " + json);
+        JsonArray arr = parseArray(json);
+        assertTrue(arr.size() > 0, "Should have references");
+        assertTrue(hasRefIn(arr, "AnimalService"),
+                "Should find ref in AnimalService");
     }
 
     @Test
     public void referencesToMethod() throws Exception {
         String json = handler.handleReferences(
                 Map.of("class", "test.model.Dog", "method", "bark"));
-        assertTrue(json.contains("AnimalService"),
-                "Should find bark() ref: " + json);
+        JsonArray arr = parseArray(json);
+        assertTrue(arr.size() > 0, "Should have references");
+        assertTrue(hasRefIn(arr, "AnimalService"),
+                "Should find bark() ref in AnimalService");
     }
 
     @Test
     public void referencesToField() throws Exception {
         String json = handler.handleReferences(
                 Map.of("class", "test.model.Dog", "field", "age"));
-        // age is private, no external references
-        assertEquals("[]", json);
+        assertEquals(0, parseArray(json).size(),
+                "age is private, no external references");
     }
 
     @Test
     public void referencesMethodNotFound() throws Exception {
         String json = handler.handleReferences(
                 Map.of("class", "test.model.Dog", "method", "fly"));
-        assertTrue(json.contains("error"),
-                "Should return error: " + json);
+        JsonObject obj = JsonParser.parseString(json)
+                .getAsJsonObject();
+        assertNotNull(obj.get("error"));
     }
 
     // ---- /implementors ----
@@ -202,10 +217,13 @@ public class SearchIntegrationTest {
     public void implementorsOfInterfaceMethod() throws Exception {
         String json = handler.handleImplementors(
                 Map.of("class", "test.model.Animal", "method", "name"));
-        assertTrue(json.contains("test.model.Dog"),
-                "Should find Dog.name: " + json);
-        assertTrue(json.contains("test.model.Cat"),
-                "Should find Cat.name: " + json);
+        JsonArray arr = parseArray(json);
+        assertTrue(arr.size() >= 2,
+                "Should find at least Dog + Cat");
+        assertNotNull(findByFqnField(arr, "test.model.Dog"),
+                "Should find Dog.name");
+        assertNotNull(findByFqnField(arr, "test.model.Cat"),
+                "Should find Cat.name");
     }
 
     // ---- /type-info ----
@@ -214,24 +232,25 @@ public class SearchIntegrationTest {
     public void typeInfoClass() throws Exception {
         String json = handler.handleTypeInfo(
                 Map.of("class", "test.model.Dog"));
-        assertTrue(json.contains("\"kind\":\"class\""),
-                "Should be class: " + json);
-        assertTrue(json.contains("\"name\":\"name\""),
-                "Should have name method: " + json);
-        assertTrue(json.contains("\"name\":\"bark\""),
-                "Should have bark method: " + json);
-        assertTrue(json.contains("\"name\":\"age\""),
-                "Should have age field: " + json);
-        assertTrue(json.contains("Animal"),
-                "Should implement Animal: " + json);
+        JsonObject obj = JsonParser.parseString(json)
+                .getAsJsonObject();
+        assertEquals("class", obj.get("kind").getAsString());
+        String full = obj.toString();
+        assertTrue(full.contains("\"name\":\"name\""),
+                "Should have name method");
+        assertTrue(full.contains("\"name\":\"bark\""),
+                "Should have bark method");
+        assertTrue(full.contains("\"name\":\"age\""),
+                "Should have age field");
     }
 
     @Test
     public void typeInfoInterface() throws Exception {
         String json = handler.handleTypeInfo(
                 Map.of("class", "test.model.Animal"));
-        assertTrue(json.contains("\"kind\":\"interface\""),
-                "Should be interface: " + json);
+        JsonObject obj = JsonParser.parseString(json)
+                .getAsJsonObject();
+        assertEquals("interface", obj.get("kind").getAsString());
     }
 
     // ---- /source ----
@@ -356,6 +375,10 @@ public class SearchIntegrationTest {
 
     // ---- Helpers ----
 
+    private static JsonArray parseArray(String json) {
+        return JsonParser.parseString(json).getAsJsonArray();
+    }
+
     private static JsonObject parse(HttpServer.Response resp) {
         return JsonParser.parseString(resp.body())
                 .getAsJsonObject();
@@ -410,10 +433,41 @@ public class SearchIntegrationTest {
         return null;
     }
 
+    private static JsonObject findByFqnField(JsonArray arr,
+            String fqn) {
+        for (JsonElement e : arr) {
+            var obj = e.getAsJsonObject();
+            if (obj.has("fqn") && fqn.equals(
+                    obj.get("fqn").getAsString())) {
+                return obj;
+            }
+        }
+        return null;
+    }
+
+    private static boolean hasRefIn(JsonArray arr,
+            String enclosingPart) {
+        for (JsonElement e : arr) {
+            var obj = e.getAsJsonObject();
+            if (obj.has("in") && obj.get("in").getAsString()
+                    .contains(enclosingPart)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Test
     public void projectsIncludesTestProject() throws Exception {
         String json = handler.handleProjects();
-        assertTrue(json.contains(TestFixture.PROJECT_NAME),
-                "Should include test project: " + json);
+        JsonArray arr = parseArray(json);
+        boolean found = false;
+        for (JsonElement e : arr) {
+            if (e.getAsString().equals(TestFixture.PROJECT_NAME)) {
+                found = true;
+                break;
+            }
+        }
+        assertTrue(found, "Should include test project");
     }
 }

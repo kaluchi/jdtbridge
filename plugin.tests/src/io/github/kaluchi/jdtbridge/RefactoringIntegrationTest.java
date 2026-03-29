@@ -1,6 +1,7 @@
 package io.github.kaluchi.jdtbridge;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.util.Map;
 
@@ -53,7 +54,7 @@ public class RefactoringIntegrationTest {
         } catch (IllegalArgumentException e) {
             // ProjectScope.getNode() fails in headless PDE tests
             // (no project preferences area). Works in full Eclipse.
-            System.out.println("[SKIP] organize-imports: " + e);
+            assumeTrue(false, "organize-imports needs ProjectScope: " + e);
         }
     }
 
@@ -71,7 +72,7 @@ public class RefactoringIntegrationTest {
             assertTrue(json.contains("\"removed\":0"),
                     "Should have 0 removed: " + json);
         } catch (IllegalArgumentException e) {
-            System.out.println("[SKIP] organize-imports: " + e);
+            assumeTrue(false, "organize-imports needs ProjectScope: " + e);
         }
     }
 
@@ -158,7 +159,7 @@ public class RefactoringIntegrationTest {
         } catch (IllegalArgumentException e) {
             // RenameFieldProcessor needs ProjectScope for getter/setter
             // detection. Fails in headless PDE tests.
-            System.out.println("[SKIP] rename-field: " + e);
+            assumeTrue(false, "rename-field needs ProjectScope: " + e);
         }
     }
 
@@ -211,7 +212,7 @@ public class RefactoringIntegrationTest {
         } catch (IllegalArgumentException e) {
             // MoveCuUpdateCreator needs ProjectScope for import rewriting.
             // Fails in headless PDE tests.
-            System.out.println("[SKIP] move: " + e);
+            assumeTrue(false, "move needs ProjectScope: " + e);
         }
     }
 

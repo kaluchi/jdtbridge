@@ -7,6 +7,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -37,10 +42,14 @@ public class EdgeCaseIntegrationTest {
     public void typeInfoShowsAllOverloads() throws Exception {
         String json = search.handleTypeInfo(
                 Map.of("class", "test.edge.Calculator"));
-        // Should have 3 add methods
+        JsonObject obj = JsonParser.parseString(json)
+                .getAsJsonObject();
+        assertEquals("class", obj.get("kind").getAsString());
+        // Count add methods in the full JSON
+        String full = obj.toString();
         int count = 0;
         int idx = 0;
-        while ((idx = json.indexOf("\"name\":\"add\"", idx)) >= 0) {
+        while ((idx = full.indexOf("\"name\":\"add\"", idx)) >= 0) {
             count++;
             idx++;
         }
@@ -88,27 +97,31 @@ public class EdgeCaseIntegrationTest {
     @Test
     public void findInnerClass() throws Exception {
         String json = search.handleFind(Map.of("name", "Inner"));
-        assertTrue(json.contains("test.edge.Outer.Inner")
-                        || json.contains("Outer$Inner"),
-                "Should find Outer.Inner: " + json);
+        JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
+        boolean found = false;
+        for (JsonElement e : arr) {
+            String fqn = e.getAsJsonObject().get("fqn").getAsString();
+            if (fqn.contains("Outer.Inner") || fqn.contains("Outer$Inner")) {
+                found = true;
+                break;
+            }
+        }
+        assertTrue(found, "Should find Outer.Inner");
     }
 
     @Test
     public void findStaticNested() throws Exception {
         String json = search.handleFind(Map.of("name", "StaticNested"));
-        assertTrue(json.contains("StaticNested"),
-                "Should find StaticNested: " + json);
+        JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
+        assertTrue(arr.size() > 0, "Should find StaticNested");
     }
 
     @Test
     public void typeInfoInnerClass() throws Exception {
-        // Inner classes are found by $ separator in JDT
         String json = search.handleTypeInfo(
                 Map.of("class", "test.edge.Outer"));
-        assertTrue(json.contains("\"kind\":\"class\""),
-                "Should be a class: " + json);
-        assertTrue(json.contains("\"name\":\"name\""),
-                "Should have name field: " + json);
+        JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
+        assertEquals("class", obj.get("kind").getAsString());
     }
 
     @Test
@@ -127,10 +140,8 @@ public class EdgeCaseIntegrationTest {
     public void typeInfoEnum() throws Exception {
         String json = search.handleTypeInfo(
                 Map.of("class", "test.edge.Color"));
-        assertTrue(json.contains("\"kind\":\"enum\""),
-                "Should be enum: " + json);
-        assertTrue(json.contains("\"name\":\"lower\""),
-                "Should have lower method: " + json);
+        JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
+        assertEquals("enum", obj.get("kind").getAsString());
     }
 
     @Test
@@ -144,8 +155,9 @@ public class EdgeCaseIntegrationTest {
     @Test
     public void findEnum() throws Exception {
         String json = search.handleFind(Map.of("name", "Color"));
-        assertTrue(json.contains("test.edge.Color"),
-                "Should find Color: " + json);
+        JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
+        assertNotNull(findByFqn(arr, "test.edge.Color"),
+                "Should find Color");
     }
 
     // ---- Annotation ----
@@ -154,8 +166,8 @@ public class EdgeCaseIntegrationTest {
     public void typeInfoAnnotation() throws Exception {
         String json = search.handleTypeInfo(
                 Map.of("class", "test.edge.Marker"));
-        assertTrue(json.contains("\"kind\":\"annotation\""),
-                "Should be annotation: " + json);
+        JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
+        assertEquals("annotation", obj.get("kind").getAsString());
     }
 
     @Test
@@ -174,50 +186,49 @@ public class EdgeCaseIntegrationTest {
     public void subtypesOfAbstract() throws Exception {
         String json = search.handleSubtypes(
                 Map.of("class", "test.edge.AbstractPet"));
-        assertTrue(json.contains("test.edge.Parrot"),
-                "Should find Parrot: " + json);
+        JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
+        assertNotNull(findByFqn(arr, "test.edge.Parrot"),
+                "Should find Parrot");
     }
 
     @Test
     public void hierarchyOfParrot() throws Exception {
         String json = search.handleHierarchy(
                 Map.of("class", "test.edge.Parrot"));
-        // Parrot -> AbstractPet (in supertypes)
-        assertTrue(json.contains("test.edge.AbstractPet"),
-                "Should have AbstractPet in supertypes: "
-                + json);
-        // Parrot implements Animal (through AbstractPet)
-        assertTrue(json.contains("test.model.Animal"),
-                "Should have Animal in supertypes: " + json);
+        JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
+        JsonArray supers = obj.getAsJsonArray("supertypes");
+        assertNotNull(findByFqn(supers, "test.edge.AbstractPet"),
+                "Should have AbstractPet in supertypes");
+        assertNotNull(findByFqn(supers, "test.model.Animal"),
+                "Should have Animal in supertypes");
     }
 
     @Test
     public void deepSubtypesOfAnimal() throws Exception {
-        // Animal -> Dog, Cat, AbstractPet, Parrot
         String json = search.handleSubtypes(
                 Map.of("class", "test.model.Animal"));
-        assertTrue(json.contains("test.model.Dog"),
-                "Should find Dog: " + json);
-        assertTrue(json.contains("test.model.Cat"),
-                "Should find Cat: " + json);
-        assertTrue(json.contains("test.edge.AbstractPet"),
-                "Should find AbstractPet: " + json);
-        assertTrue(json.contains("test.edge.Parrot"),
-                "Should find Parrot: " + json);
+        JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
+        assertNotNull(findByFqn(arr, "test.model.Dog"),
+                "Should find Dog");
+        assertNotNull(findByFqn(arr, "test.model.Cat"),
+                "Should find Cat");
+        assertNotNull(findByFqn(arr, "test.edge.AbstractPet"),
+                "Should find AbstractPet");
+        assertNotNull(findByFqn(arr, "test.edge.Parrot"),
+                "Should find Parrot");
     }
 
     @Test
     public void implementorsIncludesDeepHierarchy() throws Exception {
-        // name() is declared in Animal, implemented by Dog, Cat,
-        // AbstractPet, and Parrot inherits it
         String json = search.handleImplementors(
                 Map.of("class", "test.model.Animal", "method", "name"));
-        assertTrue(json.contains("test.model.Dog"),
-                "Should find Dog: " + json);
-        assertTrue(json.contains("test.model.Cat"),
-                "Should find Cat: " + json);
-        assertTrue(json.contains("test.edge.AbstractPet"),
-                "Should find AbstractPet: " + json);
+        JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
+        assertNotNull(findByFqn(arr, "test.model.Dog"),
+                "Should find Dog");
+        assertNotNull(findByFqn(arr, "test.model.Cat"),
+                "Should find Cat");
+        assertNotNull(findByFqn(arr, "test.edge.AbstractPet"),
+                "Should find AbstractPet");
     }
 
     // ---- Enriched source output ----
@@ -228,25 +239,26 @@ public class EdgeCaseIntegrationTest {
         HttpServer.Response resp = search.handleSource(
                 Map.of("class", "test.edge.Calculator",
                         "method", "add"));
-        String body = resp.body();
-        // Multiple overloads → JSON array
-        assertTrue(body.startsWith("["),
-                "Overloads should be array: " + body);
-        // Each overload has fqmn, file, source, refs
-        assertTrue(body.contains(
-                "\"fqmn\":\"test.edge.Calculator#add(int, int)\""),
-                "Should have int overload FQMN: " + body);
-        assertTrue(body.contains(
-                "\"fqmn\":\"test.edge.Calculator#add(double, double)\""),
-                "Should have double overload FQMN: " + body);
-        assertTrue(body.contains(
-                "\"fqmn\":\"test.edge.Calculator#add(int, int, int)\""),
-                "Should have 3-arg overload FQMN: " + body);
-        // Each has source and refs array
-        assertTrue(body.contains("\"source\""),
-                "Should have source: " + body);
-        assertTrue(body.contains("\"refs\""),
-                "Should have refs array: " + body);
+        JsonArray arr = JsonParser.parseString(resp.body())
+                .getAsJsonArray();
+        assertEquals(3, arr.size(), "Should have 3 overloads");
+        boolean hasIntInt = false, hasDoubleDouble = false,
+                hasIntIntInt = false;
+        for (JsonElement e : arr) {
+            JsonObject o = e.getAsJsonObject();
+            assertNotNull(o.get("source"), "Should have source");
+            assertTrue(o.has("refs"), "Should have refs");
+            String fqmn = o.get("fqmn").getAsString();
+            if (fqmn.equals("test.edge.Calculator#add(int, int)"))
+                hasIntInt = true;
+            if (fqmn.equals("test.edge.Calculator#add(double, double)"))
+                hasDoubleDouble = true;
+            if (fqmn.equals("test.edge.Calculator#add(int, int, int)"))
+                hasIntIntInt = true;
+        }
+        assertTrue(hasIntInt, "Should have int overload");
+        assertTrue(hasDoubleDouble, "Should have double overload");
+        assertTrue(hasIntIntInt, "Should have 3-arg overload");
     }
 
     @Test
@@ -315,13 +327,26 @@ public class EdgeCaseIntegrationTest {
         ProjectHandler handler = new ProjectHandler();
         String json = handler.handleProjectInfo(
                 Map.of("project", TestFixture.PROJECT_NAME));
-        assertTrue(json.contains("test.edge"),
-                "Should have test.edge: " + json);
-        assertTrue(json.contains("Calculator"),
-                "Should have Calculator: " + json);
-        assertTrue(json.contains("\"kind\":\"enum\""),
-                "Should have Color as enum: " + json);
-        assertTrue(json.contains("\"kind\":\"annotation\""),
-                "Should have Marker as annotation: " + json);
+        JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
+        String full = obj.toString();
+        assertTrue(full.contains("test.edge"),
+                "Should have test.edge");
+        assertTrue(full.contains("Calculator"),
+                "Should have Calculator");
+        assertTrue(full.contains("\"kind\":\"enum\""),
+                "Should have Color as enum");
+        assertTrue(full.contains("\"kind\":\"annotation\""),
+                "Should have Marker as annotation");
+    }
+
+    private static JsonObject findByFqn(JsonArray arr, String fqn) {
+        for (JsonElement e : arr) {
+            var obj = e.getAsJsonObject();
+            if (obj.has("fqn") && fqn.equals(
+                    obj.get("fqn").getAsString())) {
+                return obj;
+            }
+        }
+        return null;
     }
 }

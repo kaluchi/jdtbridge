@@ -2,118 +2,132 @@ package io.github.kaluchi.jdtbridge;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import java.io.IOException;
+import java.nio.file.Path;
 
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+/**
+ * Tests for WelcomeHandler — dismiss/undismiss, status page.
+ */
 public class WelcomeHandlerTest {
 
-    @Test
-    public void npmListDetectsInstalledPackage() {
-        String npmOutput = """
-                {
-                  "name": "npm",
-                  "dependencies": {
-                    "@kaluchi/jdtbridge": {
-                      "version": "1.1.1",
-                      "resolved": "file:cli"
-                    }
-                  }
-                }
-                """;
-        var json = JsonParser.parseString(npmOutput)
-                .getAsJsonObject();
-        var deps = json.getAsJsonObject("dependencies");
-        assertNotNull(deps);
-        var pkg = deps.getAsJsonObject("@kaluchi/jdtbridge");
-        assertNotNull(pkg);
-        assertEquals("1.1.1",
-                pkg.get("version").getAsString());
+    @TempDir
+    Path tempDir;
+    ConfigService config;
+    WelcomeHandler handler;
+
+    @BeforeEach
+    void setUp() {
+        config = new ConfigService(tempDir);
+        handler = new WelcomeHandler(config);
     }
 
-    @Test
-    public void npmListEmptyDependencies() {
-        var json = JsonParser.parseString(
-                "{\"dependencies\":{}}").getAsJsonObject();
-        var deps = json.getAsJsonObject("dependencies");
-        assertEquals(0, deps.size());
+    @Nested
+    class IsDismissed {
+
+        @Test
+        void falseByDefault() {
+            assertFalse(handler.isDismissed());
+        }
+
+        @Test
+        void trueAfterDismiss() throws IOException {
+            config.putBoolean("welcomeDismissed", true);
+            assertTrue(handler.isDismissed());
+        }
+
+        @Test
+        void falseAfterUndismiss() throws IOException {
+            config.putBoolean("welcomeDismissed", true);
+            config.putBoolean("welcomeDismissed", false);
+            assertFalse(handler.isDismissed());
+        }
     }
 
-    @Test
-    public void npmListNoDependenciesKey() {
-        var json = JsonParser.parseString(
-                "{\"name\":\"npm\"}").getAsJsonObject();
-        assertFalse(json.has("dependencies"));
+    @Nested
+    class HandleDismiss {
+
+        @Test
+        void setsConfigAndReturnsOk() {
+            HttpServer.Response resp = handler.handleDismiss();
+            assertEquals("application/json", resp.contentType());
+            assertTrue(resp.body().contains("\"ok\":true"));
+            assertTrue(handler.isDismissed());
+        }
+
+        @Test
+        void idempotent() {
+            handler.handleDismiss();
+            HttpServer.Response resp = handler.handleDismiss();
+            assertTrue(resp.body().contains("\"ok\":true"));
+            assertTrue(handler.isDismissed());
+        }
     }
 
-    @Test
-    public void bridgeFileExtractsPortAndVersion() {
-        var obj = new JsonObject();
-        obj.addProperty("port", 54321);
-        obj.addProperty("token", "abc");
-        obj.addProperty("pid", 100L);
-        obj.addProperty("workspace", "/ws");
-        obj.addProperty("version", "1.1.0.202603231744");
-        obj.addProperty("location",
-                "file:plugins/bundle.jar");
+    @Nested
+    class HandleUndismiss {
 
-        var parsed = JsonParser.parseString(obj.toString())
-                .getAsJsonObject();
-        assertEquals(54321, parsed.get("port").getAsInt());
-        assertEquals("1.1.0.202603231744",
-                parsed.get("version").getAsString());
+        @Test
+        void clearsConfigAndReturnsOk() {
+            handler.handleDismiss();
+            HttpServer.Response resp = handler.handleUndismiss();
+            assertEquals("application/json", resp.contentType());
+            assertTrue(resp.body().contains("\"ok\":true"));
+            assertFalse(handler.isDismissed());
+        }
+
+        @Test
+        void noOpWhenAlreadyUndismissed() {
+            HttpServer.Response resp = handler.handleUndismiss();
+            assertTrue(resp.body().contains("\"ok\":true"));
+            assertFalse(handler.isDismissed());
+        }
     }
 
-    @Test
-    public void bridgeFileMissingVersionReturnsNull() {
-        var obj = new JsonObject();
-        obj.addProperty("port", 8080);
-        obj.addProperty("token", "abc");
+    @Nested
+    class HandleStatus {
 
-        var parsed = JsonParser.parseString(obj.toString())
-                .getAsJsonObject();
-        assertEquals(8080, parsed.get("port").getAsInt());
-        assertNull(parsed.get("version"));
+        @Test
+        void returnsHtmlWithPlaceholdersReplaced()
+                throws IOException {
+            HttpServer.Response resp = handler.handleStatus();
+            assertEquals("text/html", resp.contentType());
+            // Placeholders should be replaced, not present raw
+            assertFalse(resp.body().contains("{{version}}"));
+            assertFalse(resp.body().contains("{{port}}"));
+            assertFalse(resp.body().contains("{{cliInstalled}}"));
+            assertFalse(resp.body().contains("{{dismissed}}"));
+        }
+
+        @Test
+        void dismissedStateReflectedInHtml()
+                throws IOException {
+            handler.handleDismiss();
+            HttpServer.Response resp = handler.handleStatus();
+            assertTrue(resp.body().contains("true"),
+                    "dismissed=true should appear in page");
+        }
     }
 
-    @Test
-    public void configDismissedTrue() {
-        var json = JsonParser.parseString(
-                "{\"eclipse\":\"D:/eclipse\","
-                + "\"welcomeDismissed\":true}")
-                .getAsJsonObject();
-        assertTrue(json.get("welcomeDismissed")
-                .getAsBoolean());
-    }
+    @Nested
+    class IsCliInstalled {
 
-    @Test
-    public void configDismissedFalse() {
-        var json = JsonParser.parseString(
-                "{\"welcomeDismissed\":false}")
-                .getAsJsonObject();
-        assertFalse(json.get("welcomeDismissed")
-                .getAsBoolean());
-    }
-
-    @Test
-    public void configDismissedMissing() {
-        var json = JsonParser.parseString(
-                "{\"eclipse\":\"D:/eclipse\"}")
-                .getAsJsonObject();
-        assertFalse(json.has("welcomeDismissed"));
-    }
-
-    @Test
-    public void configDismissedWithWhitespace() {
-        var json = JsonParser.parseString(
-                "{ \"welcomeDismissed\" : true }")
-                .getAsJsonObject();
-        assertTrue(json.get("welcomeDismissed")
-                .getAsBoolean());
+        @Test
+        void returnsBoolean() {
+            // detectCli() spawns npm — result depends on
+            // environment but must not throw
+            boolean result = handler.isCliInstalled();
+            // Just verify it completes without exception;
+            // actual value depends on whether jdt CLI is
+            // installed globally
+            assertEquals(result, handler.isCliInstalled(),
+                    "Should be deterministic across calls");
+        }
     }
 }

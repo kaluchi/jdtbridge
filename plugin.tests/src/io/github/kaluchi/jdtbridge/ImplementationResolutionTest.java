@@ -85,8 +85,8 @@ public class ImplementationResolutionTest {
                             && r.implementationOf()
                                     .contains("Animal#name"))
                     .count();
-            assertTrue(implCount > 0,
-                    "Should have impl refs for Animal#name: "
+            assertTrue(implCount >= 2,
+                    "Should have at least Dog + Cat impls: "
                     + refs.keySet());
         }
 

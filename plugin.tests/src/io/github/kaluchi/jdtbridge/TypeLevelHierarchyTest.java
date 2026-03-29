@@ -1,10 +1,16 @@
 package io.github.kaluchi.jdtbridge;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import org.eclipse.jdt.core.IType;
 import org.junit.jupiter.api.AfterAll;
@@ -30,19 +36,30 @@ public class TypeLevelHierarchyTest {
         TestFixture.destroy();
     }
 
-    private String sourceJson(String fqn) throws Exception {
+    private JsonObject sourceJson(String fqn) throws Exception {
         IType type = JdtUtils.findType(fqn);
         assertNotNull(type, fqn + " not found");
         var refs = ReferenceCollector.collect(type);
-        return SourceReport.toJson(
+        String json = SourceReport.toJson(
                 fqn, type, "D:/t.java",
                 type.getSource(), 1, 100, refs, null);
+        return JsonParser.parseString(json).getAsJsonObject();
     }
 
-    private String handleSource(String fqn) throws Exception {
+    private JsonObject handleSource(String fqn) throws Exception {
         var handler = new SearchHandler();
-        return handler.handleSource(
-                Map.of("class", fqn)).body();
+        return JsonParser.parseString(
+                handler.handleSource(
+                        Map.of("class", fqn)).body())
+                .getAsJsonObject();
+    }
+
+    private static boolean hasInArray(JsonArray arr, String fqn) {
+        for (JsonElement e : arr) {
+            if (e.getAsJsonObject().get("fqn").getAsString()
+                    .equals(fqn)) return true;
+        }
+        return false;
     }
 
     @Nested
@@ -50,41 +67,51 @@ public class TypeLevelHierarchyTest {
 
         @Test
         void dogHasAnimalSupertype() throws Exception {
-            String json = sourceJson("test.model.Dog");
-            assertTrue(json.contains("\"supertypes\""),
-                    "Should have supertypes: " + json);
-            assertTrue(json.contains("test.model.Animal"),
-                    "Dog should have Animal supertype: "
-                    + json);
+            JsonObject obj = sourceJson("test.model.Dog");
+            JsonArray supers = obj.getAsJsonArray("supertypes");
+            assertNotNull(supers, "Should have supertypes");
+            assertTrue(hasInArray(supers, "test.model.Animal"),
+                    "Dog should have Animal supertype");
         }
 
         @Test
         void supertypeHasKind() throws Exception {
-            String json = sourceJson("test.model.Dog");
-            // Animal is an interface
-            assertTrue(json.contains("\"kind\":\"interface\""),
-                    "Animal should be interface: " + json);
+            JsonObject obj = sourceJson("test.model.Dog");
+            JsonArray supers = obj.getAsJsonArray("supertypes");
+            for (JsonElement e : supers) {
+                JsonObject s = e.getAsJsonObject();
+                if ("test.model.Animal".equals(
+                        s.get("fqn").getAsString())) {
+                    assertEquals("interface",
+                            s.get("kind").getAsString());
+                    return;
+                }
+            }
+            throw new AssertionError("Animal not found in supertypes");
         }
 
         @Test
         void abstractPetHasAnimalSupertype() throws Exception {
-            String json = sourceJson("test.edge.AbstractPet");
-            assertTrue(json.contains("test.model.Animal"),
-                    "AbstractPet implements Animal: " + json);
+            JsonObject obj = sourceJson("test.edge.AbstractPet");
+            JsonArray supers = obj.getAsJsonArray("supertypes");
+            assertTrue(hasInArray(supers, "test.model.Animal"),
+                    "AbstractPet implements Animal");
         }
 
         @Test
         void parrotHasAbstractPetSupertype() throws Exception {
-            String json = sourceJson("test.edge.Parrot");
-            assertTrue(json.contains("test.edge.AbstractPet"),
-                    "Parrot extends AbstractPet: " + json);
+            JsonObject obj = sourceJson("test.edge.Parrot");
+            JsonArray supers = obj.getAsJsonArray("supertypes");
+            assertTrue(hasInArray(supers, "test.edge.AbstractPet"),
+                    "Parrot extends AbstractPet");
         }
 
         @Test
         void objectNotInSupertypes() throws Exception {
-            String json = sourceJson("test.model.Dog");
-            assertFalse(json.contains("java.lang.Object"),
-                    "Object should be filtered: " + json);
+            JsonObject obj = sourceJson("test.model.Dog");
+            JsonArray supers = obj.getAsJsonArray("supertypes");
+            assertFalse(hasInArray(supers, "java.lang.Object"),
+                    "Object should be filtered");
         }
     }
 
@@ -93,52 +120,59 @@ public class TypeLevelHierarchyTest {
 
         @Test
         void animalHasSubtypes() throws Exception {
-            String json = sourceJson("test.model.Animal");
-            assertTrue(json.contains("\"subtypes\""),
-                    "Should have subtypes: " + json);
-            // Dog, Cat, AbstractPet all implement Animal
-            assertTrue(json.contains("test.model.Dog"),
-                    "Dog should be a subtype: " + json);
+            JsonObject obj = sourceJson("test.model.Animal");
+            JsonArray subs = obj.getAsJsonArray("subtypes");
+            assertNotNull(subs, "Should have subtypes");
+            assertTrue(hasInArray(subs, "test.model.Dog"),
+                    "Dog should be a subtype");
         }
 
         @Test
         void catIsAnimalSubtype() throws Exception {
-            String json = sourceJson("test.model.Animal");
-            assertTrue(json.contains("test.model.Cat"),
-                    "Cat should be a subtype: " + json);
+            JsonObject obj = sourceJson("test.model.Animal");
+            JsonArray subs = obj.getAsJsonArray("subtypes");
+            assertTrue(hasInArray(subs, "test.model.Cat"),
+                    "Cat should be a subtype");
         }
 
         @Test
         void abstractPetIsAnimalSubtype() throws Exception {
-            String json = sourceJson("test.model.Animal");
-            assertTrue(json.contains("test.edge.AbstractPet"),
-                    "AbstractPet should be a subtype: "
-                    + json);
+            JsonObject obj = sourceJson("test.model.Animal");
+            JsonArray subs = obj.getAsJsonArray("subtypes");
+            assertTrue(hasInArray(subs, "test.edge.AbstractPet"),
+                    "AbstractPet should be a subtype");
         }
 
         @Test
         void abstractPetHasParrotSubtype() throws Exception {
-            String json = sourceJson("test.edge.AbstractPet");
-            assertTrue(json.contains("test.edge.Parrot"),
-                    "Parrot should be subtype of AbstractPet: "
-                    + json);
+            JsonObject obj = sourceJson("test.edge.AbstractPet");
+            JsonArray subs = obj.getAsJsonArray("subtypes");
+            assertTrue(hasInArray(subs, "test.edge.Parrot"),
+                    "Parrot should be subtype of AbstractPet");
         }
 
         @Test
         void subtypeHasKind() throws Exception {
-            String json = sourceJson("test.model.Animal");
-            // Dog is a class
-            assertTrue(json.contains("\"kind\":\"class\""),
-                    "Dog should be class kind: " + json);
+            JsonObject obj = sourceJson("test.model.Animal");
+            JsonArray subs = obj.getAsJsonArray("subtypes");
+            for (JsonElement e : subs) {
+                JsonObject s = e.getAsJsonObject();
+                if ("test.model.Dog".equals(
+                        s.get("fqn").getAsString())) {
+                    assertEquals("class",
+                            s.get("kind").getAsString());
+                    return;
+                }
+            }
+            throw new AssertionError("Dog not found in subtypes");
         }
 
         @Test
         void leafClassHasNoSubtypes() throws Exception {
-            String json = sourceJson("test.model.Cat");
-            // Cat has no subclasses in fixture
-            assertTrue(json.contains("\"subtypes\":[]"),
-                    "Cat should have empty subtypes: "
-                    + json);
+            JsonObject obj = sourceJson("test.model.Cat");
+            JsonArray subs = obj.getAsJsonArray("subtypes");
+            assertEquals(0, subs.size(),
+                    "Cat should have empty subtypes");
         }
     }
 
@@ -147,26 +181,23 @@ public class TypeLevelHierarchyTest {
 
         @Test
         void noRefsArrayForClass() throws Exception {
-            String json = sourceJson("test.model.Dog");
-            assertFalse(json.contains("\"refs\""),
-                    "Type-level should not have refs: "
-                    + json);
+            JsonObject obj = sourceJson("test.model.Dog");
+            assertFalse(obj.has("refs"),
+                    "Type-level should not have refs");
         }
 
         @Test
         void noRefsArrayForInterface() throws Exception {
-            String json = sourceJson("test.model.Animal");
-            assertFalse(json.contains("\"refs\""),
-                    "Interface type should not have refs: "
-                    + json);
+            JsonObject obj = sourceJson("test.model.Animal");
+            assertFalse(obj.has("refs"),
+                    "Interface type should not have refs");
         }
 
         @Test
         void noDirectionForTypeLevel() throws Exception {
-            String json = sourceJson("test.model.Dog");
-            assertFalse(json.contains("\"direction\""),
-                    "Type-level should not have direction: "
-                    + json);
+            JsonObject obj = sourceJson("test.model.Dog");
+            assertFalse(obj.toString().contains("\"direction\""),
+                    "Type-level should not have direction");
         }
     }
 
@@ -175,31 +206,32 @@ public class TypeLevelHierarchyTest {
 
         @Test
         void classSourceIncludesFullBody() throws Exception {
-            String json = handleSource("test.model.Dog");
-            assertTrue(json.contains("public class Dog"),
-                    "Should include class declaration: "
-                    + json);
-            assertTrue(json.contains("public void bark()"),
-                    "Should include bark method: " + json);
+            JsonObject obj = handleSource("test.model.Dog");
+            String source = obj.get("source").getAsString();
+            assertTrue(source.contains("public class Dog"),
+                    "Should include class declaration");
+            assertTrue(source.contains("public void bark()"),
+                    "Should include bark method");
         }
 
         @Test
         void interfaceSourceIncludesBody() throws Exception {
-            String json = handleSource("test.model.Animal");
-            assertTrue(json.contains("public interface Animal"),
-                    "Should include interface declaration: "
-                    + json);
-            assertTrue(json.contains("String name()"),
-                    "Should include name method: " + json);
+            JsonObject obj = handleSource("test.model.Animal");
+            String source = obj.get("source").getAsString();
+            assertTrue(source.contains("public interface Animal"),
+                    "Should include interface declaration");
+            assertTrue(source.contains("String name()"),
+                    "Should include name method");
         }
 
         @Test
         void enumSourceIncludesConstants() throws Exception {
-            String json = handleSource("test.edge.Color");
-            assertTrue(json.contains("RED"),
-                    "Should include enum constants: " + json);
-            assertTrue(json.contains("GREEN"),
-                    "Should include GREEN: " + json);
+            JsonObject obj = handleSource("test.edge.Color");
+            String source = obj.get("source").getAsString();
+            assertTrue(source.contains("RED"),
+                    "Should include enum constants");
+            assertTrue(source.contains("GREEN"),
+                    "Should include GREEN");
         }
     }
 
@@ -208,32 +240,28 @@ public class TypeLevelHierarchyTest {
 
         @Test
         void innerClassHasEnclosingType() throws Exception {
-            String json = sourceJson("test.edge.Outer.Inner");
-            assertTrue(json.contains("\"enclosingType\""),
-                    "Inner should have enclosingType: "
-                    + json);
-            assertTrue(json.contains("test.edge.Outer"),
-                    "Enclosing should be Outer: " + json);
-            assertTrue(json.contains("\"kind\":\"class\""),
-                    "Enclosing kind should be class: "
-                    + json);
+            JsonObject obj = sourceJson("test.edge.Outer.Inner");
+            JsonObject enc = obj.getAsJsonObject("enclosingType");
+            assertNotNull(enc, "Inner should have enclosingType");
+            assertEquals("test.edge.Outer",
+                    enc.get("fqn").getAsString());
+            assertEquals("class",
+                    enc.get("kind").getAsString());
         }
 
         @Test
         void staticNestedHasEnclosingType() throws Exception {
-            String json = sourceJson(
+            JsonObject obj = sourceJson(
                     "test.edge.Outer.StaticNested");
-            assertTrue(json.contains("\"enclosingType\""),
-                    "StaticNested should have enclosingType: "
-                    + json);
+            assertNotNull(obj.getAsJsonObject("enclosingType"),
+                    "StaticNested should have enclosingType");
         }
 
         @Test
         void topLevelHasNoEnclosingType() throws Exception {
-            String json = sourceJson("test.model.Dog");
-            assertFalse(json.contains("\"enclosingType\""),
-                    "Top-level should not have enclosingType: "
-                    + json);
+            JsonObject obj = sourceJson("test.model.Dog");
+            assertFalse(obj.has("enclosingType"),
+                    "Top-level should not have enclosingType");
         }
     }
 }

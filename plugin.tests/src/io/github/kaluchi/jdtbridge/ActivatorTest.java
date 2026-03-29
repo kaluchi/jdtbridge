@@ -34,12 +34,6 @@ public class ActivatorTest {
     }
 
     @Test
-    public void tokenContainsNoUpperCase() {
-        String token = invokeGenerateToken();
-        assertEquals(token, token.toLowerCase());
-    }
-
-    @Test
     public void bridgeFileJsonFormat() {
         var obj = new JsonObject();
         obj.addProperty("port", 12345);

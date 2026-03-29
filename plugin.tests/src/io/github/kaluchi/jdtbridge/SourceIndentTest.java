@@ -173,12 +173,15 @@ public class SourceIndentTest {
         // Line count in source should match range
         long lineCount = source.chars()
                 .filter(c -> c == '\n').count();
-        // endLine - startLine + 1 gives the line span
-        // source might have trailing newline
-        assertTrue(lineCount >= (endLine - startLine),
-                "Source lines (" + lineCount
-                        + ") should span range "
-                        + startLine + "-" + endLine);
+        // endLine - startLine gives newline count in the span
+        // (source may have trailing newline, so allow +1)
+        long expectedNewlines = endLine - startLine;
+        assertTrue(lineCount == expectedNewlines
+                        || lineCount == expectedNewlines + 1,
+                "Source newlines (" + lineCount
+                        + ") should match range "
+                        + startLine + "-" + endLine
+                        + " (expected " + expectedNewlines + ")");
     }
 
     // ---- getFullSource invariants ----
