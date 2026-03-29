@@ -53,10 +53,19 @@ class RefactoringHandler {
      * and we leave it alone.
      */
     static void ensurePreferencesInitialized() {
+        // Trigger JDT UI lazy activation (if available) so
+        // JavaPlugin.start() sets the preference node ID
+        // before we check. Without this, our setPreferenceNodeId
+        // call races with JavaPlugin.start() on CI.
+        try {
+            Class.forName(
+                    "org.eclipse.jdt.internal.ui.JavaPlugin");
+        } catch (ClassNotFoundException e) {
+            // JDT UI not on classpath (headless CI target)
+        }
         String nodeId = JavaManipulation.getPreferenceNodeId();
         if (nodeId == null) {
-            // Headless — JDT UI not started. Use manipulation
-            // bundle as preference scope (always available).
+            // Headless — JDT UI not available or failed to start.
             nodeId = MANIPULATION_NODE;
             JavaManipulation.setPreferenceNodeId(nodeId);
         }
