@@ -42,7 +42,7 @@ public class SearchIntegrationTest {
     public void findByExactName() throws Exception {
         String json = handler.handleFind(Map.of("name", "Animal"));
         JsonArray arr = parseArray(json);
-        assertNotNull(findByFqnField(arr, "test.model.Animal"),
+        assertNotNull(findByFqn(arr, "test.model.Animal"),
                 "Should find Animal");
     }
 
@@ -50,7 +50,7 @@ public class SearchIntegrationTest {
     public void findByPattern() throws Exception {
         String json = handler.handleFind(Map.of("name", "*Service"));
         JsonArray arr = parseArray(json);
-        assertNotNull(findByFqnField(arr, "test.service.AnimalService"),
+        assertNotNull(findByFqn(arr, "test.service.AnimalService"),
                 "Should find AnimalService");
     }
 
@@ -59,7 +59,7 @@ public class SearchIntegrationTest {
         String json = handler.handleFind(
                 Map.of("name", "Dog", "source", ""));
         JsonArray arr = parseArray(json);
-        assertNotNull(findByFqnField(arr, "test.model.Dog"),
+        assertNotNull(findByFqn(arr, "test.model.Dog"),
                 "Should find source Dog");
     }
 
@@ -82,9 +82,9 @@ public class SearchIntegrationTest {
         String json = handler.handleFind(
                 Map.of("name", "test.model"));
         JsonArray arr = parseArray(json);
-        assertNotNull(findByFqnField(arr, "test.model.Animal"),
+        assertNotNull(findByFqn(arr, "test.model.Animal"),
                 "Should find Animal in package");
-        assertNotNull(findByFqnField(arr, "test.model.Dog"),
+        assertNotNull(findByFqn(arr, "test.model.Dog"),
                 "Should find Dog in package");
     }
 
@@ -92,7 +92,7 @@ public class SearchIntegrationTest {
     public void findByPackageTrailingDot() throws Exception {
         String json = handler.handleFind(
                 Map.of("name", "test.model."));
-        assertNotNull(findByFqnField(parseArray(json),
+        assertNotNull(findByFqn(parseArray(json),
                 "test.model.Animal"), "Should find Animal");
     }
 
@@ -100,7 +100,7 @@ public class SearchIntegrationTest {
     public void findByPackageTrailingDotStar() throws Exception {
         String json = handler.handleFind(
                 Map.of("name", "test.model.*"));
-        assertNotNull(findByFqnField(parseArray(json),
+        assertNotNull(findByFqn(parseArray(json),
                 "test.model.Animal"), "Should find Animal");
     }
 
@@ -118,9 +118,9 @@ public class SearchIntegrationTest {
         String json = handler.handleSubtypes(
                 Map.of("class", "test.model.Animal"));
         JsonArray arr = parseArray(json);
-        assertNotNull(findByFqnField(arr, "test.model.Dog"),
+        assertNotNull(findByFqn(arr, "test.model.Dog"),
                 "Should find Dog");
-        assertNotNull(findByFqnField(arr, "test.model.Cat"),
+        assertNotNull(findByFqn(arr, "test.model.Cat"),
                 "Should find Cat");
     }
 
@@ -220,9 +220,9 @@ public class SearchIntegrationTest {
         JsonArray arr = parseArray(json);
         assertTrue(arr.size() >= 2,
                 "Should find at least Dog + Cat");
-        assertNotNull(findByFqnField(arr, "test.model.Dog"),
+        assertNotNull(findByFqn(arr, "test.model.Dog"),
                 "Should find Dog.name");
-        assertNotNull(findByFqnField(arr, "test.model.Cat"),
+        assertNotNull(findByFqn(arr, "test.model.Cat"),
                 "Should find Cat.name");
     }
 
@@ -235,12 +235,11 @@ public class SearchIntegrationTest {
         JsonObject obj = JsonParser.parseString(json)
                 .getAsJsonObject();
         assertEquals("class", obj.get("kind").getAsString());
-        String full = obj.toString();
-        assertTrue(full.contains("\"name\":\"name\""),
+        assertTrue(hasNamed(obj.getAsJsonArray("methods"), "name"),
                 "Should have name method");
-        assertTrue(full.contains("\"name\":\"bark\""),
+        assertTrue(hasNamed(obj.getAsJsonArray("methods"), "bark"),
                 "Should have bark method");
-        assertTrue(full.contains("\"name\":\"age\""),
+        assertTrue(hasNamed(obj.getAsJsonArray("fields"), "age"),
                 "Should have age field");
     }
 
@@ -433,16 +432,15 @@ public class SearchIntegrationTest {
         return null;
     }
 
-    private static JsonObject findByFqnField(JsonArray arr,
-            String fqn) {
+    private static boolean hasNamed(JsonArray arr,
+            String name) {
         for (JsonElement e : arr) {
-            var obj = e.getAsJsonObject();
-            if (obj.has("fqn") && fqn.equals(
-                    obj.get("fqn").getAsString())) {
-                return obj;
+            if (name.equals(e.getAsJsonObject()
+                    .get("name").getAsString())) {
+                return true;
             }
         }
-        return null;
+        return false;
     }
 
     private static boolean hasRefIn(JsonArray arr,

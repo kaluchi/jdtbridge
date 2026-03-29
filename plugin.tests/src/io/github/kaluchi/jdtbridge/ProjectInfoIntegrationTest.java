@@ -75,12 +75,12 @@ public class ProjectInfoIntegrationTest {
                 Map.of("project", TestFixture.PROJECT_NAME));
         JsonObject obj = JsonParser.parseString(json)
                 .getAsJsonObject();
-        String fullJson = obj.toString();
-        assertTrue(fullJson.contains("\"Animal\""),
+        JsonArray roots = obj.getAsJsonArray("sourceRoots");
+        assertTrue(hasType(roots, "Animal"),
                 "Should have Animal");
-        assertTrue(fullJson.contains("\"Dog\""),
+        assertTrue(hasType(roots, "Dog"),
                 "Should have Dog");
-        assertTrue(fullJson.contains("\"AnimalService\""),
+        assertTrue(hasType(roots, "AnimalService"),
                 "Should have AnimalService");
     }
 
@@ -127,6 +127,25 @@ public class ProjectInfoIntegrationTest {
             JsonObject pkg = e.getAsJsonObject();
             if (name.equals(pkg.get("name").getAsString())) {
                 return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasType(JsonArray roots,
+            String typeName) {
+        for (JsonElement root : roots) {
+            JsonArray pkgs = root.getAsJsonObject()
+                    .getAsJsonArray("packages");
+            for (JsonElement p : pkgs) {
+                JsonArray types = p.getAsJsonObject()
+                        .getAsJsonArray("types");
+                for (JsonElement t : types) {
+                    if (typeName.equals(t.getAsJsonObject()
+                            .get("name").getAsString())) {
+                        return true;
+                    }
+                }
             }
         }
         return false;

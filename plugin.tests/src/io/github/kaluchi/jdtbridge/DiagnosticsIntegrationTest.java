@@ -73,14 +73,20 @@ public class DiagnosticsIntegrationTest {
         String json = handler.handleErrors(params);
         JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
         boolean hasError = false;
+        boolean hasWarning = false;
         for (var e : arr) {
-            if ("ERROR".equals(e.getAsJsonObject()
-                    .get("severity").getAsString())) {
-                hasError = true;
-                break;
-            }
+            String sev = e.getAsJsonObject()
+                    .get("severity").getAsString();
+            if ("ERROR".equals(sev)) hasError = true;
+            if ("WARNING".equals(sev)) hasWarning = true;
         }
         assertTrue(hasError, "Should contain at least one ERROR");
+        // With warnings param, result should include warnings
+        // (may be 0 if project has none, but array should be
+        // larger than errors-only)
+        assertTrue(arr.size() >= 1,
+                "With warnings flag, should return errors"
+                        + (hasWarning ? " and warnings" : ""));
     }
 
     @Test

@@ -328,15 +328,61 @@ public class EdgeCaseIntegrationTest {
         String json = handler.handleProjectInfo(
                 Map.of("project", TestFixture.PROJECT_NAME));
         JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
-        String full = obj.toString();
-        assertTrue(full.contains("test.edge"),
+        JsonArray roots = obj.getAsJsonArray("sourceRoots");
+        assertTrue(hasPackageNamed(roots, "test.edge"),
                 "Should have test.edge");
-        assertTrue(full.contains("Calculator"),
+        assertTrue(hasTypeNamed(roots, "Calculator"),
                 "Should have Calculator");
-        assertTrue(full.contains("\"kind\":\"enum\""),
+        assertTrue(hasTypeWithKind(roots, "enum"),
                 "Should have Color as enum");
-        assertTrue(full.contains("\"kind\":\"annotation\""),
+        assertTrue(hasTypeWithKind(roots, "annotation"),
                 "Should have Marker as annotation");
+    }
+
+    private static boolean hasPackageNamed(JsonArray roots,
+            String name) {
+        for (JsonElement root : roots) {
+            for (JsonElement p : root.getAsJsonObject()
+                    .getAsJsonArray("packages")) {
+                if (name.equals(p.getAsJsonObject()
+                        .get("name").getAsString()))
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasTypeNamed(JsonArray roots,
+            String name) {
+        for (JsonElement root : roots) {
+            for (JsonElement p : root.getAsJsonObject()
+                    .getAsJsonArray("packages")) {
+                for (JsonElement t : p.getAsJsonObject()
+                        .getAsJsonArray("types")) {
+                    if (name.equals(t.getAsJsonObject()
+                            .get("name").getAsString()))
+                        return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasTypeWithKind(JsonArray roots,
+            String kind) {
+        for (JsonElement root : roots) {
+            for (JsonElement p : root.getAsJsonObject()
+                    .getAsJsonArray("packages")) {
+                for (JsonElement t : p.getAsJsonObject()
+                        .getAsJsonArray("types")) {
+                    JsonObject type = t.getAsJsonObject();
+                    if (type.has("kind") && kind.equals(
+                            type.get("kind").getAsString()))
+                        return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static JsonObject findByFqn(JsonArray arr, String fqn) {
