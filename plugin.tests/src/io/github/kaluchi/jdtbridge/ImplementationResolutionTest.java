@@ -15,16 +15,12 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
  * Tests for implementation resolution — interface method calls
  * should have implementationOf refs added by
  * {@link ReferenceCollector#resolveImplementations}.
  */
-@EnabledIfSystemProperty(
-        named = "jdtbridge.integration-tests",
-        matches = "true")
 public class ImplementationResolutionTest {
 
     @BeforeAll

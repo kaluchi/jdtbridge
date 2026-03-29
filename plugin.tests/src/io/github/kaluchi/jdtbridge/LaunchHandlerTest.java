@@ -16,14 +16,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
  * Integration tests for LaunchHandler — list and console commands.
  * Tests against the real Eclipse launch infrastructure.
  */
-@EnabledIfSystemProperty(named = "jdtbridge.integration-tests",
-        matches = "true")
 public class LaunchHandlerTest {
 
     private final LaunchTracker tracker = new LaunchTracker();

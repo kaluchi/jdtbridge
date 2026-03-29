@@ -15,7 +15,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
  * Tests for enriched reference metadata: declaringTypeKind,
@@ -24,9 +23,6 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
  * Uses TestFixture classes including EnrichedRefService and
  * GenericService.
  */
-@EnabledIfSystemProperty(
-        named = "jdtbridge.integration-tests",
-        matches = "true")
 public class EnrichedRefTest {
 
     @BeforeAll

@@ -22,7 +22,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
  * Contract tests: exact ref counts and FQMNs for fixture methods.
@@ -30,9 +29,6 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
  * They guarantee the ref collector output is deterministic and
  * complete.
  */
-@EnabledIfSystemProperty(
-        named = "jdtbridge.integration-tests",
-        matches = "true")
 public class RefCountContractTest {
 
     @BeforeAll

@@ -19,16 +19,12 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.eclipse.core.runtime.CoreException;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
  * Generics erasure contract: all FQMNs in source output must be
  * generics-free. {@code Map<String,String>} → {@code Map}.
  * This ensures Zero-Modification Navigation (principle #3).
  */
-@EnabledIfSystemProperty(
-        named = "jdtbridge.integration-tests",
-        matches = "true")
 public class GenericErasureTest {
 
     @BeforeAll

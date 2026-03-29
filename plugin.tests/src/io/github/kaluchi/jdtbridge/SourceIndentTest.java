@@ -21,16 +21,11 @@ import org.eclipse.jdt.core.IType;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
-
 /**
  * Tests that source output preserves original indentation.
  * Eclipse's IMember.getSource() strips leading whitespace
  * from the first line. Our handler must not.
  */
-@EnabledIfSystemProperty(
-        named = "jdtbridge.integration-tests",
-        matches = "true")
 public class SourceIndentTest {
 
     private static final SearchHandler handler = new SearchHandler();

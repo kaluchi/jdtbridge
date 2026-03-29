@@ -13,7 +13,6 @@ import org.eclipse.debug.core.ILaunch;
 import org.eclipse.debug.core.ILaunchConfigurationType;
 import org.eclipse.debug.core.ILaunchConfigurationWorkingCopy;
 import org.eclipse.debug.core.ILaunchManager;
-import org.eclipse.debug.core.Launch;
 import org.eclipse.jdt.core.IClasspathEntry;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IJavaProject;
@@ -23,7 +22,6 @@ import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.junit.JUnitCore;
-import org.eclipse.jdt.junit.launcher.JUnitLaunchConfigurationDelegate;
 import org.eclipse.jdt.launching.IJavaLaunchConfigurationConstants;
 import org.osgi.framework.Version;
 
@@ -41,6 +39,17 @@ class TestHandler {
 
     private static final String JUNIT_LAUNCH_TYPE =
             "org.eclipse.jdt.junit.launchconfig";
+    private static final String PDE_JUNIT_LAUNCH_TYPE =
+            "org.eclipse.pde.ui.JunitLaunchConfig";
+    private static final String PDE_PLUGIN_NATURE =
+            "org.eclipse.pde.PluginNature";
+    private static final String PDE_RUN_IN_UI_THREAD =
+            "run_in_ui_thread";
+    private static final String PDE_APPLICATION =
+            "application";
+    private static final String PDE_CORE_TEST_APP =
+            "org.eclipse.pde.junit.runtime"
+                    + ".coretestapplication";
     private static final String ATTR_TEST_KIND =
             "org.eclipse.jdt.junit.TEST_KIND";
     private static final String ATTR_TEST_NAME =
@@ -69,7 +78,6 @@ class TestHandler {
     private record PreparedLaunch(
             String configName,
             ILaunchConfigurationWorkingCopy wc,
-            ILaunch launch,
             String project,
             String runner) {}
 
@@ -93,11 +101,14 @@ class TestHandler {
 
         ILaunchManager manager =
                 DebugPlugin.getDefault().getLaunchManager();
+        String launchTypeId = resolveJUnitLaunchType(
+                manager, fqn, projectName);
         ILaunchConfigurationType launchType =
-                manager.getLaunchConfigurationType(JUNIT_LAUNCH_TYPE);
+                manager.getLaunchConfigurationType(launchTypeId);
         if (launchType == null) {
             errorOut[0] = HttpServer.jsonError(
-                    "JUnit launch type not available");
+                    "JUnit launch type not available: "
+                            + launchTypeId);
             return null;
         }
 
@@ -105,6 +116,18 @@ class TestHandler {
                 + System.currentTimeMillis();
         ILaunchConfigurationWorkingCopy wc =
                 launchType.newInstance(null, configName);
+
+        if (PDE_JUNIT_LAUNCH_TYPE.equals(launchTypeId)) {
+            // Headless: no workbench, no UI thread
+            wc.setAttribute(PDE_RUN_IN_UI_THREAD, false);
+            wc.setAttribute(PDE_APPLICATION, PDE_CORE_TEST_APP);
+            // Include all workspace + target bundles, auto-start
+            wc.setAttribute("default", true);
+            wc.setAttribute("automaticAdd", true);
+            wc.setAttribute("default_auto_start", true);
+            wc.setAttribute("default_start_level", 4);
+            wc.setAttribute("includeOptional", true);
+        }
 
         String configError = configureLaunch(
                 wc, fqn, methodName, projectName, packageName);
@@ -134,11 +157,7 @@ class TestHandler {
             }
         }
 
-        ILaunch launch =
-                new Launch(wc, ILaunchManager.RUN_MODE, null);
-        manager.addLaunch(launch);
-
-        return new PreparedLaunch(configName, wc, launch,
+        return new PreparedLaunch(configName, wc,
                 resolvedProject, formatRunner(testKind));
     }
 
@@ -157,10 +176,9 @@ class TestHandler {
         var ts = sessionTracker.preRegister(pl.configName());
         ts.runner = pl.runner();
 
-        JUnitLaunchConfigurationDelegate delegate =
-                new JUnitLaunchConfigurationDelegate();
-        delegate.launch(pl.wc(), ILaunchManager.RUN_MODE,
-                pl.launch(), new NullProgressMonitor());
+        ILaunch launch = pl.wc().launch(
+                ILaunchManager.RUN_MODE,
+                new NullProgressMonitor(), false);
 
         var response = new JsonObject();
         response.addProperty("ok", true);
@@ -170,7 +188,7 @@ class TestHandler {
         if (pl.runner() != null)
             response.addProperty("runner", pl.runner());
 
-        var processes = pl.launch().getProcesses();
+        var processes = launch.getProcesses();
         if (processes.length > 0) {
             String pid = processes[0].getAttribute(
                     org.eclipse.debug.core.model.IProcess
@@ -282,6 +300,40 @@ class TestHandler {
     }
 
     // ---- Helpers ----
+
+    /**
+     * If the target project has PDE PluginNature and the PDE
+     * JUnit launch type is installed, use it — this gives the
+     * test a full OSGi runtime with workspace. Otherwise fall
+     * back to plain JUnit.
+     */
+    private String resolveJUnitLaunchType(
+            ILaunchManager manager, String fqn,
+            String projectName) {
+        try {
+            org.eclipse.core.resources.IProject project = null;
+            if (fqn != null && !fqn.isBlank()) {
+                IType type = JdtUtils.findType(fqn);
+                if (type != null) {
+                    project = type.getJavaProject().getProject();
+                }
+            } else if (projectName != null
+                    && !projectName.isBlank()) {
+                project = ResourcesPlugin.getWorkspace()
+                        .getRoot().getProject(projectName);
+            }
+            if (project != null && project.exists()
+                    && project.hasNature(PDE_PLUGIN_NATURE)) {
+                if (manager.getLaunchConfigurationType(
+                        PDE_JUNIT_LAUNCH_TYPE) != null) {
+                    return PDE_JUNIT_LAUNCH_TYPE;
+                }
+            }
+        } catch (Exception e) {
+            Log.warn("Failed to detect PDE nature", e);
+        }
+        return JUNIT_LAUNCH_TYPE;
+    }
 
     String detectTestKind(IType type) {
         return detectTestKind(type.getJavaProject());

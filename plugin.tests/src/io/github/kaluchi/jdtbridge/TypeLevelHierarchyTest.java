@@ -17,15 +17,11 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
  * Tests for type-level jdt source output: hierarchy
  * (supertypes, subtypes), enclosing type, no outgoing refs.
  */
-@EnabledIfSystemProperty(
-        named = "jdtbridge.integration-tests",
-        matches = "true")
 public class TypeLevelHierarchyTest {
 
     @BeforeAll

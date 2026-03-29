@@ -12,7 +12,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
  * Integration tests for RefactoringHandler: rename, move, format,
@@ -22,7 +21,6 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
  * that subsequent tests reference).
  */
 @TestMethodOrder(MethodOrderer.MethodName.class)
-@EnabledIfSystemProperty(named = "jdtbridge.integration-tests", matches = "true")
 public class RefactoringIntegrationTest {
 
     private static final RefactoringHandler handler =

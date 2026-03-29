@@ -14,7 +14,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
  * Unit tests for {@link SourceReport} — javadoc extraction
@@ -110,9 +109,6 @@ public class SourceReportTest {
     }
 
     @Nested
-    @EnabledIfSystemProperty(
-            named = "jdtbridge.integration-tests",
-            matches = "true")
     class JsonOutput {
 
         @BeforeAll

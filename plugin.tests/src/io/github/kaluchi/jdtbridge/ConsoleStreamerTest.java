@@ -10,7 +10,6 @@ import java.io.IOException;
 import org.eclipse.debug.core.ILaunch;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
  * Tests for {@link ConsoleStreamer} — streaming console output
@@ -53,9 +52,6 @@ public class ConsoleStreamerTest {
     }
 
     @Nested
-    @EnabledIfSystemProperty(
-            named = "jdtbridge.integration-tests",
-            matches = "true")
     class Stream {
 
         @Test

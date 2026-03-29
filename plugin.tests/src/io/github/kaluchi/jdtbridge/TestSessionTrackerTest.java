@@ -13,7 +13,6 @@ import com.google.gson.JsonObject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
  * Tests for {@link TestSessionTracker} — session tracking,
@@ -340,9 +339,6 @@ public class TestSessionTrackerTest {
     }
 
     @Nested
-    @EnabledIfSystemProperty(
-            named = "jdtbridge.integration-tests",
-            matches = "true")
     class Lifecycle {
 
         // Integration tests require real JUnit session events

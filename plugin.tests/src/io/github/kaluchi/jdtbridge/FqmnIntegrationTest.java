@@ -15,14 +15,11 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 /**
  * Integration tests for FQMN (Fully Qualified Method Name) support.
  * Tests paramTypes-based method resolution against real JDT types.
  */
-@EnabledIfSystemProperty(named = "jdtbridge.integration-tests",
-        matches = "true")
 public class FqmnIntegrationTest {
 
     private static final SearchHandler handler = new SearchHandler();

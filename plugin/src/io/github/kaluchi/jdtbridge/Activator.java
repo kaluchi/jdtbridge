@@ -28,12 +28,16 @@ public class Activator implements BundleActivator {
 
     @Override
     public void start(BundleContext context) throws Exception {
-        // Skip server in test environments (Tycho surefire)
+        // Skip server in test environments (Tycho surefire, PDE JUnit)
+        if ("true".equals(System.getProperty("eclipse.pde.launch"))) {
+            Log.info("PDE test launch — skipping server");
+            return;
+        }
         String workspace = ResourcesPlugin.getWorkspace().getRoot()
                 .getLocation().toOSString();
         if (workspace.contains("target" + File.separator
                 + "work")) {
-            Log.info("Test environment detected — skipping server");
+            Log.info("Tycho test environment — skipping server");
             return;
         }
 
