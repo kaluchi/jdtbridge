@@ -41,6 +41,37 @@ function authHeaders() {
 }
 
 /**
+ * Build request options. If http_proxy is set and host is not
+ * in no_proxy, route through the proxy (HTTP CONNECT-style:
+ * send full URL as path, connect to proxy host:port).
+ */
+function requestOptions(inst, path, method, timeoutMs) {
+  const proxy = process.env.http_proxy || process.env.HTTP_PROXY;
+  const noProxy = (process.env.no_proxy || process.env.NO_PROXY || "").split(",").map(s => s.trim());
+  const needsProxy = proxy && !noProxy.includes(inst.host);
+
+  if (needsProxy) {
+    const proxyUrl = new URL(proxy);
+    return {
+      hostname: proxyUrl.hostname,
+      port: parseInt(proxyUrl.port, 10),
+      path: `http://${inst.host}:${inst.port}${path}`,
+      method,
+      timeout: timeoutMs,
+      headers: { ...authHeaders(), Host: `${inst.host}:${inst.port}` },
+    };
+  }
+  return {
+    hostname: inst.host,
+    port: inst.port,
+    path,
+    method,
+    timeout: timeoutMs,
+    headers: authHeaders(),
+  };
+}
+
+/**
  * Parse JSON responses, tolerating non-finite numeric literals sometimes
  * returned by the Eclipse bridge (for example `time: NaN` in test results).
  * @param {string} data
@@ -71,14 +102,7 @@ export async function get(path, timeoutMs = 10_000) {
   const inst = await connect();
   return new Promise((resolve, reject) => {
     const req = request(
-      {
-        hostname: inst.host,
-        port: inst.port,
-        path,
-        method: "GET",
-        timeout: timeoutMs,
-        headers: authHeaders(),
-      },
+      requestOptions(inst, path, "GET", timeoutMs),
       (res) => {
         let data = "";
         res.on("data", (chunk) => (data += chunk));
@@ -115,14 +139,7 @@ export async function getRaw(path, timeoutMs = 10_000) {
   const inst = await connect();
   return new Promise((resolve, reject) => {
     const req = request(
-      {
-        hostname: inst.host,
-        port: inst.port,
-        path,
-        method: "GET",
-        timeout: timeoutMs,
-        headers: authHeaders(),
-      },
+      requestOptions(inst, path, "GET", timeoutMs),
       (res) => {
         let data = "";
         res.on("data", (chunk) => (data += chunk));
@@ -171,14 +188,7 @@ export async function getStream(path, dest) {
   const inst = await connect();
   return new Promise((resolve, reject) => {
     const req = request(
-      {
-        hostname: inst.host,
-        port: inst.port,
-        path,
-        method: "GET",
-        timeout: 0, // no timeout for streaming
-        headers: authHeaders(),
-      },
+      requestOptions(inst, path, "GET", 0),
       (res) => {
         if (res.statusCode !== 200) {
           let data = "";
@@ -209,14 +219,7 @@ export async function getStreamLines(path, onLine) {
   const inst = await connect();
   return new Promise((resolve, reject) => {
     const req = request(
-      {
-        hostname: inst.host,
-        port: inst.port,
-        path,
-        method: "GET",
-        timeout: 0,
-        headers: authHeaders(),
-      },
+      requestOptions(inst, path, "GET", 0),
       (res) => {
         if (res.statusCode !== 200) {
           let data = "";

@@ -45,10 +45,22 @@ export async function discoverInstances() {
     }
   }
 
-  const results = await Promise.all(
-    candidates.map((inst) => probe(inst).then(() => inst).catch(() => null)),
+  // Remote instances (non-localhost): trust the file — probe
+  // won't work through Docker sandbox HTTP proxy anyway.
+  // Local instances: probe to filter stale.
+  const local = [];
+  const remote = [];
+  for (const inst of candidates) {
+    if (isLocal(inst.host)) {
+      local.push(inst);
+    } else {
+      remote.push(inst);
+    }
+  }
+  const probed = await Promise.all(
+    local.map((inst) => probe(inst).then(() => inst).catch(() => null)),
   );
-  return results.filter(Boolean);
+  return [...probed.filter(Boolean), ...remote];
 }
 
 /**
@@ -70,6 +82,10 @@ export async function findInstance(workspaceHint) {
   }
 
   return instances[0];
+}
+
+function isLocal(host) {
+  return host === "127.0.0.1" || host === "localhost" || host === "::1";
 }
 
 /**

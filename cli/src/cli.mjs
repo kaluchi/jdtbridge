@@ -33,6 +33,7 @@ import {
   editorsHelp,
   openHelp,
 } from "./commands/editor.mjs";
+import { sandboxRun, help as sandboxRunHelp } from "./commands/sandbox.mjs";
 import {
   launchList,
   launchConfigs,
@@ -127,6 +128,32 @@ async function testDispatch(args) {
   await cmd.fn(rest);
 }
 
+const sandboxHelp = `Run an agent in a Docker sandbox with JDT Bridge connectivity.
+
+Subcommands:
+  jdt sandbox run <agent> [workspace] [-- agent-args...]
+
+Use "jdt help sandbox run" for details.`;
+
+const sandboxSubcommands = {
+  run: { fn: sandboxRun, help: sandboxRunHelp },
+};
+
+async function sandboxDispatch(args) {
+  const [sub, ...rest] = args;
+  if (!sub || sub === "--help") {
+    console.log(sandboxHelp);
+    return;
+  }
+  const cmd = sandboxSubcommands[sub];
+  if (!cmd) {
+    console.error(`Unknown sandbox subcommand: ${sub}`);
+    console.log(sandboxHelp);
+    process.exit(1);
+  }
+  await cmd.fn(rest);
+}
+
 const commands = {
   projects: { fn: projects, help: projectsHelp },
   "project-info": { fn: projectInfo, help: projectInfoHelp },
@@ -149,6 +176,7 @@ const commands = {
   editors: { fn: editors, help: editorsHelp },
   open: { fn: open, help: openHelp },
   launch: { fn: launchDispatch, help: launchHelp },
+  sandbox: { fn: sandboxDispatch, help: sandboxHelp },
   setup: { fn: setup, help: setupHelp },
 };
 
@@ -233,6 +261,9 @@ Editor:
   editors${fmtAliases("editors")}                                    list open editors (absolute paths)
   open <FQMN>                                 open in Eclipse editor
 
+Docker:
+  sandbox run <agent> [workspace]             run agent in sandbox with bridge
+
 Setup:
   setup [--check|--remove]                    install/check/remove Eclipse plugin
 
@@ -259,6 +290,8 @@ export async function run(argv) {
       console.log(launchSubcommands[rest[1]].help);
     } else if (resolved === "test" && rest[1] && testSubcommands[rest[1]]) {
       console.log(testSubcommands[rest[1]].help);
+    } else if (resolved === "sandbox" && rest[1] && sandboxSubcommands[rest[1]]) {
+      console.log(sandboxSubcommands[rest[1]].help);
     } else if (resolved) {
       console.log(commands[resolved].help);
     } else if (topic) {
