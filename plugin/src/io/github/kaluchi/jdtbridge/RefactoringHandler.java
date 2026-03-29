@@ -53,40 +53,34 @@ class RefactoringHandler {
      * and we leave it alone.
      */
     static void ensurePreferencesInitialized() {
-        // Trigger JDT UI lazy activation (if available) so
-        // JavaPlugin.start() sets the preference node ID
-        // before we check. Without this, our setPreferenceNodeId
-        // call races with JavaPlugin.start() on CI.
-        try {
-            Class.forName(
-                    "org.eclipse.jdt.internal.ui.JavaPlugin");
-        } catch (ClassNotFoundException e) {
-            // JDT UI not on classpath (headless CI target)
-        }
         String nodeId = JavaManipulation.getPreferenceNodeId();
-        if (nodeId == null) {
-            // Headless — JDT UI not available or failed to start.
-            nodeId = MANIPULATION_NODE;
-            JavaManipulation.setPreferenceNodeId(nodeId);
+        if (nodeId != null) return;
+        // JDT UI not started yet. Check if the bundle exists
+        // (without activating it — activation may need SWT).
+        var jdtUi = org.eclipse.core.runtime.Platform
+                .getBundle("org.eclipse.jdt.ui");
+        if (jdtUi != null && jdtUi.getState()
+                != org.osgi.framework.Bundle.UNINSTALLED) {
+            // Bundle available — let it activate naturally
+            // on first class access. Don't race with
+            // JavaPlugin.start() setPreferenceNodeId().
+            return;
         }
-        // Ensure import defaults exist regardless of scope
+        // Truly headless — JDT UI not available at all.
+        nodeId = MANIPULATION_NODE;
+        JavaManipulation.setPreferenceNodeId(nodeId);
         var defaults = DefaultScope.INSTANCE.getNode(nodeId);
-        if (defaults.get(
+        defaults.put(
                 CodeStyleConfiguration.ORGIMPORTS_IMPORTORDER,
-                null) == null) {
-            defaults.put(
-                    CodeStyleConfiguration
-                            .ORGIMPORTS_IMPORTORDER,
-                    "java;javax;org;com");
-            defaults.put(
-                    CodeStyleConfiguration
-                            .ORGIMPORTS_ONDEMANDTHRESHOLD,
-                    "99");
-            defaults.put(
-                    CodeStyleConfiguration
-                            .ORGIMPORTS_STATIC_ONDEMANDTHRESHOLD,
-                    "99");
-        }
+                "java;javax;org;com");
+        defaults.put(
+                CodeStyleConfiguration
+                        .ORGIMPORTS_ONDEMANDTHRESHOLD,
+                "99");
+        defaults.put(
+                CodeStyleConfiguration
+                        .ORGIMPORTS_STATIC_ONDEMANDTHRESHOLD,
+                "99");
     }
 
     String handleOrganizeImports(Map<String, String> params)
