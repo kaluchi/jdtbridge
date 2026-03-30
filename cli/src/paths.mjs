@@ -17,17 +17,30 @@ export function toWsPath(p) {
 }
 
 /**
+ * Convert Windows drive path to Linux mount path.
+ * D:\foo\bar or D:/foo/bar → /d/foo/bar.
+ * Returns null if not a Windows drive path.
+ */
+export function convertDrivePath(p) {
+  const m = /^([A-Za-z]):[/\\]/.exec(p);
+  if (!m) return null;
+  return "/" + m[1].toLowerCase() + p.slice(2).replace(/\\/g, "/");
+}
+
+/**
  * Convert Windows absolute path to Docker sandbox Linux path.
- * Bridge returns Windows paths (D:/src/Foo.java) that don't exist in the
- * Linux sandbox. Docker sandbox mounts workspace with drive letter lowercased:
- * D:\git\project → /d/git/project.
- *
  * Only converts on Linux (inside sandbox). On Windows host — no-op.
  */
 export function toSandboxPath(p) {
-  if (!p) return p;
-  if (process.platform === "linux" && /^[A-Z]:[/\\]/.test(p)) {
-    return "/" + p[0].toLowerCase() + p.slice(2).replace(/\\/g, "/");
-  }
-  return p;
+  if (!p || process.platform !== "linux") return p;
+  return convertDrivePath(p) ?? p;
+}
+
+/**
+ * Convert Windows host path to Docker sandbox Linux path.
+ * Always converts (runs on host to build paths for sandbox commands).
+ * Non-drive paths get backslash normalization only.
+ */
+export function hostToSandboxPath(p) {
+  return convertDrivePath(p) ?? p.replace(/\\/g, "/");
 }

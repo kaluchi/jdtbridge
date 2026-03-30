@@ -17,6 +17,7 @@ import { openTerminal } from "../terminal.mjs";
 import { telemetryUntilExit } from "../telemetry.mjs";
 import { resolveBridge, killProcessTree } from "./agent.mjs";
 import { findRepoRoot } from "./setup.mjs";
+import { hostToSandboxPath } from "../paths.mjs";
 import { dim } from "../color.mjs";
 
 export async function run({ agent, name, agentArgs, session }) {
@@ -52,6 +53,7 @@ export async function run({ agent, name, agentArgs, session }) {
 
   // 4. Install or update CLI in sandbox
   const repoRoot = findRepoRoot();
+  let cliInstalled = false;
 
   if (repoRoot) {
     // Host has npm link — try live sync, fall back to tarball
@@ -64,9 +66,10 @@ export async function run({ agent, name, agentArgs, session }) {
     if (isVisible) {
       console.log(`Linking CLI from ${repoRoot} (live sync)...`);
       const linkCmd = ["sandbox", "exec", container,
-        "bash", "-c", `cd "${sandboxCliPath}" && npm link 2>&1`];
+        "bash", "-c", `cd "${sandboxCliPath}" && npm link`];
       console.log(dim(`  $ docker ${linkCmd.join(" ")}`));
       spawnSync("docker", linkCmd, { stdio: "inherit" });
+      cliInstalled = true;
     } else {
       console.log(`Packing CLI from ${repoRoot}...`);
       console.log(dim(`  repo outside sandbox workspace — snapshot install (no live sync)`));
@@ -75,30 +78,35 @@ export async function run({ agent, name, agentArgs, session }) {
       const packResult = spawnSync("npm", ["pack", "--json"], {
         cwd: cliDir, encoding: "utf8",
       });
-      if (packResult.status !== 0) {
-        console.error(`  npm pack failed: ${(packResult.stderr || "").trim()}`);
-        return;
+      try {
+        if (packResult.status !== 0) throw new Error((packResult.stderr || "").trim());
+        const filename = JSON.parse(packResult.stdout)[0].filename;
+        const tarball = join(cliDir, filename);
+        console.log(dim(`  ${filename} → sandbox:/tmp/jdt.tgz`));
+        spawnSync("docker", [
+          "sandbox", "exec", "-i", container,
+          "bash", "-c", "cat > /tmp/jdt.tgz",
+        ], { input: readFileSync(tarball) });
+        console.log(dim(`  $ docker sandbox exec ${container} npm install -g /tmp/jdt.tgz`));
+        spawnSync("docker", [
+          "sandbox", "exec", container,
+          "npm", "install", "-g", "/tmp/jdt.tgz",
+        ], { stdio: "inherit" });
+        unlinkSync(tarball);
+        spawnSync("docker", [
+          "sandbox", "exec", container,
+          "bash", "-c", "rm -f /tmp/jdt.tgz",
+        ], { stdio: "ignore" });
+        cliInstalled = true;
+      } catch (e) {
+        console.error(`  npm pack failed: ${e.message}`);
+        console.log(`  Falling back to npm registry...`);
       }
-      const filename = JSON.parse(packResult.stdout)[0].filename;
-      const tarball = join(cliDir, filename);
-      console.log(dim(`  ${filename} → sandbox:/tmp/jdt.tgz`));
-      spawnSync("docker", [
-        "sandbox", "exec", "-i", container,
-        "bash", "-c", "cat > /tmp/jdt.tgz",
-      ], { input: readFileSync(tarball) });
-      console.log(dim(`  $ docker sandbox exec ${container} npm install -g /tmp/jdt.tgz`));
-      spawnSync("docker", [
-        "sandbox", "exec", container,
-        "npm", "install", "-g", "/tmp/jdt.tgz",
-      ], { stdio: "inherit" });
-      unlinkSync(tarball);
-      spawnSync("docker", [
-        "sandbox", "exec", container,
-        "bash", "-c", "rm -f /tmp/jdt.tgz",
-      ], { stdio: "ignore" });
     }
-  } else {
-    // No local repo — install from npm registry
+  }
+
+  if (!cliInstalled) {
+    // Fallback: install from npm registry
     console.log(`Checking jdt CLI version inside sandbox...`);
     const versionCmd = ["sandbox", "exec", container,
       "bash", "-c", "jdt --version 2>/dev/null || echo none"];
@@ -203,13 +211,6 @@ function detectExisting(agent) {
     }
   } catch {}
   return null;
-}
-
-/** Convert Windows host path to Docker sandbox Linux path. */
-function hostToSandboxPath(p) {
-  const m = /^([A-Za-z]):[/\\]/.exec(p);
-  if (m) return "/" + m[1].toLowerCase() + p.slice(2).replace(/\\/g, "/");
-  return p.replace(/\\/g, "/");
 }
 
 /** Create sandbox and return its name. */

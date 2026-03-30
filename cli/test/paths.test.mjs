@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { stripProject, toWsPath } from "../src/paths.mjs";
+import { stripProject, toWsPath, hostToSandboxPath } from "../src/paths.mjs";
 
 describe("stripProject", () => {
   it("strips leading slash", () => {
@@ -84,5 +84,27 @@ describe("toSandboxPath", () => {
     const toSandboxPath = await loadOnWindows();
     expect(toSandboxPath("D:/foo/bar")).toBe("D:/foo/bar");
     expect(toSandboxPath("D:\\foo\\bar")).toBe("D:\\foo\\bar");
+  });
+});
+
+describe("hostToSandboxPath", () => {
+  it("converts D:\\ backslash path", () => {
+    expect(hostToSandboxPath("D:\\foo\\bar")).toBe("/d/foo/bar");
+  });
+
+  it("converts D:/ forward-slash path", () => {
+    expect(hostToSandboxPath("D:/foo/bar")).toBe("/d/foo/bar");
+  });
+
+  it("converts C:\\ path", () => {
+    expect(hostToSandboxPath("C:\\Users\\foo")).toBe("/c/Users/foo");
+  });
+
+  it("normalizes backslashes in non-drive path", () => {
+    expect(hostToSandboxPath("relative\\path")).toBe("relative/path");
+  });
+
+  it("leaves Unix path unchanged", () => {
+    expect(hostToSandboxPath("/unix/path")).toBe("/unix/path");
   });
 });

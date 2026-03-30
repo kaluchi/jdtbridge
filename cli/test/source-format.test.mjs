@@ -46,6 +46,13 @@ describe("source format", () => {
     vi.resetModules();
   });
 
+  function mockSandboxPaths() {
+    vi.doMock("../src/paths.mjs", async (importOriginal) => {
+      const orig = await importOriginal();
+      return { ...orig, toSandboxPath: (p) => p && /^[A-Z]:[/\\]/.test(p) ? "/" + p[0].toLowerCase() + p.slice(2).replace(/\\/g, "/") : p };
+    });
+  }
+
   async function setupMock(handler) {
     ({ server, port } = await startServer(handler));
     vi.doMock("../src/bridge-env.mjs", () => ({
@@ -418,10 +425,7 @@ describe("source format", () => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(METHOD_RESPONSE));
     });
-    vi.doMock("../src/paths.mjs", async (importOriginal) => {
-      const orig = await importOriginal();
-      return { ...orig, toSandboxPath: (p) => p && /^[A-Z]:[/\\]/.test(p) ? "/" + p[0].toLowerCase() + p.slice(2).replace(/\\/g, "/") : p };
-    });
+    mockSandboxPaths();
     const { source } = await import("../src/commands/source.mjs");
     await source(["pkg.Foo#bar"]);
     const out = io.logs.join("\n");
