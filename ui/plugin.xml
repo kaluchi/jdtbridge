@@ -69,4 +69,27 @@
       <startup class="io.github.kaluchi.jdtbridge.ui.WelcomeStartupHandler"/>
    </extension>
 
+   <!-- Agent launch configuration type (run only, no debug) -->
+   <extension point="org.eclipse.debug.core.launchConfigurationTypes">
+      <launchConfigurationType
+            id="io.github.kaluchi.jdtbridge.ui.agentLaunchType"
+            name="JDT Bridge Agent"
+            delegate="io.github.kaluchi.jdtbridge.ui.launch.AgentLaunchDelegate"
+            modes="run"
+            public="true"/>
+   </extension>
+
+   <extension point="org.eclipse.debug.ui.launchConfigurationTypeImages">
+      <launchConfigurationTypeImage
+            configTypeID="io.github.kaluchi.jdtbridge.ui.agentLaunchType"
+            icon="icons/agent.svg"/>
+   </extension>
+
+   <extension point="org.eclipse.debug.ui.launchConfigurationTabGroups">
+      <launchConfigurationTabGroup
+            id="io.github.kaluchi.jdtbridge.ui.agentTabGroup"
+            type="io.github.kaluchi.jdtbridge.ui.agentLaunchType"
+            class="io.github.kaluchi.jdtbridge.ui.launch.AgentTabGroup"/>
+   </extension>
+
 </plugin>
