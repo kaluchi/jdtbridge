@@ -26,9 +26,10 @@ export function openTerminal(title, cmd) {
   if (IS_WINDOWS) {
     // start /wait: opens new console window, blocks until it closes
     // The spawned cmd.exe parent stays alive → trackable PID + exit event
+    // windowsHide: true hides the parent cmd.exe wrapper
     return spawn("cmd.exe", [
-      "/c", "start", `/wait`, `"${title}"`, "cmd.exe", "/K", cmd,
-    ], { stdio: "ignore", detached: true, windowsVerbatimArguments: true });
+      "/c", "start", "/wait", `"${title}"`, "cmd.exe", "/K", cmd,
+    ], { stdio: "ignore", windowsHide: true, windowsVerbatimArguments: true });
   }
 
   if (IS_MAC) {
