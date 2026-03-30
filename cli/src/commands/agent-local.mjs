@@ -8,11 +8,11 @@
  */
 
 import { request } from "node:http";
-import { existsSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { discoverInstances } from "../discovery.mjs";
 import { agentsDir } from "../home.mjs";
-import { openTerminal, isTerminalAlive } from "../terminal.mjs";
+import { openTerminal } from "../terminal.mjs";
 import { bold, red, dim, green } from "../color.mjs";
 
 const IS_WINDOWS = process.platform === "win32";
@@ -53,12 +53,10 @@ export async function run({ agent, name, agentArgs, session }) {
 
   console.log(dim(`Terminal opened for ${agent}`));
 
-  // Eclipse path: poll telemetry until terminal dies
+  // Eclipse path: poll telemetry, exit when terminal closes
   if (session) {
     console.log(dim("Streaming request telemetry...\n"));
-    await pollTelemetry(bridgeEnv, name, child.pid);
-    // Terminal closed — clean up
-    try { unlinkSync(agentFile); } catch { /* ignore */ }
+    await telemetryUntilExit(bridgeEnv, name, child);
     console.log(dim("\nAgent session ended."));
   }
 }
@@ -107,25 +105,33 @@ function printBootstrapChecks(workDir) {
 }
 
 /**
- * Poll telemetry from bridge until terminal process dies.
- * Each cycle: check terminal alive → drain queue → output.
+ * Poll telemetry queue while terminal is open.
+ * Terminal child 'exit' event is the lifecycle signal —
+ * no PID polling, no markers, just OS process lifecycle.
  */
-function pollTelemetry(bridgeEnv, session, terminalPid) {
+function telemetryUntilExit(bridgeEnv, session, child) {
   const port = Number(bridgeEnv.JDT_BRIDGE_PORT);
   const token = bridgeEnv.JDT_BRIDGE_TOKEN;
 
   return new Promise((resolve) => {
+    let done = false;
+
     const interval = setInterval(() => {
-      if (!isTerminalAlive(terminalPid)) {
-        // Final drain
-        drainTelemetry(port, token, session, () => {
-          clearInterval(interval);
-          resolve();
-        });
-        return;
-      }
-      drainTelemetry(port, token, session, () => {});
+      drainTelemetry(port, token, session, (text) => {
+        if (text) process.stdout.write(text);
+      });
     }, 2000);
+
+    child.on("exit", () => {
+      if (done) return;
+      done = true;
+      // Final drain
+      drainTelemetry(port, token, session, (text) => {
+        if (text) process.stdout.write(text);
+        clearInterval(interval);
+        resolve();
+      });
+    });
   });
 }
 
