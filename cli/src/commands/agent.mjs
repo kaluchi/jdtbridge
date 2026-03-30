@@ -290,18 +290,12 @@ Providers:
   sandbox    Run in Docker sandbox with bridge connectivity
 
 Options:
-  --name <id>      Session ID (default: <provider>-<agent>-<timestamp>)
-  --port <port>    Bridge port (skips discovery when set with --token)
-  --token <token>  Bridge auth token
-
-When --port and --token are provided, the agent is pinned to that
-bridge instance — no discovery, no collision with other instances.
-Eclipse plugin passes these automatically.
+  --name <id>        Session ID (default: <provider>-<agent>-<timestamp>)
+  --session <id>     Bootstrap from Eclipse session file (internal)
 
 Examples:
   jdt agent run local claude
   jdt agent run sandbox claude --name my-fix
-  jdt agent run local claude --port 63741 --token abc123
 `;
 
 export const agentStopHelp = `Stop a running agent session.

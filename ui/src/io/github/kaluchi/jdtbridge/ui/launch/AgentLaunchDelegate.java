@@ -77,8 +77,8 @@ public class AgentLaunchDelegate implements ILaunchConfigurationDelegate {
 			Process process = pb.start();
 			DebugPlugin.newProcess(launch, process, sessionId);
 
-			// Clean up session file when process terminates
-			registerCleanup(sessionFile);
+			// Clean up session file when our process terminates
+			registerCleanup(launch, sessionFile);
 		} catch (IOException e) {
 			// Clean up on failure too
 			deleteQuietly(sessionFile);
@@ -115,14 +115,15 @@ public class AgentLaunchDelegate implements ILaunchConfigurationDelegate {
 		}
 	}
 
-	private void registerCleanup(Path sessionFile) {
+	private void registerCleanup(ILaunch launch, Path sessionFile) {
 		DebugPlugin.getDefault().addDebugEventListener(
 				new IDebugEventSetListener() {
 					@Override
 					public void handleDebugEvents(DebugEvent[] events) {
 						for (DebugEvent event : events) {
 							if (event.getKind() == DebugEvent.TERMINATE
-									&& event.getSource() instanceof IProcess) {
+									&& event.getSource() instanceof IProcess p
+									&& p.getLaunch() == launch) {
 								deleteQuietly(sessionFile);
 								DebugPlugin.getDefault()
 										.removeDebugEventListener(this);
