@@ -43,7 +43,8 @@
    <extension point="org.eclipse.ui.menus">
       <menuContribution locationURI="menu:org.eclipse.ui.main.menu?after=additions">
          <menu id="io.github.kaluchi.jdtbridge.ui.menu"
-               label="JDT Bridge">
+               label="JDT Bridge"
+               mnemonic="J">
             <command commandId="io.github.kaluchi.jdtbridge.ui.commands.newAgent"
                      label="New Agent..."
                      icon="icons/new-agent.svg"/>

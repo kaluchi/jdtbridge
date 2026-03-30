@@ -8,14 +8,17 @@ import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.debug.core.ILaunchConfigurationType;
 import org.eclipse.debug.core.ILaunchManager;
 import org.eclipse.jface.action.ContributionItem;
+import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.MenuItem;
 import org.eclipse.ui.actions.CompoundContributionItem;
 
+import io.github.kaluchi.jdtbridge.ui.Activator;
+
 /**
  * Dynamic menu contribution that lists saved JDT Bridge Agent
- * launch configurations. Each item runs the config on click.
+ * launch configurations. Numbered for keyboard access (Alt+J, 1/2/3).
  */
 public class AgentConfigsContribution extends CompoundContributionItem {
 
@@ -42,7 +45,7 @@ public class AgentConfigsContribution extends CompoundContributionItem {
 
 			ContributionItem[] items = new ContributionItem[configs.length];
 			for (int i = 0; i < configs.length; i++) {
-				items[i] = new AgentConfigItem(configs[i]);
+				items[i] = new AgentConfigItem(configs[i], i + 1);
 			}
 			return items;
 		} catch (CoreException e) {
@@ -54,15 +57,25 @@ public class AgentConfigsContribution extends CompoundContributionItem {
 	private static class AgentConfigItem extends ContributionItem {
 
 		private final ILaunchConfiguration config;
+		private final int number;
 
-		AgentConfigItem(ILaunchConfiguration config) {
+		AgentConfigItem(ILaunchConfiguration config, int number) {
 			this.config = config;
+			this.number = number;
 		}
 
 		@Override
 		public void fill(Menu menu, int index) {
 			MenuItem item = new MenuItem(menu, SWT.PUSH, index);
-			item.setText(config.getName());
+			// &N prefix = mnemonic for keyboard access
+			item.setText("&" + number + " " + config.getName());
+
+			ImageDescriptor icon = Activator.imageDescriptorFromPlugin(
+					Activator.PLUGIN_ID, "icons/agent.svg");
+			if (icon != null) {
+				item.setImage(icon.createImage());
+			}
+
 			item.addListener(SWT.Selection, e -> {
 				try {
 					config.launch(ILaunchManager.RUN_MODE, null, true);
