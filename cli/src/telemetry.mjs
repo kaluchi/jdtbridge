@@ -13,6 +13,7 @@ import { proxyAwareOptions } from "./proxy.mjs";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { instancesDir } from "./home.mjs";
+import { getPinnedBridge } from "./bridge-env.mjs";
 
 let _port;
 let _token;
@@ -28,14 +29,13 @@ let _scheduled = false;
  */
 function resolveConfig() {
   // Env vars (local provider sets these in terminal)
-  if (process.env.JDT_BRIDGE_SESSION
-      && process.env.JDT_BRIDGE_PORT
-      && process.env.JDT_BRIDGE_TOKEN) {
+  const pinned = getPinnedBridge();
+  if (pinned && pinned.session) {
     return {
-      port: process.env.JDT_BRIDGE_PORT,
-      token: process.env.JDT_BRIDGE_TOKEN,
-      host: process.env.JDT_BRIDGE_HOST || "127.0.0.1",
-      session: process.env.JDT_BRIDGE_SESSION,
+      port: String(pinned.port),
+      token: pinned.token,
+      host: pinned.host,
+      session: pinned.session,
     };
   }
 
@@ -62,6 +62,9 @@ function resolveConfig() {
  * Install telemetry hooks if session context exists.
  */
 export function installTelemetry() {
+  // Skip in test environment (vitest sets NODE_ENV=test)
+  if (process.env.NODE_ENV === "test" || process.env.VITEST) return;
+
   const config = resolveConfig();
   if (!config) return;
 

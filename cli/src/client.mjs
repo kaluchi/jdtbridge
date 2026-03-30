@@ -2,6 +2,7 @@
 
 import { request } from "node:http";
 import { findInstance, discoverInstances, probe } from "./discovery.mjs";
+import { getPinnedBridge } from "./bridge-env.mjs";
 import { proxyAwareOptions } from "./proxy.mjs";
 import { red, bold } from "./color.mjs";
 
@@ -18,16 +19,16 @@ export async function connect(workspaceHint) {
   if (_instance) return _instance;
 
   // Pinned connection — skip discovery entirely
-  const envPort = process.env.JDT_BRIDGE_PORT;
-  const envToken = process.env.JDT_BRIDGE_TOKEN;
-  if (envPort && envToken) {
+  const pinned = getPinnedBridge();
+  if (pinned) {
     _instance = {
-      port: Number(envPort),
-      token: envToken,
-      host: process.env.JDT_BRIDGE_HOST || "127.0.0.1",
-      workspace: process.env.JDT_BRIDGE_WORKSPACE || "",
+      port: pinned.port,
+      token: pinned.token,
+      host: pinned.host,
+      workspace: "",
       pid: 0,
       file: "",
+      session: pinned.session,
     };
     return _instance;
   }
@@ -76,8 +77,7 @@ function authHeaders() {
   if (inst && inst.token) {
     headers.Authorization = `Bearer ${inst.token}`;
   }
-  const session = process.env.JDT_BRIDGE_SESSION
-    || (inst && inst.session);
+  const session = inst && inst.session;
   if (session) {
     headers["X-Bridge-Session"] = session;
   }

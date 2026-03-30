@@ -3,6 +3,7 @@ package io.github.kaluchi.jdtbridge.ui.launch;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IProgressMonitor;
@@ -40,6 +41,8 @@ public class AgentLaunchDelegate implements ILaunchConfigurationDelegate {
 			Activator.PLUGIN_ID + ".agent";
 	public static final String ATTR_WORKING_DIR =
 			Activator.PLUGIN_ID + ".workingDir";
+	public static final String ATTR_AGENT_ARGS =
+			Activator.PLUGIN_ID + ".agentArgs";
 
 	@Override
 	public void launch(ILaunchConfiguration config, String mode,
@@ -49,6 +52,7 @@ public class AgentLaunchDelegate implements ILaunchConfigurationDelegate {
 		String provider = config.getAttribute(ATTR_PROVIDER, "local");
 		String agent = config.getAttribute(ATTR_AGENT, "claude");
 		String workDirRaw = config.getAttribute(ATTR_WORKING_DIR, "");
+		String agentArgs = config.getAttribute(ATTR_AGENT_ARGS, "");
 		String sessionId = config.getName();
 
 		String workDir = "";
@@ -65,8 +69,16 @@ public class AgentLaunchDelegate implements ILaunchConfigurationDelegate {
 					"JDT Bridge is not running."));
 		}
 
+		// Custom env vars from Environment tab
+		@SuppressWarnings("unchecked")
+		Map<String, String> envVars = config.getAttribute(
+				org.eclipse.debug.core.ILaunchManager
+						.ATTR_ENVIRONMENT_VARIABLES,
+				(Map<String, String>) null);
+
 		Path sessionFile = writeSessionFile(
-				sessionId, provider, agent, workDir, bridge);
+				sessionId, provider, agent, workDir, agentArgs,
+				bridge, envVars);
 
 		try {
 			ProcessBuilder pb = ProcessUtil.command(
@@ -89,7 +101,8 @@ public class AgentLaunchDelegate implements ILaunchConfigurationDelegate {
 	}
 
 	private Path writeSessionFile(String sessionId, String provider,
-			String agent, String workDir, BridgeConnection bridge)
+			String agent, String workDir, String agentArgs,
+			BridgeConnection bridge, Map<String, String> envVars)
 			throws CoreException {
 		Path sessionsDir = BridgeConnection.resolveHome()
 				.resolve("sessions");
@@ -104,6 +117,15 @@ public class AgentLaunchDelegate implements ILaunchConfigurationDelegate {
 			obj.addProperty("bridgePort", bridge.port);
 			obj.addProperty("bridgeToken", bridge.token);
 			obj.addProperty("bridgeHost", "127.0.0.1");
+			if (agentArgs != null && !agentArgs.isBlank()) {
+				obj.addProperty("agentArgs", agentArgs.trim());
+			}
+
+			if (envVars != null && !envVars.isEmpty()) {
+				var envObj = new JsonObject();
+				envVars.forEach(envObj::addProperty);
+				obj.add("env", envObj);
+			}
 
 			Files.writeString(sessionFile, obj.toString() + "\n");
 			return sessionFile;

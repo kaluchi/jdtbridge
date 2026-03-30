@@ -64,6 +64,9 @@ describe("setup command", () => {
       ...overrides.home,
     };
 
+    vi.doMock("../src/bridge-env.mjs", () => ({
+      getPinnedBridge: () => null,
+    }));
     vi.doMock("../src/eclipse.mjs", () => eclipse);
     vi.doMock("../src/discovery.mjs", () => discovery);
     vi.doMock("../src/home.mjs", () => home);

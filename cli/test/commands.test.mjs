@@ -48,6 +48,9 @@ describe("commands (integration)", () => {
 
   async function setupMock(handler) {
     ({ server, port } = await startServer(handler));
+    vi.doMock("../src/bridge-env.mjs", () => ({
+      getPinnedBridge: () => null,
+    }));
     vi.doMock("../src/discovery.mjs", () => ({
       discoverInstances: async () => [],
       findInstance: async () => ({ port, token: null, pid: process.pid, workspace: "/test", host: "127.0.0.1" }),
@@ -57,24 +60,24 @@ describe("commands (integration)", () => {
   it("projects lists project names", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(["m8-server", "m8-client"]));
+      res.end(JSON.stringify(["my-server", "my-client"]));
     });
     const { projects } = await import("../src/commands/projects.mjs");
     await projects([]);
-    expect(io.logs).toEqual(["m8-server", "m8-client"]);
+    expect(io.logs).toEqual(["my-server", "my-client"]);
   });
 
   it("find shows FQN and file", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { fqn: "com.example.Foo", file: "/m8-server/src/main/java/app/m8/Foo.java" },
+        { fqn: "com.example.Foo", file: "/my-server/src/main/java/app/my/Foo.java" },
       ]));
     });
     const { find } = await import("../src/commands/find.mjs");
     await find(["Foo"]);
     expect(io.logs[0]).toContain("com.example.Foo");
-    expect(io.logs[0]).toContain("m8-server/src/main/java/app/m8/Foo.java");
+    expect(io.logs[0]).toContain("my-server/src/main/java/app/my/Foo.java");
   });
 
   it("find shows no results message", async () => {
@@ -91,7 +94,7 @@ describe("commands (integration)", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { fqn: "com.example.FooImpl", file: "/m8-server/src/FooImpl.java" },
+        { fqn: "com.example.FooImpl", file: "/my-server/src/FooImpl.java" },
       ]));
     });
     const { subtypes } = await import("../src/commands/subtypes.mjs");
@@ -123,7 +126,7 @@ describe("commands (integration)", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { fqn: "com.example.FooImpl", file: "/m8-server/src/FooImpl.java", line: 25 },
+        { fqn: "com.example.FooImpl", file: "/my-server/src/FooImpl.java", line: 25 },
       ]));
     });
     const { implementors } = await import("../src/commands/implementors.mjs");
@@ -136,7 +139,7 @@ describe("commands (integration)", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { severity: "ERROR", source: "JDT", file: "/m8-server/src/Foo.java", line: 10, message: "cannot resolve symbol" },
+        { severity: "ERROR", source: "JDT", file: "/my-server/src/Foo.java", line: 10, message: "cannot resolve symbol" },
       ]));
     });
     const { errors } = await import("../src/commands/errors.mjs");
@@ -162,7 +165,7 @@ describe("commands (integration)", () => {
       res.end(JSON.stringify({ added: 2, removed: 1 }));
     });
     const { organizeImports } = await import("../src/commands/refactoring.mjs");
-    await organizeImports(["m8-server/src/Foo.java"]);
+    await organizeImports(["my-server/src/Foo.java"]);
     expect(io.logs[0]).toBe("Imports: +2 -1");
   });
 
@@ -172,7 +175,7 @@ describe("commands (integration)", () => {
       res.end(JSON.stringify({ modified: true }));
     });
     const { format } = await import("../src/commands/refactoring.mjs");
-    await format(["m8-server/src/Foo.java"]);
+    await format(["my-server/src/Foo.java"]);
     expect(io.logs[0]).toBe("Formatted");
   });
 
@@ -237,7 +240,7 @@ describe("commands (integration)", () => {
       res.end(JSON.stringify({ errors: 0 }));
     });
     const { build } = await import("../src/commands/build.mjs");
-    await build(["--project", "m8-client"]);
+    await build(["--project", "my-client"]);
     expect(io.logs[0]).toBe("Build complete (0 errors)");
   });
 
@@ -247,19 +250,19 @@ describe("commands (integration)", () => {
       res.end(JSON.stringify({ errors: 3 }));
     });
     const { build } = await import("../src/commands/build.mjs");
-    await expect(build(["--project", "m8-client"])).rejects.toThrow("exit(1)");
+    await expect(build(["--project", "my-client"])).rejects.toThrow("exit(1)");
     expect(io.logs[0]).toBe("Build complete (3 errors)");
   });
 
   it("build with --clean flag", async () => {
     await setupMock((req, res) => {
       expect(req.url).toContain("clean");
-      expect(req.url).toContain("project=m8-client");
+      expect(req.url).toContain("project=my-client");
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ errors: 0 }));
     });
     const { build } = await import("../src/commands/build.mjs");
-    await build(["--project", "m8-client", "--clean"]);
+    await build(["--project", "my-client", "--clean"]);
     expect(io.logs[0]).toBe("Build complete (0 errors)");
   });
 
@@ -286,7 +289,7 @@ describe("commands (integration)", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({
-        kind: "class", fqn: "com.example.Foo", file: "/m8-server/src/Foo.java",
+        kind: "class", fqn: "com.example.Foo", file: "/my-server/src/Foo.java",
         superclass: "java.lang.Object", interfaces: ["com.example.HasId"],
         fields: [{ modifiers: "private", type: "String", name: "id", line: 5 }],
         methods: [{ signature: "String getId()", line: 7 }],
@@ -307,7 +310,7 @@ describe("commands (integration)", () => {
       res.end(JSON.stringify({
         name: "test-proj", location: "/ws/test-proj",
         natures: ["org.eclipse.jdt.core.javanature"],
-        dependencies: ["m8-core"], totalTypes: 2, membersIncluded: false,
+        dependencies: ["my-core"], totalTypes: 2, membersIncluded: false,
         sourceRoots: [{
           path: "src/main/java", typeCount: 2,
           packages: [{ name: "app.test", types: [{ name: "A", kind: "class", fields: 0, methods: {} }] }],
@@ -324,13 +327,13 @@ describe("commands (integration)", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { file: "/m8-server/src/Bar.java", line: 10, in: "Bar.init()", content: "new Foo();" },
-        { file: "/m8-server/src/Bar.java", line: 20, in: "Bar.run()", content: "foo.go();" },
+        { file: "/my-server/src/Bar.java", line: 10, in: "Bar.init()", content: "new Foo();" },
+        { file: "/my-server/src/Bar.java", line: 20, in: "Bar.run()", content: "foo.go();" },
       ]));
     });
     const { references } = await import("../src/commands/references.mjs");
     await references(["com.example.Foo"]);
-    expect(io.logs[0]).toBe("m8-server/src/Bar.java:10");
+    expect(io.logs[0]).toBe("my-server/src/Bar.java:10");
     expect(io.logs[1]).toContain("in Bar.init()");
   });
 
@@ -476,7 +479,7 @@ describe("commands (integration)", () => {
   it("build exits on server error", async () => {
     await setupMock(errorServer());
     const { build } = await import("../src/commands/build.mjs");
-    await expect(build(["--project", "m8-client"])).rejects.toThrow("exit(1)");
+    await expect(build(["--project", "my-client"])).rejects.toThrow("exit(1)");
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
@@ -521,13 +524,13 @@ describe("commands (integration)", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { name: "m8-server", type: "Java Application", mode: "run", terminated: false, pid: "12345" },
+        { name: "my-server", type: "Java Application", mode: "run", terminated: false, pid: "12345" },
         { name: "ObjectMapperTest", type: "JUnit", mode: "run", terminated: true, exitCode: 0 },
       ]));
     });
     const { launchList } = await import("../src/commands/launch.mjs");
     await launchList();
-    expect(io.logs[0]).toContain("m8-server");
+    expect(io.logs[0]).toContain("my-server");
     expect(io.logs[0]).toContain("running");
     expect(io.logs[1]).toContain("ObjectMapperTest");
     expect(io.logs[1]).toContain("terminated");
@@ -547,13 +550,13 @@ describe("commands (integration)", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({
-        name: "m8-server",
+        name: "my-server",
         terminated: false,
         output: "Server started on port 8080\nReady.\n",
       }));
     });
     const { launchLogs } = await import("../src/commands/launch.mjs");
-    await launchLogs(["m8-server"]);
+    await launchLogs(["my-server"]);
     expect(io.logs[0]).toContain("Server started");
   });
 
@@ -561,13 +564,13 @@ describe("commands (integration)", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({
-        name: "m8-server",
+        name: "my-server",
         terminated: false,
         output: "Server started on port 8080\nReady.\n",
       }));
     });
     const { launchConsole } = await import("../src/commands/launch.mjs");
-    await launchConsole(["m8-server"]);
+    await launchConsole(["my-server"]);
     expect(io.logs[0]).toContain("Server started");
   });
 
@@ -575,10 +578,10 @@ describe("commands (integration)", () => {
     await setupMock((req, res) => {
       expect(req.url).toContain("tail=10");
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ name: "m8-server", terminated: false, output: "last line\n" }));
+      res.end(JSON.stringify({ name: "my-server", terminated: false, output: "last line\n" }));
     });
     const { launchConsole } = await import("../src/commands/launch.mjs");
-    await launchConsole(["m8-server", "--tail", "10"]);
+    await launchConsole(["my-server", "--tail", "10"]);
     expect(io.logs[0]).toContain("last line");
   });
 
@@ -586,13 +589,13 @@ describe("commands (integration)", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { name: "m8-server", type: "Java Application" },
+        { name: "my-server", type: "Java Application" },
         { name: "AllTests", type: "JUnit" },
       ]));
     });
     const { launchConfigs } = await import("../src/commands/launch.mjs");
     await launchConfigs();
-    expect(io.logs[0]).toContain("m8-server");
+    expect(io.logs[0]).toContain("my-server");
     expect(io.logs[0]).toContain("Java Application");
     expect(io.logs[1]).toContain("AllTests");
   });
@@ -632,10 +635,10 @@ describe("commands (integration)", () => {
   it("launch run shows launched with guide", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: true, name: "m8-server", mode: "run" }));
+      res.end(JSON.stringify({ ok: true, name: "my-server", mode: "run" }));
     });
     const { launchRun } = await import("../src/commands/launch.mjs");
-    await launchRun(["m8-server"]);
+    await launchRun(["my-server"]);
     expect(io.logs[0]).toContain("Launched");
     // Onboarding guide shown
     const all = io.logs.join("\n");
@@ -646,10 +649,10 @@ describe("commands (integration)", () => {
   it("launch run -q suppresses guide", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: true, name: "m8-server", mode: "run" }));
+      res.end(JSON.stringify({ ok: true, name: "my-server", mode: "run" }));
     });
     const { launchRun } = await import("../src/commands/launch.mjs");
-    await launchRun(["m8-server", "-q"]);
+    await launchRun(["my-server", "-q"]);
     expect(io.logs).toHaveLength(1);
     expect(io.logs[0]).toContain("Launched");
   });
@@ -658,10 +661,10 @@ describe("commands (integration)", () => {
     await setupMock((req, res) => {
       expect(req.url).toContain("debug");
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: true, name: "m8-server", mode: "debug" }));
+      res.end(JSON.stringify({ ok: true, name: "my-server", mode: "debug" }));
     });
     const { launchDebug } = await import("../src/commands/launch.mjs");
-    await launchDebug(["m8-server"]);
+    await launchDebug(["my-server"]);
     expect(io.logs[0]).toContain("debug");
   });
 
@@ -673,10 +676,10 @@ describe("commands (integration)", () => {
   it("launch stop shows stopped", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: true, name: "m8-server" }));
+      res.end(JSON.stringify({ ok: true, name: "my-server" }));
     });
     const { launchStop } = await import("../src/commands/launch.mjs");
-    await launchStop(["m8-server"]);
+    await launchStop(["my-server"]);
     expect(io.logs[0]).toContain("Stopped");
   });
 
@@ -693,7 +696,7 @@ describe("commands (integration)", () => {
   it("launch console error exits", async () => {
     await setupMock(errorServer());
     const { launchConsole } = await import("../src/commands/launch.mjs");
-    await expect(launchConsole(["m8-server"])).rejects.toThrow("exit(1)");
+    await expect(launchConsole(["my-server"])).rejects.toThrow("exit(1)");
   });
 
   it("launch list error exits", async () => {
@@ -807,10 +810,10 @@ describe("commands (integration)", () => {
   it("launch run without --follow prints launched", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: true, name: "m8-server", mode: "run" }));
+      res.end(JSON.stringify({ ok: true, name: "my-server", mode: "run" }));
     });
     const { launchRun } = await import("../src/commands/launch.mjs");
-    await launchRun(["m8-server"]);
+    await launchRun(["my-server"]);
     expect(io.logs[0]).toContain("Launched");
   });
 
@@ -906,7 +909,7 @@ describe("commands (integration)", () => {
       res.end(JSON.stringify({
         supers: [],
         interfaces: [],
-        subtypes: [{ fqn: "app.Sub", binary: false, file: "/m8/src/Sub.java" }],
+        subtypes: [{ fqn: "app.Sub", binary: false, file: "/my-app/src/Sub.java" }],
       }));
     });
     const { hierarchy } = await import("../src/commands/hierarchy.mjs");
@@ -935,7 +938,7 @@ describe("commands (integration)", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({
-        kind: "interface", fqn: "app.HasId", file: "/m8/src/HasId.java",
+        kind: "interface", fqn: "app.HasId", file: "/my-app/src/HasId.java",
         superclass: null, interfaces: [],
         fields: [], methods: [{ signature: "String getId()", line: 3 }],
       }));
@@ -951,7 +954,7 @@ describe("commands (integration)", () => {
       expect(req.url).toContain("warnings");
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { severity: "WARNING", source: null, file: "/m8/src/A.java", line: 1, message: "unused" },
+        { severity: "WARNING", source: null, file: "/my-app/src/A.java", line: 1, message: "unused" },
       ]));
     });
     const { errors } = await import("../src/commands/errors.mjs");

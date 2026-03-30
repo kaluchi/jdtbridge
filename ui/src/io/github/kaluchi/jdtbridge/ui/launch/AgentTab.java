@@ -16,6 +16,7 @@ import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.DirectoryDialog;
+import org.eclipse.swt.widgets.Group;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Text;
 import org.eclipse.ui.dialogs.ContainerSelectionDialog;
@@ -30,6 +31,7 @@ public class AgentTab extends AbstractLaunchConfigurationTab {
 	private Combo providerCombo;
 	private Text agentText;
 	private Text workingDirText;
+	private Text argsText;
 
 	@Override
 	public void createControl(Composite parent) {
@@ -82,7 +84,40 @@ public class AgentTab extends AbstractLaunchConfigurationTab {
 
 		Button variablesBtn = new Button(buttons, SWT.PUSH);
 		variablesBtn.setText("Variables...");
-		variablesBtn.addListener(SWT.Selection, e -> browseVariables());
+		variablesBtn.addListener(SWT.Selection,
+				e -> browseVariables(workingDirText));
+
+		// Arguments group
+		Group argsGroup = new Group(comp, SWT.NONE);
+		argsGroup.setText("Agent arguments");
+		argsGroup.setLayout(new GridLayout(1, false));
+		argsGroup.setLayoutData(new GridData(SWT.FILL, SWT.FILL,
+				true, true, 2, 1));
+
+		argsText = new Text(argsGroup,
+				SWT.BORDER | SWT.MULTI | SWT.WRAP | SWT.V_SCROLL);
+		GridData argsData = new GridData(SWT.FILL, SWT.FILL,
+				true, true);
+		argsData.heightHint = 60;
+		argsText.setLayoutData(argsData);
+		argsText.addModifyListener(listener);
+
+		Composite argsButtons = new Composite(argsGroup, SWT.NONE);
+		argsButtons.setLayout(new GridLayout(1, false));
+		argsButtons.setLayoutData(new GridData(SWT.END, SWT.CENTER,
+				false, false));
+
+		Button argsVarsBtn = new Button(argsButtons, SWT.PUSH);
+		argsVarsBtn.setText("Variables...");
+		argsVarsBtn.addListener(SWT.Selection,
+				e -> browseVariables(argsText));
+
+		Label argsNote = new Label(argsGroup, SWT.WRAP);
+		argsNote.setText(
+				"Arguments passed after -- to the agent command. "
+				+ "Use double quotes for arguments containing spaces.");
+		argsNote.setLayoutData(new GridData(SWT.FILL, SWT.CENTER,
+				true, false));
 	}
 
 	private void browseWorkspace() {
@@ -114,11 +149,11 @@ public class AgentTab extends AbstractLaunchConfigurationTab {
 		}
 	}
 
-	private void browseVariables() {
+	private void browseVariables(Text target) {
 		StringVariableSelectionDialog dialog =
 				new StringVariableSelectionDialog(getShell());
 		if (dialog.open() == StringVariableSelectionDialog.OK) {
-			workingDirText.insert(dialog.getVariableExpression());
+			target.insert(dialog.getVariableExpression());
 		}
 	}
 
@@ -142,6 +177,7 @@ public class AgentTab extends AbstractLaunchConfigurationTab {
 		config.setAttribute(AgentLaunchDelegate.ATTR_PROVIDER, "local");
 		config.setAttribute(AgentLaunchDelegate.ATTR_AGENT, "claude");
 		config.setAttribute(AgentLaunchDelegate.ATTR_WORKING_DIR, "");
+		config.setAttribute(AgentLaunchDelegate.ATTR_AGENT_ARGS, "");
 	}
 
 	@Override
@@ -156,6 +192,9 @@ public class AgentTab extends AbstractLaunchConfigurationTab {
 			workingDirText.setText(
 					config.getAttribute(
 							AgentLaunchDelegate.ATTR_WORKING_DIR, ""));
+			argsText.setText(
+					config.getAttribute(
+							AgentLaunchDelegate.ATTR_AGENT_ARGS, ""));
 		} catch (CoreException e) {
 			setErrorMessage(e.getMessage());
 		}
@@ -170,6 +209,8 @@ public class AgentTab extends AbstractLaunchConfigurationTab {
 				agentText.getText().trim());
 		config.setAttribute(AgentLaunchDelegate.ATTR_WORKING_DIR,
 				workingDirText.getText().trim());
+		config.setAttribute(AgentLaunchDelegate.ATTR_AGENT_ARGS,
+				argsText.getText().trim());
 	}
 
 	@Override

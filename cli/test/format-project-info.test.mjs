@@ -6,7 +6,7 @@ function makeData(overrides = {}) {
     name: "test-project",
     location: "/home/user/workspace/test-project",
     natures: ["org.eclipse.jdt.core.javanature"],
-    dependencies: ["m8-core", "m8-shared"],
+    dependencies: ["my-core", "my-shared"],
     totalTypes: 5,
     membersIncluded: false,
     sourceRoots: [
@@ -57,7 +57,7 @@ describe("formatProjectInfo", () => {
 
   it("shows dependencies", () => {
     const output = formatProjectInfo(makeData(), 50);
-    expect(output).toContain("m8-core, m8-shared");
+    expect(output).toContain("my-core, my-shared");
   });
 
   it("shows (none) when no dependencies", () => {

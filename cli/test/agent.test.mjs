@@ -3,6 +3,7 @@ import {
   mkdtempSync,
   mkdirSync,
   writeFileSync,
+  readFileSync,
   existsSync,
   readdirSync,
 } from "node:fs";
@@ -320,6 +321,75 @@ describe("agent commands", () => {
       printBootstrapChecks(dir);
       expect(io.logs.some((l) => l.includes("PreToolUse"))).toBe(true);
       expect(io.logs.some((l) => l.includes("PostToolUse"))).toBe(true);
+    });
+  });
+
+  describe("runFromSession agentArgs merge", () => {
+    it("parses session agentArgs string into array", async () => {
+      // Session file with agentArgs
+      const sessDir = join(testDir, "sessions");
+      mkdirSync(sessDir, { recursive: true });
+      writeFileSync(join(sessDir, "test-args.json"), JSON.stringify({
+        provider: "local",
+        agent: "echo",
+        agentArgs: "--continue --verbose",
+        bridgePort: 1,
+        bridgeToken: "t",
+      }));
+
+      // Can't fully test run (needs terminal), but verify session
+      // file is readable and agentArgs is a string
+      const data = JSON.parse(
+        readFileSync(join(sessDir, "test-args.json"), "utf8"),
+      );
+      const args = data.agentArgs.split(/\s+/).filter(Boolean);
+      expect(args).toEqual(["--continue", "--verbose"]);
+    });
+
+    it("handles empty agentArgs", () => {
+      const data = { agentArgs: "" };
+      const args = data.agentArgs
+        ? data.agentArgs.split(/\s+/).filter(Boolean)
+        : [];
+      expect(args).toEqual([]);
+    });
+
+    it("handles missing agentArgs", () => {
+      const data = {};
+      const args = data.agentArgs
+        ? data.agentArgs.split(/\s+/).filter(Boolean)
+        : [];
+      expect(args).toEqual([]);
+    });
+  });
+
+  describe("session env merge", () => {
+    it("merges custom env with bridge env", () => {
+      const bridgeEnv = {
+        JDT_BRIDGE_PORT: "12345",
+        JDT_BRIDGE_TOKEN: "tok",
+      };
+      const customEnv = { FORCE_COLOR: "1", MY_VAR: "hello" };
+      const allEnv = { ...bridgeEnv, ...customEnv };
+
+      expect(allEnv.JDT_BRIDGE_PORT).toBe("12345");
+      expect(allEnv.FORCE_COLOR).toBe("1");
+      expect(allEnv.MY_VAR).toBe("hello");
+    });
+
+    it("custom env overrides bridge env", () => {
+      const bridgeEnv = { JDT_BRIDGE_HOST: "127.0.0.1" };
+      const customEnv = { JDT_BRIDGE_HOST: "custom-host" };
+      const allEnv = { ...bridgeEnv, ...customEnv };
+
+      expect(allEnv.JDT_BRIDGE_HOST).toBe("custom-host");
+    });
+
+    it("empty custom env changes nothing", () => {
+      const bridgeEnv = { JDT_BRIDGE_PORT: "999" };
+      const allEnv = { ...bridgeEnv, ...{} };
+
+      expect(allEnv).toEqual({ JDT_BRIDGE_PORT: "999" });
     });
   });
 });

@@ -15,6 +15,9 @@ function stopServer(server) {
 }
 
 function mockDiscovery(port, token = null) {
+  vi.doMock("../src/bridge-env.mjs", () => ({
+    getPinnedBridge: () => null,
+  }));
   vi.doMock("../src/discovery.mjs", () => ({
     discoverInstances: async () => [],
     findInstance: async () => ({
@@ -44,12 +47,12 @@ describe("client", () => {
     let port;
     ({ server, port } = await startServer((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(["m8-server", "m8-client"]));
+      res.end(JSON.stringify(["my-server", "my-client"]));
     }));
     mockDiscovery(port);
     const { get } = await import("../src/client.mjs");
     const result = await get("/projects");
-    expect(result).toEqual(["m8-server", "m8-client"]);
+    expect(result).toEqual(["my-server", "my-client"]);
   });
 
   it("get() rejects on non-200 status", async () => {
@@ -142,7 +145,7 @@ describe("client", () => {
     ({ server, port } = await startServer((req, res) => {
       res.writeHead(200, {
         "Content-Type": "text/plain",
-        "X-File": "/m8-server/src/Foo.java",
+        "X-File": "/my-server/src/Foo.java",
         "X-Start-Line": "10",
         "X-End-Line": "20",
       });
@@ -152,7 +155,7 @@ describe("client", () => {
     const { getRaw } = await import("../src/client.mjs");
     const result = await getRaw("/source?class=Foo");
     expect(result.body).toBe("public class Foo {}");
-    expect(result.headers["x-file"]).toBe("/m8-server/src/Foo.java");
+    expect(result.headers["x-file"]).toBe("/my-server/src/Foo.java");
     expect(result.headers["x-start-line"]).toBe("10");
   });
 
@@ -306,6 +309,9 @@ describe("client", () => {
   // --- connect() ---
 
   it("connect() exits when no instance found", async () => {
+    vi.doMock("../src/bridge-env.mjs", () => ({
+      getPinnedBridge: () => null,
+    }));
     vi.doMock("../src/discovery.mjs", () => ({
       discoverInstances: async () => [],
       findInstance: async () => null,

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { request } from "node:http";
 import { instancesDir } from "./home.mjs";
 import { proxyAwareOptions } from "./proxy.mjs";
+import { getPinnedBridge } from "./bridge-env.mjs";
 
 /**
  * @typedef {Object} Instance
@@ -32,7 +33,8 @@ export async function discoverInstances() {
     return [];
   }
 
-  const envHost = process.env.JDT_BRIDGE_HOST;
+  const pinned = getPinnedBridge();
+  const envHost = pinned?.host;
   const instances = [];
   for (const file of files) {
     const filePath = join(dir, file);

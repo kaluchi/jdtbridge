@@ -16,35 +16,35 @@ describe("formatReferences", () => {
 
   it("formats source reference with file:line, in, content", () => {
     formatReferences([
-      { file: "/m8-server/src/Foo.java", line: 42, in: "Bar.baz(String)", content: "foo.doStuff();" },
+      { file: "/my-server/src/Foo.java", line: 42, in: "Bar.baz(String)", content: "foo.doStuff();" },
     ]);
-    expect(logs[0]).toBe("m8-server/src/Foo.java:42");
+    expect(logs[0]).toBe("my-server/src/Foo.java:42");
     expect(logs[1]).toContain("in Bar.baz(String)");
     expect(logs[2]).toContain("| foo.doStuff();");
   });
 
   it("groups binary references by project and jar", () => {
     formatReferences([
-      { file: "/libs/some.jar", line: -1, project: "m8-core", in: "SomeClass.method()", content: null },
+      { file: "/libs/some.jar", line: -1, project: "my-core", in: "SomeClass.method()", content: null },
     ]);
-    expect(logs[0]).toContain("m8-core");
+    expect(logs[0]).toContain("my-core");
     expect(logs[0]).toContain("some.jar");
     expect(logs[1]).toContain("SomeClass.method()");
   });
 
   it("separates groups with blank line", () => {
     formatReferences([
-      { file: "/m8/src/A.java", line: 10, in: "A.m()", content: "x" },
-      { file: "/m8/src/B.java", line: 20, in: "B.m()", content: "y" },
+      { file: "/my-app/src/A.java", line: 10, in: "A.m()", content: "x" },
+      { file: "/my-app/src/B.java", line: 20, in: "B.m()", content: "y" },
     ]);
     expect(logs.includes("")).toBe(true);
   });
 
   it("handles source ref without in or content", () => {
     formatReferences([
-      { file: "/m8/src/A.java", line: 5, in: null, content: null },
+      { file: "/my-app/src/A.java", line: 5, in: null, content: null },
     ]);
-    expect(logs[0]).toBe("m8/src/A.java:5");
+    expect(logs[0]).toBe("my-app/src/A.java:5");
     expect(logs).toHaveLength(1);
   });
 

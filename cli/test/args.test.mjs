@@ -46,6 +46,6 @@ describe("extractPositional", () => {
   });
 
   it("returns empty for flags only", () => {
-    expect(extractPositional(["--project", "m8-server"])).toEqual([]);
+    expect(extractPositional(["--project", "my-server"])).toEqual([]);
   });
 });

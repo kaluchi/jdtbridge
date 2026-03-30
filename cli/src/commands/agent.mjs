@@ -86,11 +86,17 @@ async function runFromSession(sessionId, agentArgs) {
     process.exit(1);
   }
 
+  // Merge: CLI args (-- ...) + session args (from Eclipse Arguments field)
+  const sessionArgs = config.agentArgs
+    ? config.agentArgs.split(/\s+/).filter(Boolean)
+    : [];
+  const allArgs = [...sessionArgs, ...agentArgs];
+
   const providerModule = await providers[providerName]();
   await providerModule.run({
     agent: config.agent || "claude",
     name: sessionId,
-    agentArgs,
+    agentArgs: allArgs,
     session: config,
   });
 }
