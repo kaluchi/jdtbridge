@@ -16,6 +16,7 @@ import { join } from "node:path";
 import { discoverInstances } from "../discovery.mjs";
 import { agentsDir } from "../home.mjs";
 import { openTerminal } from "../terminal.mjs";
+import { killProcessTree } from "./agent.mjs";
 import { bold, red, dim } from "../color.mjs";
 
 export async function run({ agent, name, agentArgs, session }) {
@@ -109,9 +110,9 @@ export async function run({ agent, name, agentArgs, session }) {
       cleanup();
       process.exit(code || 0);
     });
-    process.on("SIGINT", () => child.kill("SIGINT"));
+    process.on("SIGINT", () => killProcessTree(child.pid));
     process.on("SIGTERM", () => {
-      child.kill("SIGTERM");
+      killProcessTree(child.pid);
       cleanup();
     });
   }

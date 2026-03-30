@@ -16,6 +16,8 @@ import { agentsDir } from "../home.mjs";
 import { openTerminal } from "../terminal.mjs";
 import { bold, red, dim } from "../color.mjs";
 
+const IS_WINDOWS = process.platform === "win32";
+
 export async function run({ agent, name, agentArgs, session }) {
   // 1. Resolve bridge connection
   const bridgeEnv = session
@@ -73,7 +75,6 @@ async function bridgeFromDiscovery() {
 }
 
 function openAgentTerminal(title, agentCmd, bridgeEnv, workDir) {
-  const IS_WINDOWS = process.platform === "win32";
   const envParts = Object.entries(bridgeEnv).map(([k, v]) =>
     IS_WINDOWS ? `set "${k}=${v}"` : `export ${k}="${v}"`);
   const sep = IS_WINDOWS ? " && " : "; ";

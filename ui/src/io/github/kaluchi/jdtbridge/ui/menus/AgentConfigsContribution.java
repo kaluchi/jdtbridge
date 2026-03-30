@@ -10,6 +10,7 @@ import org.eclipse.debug.core.ILaunchManager;
 import org.eclipse.jface.action.ContributionItem;
 import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.widgets.Menu;
 import org.eclipse.swt.widgets.MenuItem;
 import org.eclipse.ui.actions.CompoundContributionItem;
@@ -73,7 +74,9 @@ public class AgentConfigsContribution extends CompoundContributionItem {
 			ImageDescriptor icon = Activator.imageDescriptorFromPlugin(
 					Activator.PLUGIN_ID, "icons/agent.svg");
 			if (icon != null) {
-				item.setImage(icon.createImage());
+				Image img = icon.createImage();
+				item.setImage(img);
+				item.addDisposeListener(e -> img.dispose());
 			}
 
 			item.addListener(SWT.Selection, e -> {
