@@ -1,74 +1,51 @@
 package io.github.kaluchi.jdtbridge;
 
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
- * Tracks HTTP requests per session for telemetry.
- * Each session (identified by X-Bridge-Session header) accumulates
- * request logs that can be streamed to Eclipse Console.
+ * Per-session event queue. Producers (HTTP request logging,
+ * CLI telemetry POST) enqueue text. Consumer (polling GET)
+ * drains the queue.
  */
 public class RequestTracker {
 
-    /** Single request log entry. */
-    public record RequestLog(
-            long timestamp,
-            String method,
-            String path,
-            String session,
-            int status,
-            long durationMs) {
-
-        public String format() {
-            return String.format("[BRIDGE] %s %s (%d, %dms)",
-                    method, path, status, durationMs);
-        }
-    }
-
-    /** Listener notified on new log entries. */
-    public interface Listener {
-        void onRequest(RequestLog log);
-
-        default void onTelemetry(String session, String text) {}
-    }
-
-    private final Map<String, List<RequestLog>> logs =
+    private final Map<String, ConcurrentLinkedQueue<String>> queues =
             new ConcurrentHashMap<>();
-    private final List<Listener> listeners =
-            new CopyOnWriteArrayList<>();
 
-    public void log(RequestLog entry) {
-        if (entry.session() != null && !entry.session().isEmpty()) {
-            logs.computeIfAbsent(entry.session(),
-                    k -> new CopyOnWriteArrayList<>()).add(entry);
-        }
-        for (Listener l : listeners) {
-            l.onRequest(entry);
-        }
+    /** Enqueue a formatted request log line. */
+    public void logRequest(String session, String method,
+            String path, int status, long durationMs) {
+        if (session == null || session.isEmpty()) return;
+        enqueue(session, String.format("[BRIDGE] %s %s (%d, %dms)\n",
+                method, path, status, durationMs));
     }
 
-    /** Log raw telemetry text from CLI (stdout/stderr). */
+    /** Enqueue raw CLI output text. */
     public void logTelemetry(String session, String text) {
-        for (Listener l : listeners) {
-            l.onTelemetry(session, text);
+        if (session == null || session.isEmpty()) return;
+        enqueue(session, text);
+    }
+
+    /** Drain all queued events for a session. */
+    public String drain(String session) {
+        var queue = queues.get(session);
+        if (queue == null || queue.isEmpty()) return "";
+        var sb = new StringBuilder();
+        String item;
+        while ((item = queue.poll()) != null) {
+            sb.append(item);
         }
+        return sb.toString();
     }
 
-    public List<RequestLog> getSessionLogs(String session) {
-        return logs.getOrDefault(session, List.of());
-    }
-
-    public void addListener(Listener listener) {
-        listeners.add(listener);
-    }
-
-    public void removeListener(Listener listener) {
-        listeners.remove(listener);
+    private void enqueue(String session, String text) {
+        queues.computeIfAbsent(session,
+                k -> new ConcurrentLinkedQueue<>()).add(text);
     }
 
     public void clearSession(String session) {
-        logs.remove(session);
+        queues.remove(session);
     }
 }

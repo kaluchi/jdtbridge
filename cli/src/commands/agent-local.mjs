@@ -8,11 +8,11 @@
  */
 
 import { request } from "node:http";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { discoverInstances } from "../discovery.mjs";
 import { agentsDir } from "../home.mjs";
-import { openTerminal } from "../terminal.mjs";
+import { openTerminal, isTerminalAlive } from "../terminal.mjs";
 import { bold, red, dim, green } from "../color.mjs";
 
 const IS_WINDOWS = process.platform === "win32";
@@ -53,11 +53,13 @@ export async function run({ agent, name, agentArgs, session }) {
 
   console.log(dim(`Terminal opened for ${agent}`));
 
-  // Eclipse path: stay alive streaming telemetry
-  // Process lives until Eclipse user hits Terminate
+  // Eclipse path: poll telemetry until terminal dies
   if (session) {
     console.log(dim("Streaming request telemetry...\n"));
-    await streamRequestLog(bridgeEnv, name);
+    await pollTelemetry(bridgeEnv, name, child.pid);
+    // Terminal closed — clean up
+    try { unlinkSync(agentFile); } catch { /* ignore */ }
+    console.log(dim("\nAgent session ended."));
   }
 }
 
@@ -105,28 +107,47 @@ function printBootstrapChecks(workDir) {
 }
 
 /**
- * Connect to bridge request-log stream and pipe to stdout.
- * Blocks forever — Eclipse Terminate kills the process.
+ * Poll telemetry from bridge until terminal process dies.
+ * Each cycle: check terminal alive → drain queue → output.
  */
-function streamRequestLog(bridgeEnv, session) {
-  return new Promise((resolve) => {
-    const port = Number(bridgeEnv.JDT_BRIDGE_PORT);
-    const token = bridgeEnv.JDT_BRIDGE_TOKEN;
-    const path = `/request-log/stream?session=${encodeURIComponent(session)}`;
-    const headers = {};
-    if (token) headers.Authorization = `Bearer ${token}`;
+function pollTelemetry(bridgeEnv, session, terminalPid) {
+  const port = Number(bridgeEnv.JDT_BRIDGE_PORT);
+  const token = bridgeEnv.JDT_BRIDGE_TOKEN;
 
-    const req = request(
-      { hostname: "127.0.0.1", port, path, headers, timeout: 0 },
-      (res) => {
-        res.pipe(process.stdout, { end: false });
-        res.on("end", resolve);
-        res.on("error", resolve);
-      },
-    );
-    req.on("error", resolve);
-    req.end();
+  return new Promise((resolve) => {
+    const interval = setInterval(() => {
+      if (!isTerminalAlive(terminalPid)) {
+        // Final drain
+        drainTelemetry(port, token, session, () => {
+          clearInterval(interval);
+          resolve();
+        });
+        return;
+      }
+      drainTelemetry(port, token, session, () => {});
+    }, 2000);
   });
+}
+
+function drainTelemetry(port, token, session, done) {
+  const path = `/telemetry?session=${encodeURIComponent(session)}`;
+  const headers = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const req = request(
+    { hostname: "127.0.0.1", port, path, headers, timeout: 5000 },
+    (res) => {
+      let data = "";
+      res.on("data", (chunk) => (data += chunk));
+      res.on("end", () => {
+        if (data) process.stdout.write(data);
+        done();
+      });
+    },
+  );
+  req.on("error", () => done());
+  req.on("timeout", () => { req.destroy(); done(); });
+  req.end();
 }
 
 function bridgeFromSession(session) {
