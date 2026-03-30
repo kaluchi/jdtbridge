@@ -1,0 +1,17 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: JDT Bridge UI
+Bundle-Vendor: kaluchi
+Bundle-SymbolicName: io.github.kaluchi.jdtbridge.ui;singleton:=true
+Bundle-Version: 1.8.0.qualifier
+Bundle-Activator: io.github.kaluchi.jdtbridge.ui.Activator
+Bundle-RequiredExecutionEnvironment: JavaSE-21
+Automatic-Module-Name: io.github.kaluchi.jdtbridge.ui
+Require-Bundle: org.eclipse.core.runtime,
+ org.eclipse.core.resources,
+ org.eclipse.ui,
+ org.eclipse.ui.ide,
+ org.eclipse.jface
+Import-Package: com.google.gson,
+ org.osgi.framework;version="1.3.0"
+Bundle-ActivationPolicy: lazy

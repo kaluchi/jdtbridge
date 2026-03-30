@@ -4,6 +4,7 @@ import java.nio.file.Path;
 
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
+import org.eclipse.core.runtime.Platform;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.swt.program.Program;
@@ -26,6 +27,10 @@ public class StartupHandler implements IStartup {
     }
 
     private IStatus check(IProgressMonitor monitor) {
+        if (Platform.getBundle("io.github.kaluchi.jdtbridge.ui") != null) {
+            Log.info("UI plugin present — skipping browser welcome");
+            return Status.OK_STATUS;
+        }
         try {
             Path home = Activator.getHome();
             ConfigService config = new ConfigService(home);

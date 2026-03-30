@@ -47,6 +47,13 @@
          unpack="false"/>
 
    <plugin
+         id="io.github.kaluchi.jdtbridge.ui"
+         download-size="0"
+         install-size="0"
+         version="0.0.0"
+         unpack="false"/>
+
+   <plugin
          id="io.github.kaluchi.jdtbridge.branding"
          download-size="0"
          install-size="0"

@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { execSync } from "node:child_process";
 import { createInterface } from "node:readline";
 import { readConfig, writeConfig } from "../home.mjs";
-import { discoverInstances } from "../discovery.mjs";
+import { discoverInstances, probe } from "../discovery.mjs";
 import { green, red, bold, dim } from "../color.mjs";
 import { parseFlags } from "../args.mjs";
 import { createRequire } from "node:module";
@@ -149,9 +149,18 @@ async function runCheck(config) {
 
   console.log();
   console.log(bold("Bridge"));
-  const instances = await discoverInstances();
-  if (instances.length > 0) {
-    for (const inst of instances) {
+  const candidates = await discoverInstances();
+  const liveInstances = [];
+  for (const inst of candidates) {
+    try {
+      await probe(inst);
+      liveInstances.push(inst);
+    } catch {
+      // stale instance — skip
+    }
+  }
+  if (liveInstances.length > 0) {
+    for (const inst of liveInstances) {
       ok(`port ${inst.port}, PID ${inst.pid}, workspace ${inst.workspace}`);
       if (inst.version) ok(`Plugin: ${inst.version}${inst.location ? dim(` — ${inst.location}`) : ""}`);
     }

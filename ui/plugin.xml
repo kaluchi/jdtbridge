@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+
+   <!-- Preference initializer -->
+   <extension point="org.eclipse.core.runtime.preferences">
+      <initializer class="io.github.kaluchi.jdtbridge.ui.preferences.PreferenceInitializer"/>
+   </extension>
+
+   <!-- Preference page -->
+   <extension point="org.eclipse.ui.preferencePages">
+      <page id="io.github.kaluchi.jdtbridge.ui.preferences"
+            name="JDT Bridge"
+            class="io.github.kaluchi.jdtbridge.ui.preferences.BridgePreferencePage"/>
+   </extension>
+
+   <!-- Commands -->
+   <extension point="org.eclipse.ui.commands">
+      <category id="io.github.kaluchi.jdtbridge.ui.category"
+                name="JDT Bridge"/>
+      <command id="io.github.kaluchi.jdtbridge.ui.commands.healthCheck"
+               name="Health Check"
+               categoryId="io.github.kaluchi.jdtbridge.ui.category"/>
+      <command id="io.github.kaluchi.jdtbridge.ui.commands.openTerminal"
+               name="Open Terminal"
+               categoryId="io.github.kaluchi.jdtbridge.ui.category"/>
+   </extension>
+
+   <!-- Handlers -->
+   <extension point="org.eclipse.ui.handlers">
+      <handler commandId="io.github.kaluchi.jdtbridge.ui.commands.healthCheck"
+               class="io.github.kaluchi.jdtbridge.ui.commands.HealthCheckHandler"/>
+      <handler commandId="io.github.kaluchi.jdtbridge.ui.commands.openTerminal"
+               class="io.github.kaluchi.jdtbridge.ui.commands.OpenTerminalHandler"/>
+   </extension>
+
+   <!-- Main menu -->
+   <extension point="org.eclipse.ui.menus">
+      <menuContribution locationURI="menu:org.eclipse.ui.main.menu?after=additions">
+         <menu id="io.github.kaluchi.jdtbridge.ui.menu"
+               label="JDT Bridge">
+            <command commandId="io.github.kaluchi.jdtbridge.ui.commands.healthCheck"
+                     label="Health Check"/>
+            <separator name="terminal" visible="true"/>
+            <command commandId="io.github.kaluchi.jdtbridge.ui.commands.openTerminal"
+                     label="Open Terminal"/>
+         </menu>
+      </menuContribution>
+
+      <!-- Context menu on projects -->
+      <menuContribution locationURI="popup:org.eclipse.ui.popup.any?after=additions">
+         <menu id="io.github.kaluchi.jdtbridge.ui.popup.menu"
+               label="JDT Bridge">
+            <command commandId="io.github.kaluchi.jdtbridge.ui.commands.openTerminal"
+                     label="Open Terminal Here"/>
+            <visibleWhen checkEnabled="false">
+               <with variable="selection">
+                  <iterate ifEmpty="false" operator="and">
+                     <adapt type="org.eclipse.core.resources.IProject"/>
+                  </iterate>
+               </with>
+            </visibleWhen>
+         </menu>
+      </menuContribution>
+   </extension>
+
+   <!-- Startup handler (welcome check) -->
+   <extension point="org.eclipse.ui.startup">
+      <startup class="io.github.kaluchi.jdtbridge.ui.WelcomeStartupHandler"/>
+   </extension>
+
+</plugin>

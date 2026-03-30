@@ -77,14 +77,16 @@ describe("discovery", () => {
       expect(instances[0].file).toContain("abc123.json");
     });
 
-    it("filters out instances where bridge is not responding", async () => {
+    it("returns instances even when bridge is not responding", async () => {
       writeInstance("dead.json", {
         port: 19999, // nothing listening
         token: "tok",
         pid: 99999999,
         workspace: "D:/ws",
       });
-      expect(await discoverInstances()).toEqual([]);
+      const instances = await discoverInstances();
+      expect(instances).toHaveLength(1);
+      expect(instances[0].port).toBe(19999);
     });
 
     it("skips files without port", async () => {
@@ -173,7 +175,7 @@ describe("discovery", () => {
       expect(instances).toHaveLength(1);
     });
 
-    it("filters dead instances regardless of host", async () => {
+    it("returns all instances regardless of host liveness", async () => {
       writeInstance("dead-local.json", {
         port: 19999, token: "t1", pid: 1, workspace: "/ws/dead",
       });
@@ -182,7 +184,7 @@ describe("discovery", () => {
         host: "192.168.1.100",
       });
       const instances = await discoverInstances();
-      expect(instances).toHaveLength(0);
+      expect(instances).toHaveLength(2);
     });
   });
 

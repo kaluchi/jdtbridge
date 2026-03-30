@@ -1,4 +1,4 @@
-// Eclipse instance discovery — find running instances via bridge files and HTTP probe.
+// Eclipse instance discovery — find running instances via bridge files.
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -19,8 +19,8 @@ import { proxyAwareOptions } from "./proxy.mjs";
  */
 
 /**
- * Read all instance files and probe each via HTTP.
- * Supports JDT_BRIDGE_HOST env var and host field in instance JSON.
+ * Read all instance files. No validation — connection errors are
+ * handled at request time by the HTTP client.
  * @returns {Promise<Instance[]>}
  */
 export async function discoverInstances() {
@@ -33,23 +33,20 @@ export async function discoverInstances() {
   }
 
   const envHost = process.env.JDT_BRIDGE_HOST;
-  const candidates = [];
+  const instances = [];
   for (const file of files) {
     const filePath = join(dir, file);
     try {
       const data = JSON.parse(readFileSync(filePath, "utf8"));
       if (!data.port) continue;
       const host = envHost || data.host || "127.0.0.1";
-      candidates.push({ ...data, host, file: filePath });
+      instances.push({ ...data, host, file: filePath });
     } catch {
       // corrupt file — skip
     }
   }
 
-  const results = await Promise.all(
-    candidates.map((inst) => probe(inst).then(() => inst).catch(() => null)),
-  );
-  return results.filter(Boolean);
+  return instances;
 }
 
 /**
@@ -73,11 +70,14 @@ export async function findInstance(workspaceHint) {
   return instances[0];
 }
 
-/** HTTP probe — check if bridge is alive. */
-function probe(inst) {
+/**
+ * HTTP probe — check if bridge is alive.
+ * Used only for diagnostics (setup --check), not for normal discovery.
+ */
+export function probe(inst) {
   return new Promise((resolve, reject) => {
     const opts = proxyAwareOptions(
-      inst.host, inst.port, "/status", "GET", 2000);
+      inst.host, inst.port, "/status", "GET", 5000);
     const req = request(opts, (res) => {
       res.resume();
       resolve();
@@ -90,4 +90,3 @@ function probe(inst) {
     req.end();
   });
 }
-

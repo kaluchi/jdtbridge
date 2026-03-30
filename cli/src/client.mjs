@@ -1,7 +1,7 @@
 // HTTP client for JDT Bridge server.
 
 import { request } from "node:http";
-import { findInstance } from "./discovery.mjs";
+import { findInstance, discoverInstances, probe } from "./discovery.mjs";
 import { proxyAwareOptions } from "./proxy.mjs";
 import { red, bold } from "./color.mjs";
 
@@ -10,6 +10,7 @@ let _instance;
 
 /**
  * Ensure we have a connected instance. Call before any HTTP request.
+ * Instant — reads instance files without probing.
  * @param {string} [workspaceHint]
  * @returns {import('./discovery.mjs').Instance}
  */
@@ -27,6 +28,25 @@ export async function connect(workspaceHint) {
     process.exit(1);
   }
   return _instance;
+}
+
+/**
+ * On connection failure, probe all instances to find a live one.
+ * If found, switch to it and return true. Otherwise return false.
+ */
+async function reconnect() {
+  _instance = null;
+  const all = await discoverInstances();
+  for (const inst of all) {
+    try {
+      await probe(inst);
+      _instance = inst;
+      return true;
+    } catch {
+      // dead instance — try next
+    }
+  }
+  return false;
 }
 
 /** Reset cached instance (for testing). */
@@ -69,12 +89,25 @@ function parseJson(data) {
 
 /**
  * HTTP GET request, returns parsed JSON.
+ * On connection error, probes for a live instance and retries once.
  * @param {string} path - URL path with query string
  * @param {number} [timeoutMs=10000]
  * @returns {Promise<any>}
  */
 export async function get(path, timeoutMs = 10_000) {
   const inst = await connect();
+  try {
+    return await doGet(inst, path, timeoutMs);
+  } catch (e) {
+    if (!isConnectionError(e)) throw e;
+    if (await reconnect()) {
+      return doGet(_instance, path, timeoutMs);
+    }
+    throw e;
+  }
+}
+
+function doGet(inst, path, timeoutMs) {
   return new Promise((resolve, reject) => {
     const req = request(
       requestOpts(inst, path, "GET", timeoutMs),
@@ -112,6 +145,18 @@ export async function get(path, timeoutMs = 10_000) {
  */
 export async function getRaw(path, timeoutMs = 10_000) {
   const inst = await connect();
+  try {
+    return await doGetRaw(inst, path, timeoutMs);
+  } catch (e) {
+    if (!isConnectionError(e)) throw e;
+    if (await reconnect()) {
+      return doGetRaw(_instance, path, timeoutMs);
+    }
+    throw e;
+  }
+}
+
+function doGetRaw(inst, path, timeoutMs) {
   return new Promise((resolve, reject) => {
     const req = request(
       requestOpts(inst, path, "GET", timeoutMs),

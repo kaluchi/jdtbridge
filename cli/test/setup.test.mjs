@@ -51,6 +51,7 @@ describe("setup command", () => {
 
     const discovery = {
       discoverInstances: () => [],
+      probe: () => Promise.resolve(),
       ...overrides.discovery,
     };
 

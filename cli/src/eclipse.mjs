@@ -279,12 +279,12 @@ export function waitForBridge(discoverFn, pid, timeoutSec = 120) {
   const deadline = Date.now() + timeoutSec * 1000;
 
   return new Promise((resolve, reject) => {
-    function poll() {
+    async function poll() {
       if (Date.now() > deadline) {
         reject(new Error("Timed out waiting for bridge"));
         return;
       }
-      const instances = discoverFn();
+      const instances = await discoverFn();
       const inst = instances.find((i) => i.pid === pid);
       if (!inst) {
         setTimeout(poll, 2000);
