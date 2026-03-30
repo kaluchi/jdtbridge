@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { agentsDir } from "../home.mjs";
 import { openTerminal } from "../terminal.mjs";
 import { telemetryUntilExit } from "../telemetry.mjs";
-import { resolveBridge, killProcessTree } from "./agent.mjs";
+import { resolveBridge, killProcessTree, printBootstrapChecks } from "./agent.mjs";
 import { findRepoRoot } from "./setup.mjs";
 import { hostToSandboxPath } from "../paths.mjs";
 import { dim } from "../color.mjs";
@@ -31,6 +31,14 @@ export async function run({ agent, name, agentArgs, session }) {
   };
 
   console.log(`Bridge: port ${inst.port}`);
+  console.log(`Session: ${name}`);
+  console.log(`Agent: ${agent}`);
+  if (agentArgs.length > 0) console.log(`Arguments: ${agentArgs.join(" ")}`);
+  if (inst.workspace) console.log(`Working dir: ${inst.workspace}`);
+
+  if (session && inst.workspace) {
+    printBootstrapChecks(inst.workspace);
+  }
 
   // 2. Ensure sandbox exists
   console.log(`Detecting sandbox for ${agent}...`);
@@ -42,7 +50,6 @@ export async function run({ agent, name, agentArgs, session }) {
     container = createSandbox(agent, inst.workspace || ".");
     console.log(`Sandbox: ${container} (created)`);
   }
-  console.log(`Session: ${name}`);
 
   // 3. Allow bridge through sandbox network proxy
   console.log(`Configuring network proxy: allow localhost...`);
