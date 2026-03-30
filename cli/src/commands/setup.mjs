@@ -178,19 +178,14 @@ async function runCheck(config) {
   } else {
     info("Repo not found (CLI not in cloned repo)");
   }
-  console.log();
 
-  // Claude Code hooks
-  console.log(bold("Claude Code"));
-  try {
-    if (!repoRoot) {
-      info("Repo not found — cannot check Claude Code settings");
-      console.log();
-      return;
-    }
-    // Check settings.local.json for hooks
-    const localPath = join(repoRoot, ".claude", "settings.local.json");
-    if (existsSync(localPath)) {
+  // Claude Code hooks (only in project directories with .claude/ and .git/)
+  const cwd = process.cwd();
+  const localPath = join(cwd, ".claude", "settings.local.json");
+  if (existsSync(join(cwd, ".claude")) && existsSync(join(cwd, ".git"))) {
+    console.log();
+    console.log(bold("Claude Code"));
+    try {
       const settings = JSON.parse(readFileSync(localPath, "utf8"));
       const hasPre = settings.hooks?.PreToolUse?.some(
         (h) => h.hooks?.some((hk) => hk.command?.includes("jdt ")));
@@ -199,20 +194,10 @@ async function runCheck(config) {
           (hk) => hk.command?.includes("jdt") && hk.command?.includes("refresh")));
       (hasPre ? ok : info)(`PreToolUse hook: ${hasPre ? "installed" : "not installed"}`);
       (hasPost ? ok : info)(`PostToolUse hook: ${hasPost ? "installed" : "not installed"}`);
-      if (!hasPre || !hasPost) {
-        info("Run: jdt setup --claude");
-      }
-    } else {
-      info("No .claude/settings.local.json — run: jdt setup --claude");
-    }
-    // Check agents
-    const agentsDir = join(repoRoot, ".claude", "agents");
-    const hasExplore = existsSync(join(agentsDir, "Explore.md"));
-    const hasPlan = existsSync(join(agentsDir, "Plan.md"));
-    (hasExplore ? ok : info)(`Explore agent: ${hasExplore ? "installed" : "not installed"}`);
-    (hasPlan ? ok : info)(`Plan agent: ${hasPlan ? "installed" : "not installed"}`);
-  } catch {
-    info("Could not read .claude/settings.local.json");
+    } catch { /* no hooks configured */ }
+    const agDir = join(cwd, ".claude", "agents");
+    (existsSync(join(agDir, "Explore.md")) ? ok : info)("Explore agent: installed");
+    (existsSync(join(agDir, "Plan.md")) ? ok : info)("Plan agent: installed");
   }
   console.log();
 }
