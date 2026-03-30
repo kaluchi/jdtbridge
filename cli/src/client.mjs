@@ -76,7 +76,8 @@ function authHeaders() {
   if (inst && inst.token) {
     headers.Authorization = `Bearer ${inst.token}`;
   }
-  const session = process.env.JDT_BRIDGE_SESSION;
+  const session = process.env.JDT_BRIDGE_SESSION
+    || (inst && inst.session);
   if (session) {
     headers["X-Bridge-Session"] = session;
   }

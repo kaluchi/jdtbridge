@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { execSync } from "node:child_process";
 import treeKill from "tree-kill";
 import { agentsDir, sessionsDir } from "../home.mjs";
+import { discoverInstances } from "../discovery.mjs";
 import { bold, dim, red, green } from "../color.mjs";
 import { parseFlags } from "../args.mjs";
 
@@ -277,6 +278,78 @@ export function killProcessTree(pid) {
   try {
     treeKill(pid);
   } catch { /* process may already be dead */ }
+}
+
+// ---- shared provider utilities ----
+
+/**
+ * Resolve bridge connection env vars.
+ * Session path (Eclipse): reads from session config.
+ * CLI path: discovers from instance files.
+ */
+export async function resolveBridge(session) {
+  if (session) {
+    return {
+      JDT_BRIDGE_PORT: String(session.bridgePort),
+      JDT_BRIDGE_TOKEN: session.bridgeToken,
+      JDT_BRIDGE_HOST: session.bridgeHost || "127.0.0.1",
+    };
+  }
+  const instances = await discoverInstances();
+  if (instances.length === 0) {
+    console.error(bold(red("No live bridge found.")) +
+      "\nStart Eclipse with the jdtbridge plugin first.");
+    process.exit(1);
+  }
+  const inst = instances[0];
+  return {
+    JDT_BRIDGE_PORT: String(inst.port),
+    JDT_BRIDGE_TOKEN: inst.token,
+    JDT_BRIDGE_HOST: inst.host || "127.0.0.1",
+  };
+}
+
+/**
+ * Print bootstrap checks for a working directory.
+ * Shows CLAUDE.md, hooks, agents status.
+ */
+export function printBootstrapChecks(workDir) {
+  console.log();
+  const ok = (msg) => console.log(green("  ✓ ") + msg);
+  const no = (msg) => console.log(dim("  · ") + msg);
+
+  existsSync(join(workDir, "CLAUDE.md"))
+    ? ok("CLAUDE.md") : no("CLAUDE.md not found");
+
+  const claudeDir = join(workDir, ".claude");
+  if (!existsSync(claudeDir)) {
+    no(".claude/ not found — run: jdt setup --claude");
+    console.log();
+    return;
+  }
+
+  const localPath = join(claudeDir, "settings.local.json");
+  if (existsSync(localPath)) {
+    try {
+      const settings = JSON.parse(readFileSync(localPath, "utf8"));
+      const hasPre = settings.hooks?.PreToolUse?.some(
+        (h) => h.hooks?.some((hk) => hk.command?.includes("jdt ")));
+      const hasPost = settings.hooks?.PostToolUse?.some(
+        (h) => h.hooks?.some(
+          (hk) => hk.command?.includes("jdt")
+            && hk.command?.includes("refresh")));
+      hasPre ? ok("PreToolUse hook") : no("PreToolUse hook missing");
+      hasPost ? ok("PostToolUse hook") : no("PostToolUse hook missing");
+    } catch { /* ignore */ }
+  }
+
+  const agentsPath = join(claudeDir, "agents");
+  existsSync(join(agentsPath, "Explore.md"))
+    ? ok("Explore agent") : no("Explore agent missing");
+  existsSync(join(agentsPath, "Plan.md"))
+    ? ok("Plan agent") : no("Plan agent missing");
+
+  console.log();
 }
 
 // ---- help strings ----

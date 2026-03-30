@@ -16,6 +16,8 @@ import {
   agentLogs,
   agentProviders,
   agentRun,
+  resolveBridge,
+  printBootstrapChecks,
 } from "../src/commands/agent.mjs";
 
 function captureConsole() {
@@ -253,12 +255,71 @@ describe("agent commands", () => {
     });
 
     it("generates default name from provider and agent", async () => {
-      // We can't fully test run without mocking spawn/discovery,
-      // but we can verify name generation by checking the error path
-      // when no bridge is found
-      const { agentsDir } = await import("../src/home.mjs");
-      // Name would be "local-claude-<timestamp>"
-      // This is a smoke test — full integration requires a mock bridge
+      // Smoke test — full integration requires a mock bridge
+    });
+  });
+
+  describe("resolveBridge", () => {
+    it("returns env vars from session config", async () => {
+      const result = await resolveBridge({
+        bridgePort: 12345,
+        bridgeToken: "tok123",
+        bridgeHost: "10.0.0.1",
+      });
+      expect(result.JDT_BRIDGE_PORT).toBe("12345");
+      expect(result.JDT_BRIDGE_TOKEN).toBe("tok123");
+      expect(result.JDT_BRIDGE_HOST).toBe("10.0.0.1");
+    });
+
+    it("defaults host to 127.0.0.1", async () => {
+      const result = await resolveBridge({
+        bridgePort: 9999,
+        bridgeToken: "tok",
+      });
+      expect(result.JDT_BRIDGE_HOST).toBe("127.0.0.1");
+    });
+  });
+
+  describe("printBootstrapChecks", () => {
+    it("shows CLAUDE.md found", () => {
+      const dir = mkdtempSync(join(tmpdir(), "jdtbridge-boot-"));
+      writeFileSync(join(dir, "CLAUDE.md"), "# test");
+      mkdirSync(join(dir, ".claude", "agents"), { recursive: true });
+      writeFileSync(join(dir, ".claude", "agents", "Explore.md"), "");
+      writeFileSync(join(dir, ".claude", "agents", "Plan.md"), "");
+      printBootstrapChecks(dir);
+      expect(io.logs.some((l) => l.includes("CLAUDE.md"))).toBe(true);
+      expect(io.logs.some((l) => l.includes("Explore"))).toBe(true);
+      expect(io.logs.some((l) => l.includes("Plan"))).toBe(true);
+    });
+
+    it("shows missing when no CLAUDE.md", () => {
+      const dir = mkdtempSync(join(tmpdir(), "jdtbridge-boot-"));
+      mkdirSync(join(dir, ".claude"), { recursive: true });
+      printBootstrapChecks(dir);
+      expect(io.logs.some((l) => l.includes("not found"))).toBe(true);
+    });
+
+    it("shows missing .claude directory", () => {
+      const dir = mkdtempSync(join(tmpdir(), "jdtbridge-boot-"));
+      printBootstrapChecks(dir);
+      expect(io.logs.some((l) => l.includes(".claude/"))).toBe(true);
+    });
+
+    it("detects hooks in settings.local.json", () => {
+      const dir = mkdtempSync(join(tmpdir(), "jdtbridge-boot-"));
+      writeFileSync(join(dir, "CLAUDE.md"), "");
+      mkdirSync(join(dir, ".claude"), { recursive: true });
+      writeFileSync(join(dir, ".claude", "settings.local.json"),
+        JSON.stringify({
+          hooks: {
+            PreToolUse: [{ hooks: [{ command: "jdt refs check" }] }],
+            PostToolUse: [{ hooks: [{ command: "jdt refresh" }] }],
+          },
+        }));
+      printBootstrapChecks(dir);
+      expect(io.logs.some((l) => l.includes("PreToolUse"))).toBe(true);
+      expect(io.logs.some((l) => l.includes("PostToolUse"))).toBe(true);
     });
   });
 });

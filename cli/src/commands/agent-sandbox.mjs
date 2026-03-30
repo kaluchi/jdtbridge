@@ -3,64 +3,77 @@
  *
  * Wraps `docker sandbox run` — creates sandbox if needed,
  * configures network policy, installs CLI, injects bridge
- * instance file, then runs the agent.
+ * instance file, sets env vars, then runs the agent.
  *
- * Two bootstrap paths:
- * 1. Eclipse (session): bridge from session config, opens external terminal
- * 2. CLI: bridge from discovery, runs inline (attached to current terminal)
+ * Every step is logged to stdout so Eclipse Console shows
+ * the full bootstrap process.
  */
 
 import { spawn, execSync, spawnSync } from "node:child_process";
 import { writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
-import { discoverInstances } from "../discovery.mjs";
 import { agentsDir } from "../home.mjs";
 import { openTerminal } from "../terminal.mjs";
-import { killProcessTree } from "./agent.mjs";
-import { bold, red, dim } from "../color.mjs";
+import { telemetryUntilExit } from "../telemetry.mjs";
+import { resolveBridge, killProcessTree } from "./agent.mjs";
+import { dim } from "../color.mjs";
 
 export async function run({ agent, name, agentArgs, session }) {
   // 1. Resolve bridge
-  const inst = session
-    ? { port: session.bridgePort, token: session.bridgeToken,
-        version: "", workspace: session.workingDir || "" }
-    : await bridgeFromDiscovery();
+  const bridgeEnv = await resolveBridge(session);
+  const inst = {
+    port: Number(bridgeEnv.JDT_BRIDGE_PORT),
+    token: bridgeEnv.JDT_BRIDGE_TOKEN,
+    version: "",
+    workspace: session?.workingDir || "",
+  };
 
-  console.log(dim(`Bridge: port ${inst.port}`));
+  console.log(`Bridge: port ${inst.port}`);
 
   // 2. Ensure sandbox exists
-  const container = detectExisting(agent)
-    || createSandbox(agent, ".");
-  console.log(dim(`Sandbox: ${container}`));
-  console.log(dim(`Session: ${name}`));
+  console.log(`Detecting sandbox for ${agent}...`);
+  let container = detectExisting(agent);
+  if (container) {
+    console.log(`Sandbox: ${container} (existing)`);
+  } else {
+    console.log(`Creating sandbox for ${agent}...`);
+    container = createSandbox(agent, ".");
+    console.log(`Sandbox: ${container} (created)`);
+  }
+  console.log(`Session: ${name}`);
 
   // 3. Allow bridge through sandbox network proxy
-  spawnSync("docker", [
-    "sandbox", "network", "proxy", container,
-    "--allow-host", "localhost",
-  ], { stdio: "ignore" });
+  console.log(`Configuring network proxy: allow localhost...`);
+  const proxyCmd = ["sandbox", "network", "proxy", container,
+    "--allow-host", "localhost"];
+  console.log(dim(`  $ docker ${proxyCmd.join(" ")}`));
+  spawnSync("docker", proxyCmd, { stdio: "ignore" });
 
   // 4. Install or update CLI to match plugin version
   const wantVersion = (inst.version || "").replace(/\.\d{12,}$/, "");
-  const have = spawnSync("docker", [
-    "sandbox", "exec", container,
-    "bash", "-c", "jdt --version 2>/dev/null || echo none",
-  ], { encoding: "utf8" });
+  console.log(`Checking jdt CLI version inside sandbox...`);
+  const versionCmd = ["sandbox", "exec", container,
+    "bash", "-c", "jdt --version 2>/dev/null || echo none"];
+  console.log(dim(`  $ docker ${versionCmd.join(" ")}`));
+  const have = spawnSync("docker", versionCmd, { encoding: "utf8" });
   const sandboxVersion = (have.stdout || "").trim();
+  console.log(`  Sandbox CLI: ${sandboxVersion || "not installed"}`);
+
   if (sandboxVersion !== wantVersion) {
     const pkg = wantVersion
       ? `@kaluchi/jdtbridge@${wantVersion}`
       : "@kaluchi/jdtbridge";
-    console.log(dim(sandboxVersion === "none"
-      ? `Installing jdt CLI ${wantVersion}...`
-      : `Updating jdt CLI ${sandboxVersion} → ${wantVersion}...`));
-    spawnSync("docker", [
-      "sandbox", "exec", container,
-      "npm", "install", "-g", pkg,
-    ], { stdio: "inherit" });
+    console.log(`Installing ${pkg}...`);
+    const installCmd = ["sandbox", "exec", container,
+      "npm", "install", "-g", pkg];
+    console.log(dim(`  $ docker ${installCmd.join(" ")}`));
+    spawnSync("docker", installCmd, { stdio: "inherit" });
+  } else {
+    console.log(`  CLI up to date`);
   }
 
   // 5. Write bridge instance file inside sandbox
+  console.log(`Writing bridge instance file...`);
   const instJson = JSON.stringify({
     port: inst.port,
     token: inst.token,
@@ -68,7 +81,9 @@ export async function run({ agent, name, agentArgs, session }) {
     workspace: inst.workspace,
     version: inst.version,
     host: "host.docker.internal",
-  });
+    session: name,
+  }, null, 2);
+  console.log(dim(`  ~/.jdtbridge/instances/bridge.json`));
   spawnSync("docker", [
     "sandbox", "exec", "-i", container,
     "bash", "-c",
@@ -76,10 +91,9 @@ export async function run({ agent, name, agentArgs, session }) {
       + " && cat > ~/.jdtbridge/instances/bridge.json",
   ], { input: instJson });
 
-  console.log(dim(
-    `Ready. Bridge at host.docker.internal:${inst.port}`));
+  console.log(`Ready. Bridge at host.docker.internal:${inst.port}`);
 
-  // 6. Write session tracking file
+  // 7. Write session tracking file
   const sessionFile = join(agentsDir(), `${name}.json`);
   writeFileSync(sessionFile, JSON.stringify({
     name,
@@ -91,12 +105,22 @@ export async function run({ agent, name, agentArgs, session }) {
     workspace: inst.workspace,
   }, null, 2) + "\n");
 
-  // 7. Run — external terminal (Eclipse) or inline (CLI)
+  // 8. Run — external terminal (Eclipse) or inline (CLI)
   if (session) {
     const dockerCmd = ["docker", "sandbox", "run", container,
       ...agentArgs].join(" ");
-    openTerminal(name, dockerCmd);
-    console.log(dim(`Terminal opened for ${agent} (sandbox)`));
+    console.log(`Launching agent...`);
+    console.log(dim(`  $ ${dockerCmd}`));
+    const child = openTerminal(name, dockerCmd);
+    console.log(`Terminal opened for ${agent} (sandbox)`);
+    console.log(dim("Streaming request telemetry...\n"));
+    const bridgeEnv = {
+      JDT_BRIDGE_PORT: String(inst.port),
+      JDT_BRIDGE_TOKEN: inst.token,
+      JDT_BRIDGE_HOST: "127.0.0.1",
+    };
+    await telemetryUntilExit(bridgeEnv, name, child);
+    console.log(dim("\nAgent session ended."));
   } else {
     const child = spawn("docker", [
       "sandbox", "run", container, ...agentArgs,
@@ -118,16 +142,6 @@ export async function run({ agent, name, agentArgs, session }) {
   }
 }
 
-async function bridgeFromDiscovery() {
-  const instances = await discoverInstances();
-  if (instances.length === 0) {
-    console.error(bold(red("No live bridge found.")) +
-      "\nStart Eclipse with the jdtbridge plugin first.");
-    process.exit(1);
-  }
-  return instances[0];
-}
-
 /** Find existing sandbox for this agent. */
 function detectExisting(agent) {
   try {
@@ -144,9 +158,8 @@ function detectExisting(agent) {
 
 /** Create sandbox and return its name. */
 function createSandbox(agent, workspace) {
-  console.log(dim("Creating sandbox..."));
-  spawnSync("docker", [
-    "sandbox", "create", agent, workspace,
-  ], { stdio: "inherit" });
+  const cmd = ["sandbox", "create", agent, workspace];
+  console.log(dim(`  $ docker ${cmd.join(" ")}`));
+  spawnSync("docker", cmd, { stdio: "inherit" });
   return detectExisting(agent);
 }
