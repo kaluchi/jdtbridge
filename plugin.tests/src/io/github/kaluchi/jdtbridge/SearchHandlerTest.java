@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
  */
 public class SearchHandlerTest {
 
+    // Heuristic: last dotted segment starting with lowercase ⇒ package, uppercase ⇒ type
     @Nested
     class IsPackageSearch {
 

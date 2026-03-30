@@ -42,12 +42,13 @@ public class HttpServer {
     private final TestHandler testHandler =
             new TestHandler(testSessionTracker);
     private final ProjectHandler projectInfo = new ProjectHandler();
+    private final RequestTracker requestTracker = new RequestTracker();
     private final ConfigService configService =
             new ConfigService(Activator.getHome());
     private final WelcomeHandler welcome =
             new WelcomeHandler(configService);
     private final ExecutorService executor =
-            Executors.newFixedThreadPool(4, r -> {
+            Executors.newCachedThreadPool(r -> {
                 Thread t = new Thread(r, "jdtbridge-req");
                 t.setDaemon(true);
                 return t;
@@ -90,6 +91,10 @@ public class HttpServer {
 
     public void setToken(String token) {
         this.token = token;
+    }
+
+    public RequestTracker getRequestTracker() {
+        return requestTracker;
     }
 
     public void stop() {
@@ -137,6 +142,7 @@ public class HttpServer {
 
             // Read headers
             String authHeader = null;
+            String sessionHeader = null;
             int contentLength = 0;
             String line;
             while ((line = reader.readLine()) != null
@@ -148,6 +154,9 @@ public class HttpServer {
                         "Content-Length:", 0, 15)) {
                     contentLength = Integer.parseInt(
                             line.substring(15).trim());
+                } else if (line.regionMatches(true, 0,
+                        "X-Bridge-Session:", 0, 17)) {
+                    sessionHeader = line.substring(17).trim();
                 }
             }
 
@@ -205,9 +214,28 @@ public class HttpServer {
                 handleTestStatusStream(socket, params);
                 return;
             }
+            if ("/request-log/stream".equals(path)) {
+                handleRequestLogStream(socket, params);
+                return;
+            }
 
+            // CLI telemetry — fire-and-forget POST with stdout/stderr
+            if ("/telemetry".equals(path) && body != null) {
+                if (sessionHeader != null) {
+                    requestTracker.logTelemetry(sessionHeader, body);
+                }
+                sendResponse(socket, Response.json("{\"ok\":true}"));
+                return;
+            }
+
+            long startNs = System.nanoTime();
             Response resp = dispatch(path, params);
+            long durationMs = (System.nanoTime() - startNs) / 1_000_000;
             sendResponse(socket, resp);
+
+            requestTracker.log(new RequestTracker.RequestLog(
+                    System.currentTimeMillis(), method, path,
+                    sessionHeader, 200, durationMs));
         } catch (Exception e) {
             Log.error("Request error", e);
         }
@@ -256,6 +284,75 @@ public class HttpServer {
         } catch (IOException
                 | ConsoleStreamer.StreamClosedException e) {
             // Client disconnected — normal for Ctrl+C
+        }
+    }
+
+    /**
+     * Streaming request log — writes request log entries as they
+     * arrive, filtered by session ID. Text format, one line per request.
+     */
+    private void handleRequestLogStream(Socket socket,
+            Map<String, String> params) {
+        String session = params.get("session");
+        if (session == null || session.isBlank()) {
+            try { sendError(socket, 400, "Missing session"); }
+            catch (IOException e) { /* ignore */ }
+            return;
+        }
+
+        try {
+            socket.setSoTimeout(0);
+            OutputStream out = socket.getOutputStream();
+            out.write(("HTTP/1.1 200 OK\r\n"
+                    + "Content-Type: text/plain; charset=utf-8\r\n"
+                    + "Connection: close\r\n"
+                    + "Cache-Control: no-cache\r\n\r\n")
+                    .getBytes(StandardCharsets.UTF_8));
+
+            // Replay existing logs
+            for (var log : requestTracker.getSessionLogs(session)) {
+                out.write((log.format() + "\n")
+                        .getBytes(StandardCharsets.UTF_8));
+                out.flush();
+            }
+
+            // Stream new logs + telemetry
+            RequestTracker.Listener listener =
+                    new RequestTracker.Listener() {
+                @Override
+                public void onRequest(RequestTracker.RequestLog log) {
+                    if (session.equals(log.session())) {
+                        writeQuietly(out, log.format() + "\n");
+                    }
+                }
+
+                @Override
+                public void onTelemetry(String sess, String text) {
+                    if (session.equals(sess)) {
+                        writeQuietly(out, text);
+                    }
+                }
+            };
+            requestTracker.addListener(listener);
+            try {
+                // Block until client disconnects
+                while (socket.getInputStream().read() != -1) {
+                    // wait
+                }
+            } finally {
+                requestTracker.removeListener(listener);
+            }
+        } catch (Exception e) {
+            // Client disconnected — normal
+        }
+    }
+
+    private static void writeQuietly(OutputStream out, String text) {
+        try {
+            out.write(text.getBytes(StandardCharsets.UTF_8));
+            out.flush();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 

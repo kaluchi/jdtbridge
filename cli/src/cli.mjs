@@ -66,7 +66,10 @@ import {
 import { setup, help as setupHelp } from "./commands/setup.mjs";
 import { isConnectionError } from "./client.mjs";
 import { bold, red, dim } from "./color.mjs";
+import { installTelemetry } from "./telemetry.mjs";
 import { createRequire } from "node:module";
+
+installTelemetry();
 
 const { version } = createRequire(import.meta.url)("../package.json");
 

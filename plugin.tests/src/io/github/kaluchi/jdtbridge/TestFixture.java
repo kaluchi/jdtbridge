@@ -16,14 +16,40 @@ import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.JavaCore;
 
 /**
- * Creates a test Java project with known classes for integration tests.
+ * Creates an in-memory Java project ({@value #PROJECT_NAME}) via JDT API
+ * for integration tests. The project lives in the Eclipse workspace only —
+ * no files on disk.
  *
  * <pre>
- * test.model.Animal      — interface with name()
- * test.model.Dog          — implements Animal, has bark()
- * test.model.Cat          — implements Animal
- * test.service.AnimalService — uses Dog.bark(), Animal.name()
- * test.broken.BrokenClass — intentional compilation error
+ * test.model
+ *   Animal               — interface with name()
+ *   Dog                  — implements Animal, has bark(), field age
+ *   Cat                  — implements Animal
+ *
+ * test.service
+ *   AnimalService        — uses Dog.bark(), Animal.name()
+ *   EnrichedRefService   — exercises annotations, static fields, inner classes
+ *   GenericService&lt;T&gt;    — bounded generic (T extends Animal)
+ *   CallerService        — delegates to AnimalService (caller-chain tests)
+ *   GenericCallerService — calls Repository with generic params
+ *   AnonymousCallerService — anonymous Animal impl
+ *
+ * test.edge
+ *   Calculator           — overloaded add() (int, double, 3-arg)
+ *   Outer / Inner / StaticNested — inner class variants
+ *   Color                — enum with method
+ *   Marker               — runtime annotation
+ *   AbstractPet / Parrot — abstract hierarchy
+ *   Repository           — generic erasure (List, Map signatures)
+ *   SimpleTest           — JUnit 5 test class (for test-runner tests)
+ *
+ * test.broken
+ *   BrokenClass          — intentional compile error (UnknownType)
+ *
+ * test.refactor
+ *   RenameTarget / RenameCaller — rename refactoring targets
+ *   FormatTarget         — intentionally messy formatting
+ *   ImportTarget         — unused imports (organize-imports tests)
  * </pre>
  */
 class TestFixture {

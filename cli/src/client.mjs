@@ -16,6 +16,22 @@ let _instance;
  */
 export async function connect(workspaceHint) {
   if (_instance) return _instance;
+
+  // Pinned connection — skip discovery entirely
+  const envPort = process.env.JDT_BRIDGE_PORT;
+  const envToken = process.env.JDT_BRIDGE_TOKEN;
+  if (envPort && envToken) {
+    _instance = {
+      port: Number(envPort),
+      token: envToken,
+      host: process.env.JDT_BRIDGE_HOST || "127.0.0.1",
+      workspace: process.env.JDT_BRIDGE_WORKSPACE || "",
+      pid: 0,
+      file: "",
+    };
+    return _instance;
+  }
+
   _instance = await findInstance(workspaceHint);
   if (!_instance) {
     console.error(
@@ -56,9 +72,15 @@ export function resetClient() {
 
 function authHeaders() {
   const inst = _instance;
-  return inst && inst.token
-    ? { Authorization: `Bearer ${inst.token}` }
-    : {};
+  const headers = {};
+  if (inst && inst.token) {
+    headers.Authorization = `Bearer ${inst.token}`;
+  }
+  const session = process.env.JDT_BRIDGE_SESSION;
+  if (session) {
+    headers["X-Bridge-Session"] = session;
+  }
+  return headers;
 }
 
 function requestOpts(inst, path, method, timeoutMs) {
