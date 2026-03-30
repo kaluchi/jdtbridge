@@ -30,6 +30,13 @@ export function agentsDir() {
   return dir;
 }
 
+/** Directory where Eclipse writes launch session configs. */
+export function sessionsDir() {
+  const dir = join(getHome(), "sessions");
+  ensureDir(dir);
+  return dir;
+}
+
 /** Read config.json from JDTBRIDGE_HOME. Returns {} if missing. */
 export function readConfig() {
   const configPath = join(getHome(), "config.json");

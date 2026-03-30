@@ -9,6 +9,7 @@ Bundle-RequiredExecutionEnvironment: JavaSE-21
 Automatic-Module-Name: io.github.kaluchi.jdtbridge.ui
 Require-Bundle: org.eclipse.core.runtime,
  org.eclipse.core.resources,
+ org.eclipse.core.variables,
  org.eclipse.ui,
  org.eclipse.ui.ide,
  org.eclipse.ui.console,

@@ -24,6 +24,9 @@
       <command id="io.github.kaluchi.jdtbridge.ui.commands.openTerminal"
                name="Open Terminal"
                categoryId="io.github.kaluchi.jdtbridge.ui.category"/>
+      <command id="io.github.kaluchi.jdtbridge.ui.commands.newAgent"
+               name="New Agent..."
+               categoryId="io.github.kaluchi.jdtbridge.ui.category"/>
    </extension>
 
    <!-- Handlers -->
@@ -32,6 +35,8 @@
                class="io.github.kaluchi.jdtbridge.ui.commands.HealthCheckHandler"/>
       <handler commandId="io.github.kaluchi.jdtbridge.ui.commands.openTerminal"
                class="io.github.kaluchi.jdtbridge.ui.commands.OpenTerminalHandler"/>
+      <handler commandId="io.github.kaluchi.jdtbridge.ui.commands.newAgent"
+               class="io.github.kaluchi.jdtbridge.ui.commands.NewAgentHandler"/>
    </extension>
 
    <!-- Main menu -->
@@ -41,6 +46,9 @@
                label="JDT Bridge">
             <command commandId="io.github.kaluchi.jdtbridge.ui.commands.healthCheck"
                      label="Health Check"/>
+            <separator name="agents" visible="true"/>
+            <command commandId="io.github.kaluchi.jdtbridge.ui.commands.newAgent"
+                     label="New Agent..."/>
             <separator name="terminal" visible="true"/>
             <command commandId="io.github.kaluchi.jdtbridge.ui.commands.openTerminal"
                      label="Open Terminal"/>

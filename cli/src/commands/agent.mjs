@@ -5,11 +5,11 @@
  * the specifics of spawning and managing agent processes.
  */
 
-import { readdirSync, readFileSync, unlinkSync } from "node:fs";
+import { readdirSync, readFileSync, unlinkSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
 import treeKill from "tree-kill";
-import { agentsDir } from "../home.mjs";
+import { agentsDir, sessionsDir } from "../home.mjs";
 import { bold, dim, red, green } from "../color.mjs";
 import { parseFlags } from "../args.mjs";
 
@@ -27,14 +27,21 @@ export async function agentRun(args) {
   const agentArgs = dashIdx >= 0 ? args.slice(dashIdx + 1) : [];
 
   const flags = parseFlags(mainArgs);
-  const positional = mainArgs.filter((a) => !a.startsWith("--"));
 
+  // Eclipse path: --session <id> → read all config from session file
+  if (flags.session) {
+    return runFromSession(flags.session, agentArgs);
+  }
+
+  // CLI path: positional args
+  const positional = mainArgs.filter((a) => !a.startsWith("--"));
   const providerName = positional[0];
   const agent = positional[1];
 
   if (!providerName || !agent) {
     console.error(bold(red(
       "Usage: jdt agent run <provider> <agent> [--name <id>] [-- agent-args...]")));
+    console.error(`       jdt agent run --session <id>`);
     console.error(`\nAvailable providers: ${Object.keys(providers).join(", ")}`);
     process.exit(1);
   }
@@ -50,6 +57,41 @@ export async function agentRun(args) {
 
   const providerModule = await providers[providerName]();
   await providerModule.run({ agent, name, agentArgs });
+}
+
+/**
+ * Bootstrap from Eclipse session file.
+ * Eclipse writes ~/.jdtbridge/sessions/<id>.json with all config,
+ * then calls `jdt agent run --session <id>`.
+ */
+async function runFromSession(sessionId, agentArgs) {
+  const sessionFile = join(sessionsDir(), `${sessionId}.json`);
+  if (!existsSync(sessionFile)) {
+    console.error(bold(red(`Session not found: ${sessionId}`)));
+    process.exit(1);
+  }
+
+  let config;
+  try {
+    config = JSON.parse(readFileSync(sessionFile, "utf8"));
+  } catch (e) {
+    console.error(bold(red(`Failed to read session: ${e.message}`)));
+    process.exit(1);
+  }
+
+  const providerName = config.provider || "local";
+  if (!providers[providerName]) {
+    console.error(bold(red(`Unknown provider in session: ${providerName}`)));
+    process.exit(1);
+  }
+
+  const providerModule = await providers[providerName]();
+  await providerModule.run({
+    agent: config.agent || "claude",
+    name: sessionId,
+    agentArgs,
+    session: config,
+  });
 }
 
 // ---- list ----
@@ -241,23 +283,25 @@ export function killProcessTree(pid) {
 
 export const agentRunHelp = `Launch an agent session via a provider.
 
-Usage:  jdt agent run <provider> <agent> [--name <id>] [-- agent-args...]
+Usage:  jdt agent run <provider> <agent> [options] [-- agent-args...]
 
 Providers:
-  local      Spawn agent on host with JDT_BRIDGE_* env vars
+  local      Open system terminal with bridge env vars
   sandbox    Run in Docker sandbox with bridge connectivity
 
 Options:
-  --name <id>    Session ID (default: <provider>-<agent>-<timestamp>)
+  --name <id>      Session ID (default: <provider>-<agent>-<timestamp>)
+  --port <port>    Bridge port (skips discovery when set with --token)
+  --token <token>  Bridge auth token
 
-The agent receives bridge connection coordinates via environment
-variables (JDT_BRIDGE_PORT, JDT_BRIDGE_TOKEN, etc.) so jdt CLI
-commands inside the agent skip discovery and connect directly.
+When --port and --token are provided, the agent is pinned to that
+bridge instance — no discovery, no collision with other instances.
+Eclipse plugin passes these automatically.
 
 Examples:
   jdt agent run local claude
   jdt agent run sandbox claude --name my-fix
-  jdt agent run local claude -- --continue
+  jdt agent run local claude --port 63741 --token abc123
 `;
 
 export const agentStopHelp = `Stop a running agent session.

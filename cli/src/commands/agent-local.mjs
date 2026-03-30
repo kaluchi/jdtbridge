@@ -1,21 +1,66 @@
 /**
- * Local provider — spawn agent on host with bridge env vars.
+ * Local provider — open system terminal with bridge env vars.
  *
- * The agent runs in the foreground (attached to the current terminal).
- * Bridge connection coordinates are injected as environment variables
- * so jdt CLI inside the agent skips discovery.
+ * Opens an external terminal window with JDT_BRIDGE_* environment
+ * variables and runs the agent command inside it.
+ *
+ * Two bootstrap paths:
+ * 1. Eclipse: session config has port/token/workingDir — no discovery
+ * 2. CLI: discover bridge from instance files
  */
 
 import { spawn } from "node:child_process";
-import { writeFileSync, unlinkSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { discoverInstances } from "../discovery.mjs";
 import { agentsDir } from "../home.mjs";
-import { killProcessTree } from "./agent.mjs";
 import { bold, red, dim } from "../color.mjs";
 
-export async function run({ agent, name, agentArgs }) {
-  // 1. Find bridge
+const IS_WINDOWS = process.platform === "win32";
+
+export async function run({ agent, name, agentArgs, session }) {
+  // 1. Resolve bridge connection
+  const bridgeEnv = session
+    ? bridgeFromSession(session)
+    : await bridgeFromDiscovery();
+
+  bridgeEnv.JDT_BRIDGE_SESSION = name;
+
+  const workDir = session?.workingDir || null;
+
+  console.log(dim(`Bridge: port ${bridgeEnv.JDT_BRIDGE_PORT}`));
+  console.log(dim(`Session: ${name}`));
+  if (workDir) console.log(dim(`Working dir: ${workDir}`));
+
+  // 2. Open system terminal
+  const agentCmd = [agent, ...agentArgs].join(" ");
+  const child = openTerminal(name, agentCmd, bridgeEnv, workDir);
+
+  // 3. Write agent tracking file
+  const agentFile = join(agentsDir(), `${name}.json`);
+  writeFileSync(agentFile, JSON.stringify({
+    name,
+    provider: "local",
+    agent,
+    pid: child.pid,
+    startedAt: Date.now(),
+    bridgePort: Number(bridgeEnv.JDT_BRIDGE_PORT),
+    workingDir: workDir || "",
+  }, null, 2) + "\n");
+
+  child.unref();
+  console.log(dim(`Terminal opened for ${agent}`));
+}
+
+function bridgeFromSession(session) {
+  return {
+    JDT_BRIDGE_PORT: String(session.bridgePort),
+    JDT_BRIDGE_TOKEN: session.bridgeToken,
+    JDT_BRIDGE_HOST: session.bridgeHost || "127.0.0.1",
+  };
+}
+
+async function bridgeFromDiscovery() {
   const instances = await discoverInstances();
   if (instances.length === 0) {
     console.error(bold(red("No live bridge found.")) +
@@ -23,57 +68,34 @@ export async function run({ agent, name, agentArgs }) {
     process.exit(1);
   }
   const inst = instances[0];
-
-  // 2. Build env vars
-  const env = {
-    ...process.env,
+  return {
     JDT_BRIDGE_PORT: String(inst.port),
     JDT_BRIDGE_TOKEN: inst.token,
-    JDT_BRIDGE_HOST: "127.0.0.1",
-    JDT_BRIDGE_WORKSPACE: inst.workspace,
-    JDT_BRIDGE_SESSION: name,
+    JDT_BRIDGE_HOST: inst.host || "127.0.0.1",
   };
+}
 
-  console.log(dim(`Bridge: port ${inst.port}`));
-  console.log(dim(`Session: ${name}`));
+function openTerminal(title, agentCmd, bridgeEnv, workDir) {
+  if (IS_WINDOWS) {
+    const envSetup = Object.entries(bridgeEnv)
+      .map(([k, v]) => `set "${k}=${v}"`)
+      .join(" && ");
+    const cdCmd = workDir ? `cd /d "${workDir}" && ` : "";
+    const fullCmd = `${envSetup} && ${cdCmd}${agentCmd}`;
 
-  // 3. Write session file
-  const sessionFile = join(agentsDir(), `${name}.json`);
-  const session = {
-    name,
-    provider: "local",
-    agent,
-    pid: null, // set after spawn
-    startedAt: Date.now(),
-    bridgePort: inst.port,
-    workspace: inst.workspace,
-  };
-
-  // 4. Spawn agent
-  const child = spawn(agent, agentArgs, {
-    stdio: "inherit",
-    env,
-    shell: true,
-  });
-
-  session.pid = child.pid;
-  writeFileSync(sessionFile, JSON.stringify(session, null, 2) + "\n");
-
-  // 5. Cleanup on exit
-  function cleanup() {
-    try { unlinkSync(sessionFile); } catch { /* ignore */ }
+    return spawn("wt.exe", [
+      "new-tab", "--title", title,
+      "cmd", "/K", fullCmd,
+    ], { stdio: "ignore", detached: true });
   }
 
-  child.on("close", (code) => {
-    cleanup();
-    process.exit(code || 0);
-  });
+  const envSetup = Object.entries(bridgeEnv)
+    .map(([k, v]) => `export ${k}="${v}"`)
+    .join("; ");
+  const cdCmd = workDir ? `cd "${workDir}"; ` : "";
+  const fullCmd = `${envSetup}; ${cdCmd}${agentCmd}; exec bash`;
 
-  process.on("SIGINT", () => {
-    killProcessTree(child.pid);
-  });
-  process.on("SIGTERM", () => {
-    killProcessTree(child.pid);
-    cleanup();
-  });
+  return spawn("x-terminal-emulator", [
+    "-e", `bash -c '${fullCmd}'`,
+  ], { stdio: "ignore", detached: true });
 }
