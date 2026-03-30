@@ -4,6 +4,10 @@
  * Wraps `docker sandbox run` — creates sandbox if needed,
  * configures network policy, installs CLI, injects bridge
  * instance file, then runs the agent.
+ *
+ * Two bootstrap paths:
+ * 1. Eclipse (session): bridge from session config, opens external terminal
+ * 2. CLI: bridge from discovery, runs inline (attached to current terminal)
  */
 
 import { spawn, execSync, spawnSync } from "node:child_process";
@@ -11,17 +15,16 @@ import { writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { discoverInstances } from "../discovery.mjs";
 import { agentsDir } from "../home.mjs";
+import { openTerminal } from "../terminal.mjs";
 import { bold, red, dim } from "../color.mjs";
 
-export async function run({ agent, name, agentArgs }) {
-  // 1. Find bridge
-  const instances = await discoverInstances();
-  if (instances.length === 0) {
-    console.error(bold(red("No live bridge found.")) +
-      "\nStart Eclipse with the jdtbridge plugin first.");
-    process.exit(1);
-  }
-  const inst = instances[0];
+export async function run({ agent, name, agentArgs, session }) {
+  // 1. Resolve bridge
+  const inst = session
+    ? { port: session.bridgePort, token: session.bridgeToken,
+        version: "", workspace: session.workingDir || "" }
+    : await bridgeFromDiscovery();
+
   console.log(dim(`Bridge: port ${inst.port}`));
 
   // 2. Ensure sandbox exists
@@ -75,9 +78,9 @@ export async function run({ agent, name, agentArgs }) {
   console.log(dim(
     `Ready. Bridge at host.docker.internal:${inst.port}`));
 
-  // 6. Write session file
+  // 6. Write session tracking file
   const sessionFile = join(agentsDir(), `${name}.json`);
-  const session = {
+  writeFileSync(sessionFile, JSON.stringify({
     name,
     provider: "sandbox",
     agent,
@@ -85,27 +88,43 @@ export async function run({ agent, name, agentArgs }) {
     startedAt: Date.now(),
     bridgePort: inst.port,
     workspace: inst.workspace,
-  };
-  writeFileSync(sessionFile, JSON.stringify(session, null, 2) + "\n");
+  }, null, 2) + "\n");
 
-  // 7. Run
-  const child = spawn("docker", [
-    "sandbox", "run", container, ...agentArgs,
-  ], { stdio: "inherit" });
+  // 7. Run — external terminal (Eclipse) or inline (CLI)
+  if (session) {
+    const dockerCmd = ["docker", "sandbox", "run", container,
+      ...agentArgs].join(" ");
+    openTerminal(name, dockerCmd);
+    console.log(dim(`Terminal opened for ${agent} (sandbox)`));
+  } else {
+    const child = spawn("docker", [
+      "sandbox", "run", container, ...agentArgs,
+    ], { stdio: "inherit" });
 
-  function cleanup() {
-    try { unlinkSync(sessionFile); } catch { /* ignore */ }
+    function cleanup() {
+      try { unlinkSync(sessionFile); } catch { /* ignore */ }
+    }
+
+    child.on("close", (code) => {
+      cleanup();
+      process.exit(code || 0);
+    });
+    process.on("SIGINT", () => child.kill("SIGINT"));
+    process.on("SIGTERM", () => {
+      child.kill("SIGTERM");
+      cleanup();
+    });
   }
+}
 
-  child.on("close", (code) => {
-    cleanup();
-    process.exit(code || 0);
-  });
-  process.on("SIGINT", () => child.kill("SIGINT"));
-  process.on("SIGTERM", () => {
-    child.kill("SIGTERM");
-    cleanup();
-  });
+async function bridgeFromDiscovery() {
+  const instances = await discoverInstances();
+  if (instances.length === 0) {
+    console.error(bold(red("No live bridge found.")) +
+      "\nStart Eclipse with the jdtbridge plugin first.");
+    process.exit(1);
+  }
+  return instances[0];
 }
 
 /** Find existing sandbox for this agent. */

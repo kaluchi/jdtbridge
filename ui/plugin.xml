@@ -44,14 +44,16 @@
       <menuContribution locationURI="menu:org.eclipse.ui.main.menu?after=additions">
          <menu id="io.github.kaluchi.jdtbridge.ui.menu"
                label="JDT Bridge">
-            <command commandId="io.github.kaluchi.jdtbridge.ui.commands.healthCheck"
-                     label="Health Check"
-                     icon="icons/health-check.svg"/>
-            <separator name="agents" visible="true"/>
             <command commandId="io.github.kaluchi.jdtbridge.ui.commands.newAgent"
                      label="New Agent..."
                      icon="icons/new-agent.svg"/>
-            <separator name="terminal" visible="true"/>
+            <separator name="configs" visible="true"/>
+            <dynamic id="io.github.kaluchi.jdtbridge.ui.menu.agentConfigs"
+                     class="io.github.kaluchi.jdtbridge.ui.menus.AgentConfigsContribution"/>
+            <separator name="tools" visible="true"/>
+            <command commandId="io.github.kaluchi.jdtbridge.ui.commands.healthCheck"
+                     label="Health Check"
+                     icon="icons/health-check.svg"/>
             <command commandId="io.github.kaluchi.jdtbridge.ui.commands.openTerminal"
                      label="Open Terminal"
                      icon="icons/terminal.svg"/>

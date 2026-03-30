@@ -9,14 +9,12 @@
  * 2. CLI: discover bridge from instance files
  */
 
-import { spawn } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { discoverInstances } from "../discovery.mjs";
 import { agentsDir } from "../home.mjs";
+import { openTerminal } from "../terminal.mjs";
 import { bold, red, dim } from "../color.mjs";
-
-const IS_WINDOWS = process.platform === "win32";
 
 export async function run({ agent, name, agentArgs, session }) {
   // 1. Resolve bridge connection
@@ -34,7 +32,7 @@ export async function run({ agent, name, agentArgs, session }) {
 
   // 2. Open system terminal
   const agentCmd = [agent, ...agentArgs].join(" ");
-  const child = openTerminal(name, agentCmd, bridgeEnv, workDir);
+  const child = openAgentTerminal(name, agentCmd, bridgeEnv, workDir);
 
   // 3. Write agent tracking file
   const agentFile = join(agentsDir(), `${name}.json`);
@@ -48,7 +46,6 @@ export async function run({ agent, name, agentArgs, session }) {
     workingDir: workDir || "",
   }, null, 2) + "\n");
 
-  child.unref();
   console.log(dim(`Terminal opened for ${agent}`));
 }
 
@@ -75,27 +72,18 @@ async function bridgeFromDiscovery() {
   };
 }
 
-function openTerminal(title, agentCmd, bridgeEnv, workDir) {
-  if (IS_WINDOWS) {
-    const envSetup = Object.entries(bridgeEnv)
-      .map(([k, v]) => `set "${k}=${v}"`)
-      .join(" && ");
-    const cdCmd = workDir ? `cd /d "${workDir}" && ` : "";
-    const fullCmd = `${envSetup} && ${cdCmd}${agentCmd}`;
+function openAgentTerminal(title, agentCmd, bridgeEnv, workDir) {
+  const IS_WINDOWS = process.platform === "win32";
+  const envParts = Object.entries(bridgeEnv).map(([k, v]) =>
+    IS_WINDOWS ? `set "${k}=${v}"` : `export ${k}="${v}"`);
+  const sep = IS_WINDOWS ? " && " : "; ";
+  const cdCmd = workDir
+    ? (IS_WINDOWS ? `cd /d "${workDir}"` : `cd "${workDir}"`)
+    : null;
 
-    return spawn("wt.exe", [
-      "new-tab", "--title", title,
-      "cmd", "/K", fullCmd,
-    ], { stdio: "ignore", detached: true });
-  }
+  const parts = [...envParts];
+  if (cdCmd) parts.push(cdCmd);
+  parts.push(agentCmd);
 
-  const envSetup = Object.entries(bridgeEnv)
-    .map(([k, v]) => `export ${k}="${v}"`)
-    .join("; ");
-  const cdCmd = workDir ? `cd "${workDir}"; ` : "";
-  const fullCmd = `${envSetup}; ${cdCmd}${agentCmd}; exec bash`;
-
-  return spawn("x-terminal-emulator", [
-    "-e", `bash -c '${fullCmd}'`,
-  ], { stdio: "ignore", detached: true });
+  return openTerminal(title, parts.join(sep));
 }
