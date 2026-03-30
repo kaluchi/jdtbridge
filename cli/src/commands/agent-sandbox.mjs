@@ -71,20 +71,31 @@ export async function run({ agent, name, agentArgs, session }) {
       console.log(`Packing CLI from ${repoRoot}...`);
       console.log(dim(`  repo outside sandbox workspace — snapshot install (no live sync)`));
       const cliDir = join(repoRoot, "cli");
+      console.log(dim(`  $ npm pack --json  (in ${cliDir})`));
       const packResult = spawnSync("npm", ["pack", "--json"], {
         cwd: cliDir, encoding: "utf8",
       });
+      if (packResult.status !== 0) {
+        console.error(`  npm pack failed: ${(packResult.stderr || "").trim()}`);
+        return;
+      }
       const filename = JSON.parse(packResult.stdout)[0].filename;
       const tarball = join(cliDir, filename);
+      console.log(dim(`  ${filename} → sandbox:/tmp/jdt.tgz`));
       spawnSync("docker", [
         "sandbox", "exec", "-i", container,
         "bash", "-c", "cat > /tmp/jdt.tgz",
       ], { input: readFileSync(tarball) });
+      console.log(dim(`  $ docker sandbox exec ${container} npm install -g /tmp/jdt.tgz`));
       spawnSync("docker", [
         "sandbox", "exec", container,
         "npm", "install", "-g", "/tmp/jdt.tgz",
       ], { stdio: "inherit" });
       unlinkSync(tarball);
+      spawnSync("docker", [
+        "sandbox", "exec", container,
+        "bash", "-c", "rm -f /tmp/jdt.tgz",
+      ], { stdio: "ignore" });
     }
   } else {
     // No local repo — install from npm registry
