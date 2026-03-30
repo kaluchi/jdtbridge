@@ -8,6 +8,7 @@
 import { readdirSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
+import treeKill from "tree-kill";
 import { agentsDir } from "../home.mjs";
 import { bold, dim, red, green } from "../color.mjs";
 import { parseFlags } from "../args.mjs";
@@ -104,9 +105,7 @@ export async function agentStop(args) {
         { stdio: "ignore" });
     } catch { /* may already be stopped */ }
   } else if (sess.pid) {
-    try {
-      process.kill(sess.pid, "SIGTERM");
-    } catch { /* may already be dead */ }
+    killProcessTree(sess.pid);
   }
 
   try { unlinkSync(sess._file); } catch { /* ignore */ }
@@ -226,6 +225,16 @@ function isAlive(sess) {
     }
   }
   return false;
+}
+
+/**
+ * Kill a process and all its descendants.
+ * Uses tree-kill for cross-platform process tree termination.
+ */
+export function killProcessTree(pid) {
+  try {
+    treeKill(pid);
+  } catch { /* process may already be dead */ }
 }
 
 // ---- help strings ----

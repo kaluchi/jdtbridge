@@ -11,6 +11,7 @@ import { writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { discoverInstances } from "../discovery.mjs";
 import { agentsDir } from "../home.mjs";
+import { killProcessTree } from "./agent.mjs";
 import { bold, red, dim } from "../color.mjs";
 
 export async function run({ agent, name, agentArgs }) {
@@ -69,10 +70,10 @@ export async function run({ agent, name, agentArgs }) {
   });
 
   process.on("SIGINT", () => {
-    child.kill("SIGINT");
+    killProcessTree(child.pid);
   });
   process.on("SIGTERM", () => {
-    child.kill("SIGTERM");
+    killProcessTree(child.pid);
     cleanup();
   });
 }
