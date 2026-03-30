@@ -119,7 +119,36 @@ describe("agent commands", () => {
   describe("stop", () => {
     it("errors when no sessions exist", async () => {
       await expect(agentStop([])).rejects.toThrow("exit(1)");
-      expect(io.errors.some((l) => l.includes("No agent sessions"))).toBe(true);
+      expect(io.errors.some((l) => l.includes("No agent sessions"))).toBe(
+        true,
+      );
+    });
+
+    it("shows choices when multiple sessions match", async () => {
+      writeSession("local-claude-111", {
+        provider: "local",
+        agent: "claude",
+        pid: 99999999,
+        startedAt: Date.now(),
+      });
+      writeSession("sandbox-claude-222", {
+        provider: "sandbox",
+        agent: "claude",
+        pid: 99999998,
+        startedAt: Date.now(),
+      });
+      await expect(agentStop(["claude"])).rejects.toThrow("exit(1)");
+      expect(
+        io.errors.some((l) => l.includes("Multiple sessions")),
+      ).toBe(true);
+      expect(
+        io.errors.some((l) => l.includes("jdt agent stop local-claude-111")),
+      ).toBe(true);
+      expect(
+        io.errors.some((l) =>
+          l.includes("jdt agent stop sandbox-claude-222"),
+        ),
+      ).toBe(true);
     });
 
     it("errors when session not found", async () => {
