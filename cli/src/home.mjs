@@ -23,6 +23,13 @@ export function instancesDir() {
   return dir;
 }
 
+/** Directory where agent session files are stored. */
+export function agentsDir() {
+  const dir = join(getHome(), "agents");
+  ensureDir(dir);
+  return dir;
+}
+
 /** Read config.json from JDTBRIDGE_HOME. Returns {} if missing. */
 export function readConfig() {
   const configPath = join(getHome(), "config.json");
