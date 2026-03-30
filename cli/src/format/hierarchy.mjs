@@ -1,3 +1,5 @@
+import { toSandboxPath } from "../paths.mjs";
+
 const TYPE_KIND_BADGE = {
   class: "[C]",
   interface: "[I]",
@@ -16,7 +18,7 @@ export function formatHierEntry(arrow, s) {
   }
   const lines = [line];
   if (s.file) {
-    let loc = s.file;
+    let loc = toSandboxPath(s.file);
     if (s.line) {
       loc += `:${s.line}`;
       if (s.endLine && s.endLine !== s.line) loc += `-${s.endLine}`;

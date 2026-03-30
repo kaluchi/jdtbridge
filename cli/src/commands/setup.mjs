@@ -90,7 +90,7 @@ function showPrereqs() {
 
 // ---- plugin source ----
 
-function findRepoRoot() {
+export function findRepoRoot() {
   // cli/src/commands/setup.mjs -> 3 levels up = repo root
   const candidate = resolve(__dirname, "..", "..", "..");
   if (

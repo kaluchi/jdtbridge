@@ -10,12 +10,13 @@
  */
 
 import { spawn, execSync, spawnSync } from "node:child_process";
-import { writeFileSync, unlinkSync } from "node:fs";
+import { writeFileSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { agentsDir } from "../home.mjs";
 import { openTerminal } from "../terminal.mjs";
 import { telemetryUntilExit } from "../telemetry.mjs";
 import { resolveBridge, killProcessTree } from "./agent.mjs";
+import { findRepoRoot } from "./setup.mjs";
 import { dim } from "../color.mjs";
 
 export async function run({ agent, name, agentArgs, session }) {
@@ -37,7 +38,7 @@ export async function run({ agent, name, agentArgs, session }) {
     console.log(`Sandbox: ${container} (existing)`);
   } else {
     console.log(`Creating sandbox for ${agent}...`);
-    container = createSandbox(agent, ".");
+    container = createSandbox(agent, inst.workspace || ".");
     console.log(`Sandbox: ${container} (created)`);
   }
   console.log(`Session: ${name}`);
@@ -49,27 +50,64 @@ export async function run({ agent, name, agentArgs, session }) {
   console.log(dim(`  $ docker ${proxyCmd.join(" ")}`));
   spawnSync("docker", proxyCmd, { stdio: "ignore" });
 
-  // 4. Install or update CLI to match plugin version
-  const wantVersion = (inst.version || "").replace(/\.\d{12,}$/, "");
-  console.log(`Checking jdt CLI version inside sandbox...`);
-  const versionCmd = ["sandbox", "exec", container,
-    "bash", "-c", "jdt --version 2>/dev/null || echo none"];
-  console.log(dim(`  $ docker ${versionCmd.join(" ")}`));
-  const have = spawnSync("docker", versionCmd, { encoding: "utf8" });
-  const sandboxVersion = (have.stdout || "").trim();
-  console.log(`  Sandbox CLI: ${sandboxVersion || "not installed"}`);
+  // 4. Install or update CLI in sandbox
+  const repoRoot = findRepoRoot();
 
-  if (sandboxVersion !== wantVersion) {
-    const pkg = wantVersion
-      ? `@kaluchi/jdtbridge@${wantVersion}`
-      : "@kaluchi/jdtbridge";
-    console.log(`Installing ${pkg}...`);
-    const installCmd = ["sandbox", "exec", container,
-      "npm", "install", "-g", pkg];
-    console.log(dim(`  $ docker ${installCmd.join(" ")}`));
-    spawnSync("docker", installCmd, { stdio: "inherit" });
+  if (repoRoot) {
+    // Host has npm link — try live sync, fall back to tarball
+    const sandboxCliPath = hostToSandboxPath(join(repoRoot, "cli"));
+    const checkCmd = ["sandbox", "exec", container,
+      "bash", "-c", `test -f "${sandboxCliPath}/package.json" && echo visible || echo hidden`];
+    const visibility = spawnSync("docker", checkCmd, { encoding: "utf8" });
+    const isVisible = (visibility.stdout || "").trim() === "visible";
+
+    if (isVisible) {
+      console.log(`Linking CLI from ${repoRoot} (live sync)...`);
+      const linkCmd = ["sandbox", "exec", container,
+        "bash", "-c", `cd "${sandboxCliPath}" && npm link 2>&1`];
+      console.log(dim(`  $ docker ${linkCmd.join(" ")}`));
+      spawnSync("docker", linkCmd, { stdio: "inherit" });
+    } else {
+      console.log(`Packing CLI from ${repoRoot}...`);
+      console.log(dim(`  repo outside sandbox workspace — snapshot install (no live sync)`));
+      const cliDir = join(repoRoot, "cli");
+      const packResult = spawnSync("npm", ["pack", "--json"], {
+        cwd: cliDir, encoding: "utf8",
+      });
+      const filename = JSON.parse(packResult.stdout)[0].filename;
+      const tarball = join(cliDir, filename);
+      spawnSync("docker", [
+        "sandbox", "exec", "-i", container,
+        "bash", "-c", "cat > /tmp/jdt.tgz",
+      ], { input: readFileSync(tarball) });
+      spawnSync("docker", [
+        "sandbox", "exec", container,
+        "npm", "install", "-g", "/tmp/jdt.tgz",
+      ], { stdio: "inherit" });
+      unlinkSync(tarball);
+    }
   } else {
-    console.log(`  CLI up to date`);
+    // No local repo — install from npm registry
+    console.log(`Checking jdt CLI version inside sandbox...`);
+    const versionCmd = ["sandbox", "exec", container,
+      "bash", "-c", "jdt --version 2>/dev/null || echo none"];
+    console.log(dim(`  $ docker ${versionCmd.join(" ")}`));
+    const have = spawnSync("docker", versionCmd, { encoding: "utf8" });
+    const sandboxVersion = (have.stdout || "").trim();
+    console.log(`  Sandbox CLI: ${sandboxVersion || "not installed"}`);
+    const wantVersion = (inst.version || "").replace(/\.\d{12,}$/, "");
+    if (sandboxVersion !== wantVersion) {
+      const pkg = wantVersion
+        ? `@kaluchi/jdtbridge@${wantVersion}`
+        : "@kaluchi/jdtbridge";
+      console.log(`Installing ${pkg}...`);
+      const installCmd = ["sandbox", "exec", container,
+        "npm", "install", "-g", pkg];
+      console.log(dim(`  $ docker ${installCmd.join(" ")}`));
+      spawnSync("docker", installCmd, { stdio: "inherit" });
+    } else {
+      console.log(`  CLI up to date`);
+    }
   }
 
   // 5. Write bridge instance file inside sandbox
@@ -154,6 +192,13 @@ function detectExisting(agent) {
     }
   } catch {}
   return null;
+}
+
+/** Convert Windows host path to Docker sandbox Linux path. */
+function hostToSandboxPath(p) {
+  const m = /^([A-Za-z]):[/\\]/.exec(p);
+  if (m) return "/" + m[1].toLowerCase() + p.slice(2).replace(/\\/g, "/");
+  return p.replace(/\\/g, "/");
 }
 
 /** Create sandbox and return its name. */

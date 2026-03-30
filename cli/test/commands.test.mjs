@@ -43,6 +43,7 @@ describe("commands (integration)", () => {
   afterEach(async () => {
     io.restore();
     if (server) await stopServer(server);
+    vi.doUnmock("../src/paths.mjs");
     vi.resetModules();
   });
 
@@ -214,6 +215,22 @@ describe("commands (integration)", () => {
     expect(io.logs[1]).toBe("D:/projects/src/Bar.java");
   });
 
+  it("editors converts paths in sandbox (Linux)", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify([
+        { file: "D:/projects/src/Foo.java" },
+      ]));
+    });
+    vi.doMock("../src/paths.mjs", async (importOriginal) => {
+      const orig = await importOriginal();
+      return { ...orig, toSandboxPath: (p) => p && /^[A-Z]:[/\\]/.test(p) ? "/" + p[0].toLowerCase() + p.slice(2).replace(/\\/g, "/") : p };
+    });
+    const { editors } = await import("../src/commands/editor.mjs");
+    await editors();
+    expect(io.logs[0]).toBe("/d/projects/src/Foo.java");
+  });
+
   it("editors shows empty message", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
@@ -283,6 +300,27 @@ describe("commands (integration)", () => {
     expect(out).toContain("[C] com.example.Foo");
     expect(out).toContain("D:/project/src/Foo.java:5-15");
     expect(out).toContain("public class Foo");
+  });
+
+  it("source converts paths in sandbox (Linux)", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        fqmn: "com.example.Foo",
+        file: "D:/project/src/Foo.java",
+        startLine: 5, endLine: 15,
+        source: "public class Foo {}",
+        refs: [],
+      }));
+    });
+    vi.doMock("../src/paths.mjs", async (importOriginal) => {
+      const orig = await importOriginal();
+      return { ...orig, toSandboxPath: (p) => p && /^[A-Z]:[/\\]/.test(p) ? "/" + p[0].toLowerCase() + p.slice(2).replace(/\\/g, "/") : p };
+    });
+    const { source } = await import("../src/commands/source.mjs");
+    await source(["com.example.Foo"]);
+    const out = io.logs.join("\n");
+    expect(out).toContain("/d/project/src/Foo.java:5-15");
   });
 
   it("type-info shows class details", async () => {

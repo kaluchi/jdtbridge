@@ -15,3 +15,19 @@ export function stripProject(wsPath) {
 export function toWsPath(p) {
   return p.startsWith("/") ? p : "/" + p;
 }
+
+/**
+ * Convert Windows absolute path to Docker sandbox Linux path.
+ * Bridge returns Windows paths (D:/src/Foo.java) that don't exist in the
+ * Linux sandbox. Docker sandbox mounts workspace with drive letter lowercased:
+ * D:\git\project → /d/git/project.
+ *
+ * Only converts on Linux (inside sandbox). On Windows host — no-op.
+ */
+export function toSandboxPath(p) {
+  if (!p) return p;
+  if (process.platform === "linux" && /^[A-Z]:[/\\]/.test(p)) {
+    return "/" + p[0].toLowerCase() + p.slice(2).replace(/\\/g, "/");
+  }
+  return p;
+}

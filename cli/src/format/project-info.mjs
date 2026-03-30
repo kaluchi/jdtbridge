@@ -1,12 +1,14 @@
 // Adaptive project-info formatter.
 // Adjusts detail level (packages → types → methods) to fit --lines budget.
 
+import { toSandboxPath } from "../paths.mjs";
+
 export function formatProjectInfo(data, maxLines) {
   const lines = [];
 
   // Header (always shown)
   lines.push(data.name);
-  lines.push(`Location: ${data.location}`);
+  lines.push(`Location: ${toSandboxPath(data.location)}`);
   if (data.natures.length) lines.push(`Natures: ${data.natures.join(", ")}`);
   const deps = data.dependencies.length
     ? data.dependencies.join(", ")

@@ -42,6 +42,7 @@ describe("source format", () => {
   afterEach(async () => {
     io.restore();
     if (server) await stopServer(server);
+    vi.doUnmock("../src/paths.mjs");
     vi.resetModules();
   });
 
@@ -410,5 +411,20 @@ describe("source format", () => {
     const out = io.logs.join("\n");
     expect(out).not.toContain("####");
     expect(out).not.toContain("Outgoing Calls:");
+  });
+
+  it("file path converted in sandbox (Linux)", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(METHOD_RESPONSE));
+    });
+    vi.doMock("../src/paths.mjs", async (importOriginal) => {
+      const orig = await importOriginal();
+      return { ...orig, toSandboxPath: (p) => p && /^[A-Z]:[/\\]/.test(p) ? "/" + p[0].toLowerCase() + p.slice(2).replace(/\\/g, "/") : p };
+    });
+    const { source } = await import("../src/commands/source.mjs");
+    await source(["pkg.Foo#bar"]);
+    const out = io.logs.join("\n");
+    expect(out).toContain("/d/src/Foo.java:10-15");
   });
 });

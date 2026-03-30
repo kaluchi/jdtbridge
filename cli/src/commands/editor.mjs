@@ -1,5 +1,6 @@
 import { get } from "../client.mjs";
 import { extractPositional, parseFlags, parseFqmn } from "../args.mjs";
+import { toSandboxPath } from "../paths.mjs";
 
 export async function editors() {
   const results = await get("/editors");
@@ -12,7 +13,7 @@ export async function editors() {
     return;
   }
   for (const r of results) {
-    console.log(r.file);
+    console.log(toSandboxPath(r.file));
   }
 }
 
