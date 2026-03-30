@@ -33,7 +33,6 @@ import {
   editorsHelp,
   openHelp,
 } from "./commands/editor.mjs";
-import { sandboxRun, help as sandboxRunHelp } from "./commands/sandbox.mjs";
 import {
   agentRun,
   agentList,
@@ -140,32 +139,6 @@ async function testDispatch(args) {
   await cmd.fn(rest);
 }
 
-const sandboxHelp = `Run an agent in a Docker sandbox with JDT Bridge connectivity.
-
-Subcommands:
-  jdt sandbox run <agent> [workspace] [-- agent-args...]
-
-Use "jdt help sandbox run" for details.`;
-
-const sandboxSubcommands = {
-  run: { fn: sandboxRun, help: sandboxRunHelp },
-};
-
-async function sandboxDispatch(args) {
-  const [sub, ...rest] = args;
-  if (!sub || sub === "--help") {
-    console.log(sandboxHelp);
-    return;
-  }
-  const cmd = sandboxSubcommands[sub];
-  if (!cmd) {
-    console.error(`Unknown sandbox subcommand: ${sub}`);
-    console.log(sandboxHelp);
-    process.exit(1);
-  }
-  await cmd.fn(rest);
-}
-
 const agentSubcommands = {
   run: { fn: agentRun, help: agentRunHelp },
   list: { fn: agentList, help: agentListHelp },
@@ -222,7 +195,6 @@ const commands = {
   editors: { fn: editors, help: editorsHelp },
   open: { fn: open, help: openHelp },
   launch: { fn: launchDispatch, help: launchHelp },
-  sandbox: { fn: sandboxDispatch, help: sandboxHelp },
   agent: { fn: agentDispatch, help: agentHelp },
   setup: { fn: setup, help: setupHelp },
 };
@@ -315,9 +287,6 @@ Agents:
   agent logs <name> [-f]                      stream agent output
   agent providers                             available providers
 
-Docker:
-  sandbox run <agent> [workspace]             run agent in sandbox with bridge
-
 Setup:
   setup [--check|--remove]                    install/check/remove Eclipse plugin
 
@@ -344,8 +313,6 @@ export async function run(argv) {
       console.log(launchSubcommands[rest[1]].help);
     } else if (resolved === "test" && rest[1] && testSubcommands[rest[1]]) {
       console.log(testSubcommands[rest[1]].help);
-    } else if (resolved === "sandbox" && rest[1] && sandboxSubcommands[rest[1]]) {
-      console.log(sandboxSubcommands[rest[1]].help);
     } else if (resolved === "agent" && rest[1] && agentSubcommands[rest[1]]) {
       console.log(agentSubcommands[rest[1]].help);
     } else if (resolved) {
