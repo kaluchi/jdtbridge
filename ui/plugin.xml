@@ -45,13 +45,16 @@
          <menu id="io.github.kaluchi.jdtbridge.ui.menu"
                label="JDT Bridge">
             <command commandId="io.github.kaluchi.jdtbridge.ui.commands.healthCheck"
-                     label="Health Check"/>
+                     label="Health Check"
+                     icon="icons/health-check.svg"/>
             <separator name="agents" visible="true"/>
             <command commandId="io.github.kaluchi.jdtbridge.ui.commands.newAgent"
-                     label="New Agent..."/>
+                     label="New Agent..."
+                     icon="icons/new-agent.svg"/>
             <separator name="terminal" visible="true"/>
             <command commandId="io.github.kaluchi.jdtbridge.ui.commands.openTerminal"
-                     label="Open Terminal"/>
+                     label="Open Terminal"
+                     icon="icons/terminal.svg"/>
          </menu>
       </menuContribution>
 
@@ -60,7 +63,8 @@
          <menu id="io.github.kaluchi.jdtbridge.ui.popup.menu"
                label="JDT Bridge">
             <command commandId="io.github.kaluchi.jdtbridge.ui.commands.openTerminal"
-                     label="Open Terminal Here"/>
+                     label="Open Terminal Here"
+                     icon="icons/terminal.svg"/>
             <visibleWhen checkEnabled="false">
                <with variable="selection">
                   <iterate ifEmpty="false" operator="and">
