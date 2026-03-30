@@ -76,10 +76,11 @@ export async function run({ agent, name, agentArgs, session }) {
       const cliDir = join(repoRoot, "cli");
       console.log(dim(`  $ npm pack --json  (in ${cliDir})`));
       const packResult = spawnSync("npm", ["pack", "--json"], {
-        cwd: cliDir, encoding: "utf8",
+        cwd: cliDir, encoding: "utf8", shell: true,
       });
       try {
-        if (packResult.status !== 0) throw new Error((packResult.stderr || "").trim());
+        if (packResult.status !== 0 || packResult.error)
+          throw new Error((packResult.stderr || "").trim() || String(packResult.error || "unknown error"));
         const filename = JSON.parse(packResult.stdout)[0].filename;
         const tarball = join(cliDir, filename);
         console.log(dim(`  ${filename} → sandbox:/tmp/jdt.tgz`));
