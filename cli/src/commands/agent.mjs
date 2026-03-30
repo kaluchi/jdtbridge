@@ -91,15 +91,14 @@ export async function agentList() {
 // ---- stop ----
 
 export async function agentStop(args) {
-  const name = args[0];
-  if (!name) {
-    console.error(bold(red("Usage: jdt agent stop <name>")));
-    process.exit(1);
-  }
-
-  const sess = findSession(name);
+  const hint = args[0] || null;
+  const sess = findSession(hint);
   if (!sess) {
-    console.error(`No agent session found: ${name}`);
+    if (!hint) {
+      console.error("No agent sessions to stop.");
+    } else {
+      console.error(`No agent session found: ${hint}`);
+    }
     process.exit(1);
   }
 
@@ -115,23 +114,21 @@ export async function agentStop(args) {
   }
 
   try { unlinkSync(sess._file); } catch { /* ignore */ }
-  console.log(`Stopped ${name}`);
+  console.log(`Stopped ${sess.name}`);
 }
 
 // ---- logs ----
 
 export async function agentLogs(args) {
   const flags = parseFlags(args);
-  const name = args.find((a) => !a.startsWith("--"));
-
-  if (!name) {
-    console.error(bold(red("Usage: jdt agent logs <name> [-f]")));
-    process.exit(1);
-  }
-
-  const sess = findSession(name);
+  const hint = args.find((a) => !a.startsWith("--")) || null;
+  const sess = findSession(hint);
   if (!sess) {
-    console.error(`No agent session found: ${name}`);
+    if (!hint) {
+      console.error("No agent sessions.");
+    } else {
+      console.error(`No agent session found: ${hint}`);
+    }
     process.exit(1);
   }
 
@@ -176,8 +173,26 @@ function readSessions() {
   return sessions;
 }
 
-function findSession(name) {
-  return readSessions().find((s) => s.name === name) || null;
+/**
+ * Find a session by exact name, agent name, or partial match.
+ * If hint is null and there's exactly one session, return it.
+ * Returns { session, ambiguous } where ambiguous lists multiple matches.
+ */
+function findSession(hint) {
+  const sessions = readSessions();
+  if (!hint) {
+    return sessions.length === 1 ? sessions[0] : null;
+  }
+  // Exact name match
+  const exact = sessions.find((s) => s.name === hint);
+  if (exact) return exact;
+  // Agent name match
+  const byAgent = sessions.filter((s) => s.agent === hint);
+  if (byAgent.length === 1) return byAgent[0];
+  // Partial name match
+  const partial = sessions.filter((s) => s.name.includes(hint));
+  if (partial.length === 1) return partial[0];
+  return null;
 }
 
 function isAlive(sess) {

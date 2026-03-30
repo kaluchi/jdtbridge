@@ -117,9 +117,9 @@ describe("agent commands", () => {
   });
 
   describe("stop", () => {
-    it("errors when no name given", async () => {
+    it("errors when no sessions exist", async () => {
       await expect(agentStop([])).rejects.toThrow("exit(1)");
-      expect(io.errors.some((l) => l.includes("Usage"))).toBe(true);
+      expect(io.errors.some((l) => l.includes("No agent sessions"))).toBe(true);
     });
 
     it("errors when session not found", async () => {
@@ -140,12 +140,46 @@ describe("agent commands", () => {
       expect(io.logs.some((l) => l.includes("Stopped to-stop"))).toBe(true);
       expect(existsSync(join(agentsPath, "to-stop.json"))).toBe(false);
     });
+
+    it("stops single session without args", async () => {
+      writeSession("only-one", {
+        provider: "local",
+        agent: "claude",
+        pid: 99999999,
+        startedAt: Date.now(),
+      });
+      await agentStop([]);
+      expect(io.logs.some((l) => l.includes("Stopped only-one"))).toBe(true);
+      expect(existsSync(join(agentsPath, "only-one.json"))).toBe(false);
+    });
+
+    it("matches by agent name", async () => {
+      writeSession("local-claude-123", {
+        provider: "local",
+        agent: "claude",
+        pid: 99999999,
+        startedAt: Date.now(),
+      });
+      await agentStop(["claude"]);
+      expect(io.logs.some((l) => l.includes("Stopped local-claude-123"))).toBe(true);
+    });
+
+    it("matches by partial name", async () => {
+      writeSession("sandbox-gemini-456", {
+        provider: "sandbox",
+        agent: "gemini",
+        pid: 99999999,
+        startedAt: Date.now(),
+      });
+      await agentStop(["gemini-456"]);
+      expect(io.logs.some((l) => l.includes("Stopped sandbox-gemini-456"))).toBe(true);
+    });
   });
 
   describe("logs", () => {
-    it("errors when no name given", async () => {
+    it("errors when no sessions exist", async () => {
       await expect(agentLogs([])).rejects.toThrow("exit(1)");
-      expect(io.errors.some((l) => l.includes("Usage"))).toBe(true);
+      expect(io.errors.some((l) => l.includes("No agent sessions"))).toBe(true);
     });
 
     it("errors when session not found", async () => {
