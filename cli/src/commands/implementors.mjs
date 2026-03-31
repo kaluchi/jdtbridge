@@ -19,7 +19,7 @@ export async function implementors(args) {
   const results = await get(url, 30_000);
   if (results.error) {
     console.error(results.error);
-    process.exit(1);
+    return;
   }
   if (results.length === 0) {
     console.log("(no implementors)");

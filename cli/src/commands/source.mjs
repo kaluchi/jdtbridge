@@ -30,7 +30,7 @@ export async function source(args) {
       blocks.push(formatMarkdown(r));
     }
   }
-  if (blocks.length === 0) process.exit(1);
+  if (blocks.length === 0) return;
   console.log(blocks.join("\n\n---\n\n"));
 }
 

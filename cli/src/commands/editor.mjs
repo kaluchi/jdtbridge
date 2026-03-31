@@ -6,7 +6,7 @@ export async function editors() {
   const results = await get("/editors");
   if (results.error) {
     console.error(results.error);
-    process.exit(1);
+    return;
   }
   if (results.length === 0) {
     console.log("(no open editors)");
@@ -35,7 +35,7 @@ export async function open(args) {
   const result = await get(url);
   if (result.error) {
     console.error(result.error);
-    process.exit(1);
+    return;
   }
   console.log("Opened");
 }

@@ -43,7 +43,7 @@ export async function testRun(args) {
   const result = await get(url, 30_000);
   if (result.error) {
     console.error(result.error);
-    process.exit(1);
+    return;
   }
 
   // Wait briefly for session to register total count

@@ -30,7 +30,7 @@ export async function refresh(args) {
       );
       if (result.error) {
         console.error(result.error);
-        process.exit(1);
+        return;
       }
       console.log(`Refreshed project ${projectName}`);
     } else {
@@ -38,7 +38,7 @@ export async function refresh(args) {
       const result = await get("/refresh", 60_000);
       if (result.error) {
         console.error(result.error);
-        process.exit(1);
+        return;
       }
       console.log("Refreshed workspace");
     }

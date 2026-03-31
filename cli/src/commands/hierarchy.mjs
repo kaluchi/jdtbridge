@@ -15,7 +15,7 @@ export async function hierarchy(args) {
   );
   if (result.error) {
     console.error(result.error);
-    process.exit(1);
+    return;
   }
 
   const lines = [];
@@ -26,7 +26,7 @@ export async function hierarchy(args) {
   if (lines.length > 2) {
     console.log(lines.join("\n"));
   } else {
-    console.log("No hierarchy found.");
+    console.log("(no hierarchy)");
   }
 }
 

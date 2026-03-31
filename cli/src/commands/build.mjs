@@ -14,7 +14,7 @@ export async function build(args) {
   const result = await get(url, 180_000);
   if (result.error) {
     console.error(result.error);
-    process.exit(1);
+    return;
   }
   const n = result.errors || 0;
   if (n === 0) {

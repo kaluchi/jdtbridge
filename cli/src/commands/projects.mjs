@@ -4,7 +4,7 @@ export async function projects() {
   const results = await get("/projects");
   if (results.error) {
     console.error(results.error);
-    process.exit(1);
+    return;
   }
   for (const p of results) console.log(p);
 }

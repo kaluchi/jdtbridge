@@ -8,7 +8,7 @@ export async function testSessions() {
   const results = await get("/test/sessions");
   if (results.error) {
     console.error(results.error);
-    process.exit(1);
+    return;
   }
   if (results.length === 0) {
     console.log("(no test sessions)");

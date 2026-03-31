@@ -27,7 +27,7 @@ async function mavenUpdate(args) {
   const result = await get(url, 300_000);
   if (result.error) {
     console.error(result.error);
-    process.exit(1);
+    return;
   }
 
   if (result.ok) {

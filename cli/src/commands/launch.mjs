@@ -5,7 +5,7 @@ export async function launchList() {
   const results = await get("/launch/list");
   if (results.error) {
     console.error(results.error);
-    process.exit(1);
+    return;
   }
   if (results.length === 0) {
     console.log("(no launches)");
@@ -25,7 +25,7 @@ export async function launchConfigs() {
   const results = await get("/launch/configs");
   if (results.error) {
     console.error(results.error);
-    process.exit(1);
+    return;
   }
   if (results.length === 0) {
     console.log("(no launch configurations)");
@@ -43,7 +43,7 @@ export async function launchClear(args) {
   const result = await get(url);
   if (result.error) {
     console.error(result.error);
-    process.exit(1);
+    return;
   }
   console.log(`Removed ${result.removed} terminated launch${result.removed !== 1 ? "es" : ""}`);
 }
@@ -74,7 +74,7 @@ async function launchWithMode(args, mode) {
   const result = await get(url, 30_000);
   if (result.error) {
     console.error(result.error);
-    process.exit(1);
+    return;
   }
 
   const follow = args.includes("-f") || args.includes("--follow");
@@ -143,7 +143,7 @@ export async function launchStop(args) {
   const result = await get(url);
   if (result.error) {
     console.error(result.error);
-    process.exit(1);
+    return;
   }
   console.log(`Stopped ${result.name}`);
 }
@@ -178,7 +178,7 @@ export async function launchLogs(args) {
   const result = await get(url, 30_000);
   if (result.error) {
     console.error(result.error);
-    process.exit(1);
+    return;
   }
   if (result.output) {
     const text = result.output.endsWith("\n")

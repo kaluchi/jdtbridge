@@ -88,7 +88,7 @@ describe("agent commands", () => {
   describe("list", () => {
     it("shows empty message when no sessions", async () => {
       await agentList();
-      expect(io.logs.some((l) => l.includes("No agent sessions"))).toBe(true);
+      expect(io.logs.some((l) => l.includes("(no agent sessions)"))).toBe(true);
     });
 
     it("shows sessions from files", async () => {
@@ -122,7 +122,7 @@ describe("agent commands", () => {
   describe("stop", () => {
     it("errors when no sessions exist", async () => {
       await expect(agentStop([])).rejects.toThrow("exit(1)");
-      expect(io.errors.some((l) => l.includes("No agent sessions"))).toBe(
+      expect(io.errors.some((l) => l.includes("(no agent sessions)"))).toBe(
         true,
       );
     });
@@ -211,7 +211,7 @@ describe("agent commands", () => {
   describe("logs", () => {
     it("errors when no sessions exist", async () => {
       await expect(agentLogs([])).rejects.toThrow("exit(1)");
-      expect(io.errors.some((l) => l.includes("No agent sessions"))).toBe(true);
+      expect(io.errors.some((l) => l.includes("(no agent sessions)"))).toBe(true);
     });
 
     it("errors when session not found", async () => {

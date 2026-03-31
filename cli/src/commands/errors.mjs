@@ -16,7 +16,7 @@ export async function errors(args) {
   const results = await get(url, 180_000);
   if (results.error) {
     console.error(results.error);
-    process.exit(1);
+    return;
   }
   if (results.length === 0) {
     console.log("(no errors)");
