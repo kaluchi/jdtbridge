@@ -139,7 +139,27 @@ public class SearchIntegrationTest {
         assertNotNull(obj.get("error"));
     }
 
+    @Test
+    public void subtypesRejectsObject() throws Exception {
+        String json = handler.handleSubtypes(
+                Map.of("class", "java.lang.Object"));
+        JsonObject obj = JsonParser.parseString(json)
+                .getAsJsonObject();
+        assertTrue(obj.get("error").getAsString()
+                .contains("too broad"));
+    }
+
     // ---- /hierarchy ----
+
+    @Test
+    public void hierarchyRejectsObject() throws Exception {
+        String json = handler.handleHierarchy(
+                Map.of("class", "java.lang.Object"));
+        JsonObject obj = JsonParser.parseString(json)
+                .getAsJsonObject();
+        assertTrue(obj.get("error").getAsString()
+                .contains("too broad"));
+    }
 
     @Test
     public void hierarchyOfDog() throws Exception {

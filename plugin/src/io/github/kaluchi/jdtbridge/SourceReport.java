@@ -382,16 +382,17 @@ class SourceReport {
                 addSupersRecursive(arr, h, iface, depth + 1);
             }
         } catch (Exception e) { /* skip */ }
-        // Superclass chain
+        // Superclass chain (including java.lang.Object)
         IType superclass = h.getSuperclass(type);
         if (superclass == null) return;
-        String fqn;
-        try { fqn = superclass.getFullyQualifiedName(); }
-        catch (Exception e) { return; }
-        if ("java.lang.Object".equals(fqn)) return;
         var s = hierEntry(superclass);
         s.addProperty("depth", depth);
         arr.add(s);
+        // Object has no further supers — stop recursion
+        try {
+            if ("java.lang.Object".equals(superclass.getFullyQualifiedName()))
+                return;
+        } catch (Exception e) { return; }
         addSupersRecursive(arr, h, superclass, depth + 1);
     }
 

@@ -266,6 +266,10 @@ class SearchHandler {
         if (fqn == null || fqn.isBlank()) {
             return HttpServer.jsonError("Missing 'class' parameter");
         }
+        if ("java.lang.Object".equals(fqn)) {
+            return HttpServer.jsonError(
+                    "Hierarchy too broad for java.lang.Object");
+        }
 
         IType type = JdtUtils.findType(fqn);
         if (type == null) {
@@ -285,6 +289,10 @@ class SearchHandler {
         String fqn = params.get("class");
         if (fqn == null || fqn.isBlank()) {
             return HttpServer.jsonError("Missing 'class' parameter");
+        }
+        if ("java.lang.Object".equals(fqn)) {
+            return HttpServer.jsonError(
+                    "Hierarchy too broad for java.lang.Object");
         }
 
         IType type = JdtUtils.findType(fqn);

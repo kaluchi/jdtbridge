@@ -481,13 +481,16 @@ public class RefCountContractTest {
         void dogSupertypesExact() throws Exception {
             var json = typeJson("test.model.Dog");
             var supers = json.getAsJsonArray("supertypes");
-            assertEquals(1, supers.size());
+            assertEquals(2, supers.size());
             assertEquals("test.model.Animal",
                     supers.get(0).getAsJsonObject()
                             .get("fqn").getAsString());
             assertEquals("interface",
                     supers.get(0).getAsJsonObject()
                             .get("kind").getAsString());
+            assertEquals("java.lang.Object",
+                    supers.get(1).getAsJsonObject()
+                            .get("fqn").getAsString());
         }
 
         @Test
