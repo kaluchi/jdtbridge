@@ -1,5 +1,9 @@
 package io.github.kaluchi.jdtbridge.ui;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -49,6 +53,46 @@ public class ProcessUtil {
 			cmd.add(joinArgs(args));
 		}
 		return new ProcessBuilder(cmd);
+	}
+
+	/**
+	 * Open an interactive terminal window with a command.
+	 * Writes a temp script so the command runs and the terminal
+	 * stays open for the user to see output.
+	 * Same approach as cli/src/terminal.mjs.
+	 */
+	public static Process openTerminal(String command)
+			throws IOException {
+		List<String> cmd = new ArrayList<>();
+		if (IS_WINDOWS) {
+			Path script = Files.createTempFile("jdt-", ".cmd");
+			Files.writeString(script,
+					"@echo.\r\n@" + command
+							+ "\r\n@echo.\r\n@pause\r\n");
+			cmd.add("cmd.exe");
+			cmd.add("/c");
+			cmd.add("start");
+			cmd.add("JDT Bridge");
+			cmd.add("cmd.exe");
+			cmd.add("/K");
+			cmd.add("call " + script);
+		} else {
+			Path script = Files.createTempFile("jdt-", ".sh");
+			Files.writeString(script,
+					"#!/bin/bash\n" + command + "\nexec bash\n");
+			script.toFile().setExecutable(true);
+			if (IS_MAC) {
+				cmd.add("open");
+				cmd.add("-a");
+				cmd.add("Terminal");
+				cmd.add(script.toString());
+			} else {
+				cmd.add("x-terminal-emulator");
+				cmd.add("-e");
+				cmd.add(script.toString());
+			}
+		}
+		return new ProcessBuilder(cmd).start();
 	}
 
 	private static String joinArgs(String... args) {

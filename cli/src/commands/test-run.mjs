@@ -104,4 +104,10 @@ Examples:
   jdt test run com.example.MyTest                       run + show guide
   jdt test run com.example.MyTest --project Build -f    run with Build classpath
   jdt test run com.example.MyTest -f --all              run + stream all tests
-  jdt test run --project my-project -f                  run project tests + stream`;
+  jdt test run --project my-project -f                  run project tests + stream
+
+The session ID printed after launch is also the launch name.
+Use it with other commands:
+  jdt test status <session> -f        test pass/fail details
+  jdt launch logs <session>           console output (stdout, stderr, stack traces)
+  jdt launch logs <session> --tail 50 last 50 lines of console`;

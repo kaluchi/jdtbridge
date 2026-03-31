@@ -16,7 +16,8 @@ export async function git(args = []) {
   if (!sub || sub === "list" || sub.startsWith("-")) {
     return gitList(sub === "list" ? args.slice(1) : args);
   }
-  console.error(`Unknown git subcommand: ${sub}`);
+  console.error(`Unknown git subcommand: ${sub}\n`);
+  console.log(help);
   process.exit(1);
 }
 

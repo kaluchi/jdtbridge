@@ -13,7 +13,7 @@ import { basename } from "node:path";
 
 // ---- Public API ----
 
-const SECTION_NAMES = ["git", "editors", "errors", "launches", "tests", "projects", "guide"];
+const SECTION_NAMES = ["intro", "git", "editors", "errors", "launches", "tests", "projects", "guide"];
 
 export async function status(args) {
   const quiet = args.includes("-q") || args.includes("--quiet");
@@ -23,15 +23,20 @@ export async function status(args) {
     : SECTION_NAMES.filter((s) => s !== "guide");
 
   const results = [];
+
+  const showExtras = !quiet && requested.length === 0;
+  // Intro first — context for agents seeing this for the first time
+  if (showExtras || sections.includes("intro")) results.push(introSection());
+
   for (const name of sections) {
+    if (name === "intro" || name === "guide") continue;
     const renderer = RENDERERS[name];
     if (renderer) results.push(await renderer());
   }
 
-  const showGuide = !quiet && requested.length === 0;
-  if (showGuide) results.push(guideSection());
-  // Explicit "guide" in args always shows it
-  if (sections.includes("guide") && !showGuide) results.push(guideSection());
+  // Guide last
+  if (showExtras) results.push(guideSection());
+  if (sections.includes("guide") && !showExtras) results.push(guideSection());
 
   const single = results.length === 1;
   console.log(results.map((s) => formatSection(s, single)).join("\n\n"));
@@ -82,6 +87,33 @@ async function renderTests() {
 
 async function renderProjects() {
   return { title: "Projects", cmd: "jdt projects", body: cliCmd("jdt projects") };
+}
+
+function introSection() {
+  return {
+    title: "Intro",
+    cmd: "jdt status intro",
+    body: `Eclipse IDE is running and connected to this terminal via jdt CLI.
+jdt is a bridge that exposes the IDE's functions as terminal commands.
+Commands cover Java search, compilation, testing, and refactoring.
+Everything the developer sees and does in Eclipse GUI
+the AI assistant can access through jdt CLI against the same
+running instance. Same IDE, different interface.
+
+The sections below are live output from that instance.
+Each section is produced by a command shown in its header:
+  ## Intro      -> jdt status intro
+  ## Git        -> jdt status git
+  ## Editors    -> jdt status editors
+  ...
+  ## Guide      -> jdt status guide
+That command can be run standalone for a fresh snapshot: jdt status errors
+Several commands can be combined in one call: jdt status git editors projects
+Beyond this dashboard, jdt has 30+ more commands.
+Run jdt help for the full reference.
+
+-q suppresses this intro and the guide at the end.`,
+  };
 }
 
 function guideSection() {

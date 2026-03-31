@@ -56,4 +56,9 @@ export const help = `List active and completed test sessions.
 
 Usage:  jdt test sessions
 
-Output: session ID, label, test counts, state — one session per line.`;
+Output: session ID, label, test counts, status — one session per line.
+
+The session ID is also the launch name. To see console output
+(stdout, stderr, stack traces) of a test run:
+  jdt launch logs <session-name>
+  jdt launch logs <session-name> --tail 50`;

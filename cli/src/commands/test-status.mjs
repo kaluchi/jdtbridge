@@ -56,4 +56,8 @@ Flags:
 Examples:
   jdt test status jdtbridge-test-1234567890
   jdt test status jdtbridge-test-1234567890 -f
-  jdt test status jdtbridge-test-1234567890 --ignored`;
+  jdt test status jdtbridge-test-1234567890 --ignored
+
+Console output (stdout, stderr, stack traces):
+  jdt launch logs <session-name>
+  jdt launch logs <session-name> --tail 50`;

@@ -107,8 +107,8 @@ async function launchDispatch(args) {
   }
   const cmd = launchSubcommands[sub];
   if (!cmd) {
-    console.error(`Unknown launch subcommand: ${sub}`);
-    console.log(launchHelp);
+    console.error(`Unknown launch subcommand: ${sub}\n`);
+    printFullSubcommandHelp("launch", launchSubcommands);
     process.exit(1);
   }
   await cmd.fn(rest);
@@ -137,8 +137,8 @@ async function testDispatch(args) {
   }
   const cmd = testSubcommands[sub];
   if (!cmd) {
-    console.error(`Unknown test subcommand: ${sub}`);
-    console.log(testHelp);
+    console.error(`Unknown test subcommand: ${sub}\n`);
+    printFullSubcommandHelp("test", testSubcommands);
     process.exit(1);
   }
   await cmd.fn(rest);
@@ -171,8 +171,8 @@ async function agentDispatch(args) {
   }
   const cmd = agentSubcommands[sub];
   if (!cmd) {
-    console.error(`Unknown agent subcommand: ${sub}`);
-    console.log(agentHelp);
+    console.error(`Unknown agent subcommand: ${sub}\n`);
+    printFullSubcommandHelp("agent", agentSubcommands);
     process.exit(1);
   }
   await cmd.fn(rest);
@@ -238,6 +238,18 @@ function resolve(name) {
 function fmtAliases(name) {
   const list = aliasesOf[name];
   return list ? " " + dim("(" + list.join(", ") + ")") : "";
+}
+
+function printFullSubcommandHelp(parentName, subcommands) {
+  const names = Object.keys(subcommands);
+  console.log(`jdt ${parentName} has ${names.length} subcommands: ${names.join(", ")}\n`);
+  for (const [name, { help }] of Object.entries(subcommands)) {
+    if (help) {
+      console.log(`--- jdt ${parentName} ${name} ---\n`);
+      console.log(help);
+      console.log();
+    }
+  }
 }
 
 function printOverview() {

@@ -110,8 +110,12 @@ describe("SECTION_NAMES", () => {
     expect(SECTION_NAMES).toContain("guide");
   });
 
-  it("has 7 sections", () => {
-    expect(SECTION_NAMES.length).toBe(7);
+  it("has 8 sections", () => {
+    expect(SECTION_NAMES.length).toBe(8);
+  });
+
+  it("contains intro", () => {
+    expect(SECTION_NAMES).toContain("intro");
   });
 });
 

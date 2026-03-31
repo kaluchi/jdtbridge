@@ -13,8 +13,7 @@ import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.ui.IStartup;
 
-import io.github.kaluchi.jdtbridge.ui.commands.OpenTerminalHandler;
-import io.github.kaluchi.jdtbridge.ui.preferences.PreferenceConstants;
+import io.github.kaluchi.jdtbridge.ui.ProcessUtil;
 
 /**
  * Replaces the core plugin's browser-based welcome with a native dialog.
@@ -69,13 +68,8 @@ public class WelcomeStartupHandler implements IStartup {
 						+ "Open a terminal to install now?");
 		if (openTerminal) {
 			try {
-				new ProcessBuilder(
-						OpenTerminalHandler.buildCommand(
-								PreferenceConstants.defaultTerminalCommand(),
-								org.eclipse.core.resources.ResourcesPlugin
-										.getWorkspace().getRoot()
-										.getLocation().toFile()))
-						.start();
+				ProcessUtil.openTerminal(
+						"npm install -g @kaluchi/jdtbridge");
 			} catch (Exception e) {
 				LOG.error("Failed to open terminal for setup", e);
 			}
