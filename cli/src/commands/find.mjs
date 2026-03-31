@@ -1,6 +1,9 @@
 import { get } from "../client.mjs";
 import { extractPositional } from "../args.mjs";
 import { stripProject, toSandboxPath } from "../paths.mjs";
+import { formatTable } from "../format/table.mjs";
+
+const BADGE = { class: "[C]", interface: "[I]", enum: "[E]", annotation: "[A]" };
 
 export async function find(args) {
   const pos = extractPositional(args);
@@ -20,9 +23,23 @@ export async function find(args) {
     console.log("(no results)");
     return;
   }
-  for (const r of results) {
-    console.log(`${r.fqn}  ${toSandboxPath(stripProject(r.file))}`);
-  }
+
+  // Deduplicate binary types (appear once per project on classpath)
+  const seen = new Set();
+  const deduped = results.filter((r) => {
+    if (!r.binary) return true;
+    if (seen.has(r.fqn)) return false;
+    seen.add(r.fqn);
+    return true;
+  });
+
+  const headers = ["KIND", "FQN", "ORIGIN"];
+  const rows = deduped.map((r) => [
+    BADGE[r.kind] || "[C]",
+    `\`${r.fqn}\``,
+    r.binary ? (r.origin || "binary") : toSandboxPath(stripProject(r.file)),
+  ]);
+  console.log(formatTable(headers, rows));
 }
 
 export const help = `Find type declarations by name, wildcard, or package.

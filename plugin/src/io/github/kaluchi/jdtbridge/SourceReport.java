@@ -406,11 +406,11 @@ class SourceReport {
         }
     }
 
-    private static String typeKindStr(IType type) {
+    static String typeKindStr(IType type) {
         try {
-            if (type.isInterface()) return "interface";
-            if (type.isEnum()) return "enum";
             if (type.isAnnotation()) return "annotation";
+            if (type.isEnum()) return "enum";
+            if (type.isInterface()) return "interface";
         } catch (Exception e) { /* ignore */ }
         return "class";
     }

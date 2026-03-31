@@ -76,6 +76,139 @@ public class SearchIntegrationTest {
     }
 
     @Test
+    public void findBinaryTypeHasFlag() throws Exception {
+        String json = handler.handleFind(
+                Map.of("name", "ArrayList"));
+        JsonArray arr = parseArray(json);
+        assertTrue(arr.size() > 0, "Should find ArrayList");
+        boolean anyBinary = false;
+        for (var el : arr) {
+            var obj = el.getAsJsonObject();
+            if (obj.has("binary") && obj.get("binary").getAsBoolean()) {
+                anyBinary = true;
+                break;
+            }
+        }
+        assertTrue(anyBinary,
+                "ArrayList should have binary flag");
+    }
+
+    @Test
+    public void findSourceTypeNoBinaryFlag() throws Exception {
+        String json = handler.handleFind(
+                Map.of("name", "Animal"));
+        JsonArray arr = parseArray(json);
+        var animal = findByFqn(arr, "test.model.Animal");
+        assertNotNull(animal);
+        assertFalse(animal.has("binary"),
+                "Source type should not have binary flag");
+    }
+
+    @Test
+    public void findSourceTypeHasKind() throws Exception {
+        String json = handler.handleFind(
+                Map.of("name", "Animal"));
+        JsonArray arr = parseArray(json);
+        var animal = findByFqn(arr, "test.model.Animal");
+        assertNotNull(animal);
+        assertEquals("interface",
+                animal.get("kind").getAsString(),
+                "Animal should be interface");
+    }
+
+    @Test
+    public void findSourceTypeHasOriginProject() throws Exception {
+        String json = handler.handleFind(
+                Map.of("name", "Dog"));
+        JsonArray arr = parseArray(json);
+        var dog = findByFqn(arr, "test.model.Dog");
+        assertNotNull(dog);
+        assertTrue(dog.has("origin"),
+                "Source type should have origin");
+        assertFalse(dog.get("origin").getAsString().isEmpty(),
+                "Origin should not be empty for source type");
+    }
+
+    @Test
+    public void findBinaryTypeHasOriginJar() throws Exception {
+        String json = handler.handleFind(
+                Map.of("name", "ArrayList"));
+        JsonArray arr = parseArray(json);
+        boolean anyWithJar = false;
+        for (var el : arr) {
+            var obj = el.getAsJsonObject();
+            if (obj.has("binary") && obj.has("origin")) {
+                String origin = obj.get("origin").getAsString();
+                if (origin.endsWith(".jar")) {
+                    anyWithJar = true;
+                    break;
+                }
+            }
+        }
+        assertTrue(anyWithJar,
+                "Binary ArrayList should have .jar origin");
+    }
+
+    @Test
+    public void findBinaryTypeHasKind() throws Exception {
+        String json = handler.handleFind(
+                Map.of("name", "ArrayList"));
+        JsonArray arr = parseArray(json);
+        boolean anyWithKind = false;
+        for (var el : arr) {
+            var obj = el.getAsJsonObject();
+            if (obj.has("kind")) {
+                anyWithKind = true;
+                break;
+            }
+        }
+        assertTrue(anyWithKind,
+                "Binary type should have kind field");
+    }
+
+    @Test
+    public void findInterfaceTypeKind() throws Exception {
+        String json = handler.handleFind(
+                Map.of("name", "Animal"));
+        JsonArray arr = parseArray(json);
+        var animal = findByFqn(arr, "test.model.Animal");
+        assertNotNull(animal);
+        assertEquals("interface",
+                animal.get("kind").getAsString(),
+                "Animal is an interface");
+    }
+
+    @Test
+    public void findAnnotationTypeKind() throws Exception {
+        String json = handler.handleFind(
+                Map.of("name", "Marker"));
+        JsonArray arr = parseArray(json);
+        var marker = findByFqn(arr, "test.edge.Marker");
+        assertNotNull(marker, "Should find Marker annotation");
+        assertEquals("annotation",
+                marker.get("kind").getAsString(),
+                "Marker should have annotation kind");
+    }
+
+    @Test
+    public void findEnumTypeKind() throws Exception {
+        String json = handler.handleFind(
+                Map.of("name", "ElementType"));
+        JsonArray arr = parseArray(json);
+        boolean anyEnum = false;
+        for (var el : arr) {
+            var obj = el.getAsJsonObject();
+            if ("enum".equals(
+                    obj.has("kind") ? obj.get("kind").getAsString() : "")) {
+                anyEnum = true;
+                break;
+            }
+        }
+        assertTrue(anyEnum,
+                "ElementType should have enum kind");
+    }
+
+    @Test
     public void findByPackage() throws Exception {
         String json = handler.handleFind(
                 Map.of("name", "test.model"));

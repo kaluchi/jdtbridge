@@ -97,12 +97,7 @@ class SearchHandler {
                     public void acceptSearchMatch(SearchMatch match) {
                         if (match.getElement() instanceof IType type) {
                             if (sourceOnly && type.isBinary()) return;
-                            var e = new JsonObject();
-                            e.addProperty("fqn",
-                                    type.getFullyQualifiedName());
-                            e.addProperty("file",
-                                    resourcePath(match));
-                            arr.add(e);
+                            arr.add(findEntry(type, resourcePath(match)));
                         }
                     }
                 },
@@ -156,23 +151,13 @@ class SearchHandler {
                 for (ICompilationUnit cu
                         : pkg.getCompilationUnits()) {
                     for (IType type : cu.getTypes()) {
-                        var e = new JsonObject();
-                        e.addProperty("fqn",
-                                type.getFullyQualifiedName());
-                        e.addProperty("file",
-                                resourcePath(type));
-                        arr.add(e);
+                        arr.add(findEntry(type, resourcePath(type)));
                     }
                 }
                 if (!sourceOnly) {
                     for (var cf : pkg.getOrdinaryClassFiles()) {
-                        IType type = cf.getType();
-                        var e = new JsonObject();
-                        e.addProperty("fqn",
-                                type.getFullyQualifiedName());
-                        e.addProperty("file",
-                                type.getPath().toOSString());
-                        arr.add(e);
+                        arr.add(findEntry(cf.getType(),
+                                cf.getType().getPath().toOSString()));
                     }
                 }
             }
@@ -651,6 +636,29 @@ class SearchHandler {
     }
 
     // ---- Helpers ----
+
+    /** Build a find result entry with FQN, kind, origin, binary. */
+    private static JsonObject findEntry(IType type, String file) {
+        var obj = new JsonObject();
+        obj.addProperty("fqn", type.getFullyQualifiedName());
+        obj.addProperty("file", file);
+        obj.addProperty("kind", SourceReport.typeKindStr(type));
+        if (type.isBinary()) {
+            obj.addProperty("binary", true);
+            try {
+                var pkg = type.getPackageFragment();
+                var root = (IPackageFragmentRoot) pkg.getParent();
+                var path = root.getPath();
+                obj.addProperty("origin", path.lastSegment());
+            } catch (Exception e) {
+                obj.addProperty("origin", "binary");
+            }
+        } else {
+            obj.addProperty("origin",
+                    type.getJavaProject().getElementName());
+        }
+        return obj;
+    }
 
     private JsonObject typeEntry(IType type) {
         var obj = new JsonObject();

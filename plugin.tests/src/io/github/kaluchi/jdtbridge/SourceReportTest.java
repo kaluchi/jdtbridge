@@ -176,4 +176,39 @@ public class SourceReportTest {
                     "Should have interface typeKind: " + json);
         }
     }
+
+    @Nested
+    class TypeKindStr {
+
+        @BeforeAll
+        static void setUp() throws Exception { TestFixture.create(); }
+
+        @Test
+        void classType() throws Exception {
+            IType type = JdtUtils.findType("test.model.Dog");
+            assertEquals("class", SourceReport.typeKindStr(type));
+        }
+
+        @Test
+        void interfaceType() throws Exception {
+            IType type = JdtUtils.findType("test.model.Animal");
+            assertNotNull(type, "Animal should be found");
+            assertEquals("interface", SourceReport.typeKindStr(type));
+        }
+
+        @Test
+        void annotationType() throws Exception {
+            IType type = JdtUtils.findType("test.edge.Marker");
+            assertNotNull(type, "Marker should be found");
+            assertEquals("annotation", SourceReport.typeKindStr(type),
+                    "Annotation must be detected before interface");
+        }
+
+        @Test
+        void enumType() throws Exception {
+            IType type = JdtUtils.findType("test.edge.Color");
+            assertNotNull(type, "Color should be found");
+            assertEquals("enum", SourceReport.typeKindStr(type));
+        }
+    }
 }
