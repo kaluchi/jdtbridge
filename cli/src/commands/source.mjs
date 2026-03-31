@@ -14,7 +14,9 @@ export async function source(args) {
   const results = await Promise.all(pos.map((arg) => fetchOne(arg)));
 
   if (jsonFlag) {
-    console.log(JSON.stringify(results.length === 1 ? results[0] : results, null, 2));
+    const data = results.length === 1 ? results[0] : results;
+    remapJsonPaths(data);
+    console.log(JSON.stringify(data, null, 2));
     return;
   }
 
@@ -282,6 +284,21 @@ function formatMarkdown(result) {
   }
 
   return lines.join("\n");
+}
+
+/** Recursively apply toSandboxPath to all "file" values in JSON data. */
+function remapJsonPaths(obj) {
+  if (Array.isArray(obj)) {
+    for (const item of obj) remapJsonPaths(item);
+  } else if (obj && typeof obj === "object") {
+    for (const key of Object.keys(obj)) {
+      if (key === "file" && typeof obj[key] === "string") {
+        obj[key] = toSandboxPath(obj[key]);
+      } else {
+        remapJsonPaths(obj[key]);
+      }
+    }
+  }
 }
 
 export const help = `Print source code of a type or method with resolved references.

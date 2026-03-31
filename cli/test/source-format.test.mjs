@@ -420,6 +420,22 @@ describe("source format", () => {
     expect(out).not.toContain("Outgoing Calls:");
   });
 
+  it("--json converts file paths in sandbox (Linux)", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(METHOD_RESPONSE));
+    });
+    mockSandboxPaths();
+    const { source } = await import("../src/commands/source.mjs");
+    await source(["pkg.Foo#bar", "--json"]);
+    const out = io.logs.join("\n");
+    const parsed = JSON.parse(out);
+    expect(parsed.file).toBe("/d/src/Foo.java");
+    for (const ref of parsed.refs) {
+      if (ref.file) expect(ref.file).not.toMatch(/^[A-Z]:[/\\]/);
+    }
+  });
+
   it("file path converted in sandbox (Linux)", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });

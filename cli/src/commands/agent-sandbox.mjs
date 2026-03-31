@@ -71,9 +71,13 @@ export async function run({ agent, name, agentArgs, session }) {
     const isVisible = (visibility.stdout || "").trim() === "visible";
 
     if (isVisible) {
+      // npm link with --no-save --ignore-scripts to avoid rewriting
+      // package-lock.json on the host via virtiofs. Without these flags,
+      // npm resolves deps for Linux and overwrites the Windows lockfile.
+      // This is fragile — npm link is only for jdt CLI developers.
       console.log(`Linking CLI from ${repoRoot} (live sync)...`);
       const linkCmd = ["sandbox", "exec", container,
-        "bash", "-c", `cd "${sandboxCliPath}" && npm link`];
+        "bash", "-c", `cd "${sandboxCliPath}" && npm link --no-save --ignore-scripts`];
       console.log(dim(`  $ docker ${linkCmd.join(" ")}`));
       spawnSync("docker", linkCmd, { stdio: "inherit" });
       cliInstalled = true;
