@@ -21,8 +21,7 @@ export async function testSessions() {
     const time = Number.isFinite(s.time) && s.time > 0
       ? `${s.time.toFixed(1)}s` : "";
     const label = s.label && s.label !== s.session ? s.label : "";
-    const tsMatch = s.session.match(/-(\d{13})$/);
-    const startMs = tsMatch ? Number(tsMatch[1]) : 0;
+    const startMs = s.startedAt || 0;
     let status;
     if (s.state === "running") {
       status = startMs ? `running, started ${ago(now - startMs)}` : "running";

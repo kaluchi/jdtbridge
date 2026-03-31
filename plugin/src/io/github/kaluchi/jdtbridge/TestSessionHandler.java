@@ -124,6 +124,7 @@ class TestSessionHandler {
             obj.addProperty("time",
                     Double.isNaN(ts.time)
                             ? 0.0 : ts.time);
+            obj.addProperty("startedAt", ts.startedAt);
             arr.add(obj);
         }
         return arr.toString();

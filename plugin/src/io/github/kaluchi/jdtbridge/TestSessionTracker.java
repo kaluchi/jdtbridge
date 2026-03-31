@@ -29,6 +29,7 @@ class TestSessionTracker extends TestRunListener {
 
     static class TrackedTestSession {
         final String name;
+        final long startedAt = System.currentTimeMillis();
         volatile String label;
         volatile String project;
         volatile String runner;
