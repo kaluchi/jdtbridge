@@ -1,39 +1,40 @@
 import { get, getStream } from "../client.mjs";
 import { extractPositional, parseFlags } from "../args.mjs";
+import { formatTable } from "../format/table.mjs";
 
 export async function launchList() {
   const results = await get("/launch/list");
   if (results.error) {
     console.error(results.error);
-    process.exit(1);
+    return;
   }
   if (results.length === 0) {
     console.log("(no launches)");
     return;
   }
-  for (const r of results) {
+  const rows = results.map((r) => {
     const status = r.terminated
       ? `terminated${r.exitCode !== undefined ? ` (${r.exitCode})` : ""}`
       : "running";
-    const parts = [r.name, r.type, r.mode, status];
-    if (r.pid) parts.push(`pid:${r.pid}`);
-    console.log(parts.join("  "));
-  }
+    return [r.name, r.type, r.mode, status, r.pid ? `${r.pid}` : ""];
+  });
+  const headers = ["NAME", "TYPE", "MODE", "STATUS", "PID"];
+  console.log(formatTable(headers, rows));
 }
 
 export async function launchConfigs() {
   const results = await get("/launch/configs");
   if (results.error) {
     console.error(results.error);
-    process.exit(1);
+    return;
   }
   if (results.length === 0) {
     console.log("(no launch configurations)");
     return;
   }
-  for (const r of results) {
-    console.log(`${r.name}  ${r.type}`);
-  }
+  const rows = results.map((r) => [r.name, r.type]);
+  const headers = ["NAME", "TYPE"];
+  console.log(formatTable(headers, rows));
 }
 
 export async function launchClear(args) {
@@ -43,7 +44,7 @@ export async function launchClear(args) {
   const result = await get(url);
   if (result.error) {
     console.error(result.error);
-    process.exit(1);
+    return;
   }
   console.log(`Removed ${result.removed} terminated launch${result.removed !== 1 ? "es" : ""}`);
 }
@@ -74,7 +75,7 @@ async function launchWithMode(args, mode) {
   const result = await get(url, 30_000);
   if (result.error) {
     console.error(result.error);
-    process.exit(1);
+    return;
   }
 
   const follow = args.includes("-f") || args.includes("--follow");
@@ -143,7 +144,7 @@ export async function launchStop(args) {
   const result = await get(url);
   if (result.error) {
     console.error(result.error);
-    process.exit(1);
+    return;
   }
   console.log(`Stopped ${result.name}`);
 }
@@ -178,7 +179,7 @@ export async function launchLogs(args) {
   const result = await get(url, 30_000);
   if (result.error) {
     console.error(result.error);
-    process.exit(1);
+    return;
   }
   if (result.output) {
     const text = result.output.endsWith("\n")

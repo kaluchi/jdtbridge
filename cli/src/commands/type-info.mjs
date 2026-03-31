@@ -16,7 +16,7 @@ export async function typeInfo(args) {
   );
   if (result.error) {
     console.error(result.error);
-    process.exit(1);
+    return;
   }
 
   const filePath = toSandboxPath(stripProject(result.file));

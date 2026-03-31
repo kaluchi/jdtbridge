@@ -35,7 +35,7 @@ export async function testStatus(args) {
   const result = await get(url, 30_000);
   if (result.error) {
     console.error(result.error);
-    process.exit(1);
+    return;
   }
 
   formatTestStatus(result);

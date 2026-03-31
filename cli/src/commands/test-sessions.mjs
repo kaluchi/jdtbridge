@@ -1,5 +1,6 @@
 import { get } from "../client.mjs";
-import { green, red, yellow, dim } from "../color.mjs";
+import { green, red, yellow } from "../color.mjs";
+import { formatTable } from "../format/table.mjs";
 
 /**
  * List active and completed test sessions.
@@ -8,26 +9,29 @@ export async function testSessions() {
   const results = await get("/test/sessions");
   if (results.error) {
     console.error(results.error);
-    process.exit(1);
+    return;
   }
   if (results.length === 0) {
     console.log("(no test sessions)");
     return;
   }
-  for (const s of results) {
-    const label = s.label || s.session;
-    const counts = formatCounts(s);
-    const time =
-      Number.isFinite(s.time) && s.time > 0
-        ? `${s.time.toFixed(1)}s`
-        : "";
-    const state = s.state === "running"
-      ? `running (${s.completed}/${s.total})`
-      : s.state;
-    console.log(
-      `${s.session}  ${label}  ${s.total} tests  ${counts}  ${time}  ${state}`,
-    );
-  }
+  const now = Date.now();
+  const headers = ["SESSION", "LABEL", "TESTS", "RESULT", "TIME", "STATUS"];
+  const rows = results.map((s) => {
+    const time = Number.isFinite(s.time) && s.time > 0
+      ? `${s.time.toFixed(1)}s` : "";
+    const label = s.label && s.label !== s.session ? s.label : "";
+    const startMs = s.startedAt || 0;
+    let status;
+    if (s.state === "running") {
+      status = startMs ? `running, started ${ago(now - startMs)}` : "running";
+    } else {
+      const endMs = startMs && s.time > 0 ? startMs + s.time * 1000 : 0;
+      status = endMs ? `finished ${ago(now - endMs)}` : "finished";
+    }
+    return [s.session, label, `${s.total}`, formatCounts(s), time, status];
+  });
+  console.log(formatTable(headers, rows));
 }
 
 function formatCounts(s) {
@@ -37,6 +41,15 @@ function formatCounts(s) {
   if (s.errors > 0) parts.push(red(`${s.errors} errors`));
   if (s.ignored > 0) parts.push(yellow(`${s.ignored} ign`));
   return parts.join(", ");
+}
+
+function ago(ms) {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  return `${h}h ago`;
 }
 
 export const help = `List active and completed test sessions.

@@ -73,56 +73,85 @@ describe("commands (integration)", () => {
     });
     const { projects } = await import("../src/commands/projects.mjs");
     await projects([]);
-    expect(io.logs).toEqual(["my-server", "my-client"]);
+    const out = io.logs.join("\n");
+    expect(out).toContain("2 projects");
+    expect(out).toContain("`my-server`");
+    expect(out).toContain("`my-client`");
   });
 
-  it("find shows FQN and file", async () => {
+  it("find shows table with headers", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { fqn: "com.example.Foo", file: "/my-server/src/main/java/app/my/Foo.java" },
+        { fqn: "com.example.Foo", file: "/my-server/src/Foo.java", kind: "class" },
       ]));
     });
     const { find } = await import("../src/commands/find.mjs");
     await find(["Foo"]);
-    expect(io.logs[0]).toContain("com.example.Foo");
-    expect(io.logs[0]).toContain("my-server/src/main/java/app/my/Foo.java");
+    const out = io.logs[0];
+    expect(out).toContain("KIND");
+    expect(out).toContain("FQN");
+    expect(out).toContain("ORIGIN");
+    expect(out).toContain("[C]");
+    expect(out).toContain("`com.example.Foo`");
+    expect(out).toContain("my-server/src/Foo.java");
   });
 
-  it("find shows absolute Windows path on host", async () => {
+  it("find deduplicates binary types", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { fqn: "com.example.Foo", file: "D:/git/project/src/Foo.java" },
-      ]));
-    });
-    const { find } = await import("../src/commands/find.mjs");
-    await find(["Foo"]);
-    expect(io.logs[0]).toContain(toSandboxPath("D:/git/project/src/Foo.java"));
-  });
-
-  it("find shows JAR project path on host", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { fqn: "javax.swing.JPanel", file: "D:/git/m8/m8-client" },
+        { fqn: "javax.swing.JPanel", file: "D:/m8/m8-client", binary: true, origin: "rt.jar" },
+        { fqn: "javax.swing.JPanel", file: "D:/m8/m8-server", binary: true, origin: "rt.jar" },
       ]));
     });
     const { find } = await import("../src/commands/find.mjs");
     await find(["JPanel"]);
-    expect(io.logs[0]).toContain(toSandboxPath("D:/git/m8/m8-client"));
+    const out = io.logs[0];
+    expect(out.match(/javax\.swing\.JPanel/g).length).toBe(1);
+    expect(out).toContain("rt.jar");
   });
 
-  it("find shows backslash Windows path", async () => {
+  it("find shows source path and binary origin", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { fqn: "com.example.Bar", file: "D:\\git\\project\\src\\Bar.java" },
+        { fqn: "com.example.Foo", file: "D:/git/project/src/Foo.java", kind: "class" },
+        { fqn: "javax.swing.JPanel", file: "D:/m8/m8-client", kind: "class", binary: true, origin: "rt.jar" },
       ]));
     });
     const { find } = await import("../src/commands/find.mjs");
-    await find(["Bar"]);
-    expect(io.logs[0]).toContain(toSandboxPath("D:\\git\\project\\src\\Bar.java"));
+    await find(["Foo"]);
+    const out = io.logs[0];
+    expect(out).toContain(toSandboxPath("D:/git/project/src/Foo.java"));
+    expect(out).toContain("rt.jar");
+  });
+
+  it("find shows interface badge", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify([
+        { fqn: "com.example.Service", file: "/my-server/src/Service.java", kind: "interface" },
+      ]));
+    });
+    const { find } = await import("../src/commands/find.mjs");
+    await find(["Service"]);
+    const out = io.logs[0];
+    expect(out).toContain("[I]");
+  });
+
+  it("find shows annotation badge", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify([
+        { fqn: "org.junit.Test", kind: "annotation", binary: true, origin: "junit-4.13.2.jar" },
+      ]));
+    });
+    const { find } = await import("../src/commands/find.mjs");
+    await find(["Test"]);
+    const out = io.logs[0];
+    expect(out).toContain("[A]");
+    expect(out).toContain("junit-4.13.2.jar");
   });
 
   it("find shows no results message", async () => {
@@ -506,97 +535,97 @@ describe("commands (integration)", () => {
   it("projects exits on server error", async () => {
     await setupMock(errorServer());
     const { projects } = await import("../src/commands/projects.mjs");
-    await expect(projects([])).rejects.toThrow("exit(1)");
+    await projects([]);
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
   it("find exits on server error", async () => {
     await setupMock(errorServer());
     const { find } = await import("../src/commands/find.mjs");
-    await expect(find(["Foo"])).rejects.toThrow("exit(1)");
+    await find(["Foo"]);
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
   it("subtypes exits on server error", async () => {
     await setupMock(errorServer());
     const { subtypes } = await import("../src/commands/subtypes.mjs");
-    await expect(subtypes(["app.Foo"])).rejects.toThrow("exit(1)");
+    await subtypes(["app.Foo"]);
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
   it("hierarchy exits on server error", async () => {
     await setupMock(errorServer());
     const { hierarchy } = await import("../src/commands/hierarchy.mjs");
-    await expect(hierarchy(["app.Foo"])).rejects.toThrow("exit(1)");
+    await hierarchy(["app.Foo"]);
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
   it("implementors exits on server error", async () => {
     await setupMock(errorServer());
     const { implementors } = await import("../src/commands/implementors.mjs");
-    await expect(implementors(["app.Foo", "m"])).rejects.toThrow("exit(1)");
+    await implementors(["app.Foo", "m"]);
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
   it("type-info exits on server error", async () => {
     await setupMock(errorServer());
     const { typeInfo } = await import("../src/commands/type-info.mjs");
-    await expect(typeInfo(["app.Foo"])).rejects.toThrow("exit(1)");
+    await typeInfo(["app.Foo"]);
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
   it("errors exits on server error", async () => {
     await setupMock(errorServer());
     const { errors } = await import("../src/commands/errors.mjs");
-    await expect(errors([])).rejects.toThrow("exit(1)");
+    await errors([]);
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
   it("build exits on server error", async () => {
     await setupMock(errorServer());
     const { build } = await import("../src/commands/build.mjs");
-    await expect(build(["--project", "my-client"])).rejects.toThrow("exit(1)");
+    await build(["--project", "my-client"]);
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
   it("project-info exits on server error", async () => {
     await setupMock(errorServer());
     const { projectInfo } = await import("../src/commands/project-info.mjs");
-    await expect(projectInfo(["proj"])).rejects.toThrow("exit(1)");
+    await projectInfo(["proj"]);
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
   it("organize-imports exits on server error", async () => {
     await setupMock(errorServer());
     const { organizeImports } = await import("../src/commands/refactoring.mjs");
-    await expect(organizeImports(["f.java"])).rejects.toThrow("exit(1)");
+    await organizeImports(["f.java"]);
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
   it("format exits on server error", async () => {
     await setupMock(errorServer());
     const { format } = await import("../src/commands/refactoring.mjs");
-    await expect(format(["f.java"])).rejects.toThrow("exit(1)");
+    await format(["f.java"]);
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
   it("rename exits on server error", async () => {
     await setupMock(errorServer());
     const { rename } = await import("../src/commands/refactoring.mjs");
-    await expect(rename(["app.Foo", "Bar"])).rejects.toThrow("exit(1)");
+    await rename(["app.Foo", "Bar"]);
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
   it("move exits on server error", async () => {
     await setupMock(errorServer());
     const { move } = await import("../src/commands/refactoring.mjs");
-    await expect(move(["app.Foo", "app.bar"])).rejects.toThrow("exit(1)");
+    await move(["app.Foo", "app.bar"]);
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
   // ---- launch ----
 
-  it("launch list shows launches", async () => {
+  it("launch list shows launches as table", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
@@ -606,10 +635,13 @@ describe("commands (integration)", () => {
     });
     const { launchList } = await import("../src/commands/launch.mjs");
     await launchList();
-    expect(io.logs[0]).toContain("my-server");
-    expect(io.logs[0]).toContain("running");
-    expect(io.logs[1]).toContain("ObjectMapperTest");
-    expect(io.logs[1]).toContain("terminated");
+    const out = io.logs[0];
+    expect(out).toContain("NAME");
+    expect(out).toContain("STATUS");
+    expect(out).toContain("my-server");
+    expect(out).toContain("running");
+    expect(out).toContain("ObjectMapperTest");
+    expect(out).toContain("terminated (0)");
   });
 
   it("launch list empty", async () => {
@@ -661,7 +693,7 @@ describe("commands (integration)", () => {
     expect(io.logs[0]).toContain("last line");
   });
 
-  it("launch configs shows configurations", async () => {
+  it("launch configs shows configurations as table", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
@@ -671,9 +703,13 @@ describe("commands (integration)", () => {
     });
     const { launchConfigs } = await import("../src/commands/launch.mjs");
     await launchConfigs();
-    expect(io.logs[0]).toContain("my-server");
-    expect(io.logs[0]).toContain("Java Application");
-    expect(io.logs[1]).toContain("AllTests");
+    const out = io.logs[0];
+    expect(out).toContain("NAME");
+    expect(out).toContain("TYPE");
+    expect(out).toContain("my-server");
+    expect(out).toContain("Java Application");
+    expect(out).toContain("AllTests");
+    expect(out).toContain("JUnit");
   });
 
   it("launch configs empty", async () => {
@@ -769,16 +805,18 @@ describe("commands (integration)", () => {
     await expect(launchConsole([])).rejects.toThrow("exit(1)");
   });
 
-  it("launch console error exits", async () => {
+  it("launch console error does not exit 1", async () => {
     await setupMock(errorServer());
     const { launchConsole } = await import("../src/commands/launch.mjs");
-    await expect(launchConsole(["my-server"])).rejects.toThrow("exit(1)");
+    await launchConsole(["my-server"]);
+    expect(io.errors[0]).toContain("Something went wrong");
   });
 
-  it("launch list error exits", async () => {
+  it("launch list error does not exit 1", async () => {
     await setupMock(errorServer());
     const { launchList } = await import("../src/commands/launch.mjs");
-    await expect(launchList()).rejects.toThrow("exit(1)");
+    await launchList();
+    expect(io.errors[0]).toContain("Something went wrong");
   });
 
   it("launch console --follow streams text/plain", async () => {
@@ -896,21 +934,21 @@ describe("commands (integration)", () => {
   it("editors exits on server error", async () => {
     await setupMock(errorServer());
     const { editors } = await import("../src/commands/editor.mjs");
-    await expect(editors()).rejects.toThrow("exit(1)");
+    await editors();
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
   it("open exits on server error", async () => {
     await setupMock(errorServer());
     const { open } = await import("../src/commands/editor.mjs");
-    await expect(open(["app.Foo"])).rejects.toThrow("exit(1)");
+    await open(["app.Foo"]);
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
   it("references exits on server error", async () => {
     await setupMock(errorServer());
     const { references } = await import("../src/commands/references.mjs");
-    await expect(references(["app.Foo"])).rejects.toThrow("exit(1)");
+    await references(["app.Foo"]);
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
@@ -1073,13 +1111,13 @@ describe("commands (integration)", () => {
     expect(out).toContain("`org.eclipse.core.runtime.CoreException`");
   });
 
-  it("source with error", async () => {
+  it("source with error does not exit 1", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Type not found: Bogus" }));
     });
     const { source } = await import("../src/commands/source.mjs");
-    await expect(source(["Bogus"])).rejects.toThrow("exit(1)");
+    await source(["Bogus"]);
     expect(io.errors[0]).toContain("not found");
   });
 
@@ -1180,40 +1218,43 @@ describe("commands (integration)", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { fqn: "com.example.Foo", file: "D:/git/project/src/Foo.java" },
+        { fqn: "com.example.Foo", file: "D:/git/project/src/Foo.java", kind: "class" },
       ]));
     });
     mockSandboxPaths();
     const { find } = await import("../src/commands/find.mjs");
     await find(["Foo"]);
-    expect(io.logs[0]).toContain("/d/git/project/src/Foo.java");
+    const out = io.logs[0];
+    expect(out).toContain("/d/git/project/src/Foo.java");
   });
 
-  it("find converts JAR project path in sandbox", async () => {
+  it("find binary shows origin not path in sandbox", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { fqn: "javax.swing.table.TableModel", file: "D:/git/m8/m8-client" },
+        { fqn: "javax.swing.table.TableModel", file: "D:/m8/m8-client", binary: true, kind: "interface", origin: "rt.jar" },
       ]));
     });
     mockSandboxPaths();
     const { find } = await import("../src/commands/find.mjs");
     await find(["TableModel"]);
-    expect(io.logs[0]).toContain("/d/git/m8/m8-client");
+    const out = io.logs[0];
+    expect(out).toContain("rt.jar");
+    expect(out).not.toContain("/d/m8");
   });
 
   it("find keeps workspace-relative path unchanged in sandbox", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { fqn: "com.example.Foo", file: "/my-server/src/Foo.java" },
+        { fqn: "com.example.Foo", file: "/my-server/src/Foo.java", kind: "class" },
       ]));
     });
     mockSandboxPaths();
     const { find } = await import("../src/commands/find.mjs");
     await find(["Foo"]);
-    expect(io.logs[0]).toContain("my-server/src/Foo.java");
-    expect(io.logs[0]).not.toContain("/d/");
+    const out = io.logs[0];
+    expect(out).toContain("my-server/src/Foo.java");
   });
 
   it("errors converts path in sandbox", async () => {
@@ -1366,5 +1407,83 @@ describe("commands (integration)", () => {
     await projectInfo(["m8-server"]);
     const out = io.logs.join("\n");
     expect(out).toContain("/d/git/m8/m8-server");
+  });
+
+  // ---- Empty states: consistent (no <entity>) format ----
+
+  it("all empty states use (no <entity>) format", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end("[]");
+    });
+
+    const cases = [
+      { mod: "../src/commands/find.mjs", fn: "find", args: ["X"], expected: "(no results)" },
+      { mod: "../src/commands/subtypes.mjs", fn: "subtypes", args: ["X"], expected: "(no subtypes)" },
+      { mod: "../src/commands/implementors.mjs", fn: "implementors", args: ["X", "m"], expected: "(no implementors)" },
+      { mod: "../src/commands/references.mjs", fn: "references", args: ["X"], expected: "(no references)" },
+      { mod: "../src/commands/errors.mjs", fn: "errors", args: [], expected: "(no errors)" },
+    ];
+
+    for (const { mod, fn, args, expected } of cases) {
+      io.logs.length = 0;
+      vi.resetModules();
+      vi.doMock("../src/bridge-env.mjs", () => ({ getPinnedBridge: () => null }));
+      vi.doMock("../src/discovery.mjs", () => ({
+        discoverInstances: async () => [],
+        findInstance: async () => ({ port, token: null, pid: process.pid, workspace: "/test", host: "127.0.0.1" }),
+      }));
+      const module = await import(mod);
+      await module[fn](args);
+      expect(io.logs[0]).toBe(expected);
+    }
+  });
+
+  // ---- Domain errors: exit 0, not exit 1 ----
+
+  it("domain errors do not call process.exit", async () => {
+    await setupMock(errorServer());
+
+    const cases = [
+      { mod: "../src/commands/find.mjs", fn: "find", args: ["X"] },
+      { mod: "../src/commands/subtypes.mjs", fn: "subtypes", args: ["X"] },
+      { mod: "../src/commands/references.mjs", fn: "references", args: ["X"] },
+      { mod: "../src/commands/errors.mjs", fn: "errors", args: [] },
+      { mod: "../src/commands/type-info.mjs", fn: "typeInfo", args: ["X"] },
+      { mod: "../src/commands/hierarchy.mjs", fn: "hierarchy", args: ["X"] },
+      { mod: "../src/commands/projects.mjs", fn: "projects", args: [] },
+    ];
+
+    for (const { mod, fn, args } of cases) {
+      io.errors.length = 0;
+      vi.resetModules();
+      vi.doMock("../src/bridge-env.mjs", () => ({ getPinnedBridge: () => null }));
+      vi.doMock("../src/discovery.mjs", () => ({
+        discoverInstances: async () => [],
+        findInstance: async () => ({ port, token: null, pid: process.pid, workspace: "/test", host: "127.0.0.1" }),
+      }));
+      const module = await import(mod);
+      // Should NOT throw — returns normally (exit 0)
+      await module[fn](args);
+      expect(io.errors[0]).toContain("Something went wrong");
+    }
+  });
+
+  // ---- Missing args: still exit 1 ----
+
+  it("missing args still exit 1", async () => {
+    const cases = [
+      { mod: "../src/commands/find.mjs", fn: "find", args: [] },
+      { mod: "../src/commands/subtypes.mjs", fn: "subtypes", args: [] },
+      { mod: "../src/commands/type-info.mjs", fn: "typeInfo", args: [] },
+      { mod: "../src/commands/hierarchy.mjs", fn: "hierarchy", args: [] },
+      { mod: "../src/commands/references.mjs", fn: "references", args: [] },
+    ];
+
+    for (const { mod, fn, args } of cases) {
+      vi.resetModules();
+      const module = await import(mod);
+      await expect(module[fn](args)).rejects.toThrow("exit(1)");
+    }
   });
 });

@@ -18,7 +18,7 @@ export async function projectInfo(args) {
   const result = await get(url, 30_000);
   if (result.error) {
     console.error(result.error);
-    process.exit(1);
+    return;
   }
   const maxLines = parseInt(flags.lines) || 50;
   console.log(formatProjectInfo(result, maxLines));

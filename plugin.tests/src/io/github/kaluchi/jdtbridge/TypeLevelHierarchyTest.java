@@ -103,11 +103,11 @@ public class TypeLevelHierarchyTest {
         }
 
         @Test
-        void objectNotInSupertypes() throws Exception {
+        void objectInSupertypes() throws Exception {
             JsonObject obj = sourceJson("test.model.Dog");
             JsonArray supers = obj.getAsJsonArray("supertypes");
-            assertFalse(hasInArray(supers, "java.lang.Object"),
-                    "Object should be filtered");
+            assertTrue(hasInArray(supers, "java.lang.Object"),
+                    "Object should be in supertypes");
         }
     }
 

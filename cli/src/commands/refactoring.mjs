@@ -16,7 +16,7 @@ export async function organizeImports(args) {
   );
   if (result.error) {
     console.error(result.error);
-    process.exit(1);
+    return;
   }
   console.log(`Imports: +${result.added} -${result.removed}`);
 }
@@ -34,7 +34,7 @@ export async function format(args) {
   );
   if (result.error) {
     console.error(result.error);
-    process.exit(1);
+    return;
   }
   if (result.modified) {
     console.log(green("Formatted"));
@@ -64,7 +64,7 @@ export async function rename(args) {
   const result = await get(url, 30_000);
   if (result.error) {
     console.error(result.error);
-    process.exit(1);
+    return;
   }
   console.log(green("Renamed"));
   if (result.warnings) {
@@ -83,7 +83,7 @@ export async function move(args) {
   const result = await get(url, 30_000);
   if (result.error) {
     console.error(result.error);
-    process.exit(1);
+    return;
   }
   console.log(green("Moved"));
   if (result.warnings) {

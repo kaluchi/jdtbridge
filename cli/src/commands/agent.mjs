@@ -107,7 +107,7 @@ export async function agentList() {
   const sessions = readSessions();
 
   if (sessions.length === 0) {
-    console.log("No agent sessions.");
+    console.log("(no agent sessions)");
     return;
   }
 
@@ -250,7 +250,7 @@ function printSessionError(subcmd, hint, candidates) {
       console.error(`  jdt agent ${subcmd} ${s.name}`);
     }
   } else if (!hint) {
-    console.error("No agent sessions.");
+    console.error("(no agent sessions)");
   } else {
     console.error(`No agent session found: ${hint}`);
   }

@@ -117,13 +117,14 @@ describe("test commands", () => {
     expect(io.errors[0]).toContain("Usage");
   });
 
-  it("test run exits on server error", async () => {
+  it("test run does not exit 1 on server error", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Something went wrong" }));
     });
     const { testRun } = await import("../src/commands/test-run.mjs");
-    await expect(testRun(["com.example.FooTest", "-q"])).rejects.toThrow("exit(1)");
+    await testRun(["com.example.FooTest", "-q"]);
+    expect(io.errors[0]).toContain("Something went wrong");
   });
 
   it("test run sends method param with FQMN#method", async () => {
@@ -280,13 +281,13 @@ describe("test commands", () => {
     await testStatus(["s", "--all"]);
   });
 
-  it("test status exits on server error", async () => {
+  it("test status does not exit 1 on server error", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Session not found" }));
     });
     const { testStatus } = await import("../src/commands/test-status.mjs");
-    await expect(testStatus(["bad-session"])).rejects.toThrow("exit(1)");
+    await testStatus(["bad-session"]);
     expect(io.errors[0]).toContain("Session not found");
   });
 
@@ -316,12 +317,13 @@ describe("test commands", () => {
     expect(io.logs[0]).toContain("no test sessions");
   });
 
-  it("test sessions exits on error", async () => {
+  it("test sessions does not exit 1 on error", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "fail" }));
     });
     const { testSessions } = await import("../src/commands/test-sessions.mjs");
-    await expect(testSessions()).rejects.toThrow("exit(1)");
+    await testSessions();
+    expect(io.errors[0]).toContain("fail");
   });
 });

@@ -1,12 +1,18 @@
 import { get } from "../client.mjs";
+import { dim } from "../color.mjs";
 
 export async function projects() {
   const results = await get("/projects");
   if (results.error) {
     console.error(results.error);
-    process.exit(1);
+    return;
   }
-  for (const p of results) console.log(p);
+  if (results.length === 0) {
+    console.log("(no projects)");
+    return;
+  }
+  console.log(`${results.length} projects:\n`);
+  for (const p of results) console.log(`- \`${p}\``);
 }
 
 export const help = `List all Java projects in the Eclipse workspace.
