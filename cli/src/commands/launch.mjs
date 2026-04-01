@@ -1,40 +1,35 @@
 import { get, getStream } from "../client.mjs";
 import { extractPositional, parseFlags } from "../args.mjs";
+import { output } from "../output.mjs";
 import { formatTable } from "../format/table.mjs";
 
-export async function launchList() {
-  const results = await get("/launch/list");
-  if (results.error) {
-    console.error(results.error);
-    return;
-  }
-  if (results.length === 0) {
-    console.log("(no launches)");
-    return;
-  }
-  const rows = results.map((r) => {
-    const status = r.terminated
-      ? `terminated${r.exitCode !== undefined ? ` (${r.exitCode})` : ""}`
-      : "running";
-    return [r.name, r.type, r.mode, status, r.pid ? `${r.pid}` : ""];
+export async function launchList(args = []) {
+  const data = await get("/launch/list");
+
+  output(args, data, {
+    empty: "(no launches)",
+    text(data) {
+      const rows = data.map((r) => {
+        const status = r.terminated
+          ? `terminated${r.exitCode !== undefined ? ` (${r.exitCode})` : ""}`
+          : "running";
+        return [r.name, r.type, r.mode, status, r.pid ? `${r.pid}` : ""];
+      });
+      console.log(formatTable(["NAME", "TYPE", "MODE", "STATUS", "PID"], rows));
+    },
   });
-  const headers = ["NAME", "TYPE", "MODE", "STATUS", "PID"];
-  console.log(formatTable(headers, rows));
 }
 
-export async function launchConfigs() {
-  const results = await get("/launch/configs");
-  if (results.error) {
-    console.error(results.error);
-    return;
-  }
-  if (results.length === 0) {
-    console.log("(no launch configurations)");
-    return;
-  }
-  const rows = results.map((r) => [r.name, r.type]);
-  const headers = ["NAME", "TYPE"];
-  console.log(formatTable(headers, rows));
+export async function launchConfigs(args = []) {
+  const data = await get("/launch/configs");
+
+  output(args, data, {
+    empty: "(no launch configurations)",
+    text(data) {
+      const rows = data.map((r) => [r.name, r.type]);
+      console.log(formatTable(["NAME", "TYPE"], rows));
+    },
+  });
 }
 
 export async function launchClear(args) {
@@ -237,73 +232,80 @@ async function followLogs(name, args) {
   }
 }
 
-export const launchRunHelp = `Launch a saved configuration.
+// ---- Help strings ----
+
+export const launchListHelp = `List all launches (running and terminated).
+
+Usage:  jdt launch list [--json]
+
+Options:
+  --json    output as JSON
+
+Examples:
+  jdt launch list
+  jdt launch list --json`;
+
+export const launchConfigsHelp = `List saved launch configurations.
+
+Usage:  jdt launch configs [--json]
+
+Options:
+  --json    output as JSON
+
+Examples:
+  jdt launch configs
+  jdt launch configs --json`;
+
+export const launchRunHelp = `Launch a saved configuration (non-blocking).
 
 Usage:  jdt launch run <config-name> [-f] [-q]
 
-Without -f, launches and prints a guide with available commands.
-With -f, launches and streams console output until the process terminates.
-
 Flags:
-  -f, --follow   stream output (Ctrl+C to detach, process keeps running)
+  -f, --follow   stream console output until termination
   -q, --quiet    suppress onboarding guide
 
 Examples:
-  jdt launch run m8-server                run + show guide
-  jdt launch run m8-server -q             run silently
-  jdt launch run jdtbridge-verify -f      run + stream all output
-  jdt launch run m8-server -f | tail -20  run + wait + bounded output`;
+  jdt launch run my-server
+  jdt launch run my-server -f
+  jdt launch run jdtbridge-verify -f | tail -20`;
 
-export const launchDebugHelp = `Launch a configuration in debug mode.
+export const launchDebugHelp = `Launch in debug mode (non-blocking).
 
 Usage:  jdt launch debug <config-name> [-f] [-q]
 
-Same as "launch run" but attaches the Eclipse debugger.
-
-Examples:
-  jdt launch debug m8-server
-  jdt launch debug m8-server -f`;
+Same as 'launch run' but attaches the debugger.`;
 
 export const launchStopHelp = `Stop a running launch.
 
 Usage:  jdt launch stop <name>
 
-Example:  jdt launch stop m8-server`;
+Example:  jdt launch stop my-server`;
 
-export const launchConfigsHelp = `List saved launch configurations (Run → Run Configurations).
-
-Usage:  jdt launch configs
-
-Output: configuration name and type, one per line.`;
-
-export const launchClearHelp = `Remove terminated launches and their console output.
+export const launchClearHelp = `Remove terminated launches from the list.
 
 Usage:  jdt launch clear [name]
 
-Without name, removes all terminated launches. With name, removes only that one.`;
-
-export const launchListHelp = `List all launches (running and terminated).
-
-Usage:  jdt launch list
-
-Output: name, type, mode, status — one launch per line.`;
+Without name: removes all terminated launches.
+With name: removes only that specific terminated launch.`;
 
 export const launchLogsHelp = `Show console output of a launch.
 
-Console output is captured by Eclipse and persists after the process
-terminates. Without -f, returns a snapshot. With -f, streams in real-time.
-
 Usage:  jdt launch logs <name> [-f|--follow] [--tail N]
+                                [--stdout] [--stderr]
+
+Without -f, returns a snapshot of current output.
+With -f, streams output until the process terminates.
 
 Flags:
-  -f, --follow   stream until process terminates (Ctrl+C to detach)
-  --tail <N>     last N lines only (snapshot), or start N lines back (follow)
+  -f, --follow     stream live output (blocks until exit)
+  --tail <N>       last N lines only
+  --stdout         stdout stream only
+  --stderr         stderr stream only
 
 Examples:
-  jdt launch logs m8-server                full output snapshot
-  jdt launch logs m8-server --tail 30      last 30 lines
-  jdt launch logs m8-server -f             stream live
-  jdt launch logs m8-server -f | tail -20  wait + bounded output`;
+  jdt launch logs my-server
+  jdt launch logs my-server --tail 50
+  jdt launch logs my-server -f
+  jdt launch logs my-server -f | tail -20`;
 
-// Keep old name for backward compatibility
 export const launchConsoleHelp = launchLogsHelp;

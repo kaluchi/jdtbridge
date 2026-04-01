@@ -1869,6 +1869,101 @@ describe("commands (integration)", () => {
     expect(data.source).toBe("public class Foo {}");
   });
 
+  // ---- Tier 2 --json ----
+
+  it("launch list --json outputs valid JSON", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify([
+        { name: "my-server", type: "Java Application", mode: "run", terminated: false, pid: "12345" },
+      ]));
+    });
+    const { launchList } = await import("../src/commands/launch.mjs");
+    await launchList(["--json"]);
+    const data = parseJsonOutput(io.logs);
+    expect(data).toBeInstanceOf(Array);
+    expect(data[0].name).toBe("my-server");
+    expect(data[0].pid).toBe("12345");
+  });
+
+  it("launch list --json returns [] when empty", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end("[]");
+    });
+    const { launchList } = await import("../src/commands/launch.mjs");
+    await launchList(["--json"]);
+    const data = parseJsonOutput(io.logs);
+    expect(data).toEqual([]);
+  });
+
+  it("launch configs --json outputs valid JSON", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify([
+        { name: "my-server", type: "Java Application" },
+        { name: "jdtbridge-verify", type: "Maven Build" },
+      ]));
+    });
+    const { launchConfigs } = await import("../src/commands/launch.mjs");
+    await launchConfigs(["--json"]);
+    const data = parseJsonOutput(io.logs);
+    expect(data).toBeInstanceOf(Array);
+    expect(data).toHaveLength(2);
+    expect(data[0].name).toBe("my-server");
+  });
+
+  it("project-info --json outputs raw server response", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        name: "test-proj", location: "/ws/test-proj",
+        natures: ["org.eclipse.jdt.core.javanature"],
+        dependencies: ["my-core"], totalTypes: 2,
+      }));
+    });
+    const { projectInfo } = await import("../src/commands/project-info.mjs");
+    await projectInfo(["test-proj", "--json"]);
+    const data = parseJsonOutput(io.logs);
+    expect(data.name).toBe("test-proj");
+    expect(data.totalTypes).toBe(2);
+    expect(data.natures).toContain("org.eclipse.jdt.core.javanature");
+  });
+
+  it("project-info --json returns error on server error", async () => {
+    await setupMock(errorServer());
+    const { projectInfo } = await import("../src/commands/project-info.mjs");
+    await projectInfo(["proj", "--json"]);
+    const data = parseJsonOutput(io.logs);
+    expect(data.error).toBe("Something went wrong");
+  });
+
+  it("git --json outputs structured repo data", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify([
+        { name: "my-server", location: "D:/projects/my-server", repo: "D:/projects", branch: "main" },
+      ]));
+    });
+    const { git } = await import("../src/commands/git.mjs");
+    await git(["--json"]);
+    const data = parseJsonOutput(io.logs);
+    expect(data).toBeInstanceOf(Array);
+    expect(data[0].name).toBe("projects");
+    expect(data[0].branch).toBe("main");
+  });
+
+  it("git --json returns [] for no repos", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify([]));
+    });
+    const { git } = await import("../src/commands/git.mjs");
+    await git(["--json"]);
+    const data = parseJsonOutput(io.logs);
+    expect(data).toEqual([]);
+  });
+
   // ---- --json does not break normal output ----
 
   it("find without --json still shows table", async () => {

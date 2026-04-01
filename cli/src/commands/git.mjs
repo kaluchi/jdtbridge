@@ -8,6 +8,7 @@ import { basename } from "node:path";
 import { get } from "../client.mjs";
 import { extractPositional, parseFlags } from "../args.mjs";
 import { toSandboxPath } from "../paths.mjs";
+import { output } from "../output.mjs";
 import { formatTable } from "../format/table.mjs";
 import { green, yellow } from "../color.mjs";
 
@@ -28,6 +29,7 @@ async function gitList(args = []) {
   const filter = extractPositional(args);
   const projects = await get("/projects");
   if (projects.error) {
+    if (flags.json) { console.log(JSON.stringify({ error: projects.error })); return; }
     console.error(projects.error);
     return;
   }
@@ -37,32 +39,45 @@ async function gitList(args = []) {
     repos = repos.filter((r) =>
       filter.some((f) => r.name === f || r.name.includes(f)));
   }
-  if (repos.length === 0) {
-    console.log("(no git repos)");
-    return;
-  }
 
-  const headers = ["REPO", "STATUS", "PATH", "BRANCH"];
-  const rows = [];
-
-  for (const repo of repos) {
-    const repoPath = toSandboxPath(repo.path);
+  // Build repo data with raw git status lines
+  const repoData = repos.map((repo) => {
     const statusOut = gitCmd(repo.path, "git status --short");
     const dirtyLines = statusOut.split("\n").filter((l) => l.trim());
-    const status = dirtyLines.length > 0
-      ? yellow(`${dirtyLines.length} modified`) : green("clean");
-    rows.push([repo.name, status, repoPath, repo.branch]);
+    return { repo, dirtyLines };
+  });
 
-    if (dirtyLines.length > 0 && limit >= 0) {
-      const show = limit === 0 ? dirtyLines : dirtyLines.slice(0, limit);
-      for (const l of show) rows.push([l.trim(), "", "", ""]);
-      if (limit > 0 && dirtyLines.length > limit) {
-        rows.push([`...+${dirtyLines.length - limit} more`, "", "", ""]);
+  // JSON gets clean data (no ANSI)
+  const data = repoData.map(({ repo, dirtyLines }) => ({
+    name: repo.name,
+    path: toSandboxPath(repo.path),
+    branch: repo.branch,
+    dirty: dirtyLines.length,
+    files: dirtyLines.map((l) => stripAnsi(l.trim())),
+  }));
+
+  output(args, data, {
+    empty: "(no git repos)",
+    text() {
+      const headers = ["REPO", "STATUS", "PATH", "BRANCH"];
+      const rows = [];
+      for (const { repo, dirtyLines } of repoData) {
+        const repoPath = toSandboxPath(repo.path);
+        const status = dirtyLines.length > 0
+          ? yellow(`${dirtyLines.length} modified`) : green("clean");
+        rows.push([repo.name, status, repoPath, repo.branch]);
+
+        if (dirtyLines.length > 0 && limit >= 0) {
+          const show = limit === 0 ? dirtyLines : dirtyLines.slice(0, limit);
+          for (const l of show) rows.push([l.trim(), "", "", ""]);
+          if (limit > 0 && dirtyLines.length > limit) {
+            rows.push([`...+${dirtyLines.length - limit} more`, "", "", ""]);
+          }
+        }
       }
-    }
-  }
-
-  console.log(formatTable(headers, rows));
+      console.log(formatTable(headers, rows));
+    },
+  });
 }
 
 function reposFromProjects(projects) {
@@ -77,6 +92,10 @@ function reposFromProjects(projects) {
   return [...seen.values()];
 }
 
+// eslint-disable-next-line no-control-regex
+const ANSI_RE = /\x1b\[[0-9;]*m/g;
+function stripAnsi(s) { return s.replace(ANSI_RE, ""); }
+
 function gitCmd(repoPath, cmd) {
   try {
     return execSync(cmd, {
@@ -89,7 +108,7 @@ function gitCmd(repoPath, cmd) {
 
 export const help = `Show git repos, branches, and modified files.
 
-Usage:  jdt git [repo...] [--limit N]
+Usage:  jdt git [repo...] [--limit N] [--json]
 
 Arguments:
   repo          filter by repo name (substring match)
@@ -97,8 +116,10 @@ Arguments:
 Flags:
   --limit <N>   max dirty files per repo (default: 10, 0 = all)
   --no-files    hide file list, show only summary table
+  --json        output as JSON
 
 Examples:
   jdt git                all repos
   jdt git m8             only repos matching "m8"
-  jdt git m8 --limit 0   m8 repos, all dirty files`;
+  jdt git m8 --limit 0   m8 repos, all dirty files
+  jdt git --json`;
