@@ -19,13 +19,17 @@ jdt setup --skip-build          # reinstall last build
 jdt setup --clean               # clean build (mvn clean verify)
 jdt setup --remove              # uninstall plugin from Eclipse
 jdt setup --eclipse <path>      # specify Eclipse path (saved to config)
+jdt setup --claude              # configure Claude Code for this project (permissions + hooks)
+jdt setup --remove-claude       # remove JDT Bridge hooks from Claude Code settings
 ```
 
-If Eclipse is running, you will be prompted to stop it. After install, Eclipse restarts automatically with the same workspace.
+Eclipse must be stopped for install/update/remove operations. If running, you will be prompted to stop it. After install, Eclipse restarts automatically with the same workspace.
 
 ## Commands
 
 Run `jdt help <command>` for detailed flags and examples. Most commands have short aliases.
+
+All data-returning commands support `--json` for structured output (JSON snapshot, or JSONL when streaming with `-f`).
 
 ### Dashboard
 
@@ -36,13 +40,13 @@ jdt status [sections...] [-q]                          # workspace overview (sta
 ### Search & navigation
 
 ```bash
-jdt find <Name|package> [--source-only]                 # find types by name, wildcard, or package
-jdt references <FQMN> [--field <name>]                  # (alias: refs) references to type/method/field
+jdt find <Name|*Pattern*|pkg> [--source-only]          # find types by name, wildcard, or package
+jdt references <FQMN> [--field <name>]                 # (alias: refs) references to type/method/field
 jdt subtypes <FQN>                                     # (alias: subt) all subtypes/implementors
 jdt hierarchy <FQN>                                    # (alias: hier) supers + interfaces + subtypes
 jdt implementors <FQMN>                                # (alias: impl) implementations of interface method
 jdt type-info <FQN>                                    # (alias: ti) class overview (fields, methods)
-jdt source <FQMN>                                      # (alias: src) source code (project + libraries)
+jdt source <FQMN> [<FQMN> ...]                         # (alias: src) source code (project + libraries)
 ```
 
 ### Testing & building
@@ -52,17 +56,20 @@ jdt build [--project <name>] [--incremental]           # (alias: b) build projec
 jdt test run <FQN>[#method] [--project <name>] [-f]    # launch tests (non-blocking)
 jdt test run --project <name> [--package <pkg>] [-f]   # run tests in project
 jdt test status <session> [-f] [--all] [--ignored]     # show test progress/results
-jdt test sessions                                       # list test sessions
+jdt test sessions                                      # list test sessions
 ```
+
+With `-f`, streams test progress until completion. `-q` suppresses the onboarding guide.
+`--all` includes passed tests, `--ignored` shows skipped.
 
 All commands auto-refresh from disk. `build` is the only command that triggers explicit builds.
 
 ### Diagnostics
 
 ```bash
-jdt errors [--project <name>] [--file <path>]          # (alias: err) compilation errors
+jdt errors [--file <path>] [--project <name>]          # (alias: err) compilation errors
 jdt errors --warnings --all                            # include warnings and all marker types
-jdt refresh <file> [<file> ...]                        # (alias: r) notify Eclipse of file changes
+jdt refresh <file> [<file> ...] [-q]                   # (alias: r) notify Eclipse of file changes
 jdt refresh --project <name>                           # refresh entire project
 jdt refresh                                            # refresh entire workspace
 ```
@@ -76,10 +83,12 @@ after every Edit/Write — Eclipse stays in sync without manual intervention.
 ### Maven
 
 ```bash
-jdt maven update                                       # update all Maven projects (Alt+F5)
+jdt maven update                                       # (alias: up) update all Maven projects (Alt+F5)
 jdt maven update --project m8-server                   # update specific project
 jdt maven update -f                                    # wait for auto-build, show error count
 jdt maven update --force --offline                     # force snapshots, offline mode
+jdt maven update --no-config --no-clean --no-refresh   # skip config/clean/refresh steps
+jdt maven up -q                                        # quiet mode, suppress guide
 ```
 
 ### Refactoring
@@ -119,10 +128,22 @@ jdt open <FQMN>                                        # open in Eclipse editor
 
 ```bash
 jdt projects                                           # list workspace projects (name, location, repo)
-jdt project-info <name> [--lines N]                    # (alias: pi) project overview
+jdt project-info <name> [--lines N]                    # (alias: pi) project overview (adaptive detail)
 jdt editors                                            # (alias: ed) open editors (FQN, project, path)
-jdt git [list] [repo...] [--no-files]                  # git repos, branches, dirty state
+jdt git [list] [repo...] [--no-files] [--limit N]      # git repos, branches, dirty state
 ```
+
+### Agents
+
+```bash
+jdt agent run <provider> <agent> [--name <id>]         # launch agent session
+jdt agent list                                         # running agent sessions
+jdt agent stop <name>                                  # stop by session ID
+jdt agent logs <name> [-f]                             # stream agent output
+jdt agent providers                                    # available providers
+```
+
+Providers: `local` (system terminal with bridge env vars), `sandbox` (Docker with bridge connectivity).
 
 ## Instance discovery
 

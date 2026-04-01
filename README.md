@@ -103,45 +103,6 @@ An agent's context window is finite. Every irrelevant token displaces useful rea
 
 MCP is the right choice for things like database connections, OAuth flows, or cloud APIs with no CLI equivalent. But for developer tools where output filtering matters and humans benefit too, a CLI wins.
 
-## Commands
-
-Most commands have short aliases for quick typing.
-
-| Command | Alias | Eclipse | What it does |
-|---------|-------|---------|-------------|
-| `status [sections...] [-q]` | | Prt Scr | CLI screenshot of Eclipse — start here |
-| `find <Name\|package>` | | Ctrl+Shift+T | Find types by name, wildcard, or package |
-| `references <FQMN>` | `refs` | Ctrl+Shift+G | All references to a type, method, or field |
-| `subtypes <FQN>` | `subt` | F4 | All subtypes and implementors |
-| `hierarchy <FQN>` | `hier` | F4 | Full type hierarchy (supers + subs) |
-| `implementors <FQMN>` | `impl` | | Implementations of an interface method |
-| `type-info <FQN>` | `ti` | | Class overview (fields, methods, signatures) |
-| `source <FQMN>` | `src` | F3 | Source code + resolved references (hypertext navigation) |
-| `build [--project <name>]` | `b` | Ctrl+B | Build project (incremental or clean) |
-| `test run <FQN> [-f]` | | | Run JUnit tests with progress streaming |
-| `errors [--project <name>]` | `err` | | Compilation errors and diagnostics |
-| `refresh [<file>] [--project <name>]` | `r` | F5 | Manually notify Eclipse of file changes |
-| `maven update [--project <name>]` | | Alt+F5 | Update Maven project |
-| `organize-imports <file>` | `oi` | Ctrl+Shift+O | Organize imports (Eclipse settings) |
-| `format <file>` | `fmt` | Ctrl+Shift+F | Format code (Eclipse settings) |
-| `rename <FQMN> <new>` | | Alt+Shift+R | Rename type, method, or field across workspace |
-| `move <FQN> <package>` | | Alt+Shift+V | Move type to another package |
-| `open <FQMN>` | | F3 | Open in Eclipse editor |
-| `launch list` | | | List launches (running + terminated) |
-| `launch configs` | | | List saved launch configurations (MRU order) |
-| `launch run <config> [-f] [-q]` | | | Launch a configuration (`-f` to stream) |
-| `launch debug <config> [-f] [-q]` | | F11 | Launch in debug mode |
-| `launch logs <name> [-f]` | | | Show console output (`-f` to stream) |
-| `launch stop <name>` | | Ctrl+F2 | Stop a running launch |
-| `launch clear [name]` | | | Remove terminated launches |
-| `projects` | | | List workspace projects (name, location, repo) |
-| `project-info <name>` | `pi` | | Project overview (packages, types, methods) |
-| `editors` | `ed` | Ctrl+E | Open editor tabs (FQN, project, path) |
-| `git [list] [repo...]` | | | Git repos, branches, dirty state |
-| `setup [--check\|--remove]` | | | Install, check, or remove Eclipse plugin |
-
-Run `jdt help <command>` for detailed flags and options.
-
 ## How it works
 
 ```
