@@ -128,7 +128,7 @@ function groupByDeclaringType(refs) {
   return groups;
 }
 
-function formatRefGroup({ typeFqn, group }, implIndex, viewScope) {
+function formatRefGroup({ group }, implIndex, viewScope) {
   const lines = [];
   // Type header: only show for standalone type refs (no members).
   // When members exist, the type is already visible in their FQMNs.

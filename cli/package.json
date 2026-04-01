@@ -14,7 +14,9 @@
   ],
   "scripts": {
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "engines": {
     "node": ">=20"
@@ -37,6 +39,8 @@
   "bugs": "https://github.com/kaluchi/jdtbridge/issues",
   "devDependencies": {
     "@vitest/coverage-v8": "^3.2.4",
+    "eslint": "^10.1.0",
+    "globals": "^17.4.0",
     "vitest": "^3.0.0"
   },
   "dependencies": {

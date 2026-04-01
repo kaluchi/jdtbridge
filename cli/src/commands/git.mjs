@@ -91,7 +91,6 @@ function reposFromProjects(projects) {
   return [...seen.values()];
 }
 
-// eslint-disable-next-line no-control-regex
 const ANSI_RE = /\x1b\[[0-9;]*m/g;
 function stripAnsi(s) { return s.replace(ANSI_RE, ""); }
 

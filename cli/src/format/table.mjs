@@ -1,4 +1,3 @@
-// eslint-disable-next-line no-control-regex
 const ANSI_RE = /\x1b\[[0-9;]*m/g;
 
 /** Visible length excluding ANSI escape codes. */

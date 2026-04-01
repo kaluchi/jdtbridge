@@ -17,20 +17,19 @@ export function formatProjectInfo(data, maxLines) {
   lines.push(`Total: ${data.totalTypes} types`);
   lines.push("");
 
-  let budget = maxLines - lines.length;
+  const budget = maxLines - lines.length;
   if (budget <= 0) return lines.join("\n");
 
   // Count lines per detail tier
   const visOrder = ["public", "protected", "default", "private"];
-  let pkgLineCount = 0;
   let typeLineCount = 0;
   const visCount = { public: 0, protected: 0, default: 0, private: 0 };
 
   for (const root of data.sourceRoots) {
-    pkgLineCount++;
+
     typeLineCount++;
     for (const pkg of root.packages) {
-      pkgLineCount++;
+  
       typeLineCount++;
       for (const type of pkg.types) {
         typeLineCount++;

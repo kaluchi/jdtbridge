@@ -1,10 +1,9 @@
 import { basename } from "node:path";
 import { get } from "../client.mjs";
-import { extractPositional, parseFlags, parseFqmn } from "../args.mjs";
+import { extractPositional, parseFqmn } from "../args.mjs";
 import { toSandboxPath } from "../paths.mjs";
 import { output } from "../output.mjs";
 import { formatTable } from "../format/table.mjs";
-import { dim } from "../color.mjs";
 
 export async function editors(args = []) {
   const data = await get("/editors");
@@ -25,7 +24,6 @@ export async function editors(args = []) {
 
 export async function open(args) {
   const pos = extractPositional(args);
-  const flags = parseFlags(args);
   const parsed = parseFqmn(pos[0]);
   const fqn = parsed.className;
   const method = parsed.method || pos[1];

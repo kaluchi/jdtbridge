@@ -1,11 +1,10 @@
 import { get } from "../client.mjs";
-import { extractPositional, parseFlags, parseFqmn } from "../args.mjs";
+import { extractPositional, parseFqmn } from "../args.mjs";
 import { stripProject, toSandboxPath } from "../paths.mjs";
 import { output } from "../output.mjs";
 
 export async function implementors(args) {
   const pos = extractPositional(args);
-  const flags = parseFlags(args);
   const parsed = parseFqmn(pos[0]);
   const fqn = parsed.className;
   const method = parsed.method || pos[1];
