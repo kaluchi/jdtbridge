@@ -482,6 +482,14 @@ describe("--json output", () => {
     expect(data).toEqual([]);
   });
 
+  it("git --json returns error on server error", async () => {
+    await setupMock(errorServer());
+    const { git } = await import("../src/commands/git.mjs");
+    await git(["--json"]);
+    const data = parseJsonOutput(io.logs);
+    expect(data.error).toBe("Something went wrong");
+  });
+
   // ---- --json does not break normal output ----
 
   it("find without --json still shows table", async () => {

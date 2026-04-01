@@ -13,6 +13,7 @@ import { agentsDir, sessionsDir } from "../home.mjs";
 import { discoverInstances } from "../discovery.mjs";
 import { bold, dim, red, green } from "../color.mjs";
 import { parseFlags } from "../args.mjs";
+import { output } from "../output.mjs";
 
 // Provider registry — lazy imports to avoid loading Docker deps when unused.
 const providers = {
@@ -104,14 +105,7 @@ async function runFromSession(sessionId, agentArgs) {
 // ---- list ----
 
 export async function agentList(args = []) {
-  const jsonFlag = args.includes("--json");
   const sessions = readSessions();
-
-  if (sessions.length === 0) {
-    if (jsonFlag) { console.log("[]"); return; }
-    console.log("(no agent sessions)");
-    return;
-  }
 
   // Build structured data, clean up stale sessions
   const data = [];
@@ -130,31 +124,29 @@ export async function agentList(args = []) {
     }
   }
 
-  if (jsonFlag) {
-    console.log(JSON.stringify(data, null, 2));
-    return;
-  }
-
-  console.log(
-    bold("NAME".padEnd(35)) +
-    "PROVIDER".padEnd(12) +
-    "AGENT".padEnd(12) +
-    "STATUS".padEnd(12) +
-    "STARTED",
-  );
-
-  for (let i = 0; i < data.length; i++) {
-    const d = data[i];
-    const status = d.status === "running" ? green("running") : red("stopped");
-    const started = d.startedAt ? new Date(d.startedAt).toLocaleString() : "";
-    console.log(
-      d.name.padEnd(35) +
-      (d.provider || "?").padEnd(12) +
-      (d.agent || "?").padEnd(12) +
-      status.padEnd(12 + (status.length - 7)) +
-      dim(started),
-    );
-  }
+  output(args, data, {
+    empty: "(no agent sessions)",
+    text(data) {
+      console.log(
+        bold("NAME".padEnd(35)) +
+        "PROVIDER".padEnd(12) +
+        "AGENT".padEnd(12) +
+        "STATUS".padEnd(12) +
+        "STARTED",
+      );
+      for (const d of data) {
+        const status = d.status === "running" ? green("running") : red("stopped");
+        const started = d.startedAt ? new Date(d.startedAt).toLocaleString() : "";
+        console.log(
+          d.name.padEnd(35) +
+          (d.provider || "?").padEnd(12) +
+          (d.agent || "?").padEnd(12) +
+          status.padEnd(12 + (status.length - 7)) +
+          dim(started),
+        );
+      }
+    },
+  });
 }
 
 // ---- stop ----

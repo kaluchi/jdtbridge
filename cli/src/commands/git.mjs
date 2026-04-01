@@ -29,8 +29,7 @@ async function gitList(args = []) {
   const filter = extractPositional(args);
   const projects = await get("/projects");
   if (projects.error) {
-    if (flags.json) { console.log(JSON.stringify({ error: projects.error })); return; }
-    console.error(projects.error);
+    output(args, projects, { text() {} });
     return;
   }
 
