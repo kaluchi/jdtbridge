@@ -1,6 +1,7 @@
 import { get, getStream } from "../client.mjs";
 import { extractPositional, parseFlags } from "../args.mjs";
 import { output } from "../output.mjs";
+import { printJson } from "../json-output.mjs";
 import { formatTable } from "../format/table.mjs";
 
 export async function launchList(args = []) {
@@ -26,10 +27,28 @@ export async function launchConfigs(args = []) {
   output(args, data, {
     empty: "(no launch configurations)",
     text(data) {
-      const rows = data.map((r) => [r.name, r.type]);
-      console.log(formatTable(["NAME", "TYPE"], rows));
+      const rows = data.map((r) => [
+        r.name,
+        r.type,
+        r.project || "",
+        configTarget(r),
+      ]);
+      console.log(
+        formatTable(["NAME", "TYPE", "PROJECT", "TARGET"], rows),
+      );
     },
   });
+}
+
+function configTarget(r) {
+  if (r.class) {
+    let t = r.class;
+    if (r.method) t += "#" + r.method;
+    return t;
+  }
+  if (r.mainClass) return r.mainClass;
+  if (r.goals) return r.goals;
+  return "";
 }
 
 export async function launchClear(args) {
@@ -42,6 +61,28 @@ export async function launchClear(args) {
     return;
   }
   console.log(`Removed ${result.removed} terminated launch${result.removed !== 1 ? "es" : ""}`);
+}
+
+export async function launchConfig(args) {
+  const pos = extractPositional(args);
+  const name = pos[0];
+  if (!name) {
+    console.error("Usage: launch config <name> [--xml] [--json]");
+    process.exit(1);
+  }
+  const xml = args.includes("--xml");
+  let url = `/launch/config?name=${encodeURIComponent(name)}`;
+  if (xml) url += "&format=xml";
+  const data = await get(url);
+  if (data.error) {
+    console.error(data.error);
+    return;
+  }
+  if (xml) {
+    console.log(data.xml);
+  } else {
+    printJson(data);
+  }
 }
 
 /**
@@ -249,12 +290,29 @@ export const launchConfigsHelp = `List saved launch configurations.
 
 Usage:  jdt launch configs [--json]
 
+Shows NAME, TYPE, PROJECT, and TARGET (class, method, main class, or goals).
+
 Options:
-  --json    output as JSON
+  --json    output as JSON (includes runner for test configs)
 
 Examples:
   jdt launch configs
   jdt launch configs --json`;
+
+export const launchConfigHelp = `Show details of a launch configuration.
+
+Usage:  jdt launch config <name> [--xml]
+
+By default, outputs JSON with all configuration attributes.
+With --xml, outputs the raw .launch XML file content.
+
+Options:
+  --xml     output raw .launch XML instead of JSON
+
+Examples:
+  jdt launch config my-server
+  jdt launch config my-server --xml
+  jdt launch config ObjectMapperTest | jq .attributes`;
 
 export const launchRunHelp = `Launch a saved configuration (non-blocking).
 

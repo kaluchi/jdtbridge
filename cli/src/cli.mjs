@@ -50,6 +50,7 @@ import { git, help as gitHelp } from "./commands/git.mjs";
 import {
   launchList,
   launchConfigs,
+  launchConfig,
   launchRun,
   launchDebug,
   launchStop,
@@ -58,6 +59,7 @@ import {
   launchConsole,
   launchListHelp,
   launchConfigsHelp,
+  launchConfigHelp,
   launchRunHelp,
   launchDebugHelp,
   launchStopHelp,
@@ -78,6 +80,7 @@ const { version } = createRequire(import.meta.url)("../package.json");
 const launchSubcommands = {
   list: { fn: launchList, help: launchListHelp },
   configs: { fn: launchConfigs, help: launchConfigsHelp },
+  config: { fn: launchConfig, help: launchConfigHelp },
   run: { fn: launchRun, help: launchRunHelp },
   debug: { fn: launchDebug, help: launchDebugHelp },
   stop: { fn: launchStop, help: launchStopHelp },
@@ -91,6 +94,7 @@ const launchHelp = `Manage launches (running and terminated processes).
 Subcommands:
   jdt launch list                           list all launches
   jdt launch configs                        list saved launch configurations
+  jdt launch config <name> [--xml]          show configuration details
   jdt launch run <config> [-f] [-q]         launch a configuration
   jdt launch debug <config> [-f] [-q]       launch in debug mode
   jdt launch logs <name> [-f] [--tail N]    show console output

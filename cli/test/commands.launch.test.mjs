@@ -94,12 +94,13 @@ describe("launch commands", () => {
     expect(io.logs[0]).toContain("last line");
   });
 
-  it("launch configs shows configurations as table", async () => {
+  it("launch configs shows configurations as table with project and target", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { name: "my-server", type: "Java Application" },
-        { name: "AllTests", type: "JUnit" },
+        { name: "my-server", type: "Java Application", project: "m8-server", mainClass: "app.m8.Main" },
+        { name: "AllTests", type: "JUnit", project: "m8-server", class: "app.m8.AllTests", runner: "JUnit 5" },
+        { name: "jdtbridge-verify", type: "Maven Build", goals: "clean verify" },
       ]));
     });
     const { launchConfigs } = await import("../src/commands/launch.mjs");
@@ -107,8 +108,14 @@ describe("launch commands", () => {
     const out = io.logs[0];
     expect(out).toContain("NAME");
     expect(out).toContain("TYPE");
+    expect(out).toContain("PROJECT");
+    expect(out).toContain("TARGET");
     expect(out).toContain("my-server");
+    expect(out).toContain("m8-server");
+    expect(out).toContain("app.m8.Main");
     expect(out).toContain("AllTests");
+    expect(out).toContain("app.m8.AllTests");
+    expect(out).toContain("clean verify");
   });
 
   it("launch configs empty", async () => {
@@ -321,5 +328,60 @@ describe("launch commands", () => {
     const { launchRun } = await import("../src/commands/launch.mjs");
     await launchRun(["my-server"]);
     expect(io.logs[0]).toContain("Launched");
+  });
+
+  it("launch config shows JSON details", async () => {
+    const detail = {
+      name: "ObjectMapperTest", type: "JUnit", typeId: "org.eclipse.jdt.junit.launchconfig",
+      file: "/ws/.metadata/.plugins/org.eclipse.debug.core/ObjectMapperTest.launch",
+      attributes: { "org.eclipse.jdt.launching.MAIN_TYPE_NAME": "app.m8.ObjectMapperTest" },
+    };
+    await setupMock((req, res) => {
+      expect(req.url).toContain("name=ObjectMapperTest");
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(detail));
+    });
+    const { launchConfig } = await import("../src/commands/launch.mjs");
+    await launchConfig(["ObjectMapperTest"]);
+    const out = io.logs.join("\n");
+    expect(out).toContain("ObjectMapperTest");
+    expect(out).toContain("MAIN_TYPE_NAME");
+  });
+
+  it("launch config --xml shows raw XML", async () => {
+    const xml = '<?xml version="1.0"?>\n<launchConfiguration type="org.eclipse.jdt.junit.launchconfig"/>';
+    await setupMock((req, res) => {
+      expect(req.url).toContain("format=xml");
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ name: "ObjectMapperTest", file: "/test.launch", xml }));
+    });
+    const { launchConfig } = await import("../src/commands/launch.mjs");
+    await launchConfig(["ObjectMapperTest", "--xml"]);
+    expect(io.logs[0]).toContain("launchConfiguration");
+  });
+
+  it("launch config missing name exits", async () => {
+    const { launchConfig } = await import("../src/commands/launch.mjs");
+    await expect(launchConfig([])).rejects.toThrow("exit(1)");
+  });
+
+  it("launch config error shows message", async () => {
+    await setupMock(errorServer());
+    const { launchConfig } = await import("../src/commands/launch.mjs");
+    await launchConfig(["nonexistent"]);
+    expect(io.errors[0]).toContain("Something went wrong");
+  });
+
+  it("launch configs shows method in target", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify([
+        { name: "FooTest.bar", type: "JUnit", project: "proj", class: "com.FooTest", method: "bar" },
+      ]));
+    });
+    const { launchConfigs } = await import("../src/commands/launch.mjs");
+    await launchConfigs();
+    const out = io.logs[0];
+    expect(out).toContain("com.FooTest#bar");
   });
 });

@@ -440,6 +440,8 @@ public class HttpServer {
                         launch.handleList(params));
                 case "/launch/configs" -> Response.json(
                         launch.handleConfigs(params));
+                case "/launch/config" -> Response.json(
+                        launch.handleConfig(params));
                 case "/launch/clear" -> Response.json(
                         launch.handleClear(params));
                 case "/launch/console" -> Response.json(

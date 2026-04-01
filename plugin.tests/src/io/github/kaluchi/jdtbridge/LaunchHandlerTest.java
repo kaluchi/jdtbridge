@@ -160,6 +160,173 @@ public class LaunchHandlerTest {
                         "Should have type: " + json);
             }
         }
+
+        @Test
+        void junitConfigHasClassAndRunner() {
+            String json = handler.handleConfigs(Map.of());
+            var arr = JsonParser.parseString(json)
+                    .getAsJsonArray();
+            for (var el : arr) {
+                var obj = el.getAsJsonObject();
+                String type = obj.get("type").getAsString();
+                if ("JUnit".equals(type)
+                        || "JUnit Plug-in Test".equals(type)) {
+                    assertTrue(obj.has("class")
+                            || obj.has("project"),
+                            "JUnit config should have class "
+                            + "or project: " + obj);
+                    return;
+                }
+            }
+            // No JUnit configs — skip
+        }
+
+        @Test
+        void mavenConfigHasGoals() {
+            String json = handler.handleConfigs(Map.of());
+            var arr = JsonParser.parseString(json)
+                    .getAsJsonArray();
+            for (var el : arr) {
+                var obj = el.getAsJsonObject();
+                String type = obj.get("type").getAsString();
+                if ("Maven Build".equals(type)) {
+                    assertTrue(obj.has("goals"),
+                            "Maven config should have goals: "
+                            + obj);
+                    return;
+                }
+            }
+            // No Maven configs — skip
+        }
+    }
+
+    @Nested
+    class Config {
+
+        @Test
+        void missingNameReturnsError() {
+            String json = handler.handleConfig(Map.of());
+            assertTrue(json.contains("error"),
+                    "Should return error: " + json);
+            assertTrue(json.contains("Missing"),
+                    "Should say missing: " + json);
+        }
+
+        @Test
+        void unknownConfigReturnsError() {
+            String json = handler.handleConfig(
+                    Map.of("name", "no-such-config-xyz-999"));
+            assertTrue(json.contains("error"),
+                    "Should return error: " + json);
+            assertTrue(json.contains("not found"),
+                    "Should say not found: " + json);
+        }
+
+        @Test
+        void knownConfigReturnsAttributes() {
+            // Find any existing config name
+            String listJson = handler.handleConfigs(Map.of());
+            var arr = JsonParser.parseString(listJson)
+                    .getAsJsonArray();
+            if (arr.isEmpty()) return; // no configs to test
+            String name = arr.get(0).getAsJsonObject()
+                    .get("name").getAsString();
+
+            String json = handler.handleConfig(
+                    Map.of("name", name));
+            assertFalse(json.contains("\"error\""),
+                    "Should not error: " + json);
+            var obj = JsonParser.parseString(json)
+                    .getAsJsonObject();
+            assertEquals(name, obj.get("name").getAsString());
+            assertTrue(obj.has("type"),
+                    "Should have type: " + json);
+            assertTrue(obj.has("typeId"),
+                    "Should have typeId: " + json);
+            assertTrue(obj.has("attributes"),
+                    "Should have attributes: " + json);
+            assertTrue(obj.get("attributes").isJsonObject(),
+                    "Attributes should be object: " + json);
+        }
+
+        @Test
+        void xmlFormatReturnsXmlContent() {
+            String listJson = handler.handleConfigs(Map.of());
+            var arr = JsonParser.parseString(listJson)
+                    .getAsJsonArray();
+            if (arr.isEmpty()) return;
+            String name = arr.get(0).getAsJsonObject()
+                    .get("name").getAsString();
+
+            String json = handler.handleConfig(
+                    Map.of("name", name, "format", "xml"));
+            assertFalse(json.contains("\"error\""),
+                    "Should not error: " + json);
+            var obj = JsonParser.parseString(json)
+                    .getAsJsonObject();
+            assertEquals(name, obj.get("name").getAsString());
+            assertTrue(obj.has("xml"),
+                    "Should have xml field: " + json);
+            String xml = obj.get("xml").getAsString();
+            assertTrue(xml.contains("<?xml")
+                    || xml.contains("<launchConfiguration"),
+                    "XML should contain launch config: "
+                    + xml.substring(0,
+                            Math.min(200, xml.length())));
+        }
+
+        @Test
+        void attributesContainExpectedKeys() {
+            // Find a JUnit config specifically
+            String listJson = handler.handleConfigs(Map.of());
+            var arr = JsonParser.parseString(listJson)
+                    .getAsJsonArray();
+            String junitName = null;
+            for (var el : arr) {
+                var obj = el.getAsJsonObject();
+                String type = obj.get("type").getAsString();
+                if ("JUnit".equals(type)
+                        || "JUnit Plug-in Test".equals(type)) {
+                    junitName = obj.get("name").getAsString();
+                    break;
+                }
+            }
+            if (junitName == null) return;
+
+            String json = handler.handleConfig(
+                    Map.of("name", junitName));
+            var obj = JsonParser.parseString(json)
+                    .getAsJsonObject();
+            var attrs = obj.getAsJsonObject("attributes");
+            assertTrue(
+                    attrs.has(
+                        "org.eclipse.jdt.launching.MAIN_TYPE_NAME")
+                    || attrs.has(
+                        "org.eclipse.jdt.junit.CONTAINER"),
+                    "JUnit config should have test class or "
+                    + "container in attributes: " + attrs);
+        }
+
+        @Test
+        void attributeTypesPreserved() {
+            // Get any config and verify attribute value types
+            String listJson = handler.handleConfigs(Map.of());
+            var arr = JsonParser.parseString(listJson)
+                    .getAsJsonArray();
+            if (arr.isEmpty()) return;
+            String name = arr.get(0).getAsJsonObject()
+                    .get("name").getAsString();
+
+            String json = handler.handleConfig(
+                    Map.of("name", name));
+            var obj = JsonParser.parseString(json)
+                    .getAsJsonObject();
+            var attrs = obj.getAsJsonObject("attributes");
+            // Attributes should be valid JSON — no crashes
+            assertNotNull(attrs);
+            assertTrue(attrs.size() > 0,
+                    "Config should have some attributes");
+        }
     }
 
     @Nested

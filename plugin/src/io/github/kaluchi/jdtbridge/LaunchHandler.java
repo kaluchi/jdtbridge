@@ -2,9 +2,15 @@ package io.github.kaluchi.jdtbridge;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonPrimitive;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
+import org.eclipse.core.runtime.CoreException;
 import org.eclipse.debug.core.DebugPlugin;
 import org.eclipse.debug.core.ILaunch;
 import org.eclipse.debug.core.ILaunchConfiguration;
@@ -13,10 +19,45 @@ import org.eclipse.debug.core.model.IProcess;
 
 class LaunchHandler {
 
+    // Attribute keys for launch configuration types
+    private static final String ATTR_PROJECT_NAME =
+            "org.eclipse.jdt.launching.PROJECT_ATTR";
+    private static final String ATTR_MAIN_TYPE_NAME =
+            "org.eclipse.jdt.launching.MAIN_TYPE_NAME";
+    private static final String ATTR_TEST_KIND =
+            "org.eclipse.jdt.junit.TEST_KIND";
+    private static final String ATTR_TEST_NAME =
+            "org.eclipse.jdt.junit.TESTNAME";
+    private static final String JUNIT_LAUNCH_TYPE =
+            "org.eclipse.jdt.junit.launchconfig";
+    private static final String PDE_JUNIT_LAUNCH_TYPE =
+            "org.eclipse.pde.ui.JunitLaunchConfig";
+    private static final String JAVA_APP_LAUNCH_TYPE =
+            "org.eclipse.jdt.launching.localJavaApplication";
+    private static final String MAVEN_LAUNCH_TYPE =
+            "org.eclipse.m2e.Maven2LaunchConfigurationType";
+    private static final String MAVEN_GOALS =
+            "M2_GOALS";
+    private static final String MAVEN_PROFILES =
+            "M2_PROFILES";
+
     private final LaunchTracker tracker;
 
     LaunchHandler(LaunchTracker tracker) {
         this.tracker = tracker;
+    }
+
+    private static String formatRunner(String testKind) {
+        if (testKind == null) return null;
+        return switch (testKind) {
+        case "org.eclipse.jdt.junit.loader.junit6" ->
+                "JUnit 6";
+        case "org.eclipse.jdt.junit.loader.junit5" ->
+                "JUnit 5";
+        case "org.eclipse.jdt.junit.loader.junit4" ->
+                "JUnit 4";
+        default -> testKind;
+        };
     }
 
     private ILaunchManager launchManager() {
@@ -96,29 +137,196 @@ class LaunchHandler {
 
             if (recent != null) {
                 for (var config : recent) {
-                    var obj = new JsonObject();
-                    obj.addProperty("name",
-                            config.getName());
-                    obj.addProperty("type",
-                            config.getType().getName());
-                    arr.add(obj);
+                    arr.add(configSummary(config));
                     seen.add(config.getName());
                 }
             }
 
             for (var config : allConfigs) {
                 if (seen.contains(config.getName())) continue;
-                var obj = new JsonObject();
-                obj.addProperty("name", config.getName());
-                obj.addProperty("type",
-                        config.getType().getName());
-                arr.add(obj);
+                arr.add(configSummary(config));
             }
 
             return arr.toString();
         } catch (Exception e) {
             return HttpServer.jsonError(e.getMessage());
         }
+    }
+
+    String handleConfig(Map<String, String> params) {
+        String name = params.get("name");
+        if (name == null || name.isBlank()) {
+            return HttpServer.jsonError(
+                    "Missing 'name' parameter");
+        }
+        try {
+            ILaunchConfiguration config = findConfig(name);
+            if (config == null) {
+                return HttpServer.jsonError(
+                        "Launch configuration not found: "
+                        + name);
+            }
+            if ("xml".equals(params.get("format"))) {
+                return configXml(config);
+            }
+            return configDetail(config);
+        } catch (Exception e) {
+            return HttpServer.jsonError(e.getMessage());
+        }
+    }
+
+    // -- config summary (for /launch/configs list) --
+
+    private JsonObject configSummary(
+            ILaunchConfiguration config) throws CoreException {
+        var obj = new JsonObject();
+        obj.addProperty("name", config.getName());
+        String typeName = config.getType().getName();
+        obj.addProperty("type", typeName);
+
+        String project = config.getAttribute(
+                ATTR_PROJECT_NAME, (String) null);
+        if (project != null)
+            obj.addProperty("project", project);
+
+        String typeId = config.getType().getIdentifier();
+        addTypeSummary(obj, config, typeId);
+        return obj;
+    }
+
+    private static void addTypeSummary(JsonObject obj,
+            ILaunchConfiguration config, String typeId)
+            throws CoreException {
+        switch (typeId) {
+        case JUNIT_LAUNCH_TYPE, PDE_JUNIT_LAUNCH_TYPE -> {
+            String mainType = config.getAttribute(
+                    ATTR_MAIN_TYPE_NAME, (String) null);
+            if (mainType != null)
+                obj.addProperty("class", mainType);
+            String method = config.getAttribute(
+                    ATTR_TEST_NAME, (String) null);
+            if (method != null)
+                obj.addProperty("method", method);
+            String runner = formatRunner(
+                    config.getAttribute(
+                            ATTR_TEST_KIND, (String) null));
+            if (runner != null)
+                obj.addProperty("runner", runner);
+        }
+        case JAVA_APP_LAUNCH_TYPE -> {
+            String mainType = config.getAttribute(
+                    ATTR_MAIN_TYPE_NAME, (String) null);
+            if (mainType != null)
+                obj.addProperty("mainClass", mainType);
+        }
+        case MAVEN_LAUNCH_TYPE -> {
+            String goals = config.getAttribute(
+                    MAVEN_GOALS, (String) null);
+            if (goals != null)
+                obj.addProperty("goals", goals);
+            String profiles = config.getAttribute(
+                    MAVEN_PROFILES, (String) null);
+            if (profiles != null
+                    && !profiles.isBlank())
+                obj.addProperty("profiles", profiles);
+        }
+        default -> { /* no extra fields */ }
+        }
+    }
+
+    // -- config detail (for /launch/config?name=X) --
+
+    private String configDetail(ILaunchConfiguration config)
+            throws CoreException {
+        var obj = new JsonObject();
+        obj.addProperty("name", config.getName());
+        obj.addProperty("type", config.getType().getName());
+        obj.addProperty("typeId",
+                config.getType().getIdentifier());
+
+        java.io.File launchFile = resolveLaunchFile(config);
+        if (launchFile != null) {
+            obj.addProperty("file",
+                    launchFile.getAbsolutePath());
+        }
+
+        // All attributes as a nested object
+        Map<String, Object> attrs = config.getAttributes();
+        var attrsObj = new JsonObject();
+        for (var entry : attrs.entrySet()) {
+            attrsObj.add(entry.getKey(),
+                    toJsonElement(entry.getValue()));
+        }
+        obj.add("attributes", attrsObj);
+        return obj.toString();
+    }
+
+    private String configXml(ILaunchConfiguration config)
+            throws CoreException {
+        java.io.File launchFile = resolveLaunchFile(config);
+        if (launchFile == null || !launchFile.exists()) {
+            return HttpServer.jsonError(
+                    "No .launch file for: "
+                    + config.getName());
+        }
+        try {
+            String xml = Files.readString(
+                    launchFile.toPath());
+            var obj = new JsonObject();
+            obj.addProperty("name", config.getName());
+            obj.addProperty("file",
+                    launchFile.getAbsolutePath());
+            obj.addProperty("xml", xml);
+            return obj.toString();
+        } catch (IOException e) {
+            return HttpServer.jsonError(
+                    "Cannot read .launch file: "
+                    + e.getMessage());
+        }
+    }
+
+    private static java.io.File resolveLaunchFile(
+            ILaunchConfiguration config) {
+        java.io.File file = DebugPlugin.getDefault()
+                .getStateLocation()
+                .append(".launches")
+                .append(config.getName() + ".launch")
+                .toFile();
+        return file.exists() ? file : null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static com.google.gson.JsonElement toJsonElement(
+            Object value) {
+        if (value == null)
+            return com.google.gson.JsonNull.INSTANCE;
+        if (value instanceof String s)
+            return new JsonPrimitive(s);
+        if (value instanceof Boolean b)
+            return new JsonPrimitive(b);
+        if (value instanceof Number n)
+            return new JsonPrimitive(n);
+        if (value instanceof List<?> list) {
+            var arr = new JsonArray();
+            for (Object item : list)
+                arr.add(toJsonElement(item));
+            return arr;
+        }
+        if (value instanceof Set<?> set) {
+            var arr = new JsonArray();
+            for (Object item : set)
+                arr.add(toJsonElement(item));
+            return arr;
+        }
+        if (value instanceof Map<?, ?> map) {
+            var obj = new JsonObject();
+            for (var entry
+                    : ((Map<String, Object>) map).entrySet())
+                obj.add(entry.getKey(),
+                        toJsonElement(entry.getValue()));
+            return obj;
+        }
+        return new JsonPrimitive(value.toString());
     }
 
     @SuppressWarnings("restriction")
