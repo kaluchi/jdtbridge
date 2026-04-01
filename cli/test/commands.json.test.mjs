@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   startServer, stopServer, captureConsole, errorServer, parseJsonOutput, disableColor,
 } from "./helpers/mock-server.mjs";
+import { toSandboxPath } from "../src/paths.mjs";
 
 describe("--json output", () => {
   let server, port, io;
@@ -235,7 +236,7 @@ describe("--json output", () => {
     expect(data[0].severity).toBe("ERROR");
     expect(data[0].message).toBe("cannot resolve symbol");
     expect(data[0].line).toBe(10);
-    expect(data[0].file).toBe("D:/projects/my-server/src/Foo.java");
+    expect(data[0].file).toBe(toSandboxPath("D:/projects/my-server/src/Foo.java"));
   });
 
   it("errors --json returns [] for no errors", async () => {

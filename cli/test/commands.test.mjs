@@ -221,7 +221,7 @@ describe("commands (integration)", () => {
     expect(io.logs[0]).toContain("ERROR");
     expect(io.logs[0]).toContain("[JDT]");
     expect(io.logs[0]).toContain("cannot resolve symbol");
-    expect(io.logs[0]).toContain("D:/projects/my-server/src/Foo.java:10");
+    expect(io.logs[0]).toContain(toSandboxPath("D:/projects/my-server/src/Foo.java") + ":10");
   });
 
   it("errors shows no errors message", async () => {
