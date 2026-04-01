@@ -124,8 +124,9 @@ function guideSection() {
 Refresh the full dashboard or individual sections.
 -q suppresses this guide. Selecting sections suppresses it too.
 
-  jdt status                  all sections + this guide
-  jdt status -q               all sections, no guide
+  jdt status                  all sections + intro + guide
+  jdt status -q               all sections, no intro/guide
+  jdt status intro            only intro
   jdt status git              only git repos and branches
   jdt status editors          only open editor tabs
   jdt status errors           only compilation errors
@@ -224,6 +225,7 @@ export const help = `CLI screenshot of Eclipse — composite view of IDE state.
 Usage:  jdt status [sections...] [-q]
 
 Sections (default: all):
+  intro        context for AI agents (shown by default, suppressed by -q)
   git          git repos, branches, modified files
   editors      open editor tabs (active first)
   errors       compilation errors
@@ -234,7 +236,8 @@ Sections (default: all):
 
 Examples:
   jdt status                    full dashboard
-  jdt status -q                 full dashboard, no guide
+  jdt status -q                 full dashboard, no intro/guide
+  jdt status intro              only intro
   jdt status editors errors     only editors + errors
   jdt status git                only git state
   jdt status guide              only usage guide`;
