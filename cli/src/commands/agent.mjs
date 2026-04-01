@@ -103,11 +103,35 @@ async function runFromSession(sessionId, agentArgs) {
 
 // ---- list ----
 
-export async function agentList() {
+export async function agentList(args = []) {
+  const jsonFlag = args.includes("--json");
   const sessions = readSessions();
 
   if (sessions.length === 0) {
+    if (jsonFlag) { console.log("[]"); return; }
     console.log("(no agent sessions)");
+    return;
+  }
+
+  // Build structured data, clean up stale sessions
+  const data = [];
+  for (const sess of sessions) {
+    const alive = isAlive(sess);
+    data.push({
+      name: sess.name,
+      provider: sess.provider || null,
+      agent: sess.agent || null,
+      status: alive ? "running" : "stopped",
+      pid: sess.pid || null,
+      startedAt: sess.startedAt || null,
+    });
+    if (!alive) {
+      try { unlinkSync(sess._file); } catch { /* ignore */ }
+    }
+  }
+
+  if (jsonFlag) {
+    console.log(JSON.stringify(data, null, 2));
     return;
   }
 
@@ -119,22 +143,17 @@ export async function agentList() {
     "STARTED",
   );
 
-  for (const sess of sessions) {
-    const alive = isAlive(sess);
-    const status = alive ? green("running") : red("stopped");
-    const started = new Date(sess.startedAt).toLocaleString();
+  for (let i = 0; i < data.length; i++) {
+    const d = data[i];
+    const status = d.status === "running" ? green("running") : red("stopped");
+    const started = d.startedAt ? new Date(d.startedAt).toLocaleString() : "";
     console.log(
-      sess.name.padEnd(35) +
-      (sess.provider || "?").padEnd(12) +
-      (sess.agent || "?").padEnd(12) +
-      status.padEnd(12 + (status.length - (alive ? 7 : 7))) +
+      d.name.padEnd(35) +
+      (d.provider || "?").padEnd(12) +
+      (d.agent || "?").padEnd(12) +
+      status.padEnd(12 + (status.length - 7)) +
       dim(started),
     );
-
-    // Clean up stale session files
-    if (!alive) {
-      try { unlinkSync(sess._file); } catch { /* ignore */ }
-    }
   }
 }
 
@@ -390,6 +409,11 @@ Examples:
 `;
 
 export const agentListHelp = `List agent sessions.
+
+Usage:  jdt agent list [--json]
+
+Options:
+  --json    output as JSON
 
 Usage:  jdt agent list
 
