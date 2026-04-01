@@ -32,7 +32,7 @@ export const help = `Show project overview with adaptive detail level.
 Usage:  jdt project-info <name> [--lines N] [--members-threshold N] [--json]
 
 Arguments:
-  name    Eclipse project name (e.g. m8-server, io.github.kaluchi.jdtbridge)
+  name    Eclipse project name (e.g. my-server, io.github.kaluchi.jdtbridge)
 
 Flags:
   --lines <N>               max output lines (default: 50)
@@ -45,6 +45,6 @@ Detail adapts to --lines budget:
   - Large budget: + method signatures per type (if server included them)
 
 Examples:
-  jdt project-info m8-server
-  jdt project-info m8-server --lines 100
-  jdt project-info m8-server --json`;
+  jdt project-info my-server
+  jdt project-info my-server --lines 100
+  jdt project-info my-server --json`;

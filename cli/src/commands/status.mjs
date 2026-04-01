@@ -245,7 +245,7 @@ export function ago(ms) {
 }
 
 // Exported for compositor testing
-export { formatSection, guideSection, SECTION_NAMES };
+export { formatSection, guideSection, SECTION_NAMES, JSON_COMMANDS };
 
 export const help = `CLI screenshot of Eclipse — composite view of IDE state.
 

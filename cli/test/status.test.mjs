@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   formatSection, guideSection, reposFromServer,
-  buildDirtyMap, ago, cliCmd, SECTION_NAMES,
+  buildDirtyMap, ago, cliCmd, SECTION_NAMES, JSON_COMMANDS,
 } from "../src/commands/status.mjs";
 
 // ---- formatSection ----
@@ -116,6 +116,25 @@ describe("SECTION_NAMES", () => {
 
   it("contains intro", () => {
     expect(SECTION_NAMES).toContain("intro");
+  });
+});
+
+// ---- JSON_COMMANDS ----
+
+describe("JSON_COMMANDS", () => {
+  const dataSections = SECTION_NAMES.filter((s) => s !== "intro" && s !== "guide");
+
+  it("covers all data sections", () => {
+    for (const name of dataSections) {
+      expect(JSON_COMMANDS[name]).toBeDefined();
+      expect(JSON_COMMANDS[name]).toContain("--json");
+    }
+  });
+
+  it("each command starts with jdt", () => {
+    for (const cmd of Object.values(JSON_COMMANDS)) {
+      expect(cmd).toMatch(/^jdt /);
+    }
   });
 });
 

@@ -47,7 +47,7 @@ Refreshes from disk and waits for auto-build before reading markers.
 Use 'jdt build' to trigger explicit builds.
 
 Examples:
-  jdt errors --project m8-server
-  jdt errors --file m8-server/src/main/java/.../Foo.java
-  jdt errors --project m8-server --all --warnings
-  jdt errors --project m8-server --json`;
+  jdt errors --project my-server
+  jdt errors --file my-server/src/main/java/.../Foo.java
+  jdt errors --project my-server --all --warnings
+  jdt errors --project my-server --json`;

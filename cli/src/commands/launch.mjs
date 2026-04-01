@@ -268,10 +268,10 @@ Flags:
   -q, --quiet    suppress onboarding guide
 
 Examples:
-  jdt launch run m8-server                run + show guide
-  jdt launch run m8-server -q             run silently
+  jdt launch run my-server                run + show guide
+  jdt launch run my-server -q             run silently
   jdt launch run jdtbridge-verify -f      run + stream all output
-  jdt launch run m8-server -f | tail -20  run + wait + bounded output`;
+  jdt launch run my-server -f | tail -20  run + wait + bounded output`;
 
 export const launchDebugHelp = `Launch a configuration in debug mode.
 
@@ -280,8 +280,8 @@ Usage:  jdt launch debug <config-name> [-f] [-q]
 Same as 'launch run' but attaches the debugger.
 
 Examples:
-  jdt launch debug m8-server
-  jdt launch debug m8-server -f`;
+  jdt launch debug my-server
+  jdt launch debug my-server -f`;
 
 export const launchStopHelp = `Stop a running launch.
 

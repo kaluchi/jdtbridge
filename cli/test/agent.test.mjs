@@ -117,6 +117,29 @@ describe("agent commands", () => {
       const files = readdirSync(agentsPath);
       expect(files).toHaveLength(0);
     });
+
+    it("--json outputs valid JSON array", async () => {
+      writeSession("json-test", {
+        provider: "local",
+        agent: "claude",
+        pid: process.pid,
+        startedAt: Date.now(),
+      });
+      await agentList(["--json"]);
+      const raw = io.logs.join("\n");
+      expect(raw).not.toMatch(/\x1b\[/); // no ANSI
+      const data = JSON.parse(raw);
+      expect(data).toBeInstanceOf(Array);
+      expect(data[0].name).toBe("json-test");
+      expect(data[0].provider).toBe("local");
+      expect(data[0].status).toBe("running");
+    });
+
+    it("--json returns [] when empty", async () => {
+      await agentList(["--json"]);
+      const data = JSON.parse(io.logs.join("\n"));
+      expect(data).toEqual([]);
+    });
   });
 
   describe("stop", () => {
