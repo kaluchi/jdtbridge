@@ -260,20 +260,28 @@ export const launchRunHelp = `Launch a saved configuration (non-blocking).
 
 Usage:  jdt launch run <config-name> [-f] [-q]
 
+Without -f, launches and prints a guide with available commands.
+With -f, launches and streams console output until the process terminates.
+
 Flags:
-  -f, --follow   stream console output until termination
+  -f, --follow   stream output (Ctrl+C to detach, process keeps running)
   -q, --quiet    suppress onboarding guide
 
 Examples:
-  jdt launch run my-server
-  jdt launch run my-server -f
-  jdt launch run jdtbridge-verify -f | tail -20`;
+  jdt launch run m8-server                run + show guide
+  jdt launch run m8-server -q             run silently
+  jdt launch run jdtbridge-verify -f      run + stream all output
+  jdt launch run m8-server -f | tail -20  run + wait + bounded output`;
 
-export const launchDebugHelp = `Launch in debug mode (non-blocking).
+export const launchDebugHelp = `Launch a configuration in debug mode.
 
 Usage:  jdt launch debug <config-name> [-f] [-q]
 
-Same as 'launch run' but attaches the debugger.`;
+Same as 'launch run' but attaches the debugger.
+
+Examples:
+  jdt launch debug m8-server
+  jdt launch debug m8-server -f`;
 
 export const launchStopHelp = `Stop a running launch.
 
