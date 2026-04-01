@@ -62,11 +62,12 @@ export async function testRun(args) {
     // ignore — total just won't be shown
   }
 
-  console.log(formatTestRunHeader(result));
+  const jsonFlag = args.includes("--json");
+  if (!jsonFlag) console.log(formatTestRunHeader(result));
 
   const follow = args.includes("-f") || args.includes("--follow");
   if (follow) {
-    console.log();
+    if (!jsonFlag) console.log();
     const exitCode = await followTestStream(session, args);
     process.exit(exitCode);
   }
@@ -83,8 +84,8 @@ function sleep(ms) {
 
 export const help = `Launch tests non-blocking with real-time progress.
 
-Usage:  jdt test run <FQN>[#method] [--project <name>] [-f] [-q]
-        jdt test run --project <name> [--package <pkg>] [-f] [-q]
+Usage:  jdt test run <FQN>[#method] [--project <name>] [-f] [-q] [--json]
+        jdt test run --project <name> [--package <pkg>] [-f] [-q] [--json]
 
 Without -f, launches and prints a guide with available commands.
 With -f, launches and streams test progress until completion.
@@ -99,12 +100,14 @@ Flags:
   -q, --quiet       suppress onboarding guide
   --all             include passed tests in output (with -f)
   --ignored         show only ignored tests (with -f)
+  --json            output as JSONL when streaming (-f), or JSON snapshot
 
 Examples:
   jdt test run com.example.MyTest                       run + show guide
   jdt test run com.example.MyTest --project Build -f    run with Build classpath
   jdt test run com.example.MyTest -f --all              run + stream all tests
   jdt test run --project my-project -f                  run project tests + stream
+  jdt test run com.example.MyTest -f --json             stream as JSONL
 
 The session ID printed after launch is also the launch name.
 Use it with other commands:

@@ -181,6 +181,7 @@ Add \`-q\` to suppress this guide.`;
  */
 export async function followTestStream(session, args) {
   const { getStreamLines } = await import("../client.mjs");
+  const jsonFlag = args.includes("--json");
 
   let filter = "failures";
   if (args.includes("--all")) filter = "all";
@@ -199,7 +200,11 @@ export async function followTestStream(session, args) {
   let hasFailed = false;
   try {
     await getStreamLines(url, (line) => {
-      formatTestEvent(line);
+      if (jsonFlag) {
+        console.log(line);
+      } else {
+        formatTestEvent(line);
+      }
       try {
         const ev = JSON.parse(line);
         if (ev.event === "finished"

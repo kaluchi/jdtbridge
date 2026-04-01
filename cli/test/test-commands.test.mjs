@@ -233,6 +233,55 @@ describe("test commands", () => {
     expect(io.logs.some((l) => l.includes("Foo#bar"))).toBe(true);
   });
 
+  it("test run -f --json outputs raw JSONL", async () => {
+    await setupMock((req, res) => {
+      if (req.url.includes("/test/run")) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, session: "test-jsonl-1" }));
+      } else if (req.url.includes("/test/status/stream")) {
+        res.writeHead(200, { "Content-Type": "application/x-ndjson" });
+        res.write(JSON.stringify({ event: "case", fqmn: "Foo#bar", status: "PASS", time: 0.1 }) + "\n");
+        res.write(JSON.stringify({ event: "finished", total: 1, passed: 1, failed: 0, errors: 0, ignored: 0, time: 0.1 }) + "\n");
+        res.end();
+      } else if (req.url.includes("/test/status")) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ total: 1 }));
+      }
+    });
+    const { testRun } = await import("../src/commands/test-run.mjs");
+    await expect(testRun(["com.example.FooTest", "-f", "-q", "--json"])).rejects.toThrow("exit(0)");
+    // Each line should be valid JSON
+    for (const line of io.logs) {
+      expect(() => JSON.parse(line)).not.toThrow();
+    }
+    // No ANSI codes — raw JSONL
+    expect(io.logs.join("\n")).not.toMatch(/\x1b\[/);
+    // Should contain the events
+    const events = io.logs.map((l) => JSON.parse(l));
+    expect(events.some((e) => e.event === "case")).toBe(true);
+    expect(events.some((e) => e.event === "finished")).toBe(true);
+  });
+
+  it("test run -f --json suppresses header", async () => {
+    await setupMock((req, res) => {
+      if (req.url.includes("/test/run")) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, session: "test-jsonl-hdr" }));
+      } else if (req.url.includes("/test/status/stream")) {
+        res.writeHead(200, { "Content-Type": "application/x-ndjson" });
+        res.write(JSON.stringify({ event: "finished", total: 0, passed: 0, failed: 0, errors: 0, ignored: 0, time: 0 }) + "\n");
+        res.end();
+      } else if (req.url.includes("/test/status")) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ total: 0 }));
+      }
+    });
+    const { testRun } = await import("../src/commands/test-run.mjs");
+    await expect(testRun(["com.example.FooTest", "-f", "--json"])).rejects.toThrow("exit(0)");
+    // No "#### Test:" header — only JSON lines
+    expect(io.logs.every((l) => l.startsWith("{"))).toBe(true);
+  });
+
   // --- test status ---
 
   it("test status sends session param", async () => {
