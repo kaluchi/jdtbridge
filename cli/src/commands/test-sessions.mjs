@@ -1,37 +1,36 @@
 import { get } from "../client.mjs";
+import { output } from "../output.mjs";
 import { green, red, yellow } from "../color.mjs";
 import { formatTable } from "../format/table.mjs";
 
 /**
  * List active and completed test sessions.
  */
-export async function testSessions() {
-  const results = await get("/test/sessions");
-  if (results.error) {
-    console.error(results.error);
-    return;
-  }
-  if (results.length === 0) {
-    console.log("(no test sessions)");
-    return;
-  }
-  const now = Date.now();
-  const headers = ["SESSION", "LABEL", "TESTS", "RESULT", "TIME", "STATUS"];
-  const rows = results.map((s) => {
-    const time = Number.isFinite(s.time) && s.time > 0
-      ? `${s.time.toFixed(1)}s` : "";
-    const label = s.label && s.label !== s.session ? s.label : "";
-    const startMs = s.startedAt || 0;
-    let status;
-    if (s.state === "running") {
-      status = startMs ? `running, started ${ago(now - startMs)}` : "running";
-    } else {
-      const endMs = startMs && s.time > 0 ? startMs + s.time * 1000 : 0;
-      status = endMs ? `finished ${ago(now - endMs)}` : "finished";
-    }
-    return [s.session, label, `${s.total}`, formatCounts(s), time, status];
+export async function testSessions(args = []) {
+  const data = await get("/test/sessions");
+
+  output(args, data, {
+    empty: "(no test sessions)",
+    text(data) {
+      const now = Date.now();
+      const headers = ["SESSION", "LABEL", "TESTS", "RESULT", "TIME", "STATUS"];
+      const rows = data.map((s) => {
+        const time = Number.isFinite(s.time) && s.time > 0
+          ? `${s.time.toFixed(1)}s` : "";
+        const label = s.label && s.label !== s.session ? s.label : "";
+        const startMs = s.startedAt || 0;
+        let status;
+        if (s.state === "running") {
+          status = startMs ? `running, started ${ago(now - startMs)}` : "running";
+        } else {
+          const endMs = startMs && s.time > 0 ? startMs + s.time * 1000 : 0;
+          status = endMs ? `finished ${ago(now - endMs)}` : "finished";
+        }
+        return [s.session, label, `${s.total}`, formatCounts(s), time, status];
+      });
+      console.log(formatTable(headers, rows));
+    },
   });
-  console.log(formatTable(headers, rows));
 }
 
 function formatCounts(s) {
@@ -54,11 +53,18 @@ function ago(ms) {
 
 export const help = `List active and completed test sessions.
 
-Usage:  jdt test sessions
+Usage:  jdt test sessions [--json]
+
+Options:
+  --json    output as JSON
 
 Output: session ID, label, test counts, status — one session per line.
 
 The session ID is also the launch name. To see console output
 (stdout, stderr, stack traces) of a test run:
   jdt launch logs <session-name>
-  jdt launch logs <session-name> --tail 50`;
+  jdt launch logs <session-name> --tail 50
+
+Examples:
+  jdt test sessions
+  jdt test sessions --json`;

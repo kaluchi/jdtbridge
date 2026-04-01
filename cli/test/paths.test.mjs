@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { stripProject, toWsPath, hostToSandboxPath } from "../src/paths.mjs";
+import { remapJsonPaths } from "../src/json-output.mjs";
 
 describe("stripProject", () => {
   it("strips leading slash", () => {
@@ -106,5 +107,43 @@ describe("hostToSandboxPath", () => {
 
   it("leaves Unix path unchanged", () => {
     expect(hostToSandboxPath("/unix/path")).toBe("/unix/path");
+  });
+});
+
+describe("remapJsonPaths", () => {
+  it("remaps file keys in flat object", () => {
+    const obj = { file: "D:/project/src/Foo.java", fqn: "com.Foo" };
+    // On win32, toSandboxPath is a no-op, so file stays the same
+    remapJsonPaths(obj);
+    expect(obj.fqn).toBe("com.Foo");
+    expect(typeof obj.file).toBe("string");
+  });
+
+  it("remaps file keys in array of objects", () => {
+    const arr = [
+      { file: "/path/Foo.java", line: 1 },
+      { file: "/path/Bar.java", line: 2 },
+    ];
+    remapJsonPaths(arr);
+    expect(arr[0].file).toBe("/path/Foo.java");
+    expect(arr[1].file).toBe("/path/Bar.java");
+  });
+
+  it("remaps location keys", () => {
+    const obj = { name: "proj", location: "/ws/proj" };
+    remapJsonPaths(obj);
+    expect(obj.location).toBe("/ws/proj");
+  });
+
+  it("recurses into nested objects", () => {
+    const obj = { items: [{ nested: { file: "/a/b.java" } }] };
+    remapJsonPaths(obj);
+    expect(obj.items[0].nested.file).toBe("/a/b.java");
+  });
+
+  it("handles null and primitives safely", () => {
+    expect(() => remapJsonPaths(null)).not.toThrow();
+    expect(() => remapJsonPaths(42)).not.toThrow();
+    expect(() => remapJsonPaths("str")).not.toThrow();
   });
 });

@@ -1,6 +1,7 @@
 import { get } from "../client.mjs";
 import { parseFlags } from "../args.mjs";
-import { stripProject, toWsPath, toSandboxPath } from "../paths.mjs";
+import { toWsPath, toSandboxPath } from "../paths.mjs";
+import { output } from "../output.mjs";
 import { red, yellow } from "../color.mjs";
 
 export async function errors(args) {
@@ -13,27 +14,25 @@ export async function errors(args) {
 
   let url = "/errors";
   if (params.length > 0) url += "?" + params.join("&");
-  const results = await get(url, 180_000);
-  if (results.error) {
-    console.error(results.error);
-    return;
-  }
-  if (results.length === 0) {
-    console.log("(no errors)");
-    return;
-  }
 
-  for (const r of results) {
-    const sev = r.severity === "ERROR" ? red("ERROR") : yellow("WARN ");
-    const src = r.source ? `[${r.source}] ` : "";
-    console.log(`${sev} ${src}${toSandboxPath(stripProject(r.file))}:${r.line}  ${r.message}`);
-  }
+  const data = await get(url, 180_000);
+
+  output(args, data, {
+    empty: "(no errors)",
+    text(data) {
+      for (const r of data) {
+        const sev = r.severity === "ERROR" ? red("ERROR") : yellow("WARN ");
+        const src = r.source ? `[${r.source}] ` : "";
+        console.log(`${sev} ${src}${toSandboxPath(r.file)}:${r.line}  ${r.message}`);
+      }
+    },
+  });
 }
 
 export const help = `Check compilation errors and diagnostics.
 
 Usage:  jdt errors [--file <path>] [--project <name>]
-                   [--warnings] [--all]
+                   [--warnings] [--all] [--json]
 
 Scope (pick one or omit for entire workspace):
   --file <path>       single file (workspace-relative)
@@ -42,6 +41,7 @@ Scope (pick one or omit for entire workspace):
 Options:
   --warnings          include warnings (default: errors only)
   --all               all marker types (jdt + checkstyle + maven + ...)
+  --json              output as JSON
 
 Refreshes from disk and waits for auto-build before reading markers.
 Use 'jdt build' to trigger explicit builds.
@@ -49,4 +49,5 @@ Use 'jdt build' to trigger explicit builds.
 Examples:
   jdt errors --project m8-server
   jdt errors --file m8-server/src/main/java/.../Foo.java
-  jdt errors --project m8-server --all --warnings`;
+  jdt errors --project m8-server --all --warnings
+  jdt errors --project m8-server --json`;

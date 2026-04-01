@@ -2,9 +2,9 @@ import { get } from "../client.mjs";
 import { extractPositional, parseFqmn } from "../args.mjs";
 import { formatHierEntry } from "../format/hierarchy.mjs";
 import { toSandboxPath } from "../paths.mjs";
+import { output } from "../output.mjs";
 
 export async function source(args) {
-  const jsonFlag = args.includes("--json");
   const pos = extractPositional(args).filter((a) => a !== "--json");
   if (pos.length === 0) {
     console.error("Usage: source <FQMN> [<FQMN> ...] [--json]");
@@ -12,26 +12,24 @@ export async function source(args) {
   }
 
   const results = await Promise.all(pos.map((arg) => fetchOne(arg)));
+  const data = results.length === 1 ? results[0] : results;
 
-  if (jsonFlag) {
-    const data = results.length === 1 ? results[0] : results;
-    remapJsonPaths(data);
-    console.log(JSON.stringify(data, null, 2));
-    return;
-  }
-
-  const blocks = [];
-  for (const r of results) {
-    if (r.error) {
-      console.error(r.error);
-    } else if (Array.isArray(r)) {
-      blocks.push(...r.map(formatMarkdown));
-    } else {
-      blocks.push(formatMarkdown(r));
-    }
-  }
-  if (blocks.length === 0) return;
-  console.log(blocks.join("\n\n---\n\n"));
+  output(args, data, {
+    text(data) {
+      const items = Array.isArray(data) ? data : [data];
+      const blocks = [];
+      for (const r of items) {
+        if (r.error) {
+          console.error(r.error);
+        } else if (Array.isArray(r)) {
+          blocks.push(...r.map(formatMarkdown));
+        } else {
+          blocks.push(formatMarkdown(r));
+        }
+      }
+      if (blocks.length > 0) console.log(blocks.join("\n\n---\n\n"));
+    },
+  });
 }
 
 async function fetchOne(fqmn) {
@@ -286,20 +284,6 @@ function formatMarkdown(result) {
   return lines.join("\n");
 }
 
-/** Recursively apply toSandboxPath to all "file" values in JSON data. */
-function remapJsonPaths(obj) {
-  if (Array.isArray(obj)) {
-    for (const item of obj) remapJsonPaths(item);
-  } else if (obj && typeof obj === "object") {
-    for (const key of Object.keys(obj)) {
-      if (key === "file" && typeof obj[key] === "string") {
-        obj[key] = toSandboxPath(obj[key]);
-      } else {
-        remapJsonPaths(obj[key]);
-      }
-    }
-  }
-}
 
 export const help = `Print source code of a type or method with resolved references.
 

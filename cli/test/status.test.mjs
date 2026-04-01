@@ -7,25 +7,25 @@ import {
 // ---- formatSection ----
 
 describe("formatSection", () => {
-  const s = { title: "Errors", cmd: "jdt errors", body: "(no errors)" };
+  const s = { title: "Errors", cmd: "jdt errors --json", body: "[]" };
 
   it("single section: body only, no header, no fence, no command", () => {
     const out = formatSection(s, true);
-    expect(out).toBe("(no errors)");
+    expect(out).toBe("[]");
   });
 
   it("multiple sections: has ## header", () => {
     const out = formatSection(s, false);
     expect(out).toContain("## Errors");
     expect(out).toContain("```bash");
-    expect(out).toContain("$ jdt errors");
+    expect(out).toContain("$ jdt errors --json");
   });
 
   it("multiple sections: code fence wraps body", () => {
     const out = formatSection(s, false);
     expect(out).toContain("```bash");
-    expect(out).toContain("$ jdt errors");
-    expect(out).toContain("(no errors)");
+    expect(out).toContain("$ jdt errors --json");
+    expect(out).toContain("[]");
     expect(out).toMatch(/```$/);
   });
 

@@ -74,7 +74,7 @@ async function renderEditors() {
 }
 
 async function renderErrors() {
-  return { title: "Errors", cmd: "jdt errors", body: cliCmd("jdt errors") };
+  return { title: "Errors", cmd: "jdt errors --json", body: cliCmd("jdt errors --json") };
 }
 
 async function renderLaunches() {

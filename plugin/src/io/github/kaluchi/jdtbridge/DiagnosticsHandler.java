@@ -74,8 +74,11 @@ class DiagnosticsHandler {
             };
 
             var entry = new JsonObject();
-            entry.addProperty("file", marker.getResource()
-                    .getFullPath().toString());
+            var loc = marker.getResource().getLocation();
+            entry.addProperty("file", loc != null
+                    ? loc.toOSString()
+                    : marker.getResource()
+                            .getFullPath().toString());
             entry.addProperty("line", marker.getAttribute(
                     IMarker.LINE_NUMBER, -1));
             entry.addProperty("severity", sevStr);

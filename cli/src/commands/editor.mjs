@@ -2,26 +2,25 @@ import { basename } from "node:path";
 import { get } from "../client.mjs";
 import { extractPositional, parseFlags, parseFqmn } from "../args.mjs";
 import { toSandboxPath } from "../paths.mjs";
+import { output } from "../output.mjs";
+import { formatTable } from "../format/table.mjs";
 import { dim } from "../color.mjs";
 
-export async function editors() {
-  const results = await get("/editors");
-  if (results.error) {
-    console.error(results.error);
-    return;
-  }
-  if (results.length === 0) {
-    console.log("(no open editors)");
-    return;
-  }
-  const rows = results.map((r) => [
-    r.active ? ">" : "",
-    r.fqn ? `\`${r.fqn}\`` : basename(r.file),
-    r.project || "",
-    toSandboxPath(r.file),
-  ]);
-  const { formatTable } = await import("../format/table.mjs");
-  console.log(formatTable([" ", "FILE", "PROJECT", "PATH"], rows));
+export async function editors(args = []) {
+  const data = await get("/editors");
+
+  output(args, data, {
+    empty: "(no open editors)",
+    text(data) {
+      const rows = data.map((r) => [
+        r.active ? ">" : "",
+        r.fqn ? `\`${r.fqn}\`` : basename(r.file),
+        r.project || "",
+        toSandboxPath(r.file),
+      ]);
+      console.log(formatTable([" ", "FILE", "PROJECT", "PATH"], rows));
+    },
+  });
 }
 
 export async function open(args) {
@@ -49,9 +48,14 @@ export async function open(args) {
 
 export const editorsHelp = `List all open editors in Eclipse. Active editor first.
 
-Usage:  jdt editors
+Usage:  jdt editors [--json]
 
-Output: absolute file paths, one per line.`;
+Options:
+  --json    output as JSON
+
+Examples:
+  jdt editors
+  jdt editors --json`;
 
 export const openHelp = `Open a type or method in the Eclipse editor.
 

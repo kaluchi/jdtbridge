@@ -1,5 +1,6 @@
 import { get } from "../client.mjs";
 import { extractPositional } from "../args.mjs";
+import { output } from "../output.mjs";
 import {
   formatTestStatus,
   followTestStream,
@@ -14,7 +15,7 @@ export async function testStatus(args) {
   const session = pos[0];
 
   if (!session) {
-    console.error("Usage: test status <session> [-f] [--all] [--ignored]");
+    console.error("Usage: test status <session> [-f] [--all] [--ignored] [--json]");
     process.exit(1);
   }
 
@@ -32,18 +33,16 @@ export async function testStatus(args) {
   let url = `/test/status?session=${encodeURIComponent(session)}`;
   if (filter) url += `&filter=${filter}`;
 
-  const result = await get(url, 30_000);
-  if (result.error) {
-    console.error(result.error);
-    return;
-  }
+  const data = await get(url, 30_000);
 
-  formatTestStatus(result);
+  output(args, data, {
+    text: formatTestStatus,
+  });
 }
 
 export const help = `Show test session status (snapshot or live stream).
 
-Usage:  jdt test status <session> [-f] [--all] [--ignored]
+Usage:  jdt test status <session> [-f] [--all] [--ignored] [--json]
 
 Without -f, returns a snapshot of the current state.
 With -f, streams test events until the session completes.
@@ -52,11 +51,13 @@ Flags:
   -f, --follow    stream events live until completion
   --all           show all tests (default: failures only)
   --ignored       show only ignored/skipped tests
+  --json          output as JSON (snapshot mode only)
 
 Examples:
   jdt test status jdtbridge-test-1234567890
   jdt test status jdtbridge-test-1234567890 -f
   jdt test status jdtbridge-test-1234567890 --ignored
+  jdt test status jdtbridge-test-1234567890 --all --json
 
 Console output (stdout, stderr, stack traces):
   jdt launch logs <session-name>

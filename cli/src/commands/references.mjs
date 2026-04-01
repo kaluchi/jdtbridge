@@ -1,5 +1,6 @@
 import { get } from "../client.mjs";
 import { extractPositional, parseFlags, parseFqmn } from "../args.mjs";
+import { output } from "../output.mjs";
 import { formatReferences } from "../format/references.mjs";
 
 export async function references(args) {
@@ -8,7 +9,7 @@ export async function references(args) {
   const parsed = parseFqmn(pos[0]);
   const fqn = parsed.className;
   if (!fqn) {
-    console.error("Usage: references <FQN>[#method[(param types)]] [--field name]");
+    console.error("Usage: references <FQN>[#method[(param types)]] [--field name] [--json]");
     process.exit(1);
   }
   let url = `/references?class=${encodeURIComponent(fqn)}`;
@@ -21,22 +22,18 @@ export async function references(args) {
       url += `&paramTypes=${encodeURIComponent(parsed.paramTypes.join(","))}`;
     }
   }
-  const results = await get(url, 30_000);
-  if (results.error) {
-    console.error(results.error);
-    return;
-  }
-  if (results.length === 0) {
-    console.log("(no references)");
-    return;
-  }
-  formatReferences(results);
+
+  const data = await get(url, 30_000);
+
+  output(args, data, {
+    empty: "(no references)",
+    text: formatReferences,
+  });
 }
 
 export const help = `Find all references to a type, method, or field across the workspace.
 
-Usage:  jdt references <FQN>[#method[(param types)]]
-        jdt references <FQN> --field <name>
+Usage:  jdt references <FQN>[#method[(param types)]] [--field name] [--json]
 
 FQMN formats (Fully Qualified Method Name):
   pkg.Class#method              any overload
@@ -46,9 +43,11 @@ FQMN formats (Fully Qualified Method Name):
 
 Flags:
   --field <name>   find references to a field
+  --json           output as JSON
 
 Examples:
   jdt references com.example.dto.BaseEntity
   jdt references com.example.dao.UserDaoImpl#getStaff
   jdt references "com.example.dao.UserDaoImpl#save(Order)"
-  jdt references com.example.dao.UserDaoImpl --field staffCache`;
+  jdt references com.example.dao.UserDaoImpl --field staffCache
+  jdt references com.example.Foo --json`;
