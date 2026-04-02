@@ -89,17 +89,20 @@ const launchSubcommands = {
   console: { fn: launchConsole, help: launchConsoleHelp },
 };
 
-const launchHelp = `Manage launches (running and terminated processes).
+const launchHelp = `Manage launch configurations and running processes.
 
 Subcommands:
-  jdt launch list                           list all launches
-  jdt launch configs                        list saved launch configurations
-  jdt launch config <name> [--xml]          show configuration details
-  jdt launch run <config> [-f] [-q]         launch a configuration
-  jdt launch debug <config> [-f] [-q]       launch in debug mode
-  jdt launch logs <name> [-f] [--tail N]    show console output
-  jdt launch stop <name>                    stop a running launch
-  jdt launch clear [name]                   remove terminated launches
+  jdt launch configs                              list saved configurations
+  jdt launch config <configId> [--xml] [--json]   show configuration details
+  jdt launch run <configId> [-f] [-q]             launch a configuration
+  jdt launch debug <configId> [-f] [-q]           launch in debug mode
+  jdt launch list                                 list running/terminated launches
+  jdt launch logs <launchId> [-f] [--tail N]      show console output
+  jdt launch stop <launchId>                      stop a running launch
+  jdt launch clear [launchId]                     remove terminated launches
+
+LaunchId is configId:pid (e.g. my-server:12345) for disambiguation.
+Plain configId works when there is only one launch with that name.
 
 Use "jdt help launch <subcommand>" for details.`;
 

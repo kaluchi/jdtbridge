@@ -32,18 +32,19 @@ describe("launch commands", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { name: "my-server", type: "Java Application", mode: "run", terminated: false, pid: "12345" },
-        { name: "ObjectMapperTest", type: "JUnit", mode: "run", terminated: true, exitCode: 0 },
+        { launchId: "my-server:12345", configId: "my-server", type: "Java Application", mode: "run", terminated: false, pid: "12345" },
+        { launchId: "ObjectMapperTest:99", configId: "ObjectMapperTest", type: "JUnit", mode: "run", terminated: true, exitCode: 0, pid: "99" },
       ]));
     });
     const { launchList } = await import("../src/commands/launch.mjs");
     await launchList();
     const out = io.logs[0];
-    expect(out).toContain("NAME");
+    expect(out).toContain("LAUNCHID");
+    expect(out).toContain("CONFIGID");
     expect(out).toContain("STATUS");
-    expect(out).toContain("my-server");
+    expect(out).toContain("my-server:12345");
     expect(out).toContain("running");
-    expect(out).toContain("ObjectMapperTest");
+    expect(out).toContain("ObjectMapperTest:99");
     expect(out).toContain("terminated (0)");
   });
 
@@ -98,15 +99,15 @@ describe("launch commands", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { name: "my-server", type: "Java Application", project: "m8-server", mainClass: "app.m8.Main" },
-        { name: "AllTests", type: "JUnit", project: "m8-server", class: "app.m8.AllTests", runner: "JUnit 5" },
-        { name: "jdtbridge-verify", type: "Maven Build", goals: "clean verify" },
+        { configId: "my-server", type: "Java Application", project: "m8-server", mainClass: "app.m8.Main" },
+        { configId: "AllTests", type: "JUnit", project: "m8-server", class: "app.m8.AllTests", runner: "JUnit 5" },
+        { configId: "jdtbridge-verify", type: "Maven Build", goals: "clean verify" },
       ]));
     });
     const { launchConfigs } = await import("../src/commands/launch.mjs");
     await launchConfigs();
     const out = io.logs[0];
-    expect(out).toContain("NAME");
+    expect(out).toContain("CONFIGID");
     expect(out).toContain("TYPE");
     expect(out).toContain("PROJECT");
     expect(out).toContain("TARGET");
@@ -153,7 +154,7 @@ describe("launch commands", () => {
   it("launch run shows launched with guide", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: true, name: "my-server", mode: "run" }));
+      res.end(JSON.stringify({ ok: true, configId: "my-server", launchId: "my-server:111", mode: "run", pid: "111" }));
     });
     const { launchRun } = await import("../src/commands/launch.mjs");
     await launchRun(["my-server"]);
@@ -166,7 +167,7 @@ describe("launch commands", () => {
   it("launch run -q suppresses guide", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: true, name: "my-server", mode: "run" }));
+      res.end(JSON.stringify({ ok: true, configId: "my-server", launchId: "my-server:111", mode: "run", pid: "111" }));
     });
     const { launchRun } = await import("../src/commands/launch.mjs");
     await launchRun(["my-server", "-q"]);
@@ -178,7 +179,7 @@ describe("launch commands", () => {
     await setupMock((req, res) => {
       expect(req.url).toContain("debug");
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: true, name: "my-server", mode: "debug" }));
+      res.end(JSON.stringify({ ok: true, configId: "my-server", launchId: "my-server:222", mode: "debug", pid: "222" }));
     });
     const { launchDebug } = await import("../src/commands/launch.mjs");
     await launchDebug(["my-server"]);
@@ -193,7 +194,7 @@ describe("launch commands", () => {
   it("launch stop shows stopped", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: true, name: "my-server" }));
+      res.end(JSON.stringify({ ok: true, configId: "my-server" }));
     });
     const { launchStop } = await import("../src/commands/launch.mjs");
     await launchStop(["my-server"]);
@@ -298,7 +299,7 @@ describe("launch commands", () => {
       urls.push(req.url);
       if (req.url.includes("/launch/run")) {
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: true, name: "my-build", mode: "run" }));
+        res.end(JSON.stringify({ ok: true, configId: "my-build", launchId: "my-build:333", mode: "run", pid: "333" }));
       } else if (req.url.includes("/launch/console/stream")) {
         res.writeHead(200, { "Content-Type": "text/plain" });
         res.end("BUILD SUCCESS\n");
@@ -323,29 +324,154 @@ describe("launch commands", () => {
   it("launch run without --follow prints launched", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: true, name: "my-server", mode: "run" }));
+      res.end(JSON.stringify({ ok: true, configId: "my-server", launchId: "my-server:111", mode: "run", pid: "111" }));
     });
     const { launchRun } = await import("../src/commands/launch.mjs");
     await launchRun(["my-server"]);
     expect(io.logs[0]).toContain("Launched");
   });
 
-  it("launch config shows JSON details", async () => {
+  it("launch config shows KEY VALUE table by default", async () => {
     const detail = {
-      name: "ObjectMapperTest", type: "JUnit", typeId: "org.eclipse.jdt.junit.launchconfig",
+      configId: "ObjectMapperTest", type: "JUnit", typeId: "org.eclipse.jdt.junit.launchconfig",
       file: "/ws/.metadata/.plugins/org.eclipse.debug.core/ObjectMapperTest.launch",
-      attributes: { "org.eclipse.jdt.launching.MAIN_TYPE_NAME": "app.m8.ObjectMapperTest" },
+      attributes: {
+        "org.eclipse.jdt.launching.MAIN_TYPE": "app.m8.ObjectMapperTest",
+        "org.eclipse.jdt.launching.PROJECT_ATTR": "m8-server",
+        "org.eclipse.jdt.junit.TEST_KIND": "org.eclipse.jdt.junit.loader.junit5",
+      },
     };
     await setupMock((req, res) => {
-      expect(req.url).toContain("name=ObjectMapperTest");
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(detail));
     });
     const { launchConfig } = await import("../src/commands/launch.mjs");
     await launchConfig(["ObjectMapperTest"]);
     const out = io.logs.join("\n");
+    expect(out).toContain("KEY");
+    expect(out).toContain("VALUE");
     expect(out).toContain("ObjectMapperTest");
-    expect(out).toContain("MAIN_TYPE_NAME");
+    expect(out).toContain("m8-server");
+    expect(out).toContain("app.m8.ObjectMapperTest");
+    expect(out).toContain("org.eclipse.jdt.junit.TEST_KIND");
+  });
+
+  it("launch config text shows synthesized Target as FQMN", async () => {
+    const detail = {
+      configId: "FooTest", type: "JUnit", typeId: "org.eclipse.jdt.junit.launchconfig",
+      attributes: {
+        "org.eclipse.jdt.launching.MAIN_TYPE": "com.example.FooTest",
+        "org.eclipse.jdt.junit.TESTNAME": "shouldPass",
+        "org.eclipse.jdt.launching.PROJECT_ATTR": "my-proj",
+      },
+    };
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(detail));
+    });
+    const { launchConfig } = await import("../src/commands/launch.mjs");
+    await launchConfig(["FooTest"]);
+    const out = io.logs.join("\n");
+    expect(out).toContain("com.example.FooTest#shouldPass");
+    expect(out).toContain("Target");
+  });
+
+  it("launch config text shows Java Application target", async () => {
+    const detail = {
+      configId: "MyApp", type: "Java Application", typeId: "org.eclipse.jdt.launching.localJavaApplication",
+      attributes: {
+        "org.eclipse.jdt.launching.MAIN_TYPE": "com.example.Main",
+        "org.eclipse.jdt.launching.PROJECT_ATTR": "my-app",
+      },
+    };
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(detail));
+    });
+    const { launchConfig } = await import("../src/commands/launch.mjs");
+    await launchConfig(["MyApp"]);
+    const out = io.logs.join("\n");
+    expect(out).toContain("com.example.Main");
+    expect(out).toContain("Target");
+    expect(out).not.toContain("#");
+  });
+
+  it("launch config text shows Maven goals as target", async () => {
+    const detail = {
+      configId: "my-build", type: "Maven Build", typeId: "org.eclipse.m2e.Maven2LaunchConfigurationType",
+      attributes: { "M2_GOALS": "clean verify", "M2_THREADS": 4 },
+    };
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(detail));
+    });
+    const { launchConfig } = await import("../src/commands/launch.mjs");
+    await launchConfig(["my-build"]);
+    const out = io.logs.join("\n");
+    expect(out).toContain("clean verify");
+    expect(out).toContain("Target");
+  });
+
+  it("launch config text aligns multiline values", async () => {
+    const detail = {
+      configId: "Test", type: "JUnit", typeId: "org.eclipse.jdt.junit.launchconfig",
+      attributes: {
+        "org.eclipse.jdt.launching.VM_ARGUMENTS": "-ea\n-javaagent:mock.jar",
+        "org.eclipse.jdt.launching.MAIN_TYPE": "com.Test",
+      },
+    };
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(detail));
+    });
+    const { launchConfig } = await import("../src/commands/launch.mjs");
+    await launchConfig(["Test"]);
+    const out = io.logs.join("\n");
+    const lines = out.split("\n");
+    const vmLine = lines.find((l) => l.includes("VM_ARGUMENTS"));
+    const contLine = lines[lines.indexOf(vmLine) + 1];
+    expect(vmLine).toContain("-ea");
+    expect(contLine).toContain("-javaagent:mock.jar");
+    // continuation should be indented to align with VALUE column
+    expect(contLine).toMatch(/^\s+-javaagent/);
+  });
+
+  it("launch config --json outputs raw JSON", async () => {
+    const detail = {
+      configId: "ObjectMapperTest", type: "JUnit", typeId: "org.eclipse.jdt.junit.launchconfig",
+      file: "/ws/ObjectMapperTest.launch",
+      attributes: { "org.eclipse.jdt.launching.MAIN_TYPE": "app.m8.ObjectMapperTest" },
+    };
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(detail));
+    });
+    const { launchConfig } = await import("../src/commands/launch.mjs");
+    await launchConfig(["ObjectMapperTest", "--json"]);
+    const out = io.logs.join("\n");
+    const parsed = JSON.parse(out);
+    expect(parsed.configId).toBe("ObjectMapperTest");
+    expect(parsed.attributes).toBeDefined();
+  });
+
+  it("launch config text omits Target when no class or goals", async () => {
+    const detail = {
+      configId: "m8-server", type: "JUnit", typeId: "org.eclipse.jdt.junit.launchconfig",
+      attributes: {
+        "org.eclipse.jdt.launching.MAIN_TYPE": "",
+        "org.eclipse.jdt.junit.CONTAINER": "=m8-server",
+        "org.eclipse.jdt.launching.PROJECT_ATTR": "m8-server",
+      },
+    };
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(detail));
+    });
+    const { launchConfig } = await import("../src/commands/launch.mjs");
+    await launchConfig(["m8-server"]);
+    const out = io.logs.join("\n");
+    expect(out).toContain("Project");
+    expect(out).not.toContain("Target");
   });
 
   it("launch config --xml shows raw XML", async () => {
@@ -376,7 +502,7 @@ describe("launch commands", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { name: "FooTest.bar", type: "JUnit", project: "proj", class: "com.FooTest", method: "bar" },
+        { configId: "FooTest.bar", type: "JUnit", project: "proj", class: "com.FooTest", method: "bar" },
       ]));
     });
     const { launchConfigs } = await import("../src/commands/launch.mjs");

@@ -11,10 +11,23 @@ function pad(s, w) {
   return diff > 0 ? s + " ".repeat(diff) : s;
 }
 
-/** Format rows as aligned columns with headers. */
+/** Format rows as aligned columns with headers. Handles multiline cell values. */
 export function formatTable(headers, rows) {
+  // Split each cell into lines for width calculation
+  const cellLines = rows.map((r) => r.map((c) => (c || "").split("\n")));
+
   const widths = headers.map((h, i) =>
-    Math.max(h.length, ...rows.map((r) => visLen(r[i] || ""))));
-  const line = (cells) => cells.map((c, i) => pad(c || "", widths[i])).join("  ").trimEnd();
-  return [line(headers), ...rows.map(line)].join("\n");
+    Math.max(h.length, ...cellLines.map((r) =>
+      Math.max(...(r[i] || [""]).map(visLen)))));
+
+  const fmtLine = (cells) => cells.map((c, i) => pad(c || "", widths[i])).join("  ").trimEnd();
+  const out = [fmtLine(headers)];
+
+  for (const cl of cellLines) {
+    const maxLines = Math.max(...cl.map((c) => c.length));
+    for (let ln = 0; ln < maxLines; ln++) {
+      out.push(fmtLine(cl.map((c) => c[ln] || "")));
+    }
+  }
+  return out.join("\n");
 }

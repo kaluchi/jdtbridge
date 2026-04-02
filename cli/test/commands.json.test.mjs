@@ -419,9 +419,9 @@ describe("--json output", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { name: "my-server", type: "Java Application", project: "m8-server", mainClass: "app.m8.Main" },
-        { name: "jdtbridge-verify", type: "Maven Build", goals: "clean verify" },
-        { name: "AllTests", type: "JUnit", project: "m8-server", class: "app.m8.AllTests", runner: "JUnit 5" },
+        { configId: "my-server", type: "Java Application", project: "m8-server", mainClass: "app.m8.Main" },
+        { configId: "jdtbridge-verify", type: "Maven Build", goals: "clean verify" },
+        { configId: "AllTests", type: "JUnit", project: "m8-server", class: "app.m8.AllTests", runner: "JUnit 5" },
       ]));
     });
     const { launchConfigs } = await import("../src/commands/launch.mjs");

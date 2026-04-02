@@ -13,7 +13,7 @@ import { basename } from "node:path";
 
 // ---- Public API ----
 
-const SECTION_NAMES = ["intro", "git", "editors", "errors", "launches", "tests", "projects", "guide"];
+const SECTION_NAMES = ["intro", "git", "editors", "errors", "launch-configs", "launches", "tests", "projects", "guide"];
 
 export async function status(args) {
   const jsonFlag = args.includes("--json");
@@ -76,6 +76,7 @@ const JSON_COMMANDS = {
   git: "jdt git --json",
   editors: "jdt editors --json",
   errors: "jdt errors --json",
+  "launch-configs": "jdt launch configs --json",
   launches: "jdt launch list --json",
   tests: "jdt test sessions --json",
   projects: "jdt projects --json",
@@ -87,6 +88,7 @@ const RENDERERS = {
   git: renderGit,
   editors: renderEditors,
   errors: renderErrors,
+  "launch-configs": renderLaunchConfigs,
   launches: renderLaunches,
   tests: renderTests,
   projects: renderProjects,
@@ -102,6 +104,10 @@ async function renderEditors() {
 
 async function renderErrors() {
   return { title: "Errors", cmd: "jdt errors --json", body: cliCmd("jdt errors --json") };
+}
+
+async function renderLaunchConfigs() {
+  return { title: "Launch Configs", cmd: "jdt launch configs", body: cliCmd("jdt launch configs") };
 }
 
 async function renderLaunches() {
@@ -157,6 +163,7 @@ Refresh the full dashboard or individual sections.
   jdt status git              only git repos and branches
   jdt status editors          only open editor tabs
   jdt status errors           only compilation errors
+  jdt status launch-configs   only saved launch configurations
   jdt status launches         only running launches
   jdt status tests            only test results
   jdt status projects         only project list
@@ -167,6 +174,7 @@ Each section can also be refreshed with its standalone command:
   jdt git                     same as jdt status git
   jdt editors                 same as jdt status editors
   jdt errors                  compilation errors (with --project for one project)
+  jdt launch configs          same as jdt status launch-configs
   jdt launch list             same as jdt status launches
   jdt test sessions           same as jdt status tests
   jdt projects                same as jdt status projects
@@ -252,14 +260,15 @@ export const help = `CLI screenshot of Eclipse — composite view of IDE state.
 Usage:  jdt status [sections...] [-q] [--json]
 
 Sections (default: all):
-  intro        context for AI agents (shown by default, suppressed by -q)
-  git          git repos, branches, modified files
-  editors      open editor tabs (active first)
-  errors       compilation errors
-  launches     running launches
-  tests        recent test sessions
-  projects     workspace projects with repo mapping
-  guide        usage guide (shown by default, suppressed by -q)
+  intro           context for AI agents (shown by default, suppressed by -q)
+  git             git repos, branches, modified files
+  editors         open editor tabs (active first)
+  errors          compilation errors
+  launch-configs  saved launch configurations (name, type, project, target)
+  launches        running launches
+  tests           recent test sessions
+  projects        workspace projects with repo mapping
+  guide           usage guide (shown by default, suppressed by -q)
 
 Options:
   --json       composite JSON of all data sections

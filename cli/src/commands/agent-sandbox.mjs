@@ -177,7 +177,7 @@ export async function run({ agent, name, agentArgs, session }) {
   // 8. Run — external terminal (Eclipse) or inline (CLI)
   if (session) {
     const dockerCmd = ["docker", "sandbox", "run", container,
-      ...agentArgs].join(" ");
+      "--", ...agentArgs].join(" ");
     console.log(`Launching agent...`);
     console.log(dim(`  $ ${dockerCmd}`));
     const child = openTerminal(name, dockerCmd);
@@ -192,7 +192,7 @@ export async function run({ agent, name, agentArgs, session }) {
     console.log(dim("\nAgent session ended."));
   } else {
     const child = spawn("docker", [
-      "sandbox", "run", container, ...agentArgs,
+      "sandbox", "run", container, "--", ...agentArgs,
     ], { stdio: "inherit" });
 
     function cleanup() {

@@ -137,13 +137,14 @@ function formatTime(t) {
  * Format the header printed at test run start.
  * Markdown-friendly: heading + backtick-wrapped values.
  */
-export function formatTestRunHeader(result) {
+export function formatTestRunHeader(result, launchId) {
   const label = result.label || result.session;
   const total = result.total ? ` (${result.total} tests)` : "";
   const parts = [`#### Test: ${label}${total}`];
-  parts.push(`Launch: \`${result.session}\``);
-  if (result.project) parts.push(`Project: \`${result.project}\``);
-  if (result.runner) parts.push(`Runner: ${result.runner}`);
+  parts.push(`Session:  \`${result.session}\``);
+  parts.push(`LaunchId: \`${launchId}\``);
+  if (result.project) parts.push(`Project:  \`${result.project}\``);
+  if (result.runner) parts.push(`Runner:   ${result.runner}`);
   return parts.join("\n");
 }
 
@@ -151,25 +152,26 @@ export function formatTestRunHeader(result) {
  * Onboarding guide printed after non-blocking launch.
  * Markdown-friendly: bold sections, backtick commands.
  */
-export function testRunGuide(session) {
+export function testRunGuide(session, launchId) {
   return `
-**Status** — snapshot or live stream:
-  \`jdt test status ${session}\`        failures only (default)
-  \`jdt test status ${session} -f\`     stream live until done
-  \`jdt test status ${session} --all\`  all tests including passed
+**Test status** (session = ${session}):
+  \`jdt test status ${session}\`            failures only (default)
+  \`jdt test status ${session} -f\`         stream live until done
+  \`jdt test status ${session} --all\`      all tests including passed
   \`jdt test status ${session} --ignored\`  only skipped/disabled tests
 
-**Console** — raw stdout/stderr of the test JVM:
-  \`jdt launch logs ${session}\`
+**Console output** (launchId = ${launchId}):
+  \`jdt launch logs ${launchId}\`
+  \`jdt launch logs ${launchId} --tail 50\`
 
 **Manage:**
-  \`jdt test sessions\`                 list active/completed sessions
-  \`jdt launch stop ${session}\`   abort
-  \`jdt launch clear ${session}\`  remove
+  \`jdt test sessions\`                     list active/completed sessions
+  \`jdt launch stop ${launchId}\`           abort
+  \`jdt launch clear ${launchId}\`          remove
 
 **Navigate** — FQMNs from status output are copy-pasteable:
-  \`jdt source <FQMN>\`                 view test source
-  \`jdt test run <FQMN> -f\`            re-run single test
+  \`jdt source <FQMN>\`                     view test source
+  \`jdt test run <FQMN> -f\`                re-run single test
 
 Add \`-q\` to suppress this guide.`;
 }

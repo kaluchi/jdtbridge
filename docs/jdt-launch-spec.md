@@ -25,12 +25,15 @@ Maven builds, PDE plugin tests, and custom agent types.
 List active and terminated launches (current Eclipse session).
 
 ```
-NAME                TYPE                MODE  STATUS          PID
-my-server           Java Application    run   running         12345
-ObjectMapperTest    JUnit               run   terminated (0)
+LAUNCHID                 CONFIGID          TYPE                MODE  STATUS          PID
+my-server:12345          my-server         Java Application    run   running         12345
+ObjectMapperTest:67890   ObjectMapperTest  JUnit               run   terminated (0)  67890
 ```
 
-JSON fields: `name`, `type`, `mode`, `terminated`, `started`, `exitCode`, `pid`.
+`LAUNCHID` is `configId:pid` — unique per launch instance. Use it with
+`launch logs`, `launch stop`. `CONFIGID` links back to `launch configs`.
+
+JSON fields: `launchId`, `configId`, `type`, `mode`, `terminated`, `started`, `exitCode`, `pid`.
 
 Launches are ephemeral — they exist only for the current Eclipse session.
 Restarting Eclipse clears the list. Use `jdt launch clear` to remove
@@ -52,24 +55,49 @@ Columns:
 - **NAME** — configuration name (unique identifier for `jdt launch run`)
 - **TYPE** — Eclipse launch type (human-readable)
 - **PROJECT** — Java project (from `org.eclipse.jdt.launching.PROJECT_ATTR`)
-- **TARGET** — type-specific summary:
-  - JUnit: `class#method` (FQMN)
-  - Java Application: main class
-  - Maven Build: goals
+- **TARGET** — synthesized FQMN, type-specific:
+  - JUnit class: `class#method` (FQMN from `MAIN_TYPE` + `TESTNAME`)
+  - JUnit package: package name (parsed from `CONTAINER`)
+  - JUnit project: empty (redundant with PROJECT)
+  - Java Application: main class (from `MAIN_TYPE`)
+  - Maven Build: goals (from `M2_GOALS`)
 
 JSON includes additional fields per type:
-- JUnit / JUnit Plug-in Test: `class`, `method`, `runner` (JUnit 4/5/6)
+- JUnit / JUnit Plug-in Test: `class`, `method`, `package`, `runner` (JUnit 4/5/6)
 - Java Application: `mainClass`
 - Maven Build: `goals`, `profiles`
+
+Note: `class` and `mainClass` are separate JSON fields for the same
+underlying attribute (`MAIN_TYPE`). The split lets consumers distinguish
+test classes from application entry points without checking `type`.
+`package` is only present when `class` is empty (package/project-level test configs).
 
 Sort order: favorites first, then launch history, then alphabetical.
 This matches the Eclipse Run > Run Configurations dialog order.
 
-### `jdt launch config <name> [--xml]`
+### `jdt launch config <name> [--xml] [--json]`
 
 Show full details of a single launch configuration.
 
-Default output (JSON):
+Default output (KEY VALUE table):
+```
+KEY                                             VALUE
+Name                                            ObjectMapperTest
+Type                                            JUnit
+Project                                         m8-server
+Target                                          app.m8ws.utils.ObjectMapperTest
+File                                            D:\...\ObjectMapperTest.launch
+org.eclipse.jdt.junit.TEST_KIND                 org.eclipse.jdt.junit.loader.junit5
+org.eclipse.jdt.launching.VM_ARGUMENTS          -ea
+                                                -javaagent:"mockito-core.jar"
+```
+
+Header rows (Name, Type, Project, Target, File) are synthesized from
+raw attributes. Target uses the same FQMN logic as `launch configs`.
+Remaining attributes are shown with full Eclipse key names and all values
+(including false and empty). Multiline values are aligned to the VALUE column.
+
+With `--json`, outputs raw server response:
 ```json
 {
   "name": "ObjectMapperTest",
@@ -77,7 +105,7 @@ Default output (JSON):
   "typeId": "org.eclipse.jdt.junit.launchconfig",
   "file": "/path/to/.metadata/.plugins/org.eclipse.debug.core/.launches/ObjectMapperTest.launch",
   "attributes": {
-    "org.eclipse.jdt.launching.MAIN_TYPE_NAME": "app.m8.ObjectMapperTest",
+    "org.eclipse.jdt.launching.MAIN_TYPE": "app.m8ws.utils.ObjectMapperTest",
     "org.eclipse.jdt.launching.PROJECT_ATTR": "m8-server",
     "org.eclipse.jdt.junit.TEST_KIND": "org.eclipse.jdt.junit.loader.junit5",
     "org.eclipse.jdt.launching.VM_ARGUMENTS": "-Xmx512m"
@@ -89,14 +117,19 @@ With `--xml`, outputs the raw .launch file content (Eclipse XML format).
 Useful for debugging attribute issues or comparing configurations.
 
 Design decisions:
-- Default is JSON (not text table) because config details are inherently
-  nested key-value data, not tabular. JSON is both human-readable and
-  machine-parseable.
-- Attribute keys are raw Eclipse IDs (e.g. `org.eclipse.jdt.launching.MAIN_TYPE_NAME`),
-  not mapped to friendly names. This preserves the full fidelity and avoids
-  lossy mapping. Agents can use known keys; humans use `--xml` for the full picture.
+- Default is text table (not JSON) for human readability. Header rows
+  provide the same synthesized view as `launch configs` (Name, Type,
+  Project, Target). Attributes below use full Eclipse key names — no
+  shortening, no filtering.
+- `--json` outputs the raw server response with typed attribute values.
+  Attribute keys are raw Eclipse IDs (e.g. `org.eclipse.jdt.launching.MAIN_TYPE`),
+  not mapped to friendly names — full fidelity, no lossy mapping.
 - `getAttributes()` preserves types: strings, booleans, integers, lists, maps.
   This is richer than parsing XML where everything is a string.
+- The text and JSON views share the same data from a single endpoint.
+  Target synthesis (FQMN) happens on the CLI side from raw attributes,
+  not on the server — keeps the API clean and the rendering consistent
+  between `configs` and `config`.
 
 ### `jdt launch run <name> [-f] [-q]`
 
@@ -140,19 +173,24 @@ With name: removes only that specific terminated launch.
 
 ### `GET /launch/list`
 
-Returns: `[{name, type, mode, terminated, started, exitCode, pid}]`
+Returns: `[{launchId, configId, type, mode, terminated, started, exitCode, pid}]`
+
+`launchId` = `configId:pid`. Uniquely identifies a launch instance.
+`configId` = launch configuration name. Links to `/launch/configs`.
 
 ### `GET /launch/configs`
 
-Returns: `[{name, type, project?, class?, method?, runner?, mainClass?, goals?, profiles?}]`
+Returns: `[{configId, type, project?, class?, method?, package?, runner?, mainClass?, goals?, profiles?}]`
 
-Fields vary by launch type. Only non-null fields are included.
+Fields vary by launch type. Only non-blank fields are included.
+`class` and `package` are mutually exclusive — `package` appears only
+when `class` is empty (package-level JUnit configs, parsed from CONTAINER).
 
-### `GET /launch/config?name=<name>[&format=xml]`
+### `GET /launch/config?name=<configId>[&format=xml]`
 
-Default: `{name, type, typeId, file, attributes: {key: value, ...}}`
+Default: `{configId, type, typeId, file, attributes: {key: value, ...}}`
 
-`format=xml`: `{name, file, xml: "<raw .launch XML content>"}`
+`format=xml`: `{configId, file, xml: "<raw .launch XML content>"}`
 
 Attribute values preserve Eclipse types:
 - `String` -> JSON string
@@ -164,21 +202,22 @@ Attribute values preserve Eclipse types:
 
 ### `GET /launch/run?name=<name>[&debug]`
 
-Returns: `{ok, name, mode, type, pid, cmdline, workingDir}`
+Returns: `{ok, configId, launchId, mode, type, pid, cmdline, workingDir}`
 
-### `GET /launch/console?name=<name>[&tail=N][&stream=stdout|stderr]`
+### `GET /launch/console?name=<launchId>[&tail=N][&stream=stdout|stderr]`
 
+Accepts `launchId` (configId:pid) or plain `configId` for disambiguation.
 Returns: `{name, terminated, output}`
 
-### `GET /launch/console/stream?name=<name>[&tail=N][&stream=stdout|stderr]`
+### `GET /launch/console/stream?name=<launchId>[&tail=N][&stream=stdout|stderr]`
 
 SSE stream (text/plain). Streams console output until process terminates.
 
-### `GET /launch/stop?name=<name>`
+### `GET /launch/stop?name=<launchId>`
 
-Returns: `{ok, name}`
+Returns: `{ok, configId}`
 
-### `GET /launch/clear[?name=<name>]`
+### `GET /launch/clear[?name=<launchId>]`
 
 Returns: `{removed: N}`
 
@@ -216,14 +255,14 @@ Returns: `{removed: N}`
 
 **Common (all Java types):**
 - `org.eclipse.jdt.launching.PROJECT_ATTR` — project name
-- `org.eclipse.jdt.launching.MAIN_TYPE_NAME` — main class FQN
+- `org.eclipse.jdt.launching.MAIN_TYPE` — main class FQN (note: Eclipse constant is `ATTR_MAIN_TYPE_NAME` but value is `.MAIN_TYPE`)
 - `org.eclipse.jdt.launching.VM_ARGUMENTS` — JVM arguments
 - `org.eclipse.debug.core.ATTR_WORKING_DIRECTORY` — working directory
 
 **JUnit-specific:**
 - `org.eclipse.jdt.junit.TEST_KIND` — runner (junit4/junit5/junit6 loader ID)
-- `org.eclipse.jdt.junit.TESTNAME` — specific test method
-- `org.eclipse.jdt.junit.CONTAINER` — test container (for package/project scope)
+- `org.eclipse.jdt.junit.TESTNAME` — specific test method (empty string when not set)
+- `org.eclipse.jdt.junit.CONTAINER` — test scope: `=project` for project-level, `=project/path=/<package` for package-level. Empty when a specific class is set in `MAIN_TYPE`.
 
 **PDE JUnit-specific:**
 - `run_in_ui_thread` — false for headless tests

@@ -23,11 +23,13 @@ class LaunchHandler {
     private static final String ATTR_PROJECT_NAME =
             "org.eclipse.jdt.launching.PROJECT_ATTR";
     private static final String ATTR_MAIN_TYPE_NAME =
-            "org.eclipse.jdt.launching.MAIN_TYPE_NAME";
+            "org.eclipse.jdt.launching.MAIN_TYPE";
     private static final String ATTR_TEST_KIND =
             "org.eclipse.jdt.junit.TEST_KIND";
     private static final String ATTR_TEST_NAME =
             "org.eclipse.jdt.junit.TESTNAME";
+    private static final String ATTR_CONTAINER =
+            "org.eclipse.jdt.junit.CONTAINER";
     private static final String JUNIT_LAUNCH_TYPE =
             "org.eclipse.jdt.junit.launchconfig";
     private static final String PDE_JUNIT_LAUNCH_TYPE =
@@ -40,6 +42,14 @@ class LaunchHandler {
             "M2_GOALS";
     private static final String MAVEN_PROFILES =
             "M2_PROFILES";
+    private static final String AGENT_LAUNCH_TYPE =
+            "io.github.kaluchi.jdtbridge.ui.agentLaunchType";
+    private static final String AGENT_PROVIDER =
+            "io.github.kaluchi.jdtbridge.ui.provider";
+    private static final String AGENT_NAME =
+            "io.github.kaluchi.jdtbridge.ui.agent";
+    private static final String AGENT_ARGS =
+            "io.github.kaluchi.jdtbridge.ui.agentArgs";
 
     private final LaunchTracker tracker;
 
@@ -58,6 +68,20 @@ class LaunchHandler {
                 "JUnit 4";
         default -> testKind;
         };
+    }
+
+    /**
+     * Extract package name from JUnit CONTAINER attribute.
+     * Format: "=project/src\/test\/java=...=/<package.name"
+     * Returns null for project-level containers ("=project").
+     */
+    private static String parseContainerPackage(
+            String container) {
+        if (container == null || container.isBlank())
+            return null;
+        int lt = container.lastIndexOf('<');
+        if (lt < 0) return null; // project-level
+        return container.substring(lt + 1);
     }
 
     private ILaunchManager launchManager() {
@@ -91,8 +115,19 @@ class LaunchHandler {
         String mode = launch.getLaunchMode();
         boolean terminated = launch.isTerminated();
 
+        String pid = null;
+        IProcess[] processes = launch.getProcesses();
+        if (processes.length > 0) {
+            IProcess proc = processes[0];
+            pid = proc.getAttribute(
+                    IProcess.ATTR_PROCESS_ID);
+        }
+
         var entry = new JsonObject();
-        entry.addProperty("name", name);
+        String launchId = pid != null
+                ? name + ":" + pid : name;
+        entry.addProperty("launchId", launchId);
+        entry.addProperty("configId", name);
         entry.addProperty("type", type);
         entry.addProperty("mode", mode);
         entry.addProperty("terminated", terminated);
@@ -106,7 +141,6 @@ class LaunchHandler {
             } catch (NumberFormatException e) { /* skip */ }
         }
 
-        IProcess[] processes = launch.getProcesses();
         if (processes.length > 0) {
             IProcess proc = processes[0];
             if (terminated) {
@@ -115,8 +149,6 @@ class LaunchHandler {
                             proc.getExitValue());
                 } catch (Exception e) { /* ignored */ }
             }
-            String pid = proc.getAttribute(
-                    IProcess.ATTR_PROCESS_ID);
             if (pid != null) {
                 entry.addProperty("pid", pid);
             }
@@ -180,7 +212,7 @@ class LaunchHandler {
     private JsonObject configSummary(
             ILaunchConfiguration config) throws CoreException {
         var obj = new JsonObject();
-        obj.addProperty("name", config.getName());
+        obj.addProperty("configId", config.getName());
         String typeName = config.getType().getName();
         obj.addProperty("type", typeName);
 
@@ -201,11 +233,19 @@ class LaunchHandler {
         case JUNIT_LAUNCH_TYPE, PDE_JUNIT_LAUNCH_TYPE -> {
             String mainType = config.getAttribute(
                     ATTR_MAIN_TYPE_NAME, (String) null);
-            if (mainType != null)
+            if (mainType != null && !mainType.isBlank())
                 obj.addProperty("class", mainType);
+            else {
+                String pkg = parseContainerPackage(
+                        config.getAttribute(
+                                ATTR_CONTAINER,
+                                (String) null));
+                if (pkg != null)
+                    obj.addProperty("package", pkg);
+            }
             String method = config.getAttribute(
                     ATTR_TEST_NAME, (String) null);
-            if (method != null)
+            if (method != null && !method.isBlank())
                 obj.addProperty("method", method);
             String runner = formatRunner(
                     config.getAttribute(
@@ -216,7 +256,7 @@ class LaunchHandler {
         case JAVA_APP_LAUNCH_TYPE -> {
             String mainType = config.getAttribute(
                     ATTR_MAIN_TYPE_NAME, (String) null);
-            if (mainType != null)
+            if (mainType != null && !mainType.isBlank())
                 obj.addProperty("mainClass", mainType);
         }
         case MAVEN_LAUNCH_TYPE -> {
@@ -230,6 +270,20 @@ class LaunchHandler {
                     && !profiles.isBlank())
                 obj.addProperty("profiles", profiles);
         }
+        case AGENT_LAUNCH_TYPE -> {
+            String provider = config.getAttribute(
+                    AGENT_PROVIDER, (String) null);
+            if (provider != null && !provider.isBlank())
+                obj.addProperty("provider", provider);
+            String agent = config.getAttribute(
+                    AGENT_NAME, (String) null);
+            if (agent != null && !agent.isBlank())
+                obj.addProperty("agent", agent);
+            String agentArgs = config.getAttribute(
+                    AGENT_ARGS, (String) null);
+            if (agentArgs != null && !agentArgs.isBlank())
+                obj.addProperty("agentArgs", agentArgs);
+        }
         default -> { /* no extra fields */ }
         }
     }
@@ -239,7 +293,7 @@ class LaunchHandler {
     private String configDetail(ILaunchConfiguration config)
             throws CoreException {
         var obj = new JsonObject();
-        obj.addProperty("name", config.getName());
+        obj.addProperty("configId", config.getName());
         obj.addProperty("type", config.getType().getName());
         obj.addProperty("typeId",
                 config.getType().getIdentifier());
@@ -273,7 +327,7 @@ class LaunchHandler {
             String xml = Files.readString(
                     launchFile.toPath());
             var obj = new JsonObject();
-            obj.addProperty("name", config.getName());
+            obj.addProperty("configId", config.getName());
             obj.addProperty("file",
                     launchFile.getAbsolutePath());
             obj.addProperty("xml", xml);
@@ -428,12 +482,18 @@ class LaunchHandler {
             ILaunch launch = config.launch(mode, null, true);
             var response = new JsonObject();
             response.addProperty("ok", true);
-            response.addProperty("name",
-                    launchName(launch));
+            String configId = launchName(launch);
+            response.addProperty("configId", configId);
             response.addProperty("mode", mode);
             response.addProperty("type",
                     launchType(launch));
             addProcessMetadata(launch, response);
+            // Add launchId after process metadata (has pid)
+            String pid = response.has("pid")
+                    ? response.get("pid").getAsString() : null;
+            response.addProperty("launchId",
+                    pid != null ? configId + ":" + pid
+                            : configId);
             return response.toString();
         } catch (Exception e) {
             return HttpServer.jsonError(e.getMessage());
@@ -459,7 +519,8 @@ class LaunchHandler {
             target.terminate();
             var result = new JsonObject();
             result.addProperty("ok", true);
-            result.addProperty("name", name);
+            result.addProperty("configId",
+                    launchName(target));
             return result.toString();
         } catch (Exception e) {
             return HttpServer.jsonError(
@@ -523,14 +584,43 @@ class LaunchHandler {
         return obj.toString();
     }
 
-    private ILaunch findLaunch(String name) {
-        ILaunch[] launches = launchManager().getLaunches();
-        for (int i = launches.length - 1; i >= 0; i--) {
-            if (name.equals(launchName(launches[i]))) {
-                return launches[i];
+    /**
+     * Find launch by name or launchId (configId:pid).
+     * LaunchId format allows disambiguation when multiple
+     * launches share the same config name.
+     */
+    private ILaunch findLaunch(String nameOrId) {
+        // Parse launchId format: configId:pid
+        String configName = nameOrId;
+        String targetPid = null;
+        int colonIdx = nameOrId.lastIndexOf(':');
+        if (colonIdx > 0) {
+            String maybePid = nameOrId.substring(colonIdx + 1);
+            // Only treat as pid if it's numeric
+            if (maybePid.matches("\\d+")) {
+                configName = nameOrId.substring(0, colonIdx);
+                targetPid = maybePid;
             }
         }
-        return null;
+
+        ILaunch[] launches = launchManager().getLaunches();
+        ILaunch fallback = null;
+        for (int i = launches.length - 1; i >= 0; i--) {
+            if (!configName.equals(launchName(launches[i])))
+                continue;
+            if (targetPid != null) {
+                IProcess[] procs = launches[i].getProcesses();
+                if (procs.length > 0) {
+                    String pid = procs[0].getAttribute(
+                            IProcess.ATTR_PROCESS_ID);
+                    if (targetPid.equals(pid))
+                        return launches[i];
+                }
+            } else {
+                if (fallback == null) fallback = launches[i];
+            }
+        }
+        return fallback;
     }
 
     private static void addProcessMetadata(ILaunch launch,

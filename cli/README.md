@@ -107,6 +107,7 @@ jdt move <FQN> <target.package>                        # move type to another pa
 ```bash
 jdt launch list                                        # list launches (running + terminated)
 jdt launch configs                                     # list saved launch configurations
+jdt launch config <name> [--xml] [--json]              # show configuration details
 jdt launch run <config> [-f] [-q]                      # launch a configuration
 jdt launch debug <config> [-f] [-q]                    # launch in debug mode
 jdt launch logs <name> [-f] [--tail N]                 # show console output
