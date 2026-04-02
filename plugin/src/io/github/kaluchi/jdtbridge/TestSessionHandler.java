@@ -7,6 +7,8 @@ import com.google.gson.JsonParser;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.debug.core.DebugPlugin;
+import org.eclipse.debug.core.ILaunch;
 import org.eclipse.jdt.internal.junit.JUnitCorePlugin;
 import org.eclipse.jdt.internal.junit.model.TestCaseElement;
 import org.eclipse.jdt.internal.junit.model.TestRunSession;
@@ -17,6 +19,16 @@ import org.eclipse.jdt.junit.model.ITestElementContainer;
 import org.eclipse.jdt.junit.model.ITestSuiteElement;
 
 class TestSessionHandler {
+
+    static String testRunId(TestRunSession session) {
+        String configId = session.getTestRunName();
+        ILaunch launch = session.getLaunch();
+        if (launch == null) return configId;
+        String ts = launch.getAttribute(
+                DebugPlugin.ATTR_LAUNCH_TIMESTAMP);
+        if (ts == null) return configId;
+        return configId + ":" + ts;
+    }
 
     TestSessionHandler() {
     }
@@ -40,7 +52,6 @@ class TestSessionHandler {
         collectEntries(session, entries, filter);
 
         String configId = session.getTestRunName();
-        long startTime = session.getStartTime();
 
         String state;
         if (session.isRunning()) state = "running";
@@ -54,10 +65,7 @@ class TestSessionHandler {
 
         var result = new JsonObject();
         result.addProperty("configId", configId);
-        result.addProperty("testRunId",
-                startTime > 0
-                        ? configId + ":" + startTime
-                        : testRunId);
+        result.addProperty("testRunId", testRunId(session));
 
         var launchedProject = session.getLaunchedProject();
         if (launchedProject != null)
@@ -88,13 +96,8 @@ class TestSessionHandler {
                 JUnitCorePlugin.getModel()
                         .getTestRunSessions();
         for (TestRunSession s : sessions) {
-            String configId = s.getTestRunName();
-            long startTime = s.getStartTime();
-            String id = startTime > 0
-                    ? configId + ":" + startTime
-                    : configId;
-            if (testRunId.equals(id)
-                    || testRunId.equals(configId)) {
+            if (testRunId.equals(testRunId(s))
+                    || testRunId.equals(s.getTestRunName())) {
                 return s;
             }
         }
@@ -197,15 +200,11 @@ class TestSessionHandler {
         for (TestRunSession s : sessions) {
             var obj = new JsonObject();
             String configId = s.getTestRunName();
-            long startTime = s.getStartTime();
             obj.addProperty("configId", configId);
-            obj.addProperty("testRunId",
-                    startTime > 0
-                            ? configId + ":" + startTime
-                            : configId);
+            obj.addProperty("testRunId", testRunId(s));
 
             // LaunchId from ILaunch → PID
-            var launch = s.getLaunch();
+            ILaunch launch = s.getLaunch();
             if (launch != null) {
                 var procs = launch.getProcesses();
                 if (procs.length > 0) {
@@ -240,8 +239,13 @@ class TestSessionHandler {
             double elapsed = s.getElapsedTimeInSeconds();
             obj.addProperty("time",
                     Double.isNaN(elapsed) ? 0.0 : elapsed);
-            if (startTime > 0)
-                obj.addProperty("startedAt", startTime);
+            if (launch != null) {
+                String ts = launch.getAttribute(
+                        DebugPlugin.ATTR_LAUNCH_TIMESTAMP);
+                if (ts != null)
+                    obj.addProperty("startedAt",
+                            Long.parseLong(ts));
+            }
             arr.add(obj);
         }
         return arr.toString();

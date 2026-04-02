@@ -10,6 +10,7 @@ import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.debug.core.DebugPlugin;
+import org.eclipse.jdt.internal.junit.JUnitCorePlugin;
 import org.eclipse.debug.core.ILaunch;
 import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.debug.core.ILaunchConfigurationType;
@@ -232,11 +233,11 @@ class TestHandler {
 
         String launchTimestamp = launch.getAttribute(
                 DebugPlugin.ATTR_LAUNCH_TIMESTAMP);
+
         String launchId = pid != null
                 ? configId + ":" + pid : configId;
-        String testRunId = launchTimestamp != null
-                ? configId + ":" + launchTimestamp
-                : configId;
+        String testRunId = configId + ":"
+                + launchTimestamp;
 
         var response = new JsonObject();
         response.addProperty("ok", true);

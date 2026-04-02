@@ -65,7 +65,6 @@ export async function testRun(args) {
     // ignore — total just won't be shown
   }
 
-  // Enrich result with composed IDs for header/guide
   result.launchId = launchId;
   result.testRunId = testRunId;
 
