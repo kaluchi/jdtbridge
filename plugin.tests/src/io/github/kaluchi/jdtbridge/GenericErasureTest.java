@@ -42,7 +42,7 @@ public class GenericErasureTest {
         var handler = new SearchHandler();
         String body = handler.handleSource(
                 Map.of("class", typeFqn,
-                        "method", methodName)).body();
+                        "method", methodName), ProjectScope.ALL).body();
         return JsonParser.parseString(body).getAsJsonObject();
     }
 
@@ -356,7 +356,7 @@ public class GenericErasureTest {
             String implJson = handler.handleImplementors(
                     java.util.Map.of(
                             "class", "test.model.Animal",
-                            "method", "name"));
+                            "method", "name"), ProjectScope.ALL);
             var implArr = com.google.gson.JsonParser
                     .parseString(implJson).getAsJsonArray();
             var hierFqns = new java.util.HashSet<String>();

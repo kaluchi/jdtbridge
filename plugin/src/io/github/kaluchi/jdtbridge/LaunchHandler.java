@@ -6,9 +6,12 @@ import com.google.gson.JsonPrimitive;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.debug.core.DebugPlugin;
@@ -88,14 +91,21 @@ class LaunchHandler {
         return DebugPlugin.getDefault().getLaunchManager();
     }
 
-    String handleList(Map<String, String> params) {
+    String handleList(Map<String, String> params,
+            ProjectScope scope) {
         ILaunch[] launches = launchManager().getLaunches();
         var arr = new JsonArray();
-        for (int i = launches.length - 1; i >= 0; i--) {
-            arr.add(launchEntry(launches[i],
-                    launchName(launches[i])));
-        }
+        // Reverse order: newest first
+        reversedStream(launches)
+                .filter(scope::containsLaunch)
+                .map(l -> launchEntry(l, launchName(l)))
+                .forEach(arr::add);
         return arr.toString();
+    }
+
+    private static <T> Stream<T> reversedStream(T[] array) {
+        var list = Arrays.asList(array);
+        return list.reversed().stream();
     }
 
     private JsonObject launchEntry(ILaunch launch,
@@ -146,33 +156,34 @@ class LaunchHandler {
         return entry;
     }
 
-    String handleConfigs(Map<String, String> params) {
+    String handleConfigs(Map<String, String> params,
+            ProjectScope scope) {
         try {
             var allConfigs =
                     launchManager().getLaunchConfigurations();
             ILaunchConfiguration[] recent =
                     getRecentConfigs();
 
+            // Recent first, then remaining — deduplicated
+            var seen = new LinkedHashSet<String>();
             var arr = new JsonArray();
-            var seen = new java.util.HashSet<String>();
 
-            if (recent != null) {
-                for (var config : recent) {
-                    arr.add(configSummary(config));
-                    seen.add(config.getName());
-                }
-            }
-
-            for (var config : allConfigs) {
-                if (seen.contains(config.getName())) continue;
-                arr.add(configSummary(config));
-            }
+            Stream.concat(
+                    recent != null
+                            ? Arrays.stream(recent)
+                            : Stream.empty(),
+                    Arrays.stream(allConfigs))
+                    .filter(scope::containsConfig)
+                    .filter(c -> seen.add(c.getName()))
+                    .map(this::configSummary)
+                    .forEach(arr::add);
 
             return arr.toString();
         } catch (Exception e) {
             return HttpServer.jsonError(e.getMessage());
         }
     }
+
 
     String handleConfig(Map<String, String> params) {
         String name = params.get("configId");
@@ -222,19 +233,23 @@ class LaunchHandler {
     // -- config summary (for /launch/configs list) --
 
     private JsonObject configSummary(
-            ILaunchConfiguration config) throws CoreException {
+            ILaunchConfiguration config) {
         var obj = new JsonObject();
         obj.addProperty("configId", config.getName());
-        String typeName = config.getType().getName();
-        obj.addProperty("type", typeName);
+        try {
+            String typeName = config.getType().getName();
+            obj.addProperty("type", typeName);
 
-        String project = config.getAttribute(
-                ATTR_PROJECT_NAME, (String) null);
-        if (project != null)
-            obj.addProperty("project", project);
+            String project = config.getAttribute(
+                    ATTR_PROJECT_NAME, (String) null);
+            if (project != null)
+                obj.addProperty("project", project);
 
-        String typeId = config.getType().getIdentifier();
-        addTypeSummary(obj, config, typeId);
+            String typeId = config.getType().getIdentifier();
+            addTypeSummary(obj, config, typeId);
+        } catch (CoreException e) {
+            obj.addProperty("error", e.getMessage());
+        }
         return obj;
     }
 

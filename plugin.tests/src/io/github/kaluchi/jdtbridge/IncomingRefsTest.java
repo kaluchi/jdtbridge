@@ -37,7 +37,7 @@ public class IncomingRefsTest {
                 ? Map.of("class", fqn, "method", method)
                 : Map.of("class", fqn);
         return JsonParser.parseString(
-                handler.handleSource(params).body())
+                handler.handleSource(params, ProjectScope.ALL).body())
                 .getAsJsonObject();
     }
 

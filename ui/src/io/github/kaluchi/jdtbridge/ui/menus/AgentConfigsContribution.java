@@ -7,6 +7,7 @@ import org.eclipse.debug.core.DebugPlugin;
 import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.debug.core.ILaunchConfigurationType;
 import org.eclipse.debug.core.ILaunchManager;
+import org.eclipse.debug.ui.DebugUITools;
 import org.eclipse.jface.action.ContributionItem;
 import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.swt.SWT;
@@ -79,13 +80,9 @@ public class AgentConfigsContribution extends CompoundContributionItem {
 				item.addDisposeListener(e -> img.dispose());
 			}
 
-			item.addListener(SWT.Selection, e -> {
-				try {
-					config.launch(ILaunchManager.RUN_MODE, null, true);
-				} catch (CoreException ex) {
-					LOG.error("Failed to launch " + config.getName(), ex);
-				}
-			});
+			item.addListener(SWT.Selection, e ->
+					DebugUITools.launch(config,
+							ILaunchManager.RUN_MODE));
 		}
 	}
 }

@@ -196,7 +196,7 @@ public class FqmnIntegrationTest {
             HttpServer.Response resp = handler.handleSource(
                     Map.of("class", "test.edge.Calculator",
                             "method", "add",
-                            "paramTypes", "double,double"));
+                            "paramTypes", "double,double"), ProjectScope.ALL);
             assertTrue(resp.body().contains("double a"),
                     "Should contain double param: " + resp.body());
             assertFalse(resp.body().contains("int a"),
@@ -208,7 +208,7 @@ public class FqmnIntegrationTest {
         void sourceAllOverloads() throws Exception {
             HttpServer.Response resp = handler.handleSource(
                     Map.of("class", "test.edge.Calculator",
-                            "method", "add"));
+                            "method", "add"), ProjectScope.ALL);
             // Should return JSON array with multiple overloads
             assertEquals("application/json", resp.contentType());
             assertTrue(resp.body().startsWith("["),
@@ -220,7 +220,7 @@ public class FqmnIntegrationTest {
             HttpServer.Response resp = handler.handleSource(
                     Map.of("class", "test.model.Dog",
                             "method", "bark",
-                            "paramTypes", ""));
+                            "paramTypes", ""), ProjectScope.ALL);
             assertTrue(resp.body().contains("bark"),
                     "Should contain bark: " + resp.body());
         }
@@ -230,7 +230,7 @@ public class FqmnIntegrationTest {
             HttpServer.Response resp = handler.handleSource(
                     Map.of("class", "test.edge.Calculator",
                             "method", "add",
-                            "paramTypes", "String,String"));
+                            "paramTypes", "String,String"), ProjectScope.ALL);
             assertTrue(resp.body().contains("error"),
                     "Should be error: " + resp.body());
         }
@@ -241,7 +241,7 @@ public class FqmnIntegrationTest {
             String json = handler.handleReferences(
                     Map.of("class", "test.model.Dog",
                             "method", "bark",
-                            "paramTypes", ""));
+                            "paramTypes", ""), ProjectScope.ALL);
             assertTrue(json.contains("AnimalService"),
                     "Should find ref: " + json);
         }
@@ -251,7 +251,7 @@ public class FqmnIntegrationTest {
             String json = handler.handleReferences(
                     Map.of("class", "test.model.Dog",
                             "method", "bark",
-                            "paramTypes", "int"));
+                            "paramTypes", "int"), ProjectScope.ALL);
             assertTrue(json.contains("error"),
                     "Should be error: " + json);
         }
@@ -261,7 +261,7 @@ public class FqmnIntegrationTest {
             HttpServer.Response resp = handler.handleSource(
                     Map.of("class", "test.edge.Repository",
                             "method", "save",
-                            "paramTypes", "List"));
+                            "paramTypes", "List"), ProjectScope.ALL);
             assertTrue(resp.body().contains("List<String>"),
                     "Should find save(List<String>): "
                             + resp.body());

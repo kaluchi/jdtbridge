@@ -36,7 +36,7 @@ public class SearchHandlerSourceTest {
                 ? Map.of("class", cls, "method", method)
                 : Map.of("class", cls);
         return JsonParser.parseString(
-                handler.handleSource(params).body())
+                handler.handleSource(params, ProjectScope.ALL).body())
                 .getAsJsonObject();
     }
 
@@ -75,7 +75,7 @@ public class SearchHandlerSourceTest {
         @Test
         void missingClassParam() throws Exception {
             var json = JsonParser.parseString(
-                    handler.handleSource(Map.of()).body())
+                    handler.handleSource(Map.of(), ProjectScope.ALL).body())
                     .getAsJsonObject();
             assertTrue(json.has("error"));
         }
@@ -84,7 +84,7 @@ public class SearchHandlerSourceTest {
         void emptyClassParam() throws Exception {
             var json = JsonParser.parseString(
                     handler.handleSource(
-                            Map.of("class", "")).body())
+                            Map.of("class", ""), ProjectScope.ALL).body())
                     .getAsJsonObject();
             assertTrue(json.has("error"));
         }
@@ -93,7 +93,7 @@ public class SearchHandlerSourceTest {
         void typeNotFound() throws Exception {
             var json = JsonParser.parseString(
                     handler.handleSource(
-                            Map.of("class", "no.such.Type"))
+                            Map.of("class", "no.such.Type"), ProjectScope.ALL)
                             .body())
                     .getAsJsonObject();
             assertTrue(json.get("error").getAsString()
@@ -151,7 +151,7 @@ public class SearchHandlerSourceTest {
         void contentTypeIsJson() throws Exception {
             var resp = handler.handleSource(
                     Map.of("class", "test.model.Dog",
-                            "method", "bark"));
+                            "method", "bark"), ProjectScope.ALL);
             assertEquals("application/json",
                     resp.contentType());
         }
@@ -225,7 +225,7 @@ public class SearchHandlerSourceTest {
         void returnsArrayForOverloads() throws Exception {
             var resp = handler.handleSource(
                     Map.of("class", "test.edge.Calculator",
-                            "method", "add"));
+                            "method", "add"), ProjectScope.ALL);
             var arr = JsonParser.parseString(resp.body())
                     .getAsJsonArray();
             assertEquals(3, arr.size());
@@ -235,7 +235,7 @@ public class SearchHandlerSourceTest {
         void eachOverloadHasFqmn() throws Exception {
             var resp = handler.handleSource(
                     Map.of("class", "test.edge.Calculator",
-                            "method", "add"));
+                            "method", "add"), ProjectScope.ALL);
             var arr = JsonParser.parseString(resp.body())
                     .getAsJsonArray();
             var fqmns = new java.util.HashSet<String>();
@@ -258,7 +258,7 @@ public class SearchHandlerSourceTest {
                             Map.of("class",
                                     "test.edge.Calculator",
                                     "method", "add",
-                                    "paramTypes", "int,int,int"))
+                                    "paramTypes", "int,int,int"), ProjectScope.ALL)
                             .body()).getAsJsonObject();
             assertEquals(
                     "test.edge.Calculator#add(int, int, int)",

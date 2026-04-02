@@ -192,12 +192,16 @@ class TestSessionHandler {
     }
 
     @SuppressWarnings("restriction")
-    String handleSessions(Map<String, String> params) {
+    String handleSessions(Map<String, String> params,
+            ProjectScope scope) {
         List<TestRunSession> sessions =
                 JUnitCorePlugin.getModel()
                         .getTestRunSessions();
         var arr = new JsonArray();
         for (TestRunSession s : sessions) {
+            if (s.getLaunch() != null
+                    && !scope.containsLaunch(s.getLaunch()))
+                continue;
             var obj = new JsonObject();
             String configId = s.getTestRunName();
             obj.addProperty("configId", configId);
@@ -250,4 +254,5 @@ class TestSessionHandler {
         }
         return arr.toString();
     }
+
 }

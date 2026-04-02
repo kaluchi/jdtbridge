@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 public class SearchIntegrationTest {
 
     private static final SearchHandler handler = new SearchHandler();
+    private static final ProjectScope ALL = ProjectScope.ALL;
 
     @BeforeAll
     public static void setUp() throws Exception {
@@ -38,7 +39,7 @@ public class SearchIntegrationTest {
 
     @Test
     public void findByExactName() throws Exception {
-        String json = handler.handleFind(Map.of("name", "Animal"));
+        String json = handler.handleFind(Map.of("name", "Animal"), ALL);
         JsonArray arr = parseArray(json);
         assertNotNull(findByFqn(arr, "test.model.Animal"),
                 "Should find Animal");
@@ -46,7 +47,7 @@ public class SearchIntegrationTest {
 
     @Test
     public void findByPattern() throws Exception {
-        String json = handler.handleFind(Map.of("name", "*Service"));
+        String json = handler.handleFind(Map.of("name", "*Service"), ALL);
         JsonArray arr = parseArray(json);
         assertNotNull(findByFqn(arr, "test.service.AnimalService"),
                 "Should find AnimalService");
@@ -55,7 +56,7 @@ public class SearchIntegrationTest {
     @Test
     public void findSourceOnly() throws Exception {
         String json = handler.handleFind(
-                Map.of("name", "Dog", "source", ""));
+                Map.of("name", "Dog", "source", ""), ALL);
         JsonArray arr = parseArray(json);
         assertNotNull(findByFqn(arr, "test.model.Dog"),
                 "Should find source Dog");
@@ -63,7 +64,7 @@ public class SearchIntegrationTest {
 
     @Test
     public void findMissingParam() throws Exception {
-        String json = handler.handleFind(Map.of());
+        String json = handler.handleFind(Map.of(), ALL);
         JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
         assertNotNull(obj.get("error"), "Should have error field");
     }
@@ -71,14 +72,14 @@ public class SearchIntegrationTest {
     @Test
     public void findNonExistent() throws Exception {
         String json = handler.handleFind(
-                Map.of("name", "NoSuchTypeXYZ"));
+                Map.of("name", "NoSuchTypeXYZ"), ALL);
         assertEquals(0, parseArray(json).size());
     }
 
     @Test
     public void findBinaryTypeHasFlag() throws Exception {
         String json = handler.handleFind(
-                Map.of("name", "ArrayList"));
+                Map.of("name", "ArrayList"), ALL);
         JsonArray arr = parseArray(json);
         assertTrue(arr.size() > 0, "Should find ArrayList");
         boolean anyBinary = false;
@@ -96,7 +97,7 @@ public class SearchIntegrationTest {
     @Test
     public void findSourceTypeNoBinaryFlag() throws Exception {
         String json = handler.handleFind(
-                Map.of("name", "Animal"));
+                Map.of("name", "Animal"), ALL);
         JsonArray arr = parseArray(json);
         var animal = findByFqn(arr, "test.model.Animal");
         assertNotNull(animal);
@@ -107,7 +108,7 @@ public class SearchIntegrationTest {
     @Test
     public void findSourceTypeHasKind() throws Exception {
         String json = handler.handleFind(
-                Map.of("name", "Animal"));
+                Map.of("name", "Animal"), ALL);
         JsonArray arr = parseArray(json);
         var animal = findByFqn(arr, "test.model.Animal");
         assertNotNull(animal);
@@ -119,7 +120,7 @@ public class SearchIntegrationTest {
     @Test
     public void findSourceTypeHasOriginProject() throws Exception {
         String json = handler.handleFind(
-                Map.of("name", "Dog"));
+                Map.of("name", "Dog"), ALL);
         JsonArray arr = parseArray(json);
         var dog = findByFqn(arr, "test.model.Dog");
         assertNotNull(dog);
@@ -132,7 +133,7 @@ public class SearchIntegrationTest {
     @Test
     public void findBinaryTypeHasOriginJar() throws Exception {
         String json = handler.handleFind(
-                Map.of("name", "ArrayList"));
+                Map.of("name", "ArrayList"), ALL);
         JsonArray arr = parseArray(json);
         boolean anyWithJar = false;
         for (var el : arr) {
@@ -152,7 +153,7 @@ public class SearchIntegrationTest {
     @Test
     public void findBinaryTypeHasKind() throws Exception {
         String json = handler.handleFind(
-                Map.of("name", "ArrayList"));
+                Map.of("name", "ArrayList"), ALL);
         JsonArray arr = parseArray(json);
         boolean anyWithKind = false;
         for (var el : arr) {
@@ -169,7 +170,7 @@ public class SearchIntegrationTest {
     @Test
     public void findInterfaceTypeKind() throws Exception {
         String json = handler.handleFind(
-                Map.of("name", "Animal"));
+                Map.of("name", "Animal"), ALL);
         JsonArray arr = parseArray(json);
         var animal = findByFqn(arr, "test.model.Animal");
         assertNotNull(animal);
@@ -181,7 +182,7 @@ public class SearchIntegrationTest {
     @Test
     public void findAnnotationTypeKind() throws Exception {
         String json = handler.handleFind(
-                Map.of("name", "Marker"));
+                Map.of("name", "Marker"), ALL);
         JsonArray arr = parseArray(json);
         var marker = findByFqn(arr, "test.edge.Marker");
         assertNotNull(marker, "Should find Marker annotation");
@@ -193,7 +194,7 @@ public class SearchIntegrationTest {
     @Test
     public void findEnumTypeKind() throws Exception {
         String json = handler.handleFind(
-                Map.of("name", "ElementType"));
+                Map.of("name", "ElementType"), ALL);
         JsonArray arr = parseArray(json);
         boolean anyEnum = false;
         for (var el : arr) {
@@ -211,7 +212,7 @@ public class SearchIntegrationTest {
     @Test
     public void findByPackage() throws Exception {
         String json = handler.handleFind(
-                Map.of("name", "test.model"));
+                Map.of("name", "test.model"), ALL);
         JsonArray arr = parseArray(json);
         assertNotNull(findByFqn(arr, "test.model.Animal"),
                 "Should find Animal in package");
@@ -222,7 +223,7 @@ public class SearchIntegrationTest {
     @Test
     public void findByPackageTrailingDot() throws Exception {
         String json = handler.handleFind(
-                Map.of("name", "test.model."));
+                Map.of("name", "test.model."), ALL);
         assertNotNull(findByFqn(parseArray(json),
                 "test.model.Animal"), "Should find Animal");
     }
@@ -230,7 +231,7 @@ public class SearchIntegrationTest {
     @Test
     public void findByPackageTrailingDotStar() throws Exception {
         String json = handler.handleFind(
-                Map.of("name", "test.model.*"));
+                Map.of("name", "test.model.*"), ALL);
         assertNotNull(findByFqn(parseArray(json),
                 "test.model.Animal"), "Should find Animal");
     }
@@ -238,7 +239,7 @@ public class SearchIntegrationTest {
     @Test
     public void findByPackageNonExistent() throws Exception {
         String json = handler.handleFind(
-                Map.of("name", "no.such.package"));
+                Map.of("name", "no.such.package"), ALL);
         assertEquals(0, parseArray(json).size());
     }
 
@@ -247,7 +248,7 @@ public class SearchIntegrationTest {
     @Test
     public void subtypesOfInterface() throws Exception {
         String json = handler.handleSubtypes(
-                Map.of("class", "test.model.Animal"));
+                Map.of("class", "test.model.Animal"), ALL);
         JsonArray arr = parseArray(json);
         assertNotNull(findByFqn(arr, "test.model.Dog"),
                 "Should find Dog");
@@ -258,7 +259,7 @@ public class SearchIntegrationTest {
     @Test
     public void subtypesOfClass() throws Exception {
         String json = handler.handleSubtypes(
-                Map.of("class", "test.model.Dog"));
+                Map.of("class", "test.model.Dog"), ALL);
         assertEquals(0, parseArray(json).size(),
                 "Dog has no subtypes");
     }
@@ -266,7 +267,7 @@ public class SearchIntegrationTest {
     @Test
     public void subtypesNotFound() throws Exception {
         String json = handler.handleSubtypes(
-                Map.of("class", "no.such.Type"));
+                Map.of("class", "no.such.Type"), ALL);
         JsonObject obj = JsonParser.parseString(json)
                 .getAsJsonObject();
         assertNotNull(obj.get("error"));
@@ -275,7 +276,7 @@ public class SearchIntegrationTest {
     @Test
     public void subtypesRejectsObject() throws Exception {
         String json = handler.handleSubtypes(
-                Map.of("class", "java.lang.Object"));
+                Map.of("class", "java.lang.Object"), ALL);
         JsonObject obj = JsonParser.parseString(json)
                 .getAsJsonObject();
         assertTrue(obj.get("error").getAsString()
@@ -287,7 +288,7 @@ public class SearchIntegrationTest {
     @Test
     public void hierarchyRejectsObject() throws Exception {
         String json = handler.handleHierarchy(
-                Map.of("class", "java.lang.Object"));
+                Map.of("class", "java.lang.Object"), ALL);
         JsonObject obj = JsonParser.parseString(json)
                 .getAsJsonObject();
         assertTrue(obj.get("error").getAsString()
@@ -297,7 +298,7 @@ public class SearchIntegrationTest {
     @Test
     public void hierarchyOfDog() throws Exception {
         String json = handler.handleHierarchy(
-                Map.of("class", "test.model.Dog"));
+                Map.of("class", "test.model.Dog"), ALL);
         JsonObject obj = JsonParser.parseString(json)
                 .getAsJsonObject();
         JsonArray supertypes = obj.getAsJsonArray("supertypes");
@@ -313,7 +314,7 @@ public class SearchIntegrationTest {
     @Test
     public void hierarchyOfAnimal() throws Exception {
         String json = handler.handleHierarchy(
-                Map.of("class", "test.model.Animal"));
+                Map.of("class", "test.model.Animal"), ALL);
         JsonObject obj = JsonParser.parseString(json)
                 .getAsJsonObject();
         JsonArray subtypes = obj.getAsJsonArray("subtypes");
@@ -328,7 +329,7 @@ public class SearchIntegrationTest {
     @Test
     public void referencesToType() throws Exception {
         String json = handler.handleReferences(
-                Map.of("class", "test.model.Dog"));
+                Map.of("class", "test.model.Dog"), ALL);
         JsonArray arr = parseArray(json);
         assertTrue(arr.size() > 0, "Should have references");
         assertTrue(hasRefIn(arr, "AnimalService"),
@@ -338,7 +339,7 @@ public class SearchIntegrationTest {
     @Test
     public void referencesToMethod() throws Exception {
         String json = handler.handleReferences(
-                Map.of("class", "test.model.Dog", "method", "bark"));
+                Map.of("class", "test.model.Dog", "method", "bark"), ALL);
         JsonArray arr = parseArray(json);
         assertTrue(arr.size() > 0, "Should have references");
         assertTrue(hasRefIn(arr, "AnimalService"),
@@ -348,7 +349,7 @@ public class SearchIntegrationTest {
     @Test
     public void referencesToField() throws Exception {
         String json = handler.handleReferences(
-                Map.of("class", "test.model.Dog", "field", "age"));
+                Map.of("class", "test.model.Dog", "field", "age"), ALL);
         assertEquals(0, parseArray(json).size(),
                 "age is private, no external references");
     }
@@ -356,7 +357,7 @@ public class SearchIntegrationTest {
     @Test
     public void referencesMethodNotFound() throws Exception {
         String json = handler.handleReferences(
-                Map.of("class", "test.model.Dog", "method", "fly"));
+                Map.of("class", "test.model.Dog", "method", "fly"), ALL);
         JsonObject obj = JsonParser.parseString(json)
                 .getAsJsonObject();
         assertNotNull(obj.get("error"));
@@ -367,7 +368,7 @@ public class SearchIntegrationTest {
     @Test
     public void implementorsOfInterfaceMethod() throws Exception {
         String json = handler.handleImplementors(
-                Map.of("class", "test.model.Animal", "method", "name"));
+                Map.of("class", "test.model.Animal", "method", "name"), ALL);
         JsonArray arr = parseArray(json);
         assertTrue(arr.size() >= 2,
                 "Should find at least Dog + Cat");
@@ -408,7 +409,7 @@ public class SearchIntegrationTest {
     @Test
     public void sourceFullClass() throws Exception {
         var resp = handler.handleSource(
-                Map.of("class", "test.model.Dog"));
+                Map.of("class", "test.model.Dog"), ALL);
         assertEquals("application/json", resp.contentType());
         var json = parse(resp);
         assertEquals("test.model.Dog",
@@ -423,7 +424,7 @@ public class SearchIntegrationTest {
     public void sourceMethod() throws Exception {
         var resp = handler.handleSource(
                 Map.of("class", "test.model.Dog",
-                        "method", "bark"));
+                        "method", "bark"), ALL);
         assertEquals("application/json", resp.contentType());
         var json = parse(resp);
         assertEquals("test.model.Dog#bark()",
@@ -436,7 +437,7 @@ public class SearchIntegrationTest {
     public void sourceMethodRefsVerified() throws Exception {
         var json = parse(handler.handleSource(
                 Map.of("class", "test.service.AnimalService",
-                        "method", "process")));
+                        "method", "process"), ALL));
         assertEquals("test.service.AnimalService#process(Animal)",
                 json.get("fqmn").getAsString());
 
@@ -466,7 +467,7 @@ public class SearchIntegrationTest {
     public void sourceMethodIncomingCallers() throws Exception {
         var json = parse(handler.handleSource(
                 Map.of("class", "test.model.Dog",
-                        "method", "bark")));
+                        "method", "bark"), ALL));
         var incoming = refsDir(json, "incoming");
         assertTrue(incoming.size() > 0);
         JsonObject caller = findRef(incoming,
@@ -480,7 +481,7 @@ public class SearchIntegrationTest {
     public void sourceMethodOverrideTarget() throws Exception {
         var json = parse(handler.handleSource(
                 Map.of("class", "test.model.Dog",
-                        "method", "name")));
+                        "method", "name"), ALL));
         var ot = json.getAsJsonObject("overrideTarget");
         assertNotNull(ot);
         assertEquals("method",
@@ -492,7 +493,7 @@ public class SearchIntegrationTest {
     @Test
     public void sourceTypeHierarchyParsed() throws Exception {
         var json = parse(handler.handleSource(
-                Map.of("class", "test.model.Animal")));
+                Map.of("class", "test.model.Animal"), ALL));
         assertEquals("test.model.Animal",
                 json.get("fqmn").getAsString());
 
@@ -507,7 +508,7 @@ public class SearchIntegrationTest {
     public void sourcePreservesLeadingIndent() throws Exception {
         var json = parse(handler.handleSource(
                 Map.of("class", "test.model.Dog",
-                        "method", "bark")));
+                        "method", "bark"), ALL));
         String source = json.get("source").getAsString();
         assertNotNull(source);
         assertFalse(source.startsWith("public"));
@@ -517,7 +518,7 @@ public class SearchIntegrationTest {
     @Test
     public void sourceNotFound() throws Exception {
         var json = parse(handler.handleSource(
-                Map.of("class", "no.such.Type")));
+                Map.of("class", "no.such.Type"), ALL));
         assertNotNull(json.get("error"));
     }
 
@@ -608,7 +609,7 @@ public class SearchIntegrationTest {
 
     @Test
     public void projectsIncludesTestProject() throws Exception {
-        String json = handler.handleProjects();
+        String json = handler.handleProjects(ALL);
         JsonArray arr = parseArray(json);
         boolean found = false;
         for (JsonElement e : arr) {

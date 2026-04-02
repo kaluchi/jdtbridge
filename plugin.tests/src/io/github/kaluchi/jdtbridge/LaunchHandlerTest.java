@@ -41,7 +41,7 @@ public class LaunchHandlerTest {
 
         @Test
         void returnsArray() {
-            String json = handler.handleList(Map.of());
+            String json = handler.handleList(Map.of(), ProjectScope.ALL);
             assertNotNull(json);
             assertTrue(json.startsWith("["),
                     "Should be JSON array: " + json);
@@ -56,7 +56,7 @@ public class LaunchHandlerTest {
             if (existing.length > 0) {
                 mgr.removeLaunches(existing);
             }
-            String json = handler.handleList(Map.of());
+            String json = handler.handleList(Map.of(), ProjectScope.ALL);
             assertEquals("[]", json);
             // Restore
             for (ILaunch l : existing) {
@@ -66,7 +66,7 @@ public class LaunchHandlerTest {
 
         @Test
         void containsIdentityFields() {
-            String json = handler.handleList(Map.of());
+            String json = handler.handleList(Map.of(), ProjectScope.ALL);
             if (!json.equals("[]")) {
                 assertTrue(json.contains("\"configId\""),
                         "Should have configId: " + json);
@@ -79,7 +79,7 @@ public class LaunchHandlerTest {
 
         @Test
         void containsModeAndType() {
-            String json = handler.handleList(Map.of());
+            String json = handler.handleList(Map.of(), ProjectScope.ALL);
             if (!json.equals("[]")) {
                 assertTrue(json.contains("\"mode\""),
                         "Should have mode: " + json);
@@ -144,7 +144,7 @@ public class LaunchHandlerTest {
 
         @Test
         void returnsArray() {
-            String json = handler.handleConfigs(Map.of());
+            String json = handler.handleConfigs(Map.of(), ProjectScope.ALL);
             assertNotNull(json);
             assertTrue(json.startsWith("["),
                     "Should be JSON array: " + json);
@@ -152,7 +152,7 @@ public class LaunchHandlerTest {
 
         @Test
         void containsNameAndType() {
-            String json = handler.handleConfigs(Map.of());
+            String json = handler.handleConfigs(Map.of(), ProjectScope.ALL);
             if (!json.equals("[]")) {
                 assertTrue(json.contains("\"configId\""),
                         "Should have configId: " + json);
@@ -163,7 +163,7 @@ public class LaunchHandlerTest {
 
         @Test
         void junitConfigHasClassAndRunner() {
-            String json = handler.handleConfigs(Map.of());
+            String json = handler.handleConfigs(Map.of(), ProjectScope.ALL);
             var arr = JsonParser.parseString(json)
                     .getAsJsonArray();
             for (var el : arr) {
@@ -183,7 +183,7 @@ public class LaunchHandlerTest {
 
         @Test
         void mavenConfigHasGoals() {
-            String json = handler.handleConfigs(Map.of());
+            String json = handler.handleConfigs(Map.of(), ProjectScope.ALL);
             var arr = JsonParser.parseString(json)
                     .getAsJsonArray();
             for (var el : arr) {
@@ -225,7 +225,7 @@ public class LaunchHandlerTest {
         @Test
         void knownConfigReturnsAttributes() {
             // Find any existing config name
-            String listJson = handler.handleConfigs(Map.of());
+            String listJson = handler.handleConfigs(Map.of(), ProjectScope.ALL);
             var arr = JsonParser.parseString(listJson)
                     .getAsJsonArray();
             if (arr.isEmpty()) return; // no configs to test
@@ -251,7 +251,7 @@ public class LaunchHandlerTest {
 
         @Test
         void xmlFormatReturnsXmlContent() {
-            String listJson = handler.handleConfigs(Map.of());
+            String listJson = handler.handleConfigs(Map.of(), ProjectScope.ALL);
             var arr = JsonParser.parseString(listJson)
                     .getAsJsonArray();
             if (arr.isEmpty()) return;
@@ -278,7 +278,7 @@ public class LaunchHandlerTest {
         @Test
         void attributesContainExpectedKeys() {
             // Find a JUnit config specifically
-            String listJson = handler.handleConfigs(Map.of());
+            String listJson = handler.handleConfigs(Map.of(), ProjectScope.ALL);
             var arr = JsonParser.parseString(listJson)
                     .getAsJsonArray();
             String configId = null;
@@ -310,7 +310,7 @@ public class LaunchHandlerTest {
         @Test
         void attributeTypesPreserved() {
             // Get any config and verify attribute value types
-            String listJson = handler.handleConfigs(Map.of());
+            String listJson = handler.handleConfigs(Map.of(), ProjectScope.ALL);
             var arr = JsonParser.parseString(listJson)
                     .getAsJsonArray();
             if (arr.isEmpty()) return;
@@ -425,7 +425,7 @@ public class LaunchHandlerTest {
                     Long.toString(System.currentTimeMillis()));
             mgr.addLaunch(launch);
             try {
-                String json = handler.handleList(Map.of());
+                String json = handler.handleList(Map.of(), ProjectScope.ALL);
                 assertFalse(json.equals("[]"),
                         "Should have launch: " + json);
                 assertTrue(json.contains("\"mode\":\"run\""),
@@ -451,7 +451,7 @@ public class LaunchHandlerTest {
             mgr.addLaunch(launch);
             try {
                 // Should appear in list
-                String listJson = handler.handleList(Map.of());
+                String listJson = handler.handleList(Map.of(), ProjectScope.ALL);
                 assertTrue(listJson.contains("\"terminated\""),
                         "Should have terminated: " + listJson);
 

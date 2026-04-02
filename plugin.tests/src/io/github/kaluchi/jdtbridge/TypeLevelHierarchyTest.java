@@ -46,7 +46,7 @@ public class TypeLevelHierarchyTest {
         var handler = new SearchHandler();
         return JsonParser.parseString(
                 handler.handleSource(
-                        Map.of("class", fqn)).body())
+                        Map.of("class", fqn), ProjectScope.ALL).body())
                 .getAsJsonObject();
     }
 

@@ -15,7 +15,7 @@ import org.eclipse.debug.core.DebugPlugin;
 import org.eclipse.debug.core.IDebugEventSetListener;
 import org.eclipse.debug.core.ILaunch;
 import org.eclipse.debug.core.ILaunchConfiguration;
-import org.eclipse.debug.core.model.ILaunchConfigurationDelegate;
+import org.eclipse.debug.core.model.ILaunchConfigurationDelegate2;
 import org.eclipse.debug.core.model.IProcess;
 
 import com.google.gson.JsonObject;
@@ -33,7 +33,32 @@ import io.github.kaluchi.jdtbridge.ui.ProcessUtil;
  * <p>
  * Session file is cleaned up when the process terminates.
  */
-public class AgentLaunchDelegate implements ILaunchConfigurationDelegate {
+public class AgentLaunchDelegate
+		implements ILaunchConfigurationDelegate2 {
+
+	@Override
+	public ILaunch getLaunch(ILaunchConfiguration config,
+			String mode) {
+		return null; // default Launch
+	}
+
+	@Override
+	public boolean buildForLaunch(ILaunchConfiguration config,
+			String mode, IProgressMonitor monitor) {
+		return false; // agent is a CLI wrapper, no build needed
+	}
+
+	@Override
+	public boolean preLaunchCheck(ILaunchConfiguration config,
+			String mode, IProgressMonitor monitor) {
+		return true;
+	}
+
+	@Override
+	public boolean finalLaunchCheck(ILaunchConfiguration config,
+			String mode, IProgressMonitor monitor) {
+		return true;
+	}
 
 	public static final String ATTR_PROVIDER =
 			Activator.PLUGIN_ID + ".provider";
@@ -53,7 +78,8 @@ public class AgentLaunchDelegate implements ILaunchConfigurationDelegate {
 		String agent = config.getAttribute(ATTR_AGENT, "claude");
 		String workDirRaw = config.getAttribute(ATTR_WORKING_DIR, "");
 		String agentArgs = config.getAttribute(ATTR_AGENT_ARGS, "");
-		String sessionId = config.getName();
+		String bridgeSessionId = config.getName() + "-"
+				+ System.currentTimeMillis();
 
 		String workDir = "";
 		if (workDirRaw != null && !workDirRaw.isBlank()) {
@@ -77,17 +103,17 @@ public class AgentLaunchDelegate implements ILaunchConfigurationDelegate {
 				(Map<String, String>) null);
 
 		Path sessionFile = writeSessionFile(
-				sessionId, provider, agent, workDir, agentArgs,
+				bridgeSessionId, provider, agent, workDir, agentArgs,
 				bridge, envVars);
 
 		try {
 			ProcessBuilder pb = ProcessUtil.command(
 					"jdt", "agent", "run",
-					"--session", sessionId);
+					"--session", bridgeSessionId);
 			pb.redirectErrorStream(true);
 
 			Process process = pb.start();
-			DebugPlugin.newProcess(launch, process, sessionId);
+			DebugPlugin.newProcess(launch, process, bridgeSessionId);
 
 			// Clean up session file when our process terminates
 			registerCleanup(launch, sessionFile);
@@ -100,7 +126,7 @@ public class AgentLaunchDelegate implements ILaunchConfigurationDelegate {
 		}
 	}
 
-	private Path writeSessionFile(String sessionId, String provider,
+	private Path writeSessionFile(String bridgeSessionId, String provider,
 			String agent, String workDir, String agentArgs,
 			BridgeConnection bridge, Map<String, String> envVars)
 			throws CoreException {
@@ -108,7 +134,7 @@ public class AgentLaunchDelegate implements ILaunchConfigurationDelegate {
 				.resolve("sessions");
 		try {
 			Files.createDirectories(sessionsDir);
-			Path sessionFile = sessionsDir.resolve(sessionId + ".json");
+			Path sessionFile = sessionsDir.resolve(bridgeSessionId + ".json");
 
 			var obj = new JsonObject();
 			obj.addProperty("provider", provider);

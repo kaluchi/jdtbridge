@@ -20,8 +20,8 @@ import org.eclipse.ui.PlatformUI;
 
 class EditorHandler {
 
-    String handleEditors(Map<String, String> params)
-            throws Exception {
+    String handleEditors(Map<String, String> params,
+            ProjectScope scope) throws Exception {
         String[] result = {"[]"};
         Runnable query = () -> {
             try {
@@ -44,7 +44,7 @@ class EditorHandler {
                 if (active != null) {
                     addEditorEntry(
                             active.getEditorInput(), arr,
-                            true);
+                            true, scope);
                 }
                 for (IEditorReference ref : refs) {
                     IEditorPart editor =
@@ -54,7 +54,7 @@ class EditorHandler {
                     try {
                         addEditorEntry(
                                 ref.getEditorInput(), arr,
-                                false);
+                                false, scope);
                     } catch (Exception ignored) {
                     }
                 }
@@ -76,10 +76,13 @@ class EditorHandler {
 
     private void addEditorEntry(
             org.eclipse.ui.IEditorInput input,
-            JsonArray arr, boolean isActive) {
+            JsonArray arr, boolean isActive,
+            ProjectScope scope) {
         if (!(input instanceof IFileEditorInput fi)) return;
         IFile file = fi.getFile();
         if (file.getLocation() == null) return;
+        if (!scope.containsProject(
+                file.getProject().getName())) return;
         var obj = new JsonObject();
         obj.addProperty("file",
                 file.getLocation().toOSString());

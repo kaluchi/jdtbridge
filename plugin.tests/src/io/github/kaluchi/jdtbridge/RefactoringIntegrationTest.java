@@ -130,7 +130,7 @@ public class RefactoringIntegrationTest {
 
         // Verify caller updated
         String source = search.handleSource(
-                Map.of("class", "test.refactor.RenameCaller")).body();
+                Map.of("class", "test.refactor.RenameCaller"), ProjectScope.ALL).body();
         assertTrue(source.contains("incrementCounter"),
                 "Caller should use new name: " + source);
     }
@@ -151,7 +151,7 @@ public class RefactoringIntegrationTest {
             Job.getJobManager().join(
                     ResourcesPlugin.FAMILY_AUTO_BUILD, null);
             String source = search.handleSource(
-                    Map.of("class", "test.refactor.RenameTarget")).body();
+                    Map.of("class", "test.refactor.RenameTarget"), ProjectScope.ALL).body();
             assertTrue(source.contains("count"),
                     "Should use new field name: " + source);
         } catch (IllegalArgumentException e) {
@@ -176,13 +176,13 @@ public class RefactoringIntegrationTest {
                 ResourcesPlugin.FAMILY_AUTO_BUILD, null);
 
         // Verify new type exists
-        String findJson = search.handleFind(Map.of("name", "RenamedTarget"));
+        String findJson = search.handleFind(Map.of("name", "RenamedTarget"), ProjectScope.ALL);
         assertTrue(findJson.contains("test.refactor.RenamedTarget"),
                 "Should find renamed type: " + findJson);
 
         // Verify caller references updated
         String callerSrc = search.handleSource(
-                Map.of("class", "test.refactor.RenameCaller")).body();
+                Map.of("class", "test.refactor.RenameCaller"), ProjectScope.ALL).body();
         assertTrue(callerSrc.contains("RenamedTarget"),
                 "Caller should reference RenamedTarget: " + callerSrc);
     }
@@ -204,7 +204,7 @@ public class RefactoringIntegrationTest {
 
             // Verify type in new package
             String findJson = search.handleFind(
-                    Map.of("name", "RenameCaller"));
+                    Map.of("name", "RenameCaller"), ProjectScope.ALL);
             assertTrue(findJson.contains("test.moved.RenameCaller"),
                     "Should be in test.moved: " + findJson);
         } catch (IllegalArgumentException e) {

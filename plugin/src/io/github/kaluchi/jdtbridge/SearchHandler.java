@@ -38,31 +38,28 @@ import org.eclipse.jdt.core.search.SearchRequestor;
  */
 class SearchHandler {
 
-    String handleProjects() throws Exception {
+    String handleProjects(ProjectScope scope) throws Exception {
         var arr = new JsonArray();
-        for (var p : ResourcesPlugin.getWorkspace().getRoot()
-                .getProjects()) {
-            if (p.isOpen() && !p.getName().startsWith(".")) {
-                var obj = new JsonObject();
-                obj.addProperty("name", p.getName());
-                var loc = p.getLocation();
-                obj.addProperty("location",
-                        loc != null ? loc.toOSString() : "");
-                // Git repo info via EGit
-                var mapping = org.eclipse.egit.core.project
-                        .RepositoryMapping.getMapping(p);
-                if (mapping != null) {
-                    var repo = mapping.getRepository();
-                    obj.addProperty("repo",
-                            repo.getWorkTree().getAbsolutePath());
-                    try {
-                        obj.addProperty("branch",
-                                repo.getBranch());
-                    } catch (Exception ignored) { }
-                }
-                arr.add(obj);
+        scope.openProjects().forEach(p -> {
+            var obj = new JsonObject();
+            obj.addProperty("name", p.getName());
+            var loc = p.getLocation();
+            obj.addProperty("location",
+                    loc != null ? loc.toOSString() : "");
+            // Git repo info via EGit
+            var mapping = org.eclipse.egit.core.project
+                    .RepositoryMapping.getMapping(p);
+            if (mapping != null) {
+                var repo = mapping.getRepository();
+                obj.addProperty("repo",
+                        repo.getWorkTree().getAbsolutePath());
+                try {
+                    obj.addProperty("branch",
+                            repo.getBranch());
+                } catch (Exception ignored) { }
             }
-        }
+            arr.add(obj);
+        });
         return arr.toString();
     }
 
@@ -75,7 +72,8 @@ class SearchHandler {
      * @return JSON array of `{fqn, file}` entries.
      * @throws CoreException
      */
-    String handleFind(Map<String, String> params) throws CoreException {
+    String handleFind(Map<String, String> params,
+            ProjectScope scope) throws CoreException {
         String name = params.get("name");
         if (name == null || name.isBlank()) {
             return HttpServer.jsonError("Missing 'name' parameter");
@@ -108,7 +106,7 @@ class SearchHandler {
         engine.search(pattern,
                 new SearchParticipant[]{
                         SearchEngine.getDefaultSearchParticipant()},
-                SearchEngine.createWorkspaceScope(),
+                scope.searchScope(),
                 new SearchRequestor() {
                     @Override
                     public void acceptSearchMatch(SearchMatch match) {
@@ -182,7 +180,8 @@ class SearchHandler {
         return arr.toString();
     }
 
-    String handleReferences(Map<String, String> params)
+    String handleReferences(Map<String, String> params,
+            ProjectScope scope)
             throws CoreException {
         String fqn = params.get("class");
         if (fqn == null || fqn.isBlank()) {
@@ -225,7 +224,7 @@ class SearchHandler {
         engine.search(pattern,
                 new SearchParticipant[]{
                         SearchEngine.getDefaultSearchParticipant()},
-                SearchEngine.createWorkspaceScope(),
+                scope.searchScope(),
                 new SearchRequestor() {
                     @Override
                     public void acceptSearchMatch(SearchMatch match) {
@@ -262,7 +261,8 @@ class SearchHandler {
         return arr.toString();
     }
 
-    String handleSubtypes(Map<String, String> params)
+    String handleSubtypes(Map<String, String> params,
+            ProjectScope scope)
             throws CoreException {
         String fqn = params.get("class");
         if (fqn == null || fqn.isBlank()) {
@@ -286,7 +286,8 @@ class SearchHandler {
         return arr.toString();
     }
 
-    String handleHierarchy(Map<String, String> params)
+    String handleHierarchy(Map<String, String> params,
+            ProjectScope scope)
             throws CoreException {
         String fqn = params.get("class");
         if (fqn == null || fqn.isBlank()) {
@@ -319,7 +320,8 @@ class SearchHandler {
         return result.toString();
     }
 
-    String handleImplementors(Map<String, String> params)
+    String handleImplementors(Map<String, String> params,
+            ProjectScope scope)
             throws CoreException {
         String fqn = params.get("class");
         String methodName = params.get("method");
@@ -421,7 +423,8 @@ class SearchHandler {
 
     // ---- /source?class=FQN[&method=name] ----
 
-    HttpServer.Response handleSource(Map<String, String> params)
+    HttpServer.Response handleSource(Map<String, String> params,
+            ProjectScope scope)
             throws Exception {
         String fqn = params.get("class");
         String methodName = params.get("method");
@@ -461,7 +464,7 @@ class SearchHandler {
             if (methods.size() == 1) {
                 return resolvedResponse(
                         methods.get(0), fqn, methodName,
-                        absPath, fullSource, params);
+                        absPath, fullSource, params, scope);
             }
 
             // Multiple overloads — JSON array, each fully enriched
@@ -477,7 +480,7 @@ class SearchHandler {
                 String sig = JdtUtils.compactSignature(method);
                 String mFqmn = fqn + "#" + sig;
                 var refs = ReferenceCollector.collect(method);
-                var incoming = collectIncomingRefs(method);
+                var incoming = collectIncomingRefs(method, scope);
                 String json = SourceReport.toJson(
                         mFqmn, method, absPath, src,
                         lines[0], lines[1], refs, incoming);
@@ -491,13 +494,13 @@ class SearchHandler {
 
         // Full class source
         return resolvedResponse(type, fqn, null,
-                absPath, fullSource, params);
+                absPath, fullSource, params, scope);
     }
 
     private HttpServer.Response resolvedResponse(IMember member,
             String fqn, String methodName, String absPath,
-            String fullSource, Map<String, String> params)
-            throws Exception {
+            String fullSource, Map<String, String> params,
+            ProjectScope scope) throws Exception {
         int[] lines = memberLines(member, fullSource);
         // Top-level type: include package + imports (from line 1)
         // Inner classes keep their declaration range
@@ -526,7 +529,7 @@ class SearchHandler {
                 : fqn;
 
         var refs = ReferenceCollector.collect(member);
-        var incoming = collectIncomingRefs(member);
+        var incoming = collectIncomingRefs(member, scope);
         String json = SourceReport.toJson(
                 fqmn, member, absPath, source,
                 lines[0], lines[1], refs, incoming);
@@ -539,7 +542,7 @@ class SearchHandler {
      * SearchEngine. Returns enriched refs for the JSON output.
      */
     private List<SourceReport.IncomingRef> collectIncomingRefs(
-            IMember member) {
+            IMember member, ProjectScope scope) {
         var result = new ArrayList<SourceReport.IncomingRef>();
         var seen = new java.util.HashSet<String>();
         try {
@@ -552,7 +555,7 @@ class SearchHandler {
                     new SearchParticipant[]{
                             SearchEngine
                                     .getDefaultSearchParticipant()},
-                    SearchEngine.createWorkspaceScope(),
+                    scope.searchScope(),
                     new SearchRequestor() {
                         @Override
                         public void acceptSearchMatch(

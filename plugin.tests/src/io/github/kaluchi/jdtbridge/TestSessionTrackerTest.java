@@ -163,7 +163,7 @@ public class TestSessionTrackerTest {
 
         @Test
         void returnsJsonArray() {
-            String json = handler.handleSessions(Map.of());
+            String json = handler.handleSessions(Map.of(), ProjectScope.ALL);
             // JUnitModel returns real sessions from workspace.
             // At minimum, result must be valid JSON array.
             var arr = JsonParser.parseString(json)
@@ -173,7 +173,7 @@ public class TestSessionTrackerTest {
 
         @Test
         void sessionsHaveRequiredFields() {
-            String json = handler.handleSessions(Map.of());
+            String json = handler.handleSessions(Map.of(), ProjectScope.ALL);
             var arr = JsonParser.parseString(json)
                     .getAsJsonArray();
             for (var el : arr) {

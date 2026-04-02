@@ -29,6 +29,7 @@ import org.junit.jupiter.api.Test;
 public class SourceIndentTest {
 
     private static final SearchHandler handler = new SearchHandler();
+    private static final ProjectScope ALL = ProjectScope.ALL;
 
     @BeforeAll
     static void setUp() throws Exception { TestFixture.create(); }
@@ -91,7 +92,7 @@ public class SourceIndentTest {
     void methodSourceHasLeadingIndent() throws Exception {
         HttpServer.Response resp = handler.handleSource(
                 Map.of("class", "test.model.Dog",
-                        "method", "bark"));
+                        "method", "bark"), ALL);
         var parsed = JsonParser.parseString(resp.body())
                 .getAsJsonObject();
         String source = parsed.get("source").getAsString();
@@ -126,7 +127,7 @@ public class SourceIndentTest {
     @Test
     void classSourceStartsAtColumnZero() throws Exception {
         HttpServer.Response resp = handler.handleSource(
-                Map.of("class", "test.model.Dog"));
+                Map.of("class", "test.model.Dog"), ALL);
         var parsed = JsonParser.parseString(resp.body())
                 .getAsJsonObject();
         String source = parsed.get("source").getAsString();
@@ -145,7 +146,7 @@ public class SourceIndentTest {
     void methodSourceContainsFullBody() throws Exception {
         HttpServer.Response resp = handler.handleSource(
                 Map.of("class", "test.model.Dog",
-                        "method", "bark"));
+                        "method", "bark"), ALL);
         var parsed = JsonParser.parseString(resp.body())
                 .getAsJsonObject();
         String source = parsed.get("source").getAsString();
@@ -159,7 +160,7 @@ public class SourceIndentTest {
     void sourceMatchesFileLineRange() throws Exception {
         HttpServer.Response resp = handler.handleSource(
                 Map.of("class", "test.model.Dog",
-                        "method", "bark"));
+                        "method", "bark"), ALL);
         var parsed = JsonParser.parseString(resp.body())
                 .getAsJsonObject();
         String source = parsed.get("source").getAsString();
@@ -296,7 +297,7 @@ public class SourceIndentTest {
         HttpServer.Response resp = handler.handleSource(
                 Map.of("class",
                         "org.eclipse.core.resources.IResource",
-                        "method", "getLocation"));
+                        "method", "getLocation"), ALL);
         var parsed = JsonParser.parseString(resp.body())
                 .getAsJsonObject();
         String source = parsed.get("source").getAsString();
@@ -315,7 +316,7 @@ public class SourceIndentTest {
         // Calculator has overloaded add() methods
         HttpServer.Response resp = handler.handleSource(
                 Map.of("class", "test.edge.Calculator",
-                        "method", "add"));
+                        "method", "add"), ALL);
         // Returns JSON array for overloads
         String body = resp.body();
         assertTrue(body.startsWith("["),

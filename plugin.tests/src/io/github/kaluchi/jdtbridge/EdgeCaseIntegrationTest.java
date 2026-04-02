@@ -57,7 +57,7 @@ public class EdgeCaseIntegrationTest {
     @Test
     public void sourceByMethodFindsAllOverloads() throws Exception {
         HttpServer.Response resp = search.handleSource(
-                Map.of("class", "test.edge.Calculator", "method", "add"));
+                Map.of("class", "test.edge.Calculator", "method", "add"), ProjectScope.ALL);
         // Without arity, all overloads should be returned
         String body = resp.body();
         assertTrue(body.contains("int add(int a, int b)"),
@@ -72,7 +72,7 @@ public class EdgeCaseIntegrationTest {
     public void sourceByMethodWithArity() throws Exception {
         HttpServer.Response resp = search.handleSource(
                 Map.of("class", "test.edge.Calculator",
-                        "method", "add", "arity", "3"));
+                        "method", "add", "arity", "3"), ProjectScope.ALL);
         String body = resp.body();
         assertTrue(body.contains("int a, int b, int c"),
                 "Should contain 3-arg overload: " + body);
@@ -85,7 +85,7 @@ public class EdgeCaseIntegrationTest {
         // add(int, int) has arity 2
         String json = search.handleReferences(
                 Map.of("class", "test.edge.Calculator",
-                        "method", "add", "arity", "2"));
+                        "method", "add", "arity", "2"), ProjectScope.ALL);
         // No external callers in test project
         assertEquals("[]", json);
     }
@@ -94,7 +94,7 @@ public class EdgeCaseIntegrationTest {
 
     @Test
     public void findInnerClass() throws Exception {
-        String json = search.handleFind(Map.of("name", "Inner"));
+        String json = search.handleFind(Map.of("name", "Inner"), ProjectScope.ALL);
         JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
         boolean found = false;
         for (JsonElement e : arr) {
@@ -109,7 +109,7 @@ public class EdgeCaseIntegrationTest {
 
     @Test
     public void findStaticNested() throws Exception {
-        String json = search.handleFind(Map.of("name", "StaticNested"));
+        String json = search.handleFind(Map.of("name", "StaticNested"), ProjectScope.ALL);
         JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
         assertTrue(arr.size() > 0, "Should find StaticNested");
     }
@@ -125,7 +125,7 @@ public class EdgeCaseIntegrationTest {
     @Test
     public void sourceOuter() throws Exception {
         HttpServer.Response resp = search.handleSource(
-                Map.of("class", "test.edge.Outer"));
+                Map.of("class", "test.edge.Outer"), ProjectScope.ALL);
         assertTrue(resp.body().contains("public class Inner"),
                 "Should contain Inner: " + resp.body());
         assertTrue(resp.body().contains("public static class StaticNested"),
@@ -145,14 +145,14 @@ public class EdgeCaseIntegrationTest {
     @Test
     public void sourceEnum() throws Exception {
         HttpServer.Response resp = search.handleSource(
-                Map.of("class", "test.edge.Color"));
+                Map.of("class", "test.edge.Color"), ProjectScope.ALL);
         assertTrue(resp.body().contains("RED"),
                 "Should contain RED: " + resp.body());
     }
 
     @Test
     public void findEnum() throws Exception {
-        String json = search.handleFind(Map.of("name", "Color"));
+        String json = search.handleFind(Map.of("name", "Color"), ProjectScope.ALL);
         JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
         assertNotNull(findByFqn(arr, "test.edge.Color"),
                 "Should find Color");
@@ -171,7 +171,7 @@ public class EdgeCaseIntegrationTest {
     @Test
     public void sourceAnnotation() throws Exception {
         HttpServer.Response resp = search.handleSource(
-                Map.of("class", "test.edge.Marker"));
+                Map.of("class", "test.edge.Marker"), ProjectScope.ALL);
         assertTrue(resp.body().contains("@Retention"),
                 "Should contain @Retention: " + resp.body());
         assertTrue(resp.body().contains("String value()"),
@@ -183,7 +183,7 @@ public class EdgeCaseIntegrationTest {
     @Test
     public void subtypesOfAbstract() throws Exception {
         String json = search.handleSubtypes(
-                Map.of("class", "test.edge.AbstractPet"));
+                Map.of("class", "test.edge.AbstractPet"), ProjectScope.ALL);
         JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
         assertNotNull(findByFqn(arr, "test.edge.Parrot"),
                 "Should find Parrot");
@@ -192,7 +192,7 @@ public class EdgeCaseIntegrationTest {
     @Test
     public void hierarchyOfParrot() throws Exception {
         String json = search.handleHierarchy(
-                Map.of("class", "test.edge.Parrot"));
+                Map.of("class", "test.edge.Parrot"), ProjectScope.ALL);
         JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
         JsonArray supers = obj.getAsJsonArray("supertypes");
         assertNotNull(findByFqn(supers, "test.edge.AbstractPet"),
@@ -204,7 +204,7 @@ public class EdgeCaseIntegrationTest {
     @Test
     public void deepSubtypesOfAnimal() throws Exception {
         String json = search.handleSubtypes(
-                Map.of("class", "test.model.Animal"));
+                Map.of("class", "test.model.Animal"), ProjectScope.ALL);
         JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
         assertNotNull(findByFqn(arr, "test.model.Dog"),
                 "Should find Dog");
@@ -219,7 +219,7 @@ public class EdgeCaseIntegrationTest {
     @Test
     public void implementorsIncludesDeepHierarchy() throws Exception {
         String json = search.handleImplementors(
-                Map.of("class", "test.model.Animal", "method", "name"));
+                Map.of("class", "test.model.Animal", "method", "name"), ProjectScope.ALL);
         JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
         assertNotNull(findByFqn(arr, "test.model.Dog"),
                 "Should find Dog");
@@ -236,7 +236,7 @@ public class EdgeCaseIntegrationTest {
             throws Exception {
         HttpServer.Response resp = search.handleSource(
                 Map.of("class", "test.edge.Calculator",
-                        "method", "add"));
+                        "method", "add"), ProjectScope.ALL);
         JsonArray arr = JsonParser.parseString(resp.body())
                 .getAsJsonArray();
         assertEquals(3, arr.size(), "Should have 3 overloads");
@@ -262,7 +262,7 @@ public class EdgeCaseIntegrationTest {
     @Test
     public void sourceEnumHasHierarchy() throws Exception {
         HttpServer.Response resp = search.handleSource(
-                Map.of("class", "test.edge.Color"));
+                Map.of("class", "test.edge.Color"), ProjectScope.ALL);
         String body = resp.body();
         assertTrue(body.contains("\"supertypes\""),
                 "Enum should have supertypes: " + body);
@@ -276,7 +276,7 @@ public class EdgeCaseIntegrationTest {
     @Test
     public void sourceAnnotationHasHierarchy() throws Exception {
         HttpServer.Response resp = search.handleSource(
-                Map.of("class", "test.edge.Marker"));
+                Map.of("class", "test.edge.Marker"), ProjectScope.ALL);
         String body = resp.body();
         assertTrue(body.contains("\"supertypes\""),
                 "Annotation should have supertypes: " + body);
@@ -288,7 +288,7 @@ public class EdgeCaseIntegrationTest {
     @Test
     public void sourceInnerTypeHasEnclosingType() throws Exception {
         HttpServer.Response resp = search.handleSource(
-                Map.of("class", "test.edge.Outer.Inner"));
+                Map.of("class", "test.edge.Outer.Inner"), ProjectScope.ALL);
         String body = resp.body();
         assertTrue(body.contains("\"enclosingType\""),
                 "Inner should have enclosingType: " + body);
@@ -300,7 +300,7 @@ public class EdgeCaseIntegrationTest {
     public void sourceInheritedMethodFlagged() throws Exception {
         HttpServer.Response resp = search.handleSource(
                 Map.of("class", "test.service.EnrichedRefService",
-                        "method", "getParrotName"));
+                        "method", "getParrotName"), ProjectScope.ALL);
         String body = resp.body();
         assertTrue(body.contains("\"inherited\":true"),
                 "Should flag inherited call: " + body);
@@ -312,7 +312,7 @@ public class EdgeCaseIntegrationTest {
     public void sourceStaticMethodFlagged() throws Exception {
         HttpServer.Response resp = search.handleSource(
                 Map.of("class", "test.service.EnrichedRefService",
-                        "method", "getStaticValue"));
+                        "method", "getStaticValue"), ProjectScope.ALL);
         String body = resp.body();
         assertTrue(body.contains("\"static\":true"),
                 "Should flag static ref: " + body);

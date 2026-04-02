@@ -3,6 +3,7 @@ package io.github.kaluchi.jdtbridge;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
+import java.util.Arrays;
 import java.util.Map;
 
 import org.eclipse.core.resources.IFile;
@@ -18,8 +19,8 @@ class DiagnosticsHandler {
     private static final String JDT_PROBLEM_MARKER =
             "org.eclipse.jdt.core.problem";
 
-    String handleErrors(Map<String, String> params)
-            throws Exception {
+    String handleErrors(Map<String, String> params,
+            ProjectScope projectScope) throws Exception {
         String filePath = params.get("file");
         String projectName = params.get("project");
         boolean includeWarnings =
@@ -29,10 +30,10 @@ class DiagnosticsHandler {
         IWorkspaceRoot root =
                 ResourcesPlugin.getWorkspace().getRoot();
 
-        IResource scope;
+        IResource resource;
         if (filePath != null && !filePath.isBlank()) {
-            scope = root.findMember(filePath);
-            if (scope == null) {
+            resource = root.findMember(filePath);
+            if (resource == null) {
                 return HttpServer.jsonError(
                         "Resource not found: " + filePath);
             }
@@ -43,53 +44,34 @@ class DiagnosticsHandler {
                 return HttpServer.jsonError(
                         "Project not found: " + projectName);
             }
-            scope = project;
+            resource = project;
         } else {
-            scope = root;
+            resource = root;
         }
 
-        int depth = (scope instanceof IFile)
+        int depth = (resource instanceof IFile)
                 ? IResource.DEPTH_ZERO
                 : IResource.DEPTH_INFINITE;
-        scope.refreshLocal(depth, null);
+        resource.refreshLocal(depth, null);
         JdtUtils.joinAutoBuild();
 
         String markerType = all ? IMarker.PROBLEM
                 : JDT_PROBLEM_MARKER;
-        IMarker[] markers = scope.findMarkers(
+        IMarker[] markers = resource.findMarkers(
                 markerType, true, IResource.DEPTH_INFINITE);
 
-        var arr = new JsonArray();
-        for (IMarker marker : markers) {
-            int severity = marker.getAttribute(
-                    IMarker.SEVERITY, -1);
-            if (!includeWarnings
-                    && severity != IMarker.SEVERITY_ERROR) {
-                continue;
-            }
-            String sevStr = switch (severity) {
-                case IMarker.SEVERITY_ERROR -> "ERROR";
-                case IMarker.SEVERITY_WARNING -> "WARNING";
-                default -> "INFO";
-            };
+        int minSeverity = includeWarnings
+                ? IMarker.SEVERITY_WARNING
+                : IMarker.SEVERITY_ERROR;
 
-            var entry = new JsonObject();
-            var loc = marker.getResource().getLocation();
-            entry.addProperty("file", loc != null
-                    ? loc.toOSString()
-                    : marker.getResource()
-                            .getFullPath().toString());
-            entry.addProperty("line", marker.getAttribute(
-                    IMarker.LINE_NUMBER, -1));
-            entry.addProperty("severity", sevStr);
-            entry.addProperty("message", marker.getAttribute(
-                    IMarker.MESSAGE, ""));
-            if (all) {
-                entry.addProperty("source",
-                        shortMarkerType(marker.getType()));
-            }
-            arr.add(entry);
-        }
+        var arr = new JsonArray();
+        Arrays.stream(markers)
+                .filter(m -> m.getAttribute(
+                        IMarker.SEVERITY, -1) >= minSeverity)
+                .filter(m -> projectScope.containsProject(
+                        m.getResource().getProject().getName()))
+                .map(m -> toMarkerJson(m, all))
+                .forEach(arr::add);
         return arr.toString();
     }
 
@@ -226,6 +208,35 @@ class DiagnosticsHandler {
             result.addProperty("scope", "workspace");
             return result.toString();
         }
+    }
+
+    private JsonObject toMarkerJson(IMarker marker,
+            boolean includeSource) {
+        int severity = marker.getAttribute(
+                IMarker.SEVERITY, -1);
+        String sevStr = switch (severity) {
+            case IMarker.SEVERITY_ERROR -> "ERROR";
+            case IMarker.SEVERITY_WARNING -> "WARNING";
+            default -> "INFO";
+        };
+        var entry = new JsonObject();
+        var loc = marker.getResource().getLocation();
+        entry.addProperty("file", loc != null
+                ? loc.toOSString()
+                : marker.getResource()
+                        .getFullPath().toString());
+        entry.addProperty("line", marker.getAttribute(
+                IMarker.LINE_NUMBER, -1));
+        entry.addProperty("severity", sevStr);
+        entry.addProperty("message", marker.getAttribute(
+                IMarker.MESSAGE, ""));
+        if (includeSource) {
+            try {
+                entry.addProperty("source",
+                        shortMarkerType(marker.getType()));
+            } catch (Exception ignored) { }
+        }
+        return entry;
     }
 
     String shortMarkerType(String type) {

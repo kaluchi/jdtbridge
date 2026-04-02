@@ -40,6 +40,7 @@ public class HttpServer {
     private final TestHandler testHandler =
             new TestHandler();
     private final ProjectHandler projectInfo = new ProjectHandler();
+    private final SessionScope sessionScope = new SessionScope();
     private final RequestTracker requestTracker = new RequestTracker();
     private final ConfigService configService =
             new ConfigService(Activator.getHome());
@@ -226,8 +227,11 @@ public class HttpServer {
                 return;
             }
 
+            ProjectScope scope = sessionScope.resolve(
+                    sessionHeader);
+
             long startNs = System.nanoTime();
-            Response resp = dispatch(path, params);
+            Response resp = dispatch(path, params, scope);
             long durationMs = (System.nanoTime() - startNs) / 1_000_000;
             sendResponse(socket, resp);
 
@@ -395,25 +399,26 @@ public class HttpServer {
         }
     }
 
-    private Response dispatch(String path, Map<String, String> params) {
+    private Response dispatch(String path,
+            Map<String, String> params, ProjectScope scope) {
         try {
             return switch (path) {
                 case "/projects" -> Response.json(
-                        search.handleProjects());
+                        search.handleProjects(scope));
                 case "/project-info" -> Response.json(
                         projectInfo.handleProjectInfo(params));
                 case "/find" -> Response.json(
-                        search.handleFind(params));
+                        search.handleFind(params, scope));
                 case "/references" -> Response.json(
-                        search.handleReferences(params));
+                        search.handleReferences(params, scope));
                 case "/subtypes" -> Response.json(
-                        search.handleSubtypes(params));
+                        search.handleSubtypes(params, scope));
                 case "/hierarchy" -> Response.json(
-                        search.handleHierarchy(params));
+                        search.handleHierarchy(params, scope));
                 case "/implementors" -> Response.json(
-                        search.handleImplementors(params));
+                        search.handleImplementors(params, scope));
                 case "/errors" -> Response.json(
-                        diagnostics.handleErrors(params));
+                        diagnostics.handleErrors(params, scope));
                 case "/build" -> Response.json(
                         diagnostics.handleBuild(params));
                 case "/refresh" -> Response.json(
@@ -422,7 +427,8 @@ public class HttpServer {
                         maven.handleUpdate(params));
                 case "/type-info" -> Response.json(
                         search.handleTypeInfo(params));
-                case "/source" -> search.handleSource(params);
+                case "/source" -> search.handleSource(params,
+                        scope);
                 case "/organize-imports" -> Response.json(
                         refactoring.handleOrganizeImports(params));
                 case "/format" -> Response.json(
@@ -436,17 +442,18 @@ public class HttpServer {
                 case "/test/status" -> Response.json(
                         testSessionHandler.handleStatus(params));
                 case "/test/sessions" -> Response.json(
-                        testSessionHandler.handleSessions(params));
+                        testSessionHandler.handleSessions(
+                                params, scope));
                 case "/test/clear" -> Response.json(
                         testSessionHandler.handleClear(params));
                 case "/editors" -> Response.json(
-                        editor.handleEditors(params));
+                        editor.handleEditors(params, scope));
                 case "/open" -> Response.json(
                         editor.handleOpen(params));
                 case "/launch/list" -> Response.json(
-                        launch.handleList(params));
+                        launch.handleList(params, scope));
                 case "/launch/configs" -> Response.json(
-                        launch.handleConfigs(params));
+                        launch.handleConfigs(params, scope));
                 case "/launch/config" -> Response.json(
                         launch.handleConfig(params));
                 case "/launch/config/delete" -> Response.json(

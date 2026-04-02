@@ -61,14 +61,14 @@ public class RefCountContractTest {
         var handler = new SearchHandler();
         String body = handler.handleSource(
                 Map.of("class", typeFqn,
-                        "method", methodName)).body();
+                        "method", methodName), ProjectScope.ALL).body();
         return JsonParser.parseString(body).getAsJsonObject();
     }
 
     static JsonObject typeJson(String typeFqn) throws Exception {
         var handler = new SearchHandler();
         String body = handler.handleSource(
-                Map.of("class", typeFqn)).body();
+                Map.of("class", typeFqn), ProjectScope.ALL).body();
         return JsonParser.parseString(body).getAsJsonObject();
     }
 

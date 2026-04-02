@@ -24,7 +24,8 @@ Require-Bundle: org.eclipse.core.runtime,
  org.eclipse.ui.ide,
  org.eclipse.m2e.core,
  org.eclipse.egit.core,
- org.eclipse.jgit
+ org.eclipse.jgit,
+ org.eclipse.core.variables
 Import-Package: com.google.gson,
  org.osgi.framework;version="1.3.0"
 Bundle-ActivationPolicy: lazy
