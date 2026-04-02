@@ -124,15 +124,15 @@ async function launchDispatch(args) {
 const testSubcommands = {
   run: { fn: testRun, help: testRunHelp },
   status: { fn: testStatus, help: testStatusHelp },
-  sessions: { fn: testSessions, help: testSessionsHelp },
+  runs: { fn: testSessions, help: testSessionsHelp },
 };
 
 const testHelp = `Run and monitor JUnit tests via Eclipse's built-in runner.
 
 Subcommands:
-  jdt test run <FQN> [-f] [-q]                launch tests (non-blocking)
-  jdt test status <session> [-f] [--all]      show test progress/results
-  jdt test sessions                           list test sessions
+  jdt test run <FQN> [-f] [-q]                    launch tests (non-blocking)
+  jdt test status <testRunId> [-f] [--all]         show test progress/results
+  jdt test runs                                    list test runs
 
 Use "jdt help test <subcommand>" for details.`;
 
@@ -278,8 +278,8 @@ Search & navigation:
 Testing & building:
   build${fmtAliases("build")} [--project <name>] [--clean]      build project (incremental or clean)
   test run <FQN> [-f] [-q]                    launch tests (non-blocking)
-  test status <session> [-f] [--all]          show test progress/results
-  test sessions                               list test sessions
+  test status <testRunId> [-f] [--all]        show test progress/results
+  test runs                                   list test runs
 
 Diagnostics:
   errors${fmtAliases("errors")} [--file <path>] [--project <name>]   compilation errors

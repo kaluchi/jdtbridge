@@ -317,7 +317,7 @@ describe("--json output", () => {
     expect(data).toEqual([]);
   });
 
-  it("test sessions --json outputs valid JSON", async () => {
+  it("test runs --json outputs valid JSON", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
@@ -333,7 +333,7 @@ describe("--json output", () => {
     expect(data[0].passed).toBe(4);
   });
 
-  it("test sessions --json returns [] for no sessions", async () => {
+  it("test runs --json returns [] for no runs", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end("[]");

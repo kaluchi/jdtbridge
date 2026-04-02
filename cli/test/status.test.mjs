@@ -74,7 +74,7 @@ describe("guideSection", () => {
     expect(g.body).toContain("jdt editors");
     expect(g.body).toContain("jdt errors");
     expect(g.body).toContain("jdt launch list");
-    expect(g.body).toContain("jdt test sessions");
+    expect(g.body).toContain("jdt test runs");
     expect(g.body).toContain("jdt projects");
   });
 

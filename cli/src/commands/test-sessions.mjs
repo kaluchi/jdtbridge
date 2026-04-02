@@ -4,20 +4,22 @@ import { green, red, yellow } from "../color.mjs";
 import { formatTable } from "../format/table.mjs";
 
 /**
- * List active and completed test sessions.
+ * List test runs (active and completed).
  */
 export async function testSessions(args = []) {
   const data = await get("/test/sessions");
 
   output(args, data, {
-    empty: "(no test sessions)",
+    empty: "(no test runs)",
     text(data) {
       const now = Date.now();
-      const headers = ["SESSION", "LABEL", "TESTS", "RESULT", "TIME", "STATUS"];
+      const headers = ["TESTRUNID", "CONFIGID", "TESTS", "RESULT", "TIME", "STATUS"];
       const rows = data.map((s) => {
         const time = Number.isFinite(s.time) && s.time > 0
           ? `${s.time.toFixed(1)}s` : "";
-        const label = s.label && s.label !== s.session ? s.label : "";
+        const configId = s.session;
+        const testRunId = s.startedAt
+          ? `${configId}:${s.startedAt}` : configId;
         const startMs = s.startedAt || 0;
         let status;
         if (s.state === "running") {
@@ -26,7 +28,7 @@ export async function testSessions(args = []) {
           const endMs = startMs && s.time > 0 ? startMs + s.time * 1000 : 0;
           status = endMs ? `finished ${ago(now - endMs)}` : "finished";
         }
-        return [s.session, label, `${s.total}`, formatCounts(s), time, status];
+        return [testRunId, configId, `${s.total}`, formatCounts(s), time, status];
       });
       console.log(formatTable(headers, rows));
     },
@@ -51,20 +53,20 @@ function ago(ms) {
   return `${h}h ago`;
 }
 
-export const help = `List active and completed test sessions.
+export const help = `List test runs (active and completed).
 
-Usage:  jdt test sessions [--json]
+Usage:  jdt test runs [--json]
 
 Options:
   --json    output as JSON
 
-Output: session ID, label, test counts, status — one session per line.
+Shows TESTRUNID, CONFIGID, test counts, result, time, and status.
+Use TESTRUNID with jdt test status. Use CONFIGID with jdt launch config.
 
-The session ID is also the launch name. To see console output
-(stdout, stderr, stack traces) of a test run:
-  jdt launch logs <session-name>
-  jdt launch logs <session-name> --tail 50
+To see console output (stdout, stderr, stack traces):
+  jdt launch logs <launchId>
+  jdt launch logs <launchId> --tail 50
 
 Examples:
-  jdt test sessions
-  jdt test sessions --json`;
+  jdt test runs
+  jdt test runs --json`;

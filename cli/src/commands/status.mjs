@@ -78,7 +78,7 @@ const JSON_COMMANDS = {
   errors: "jdt errors --json",
   "launch-configs": "jdt launch configs --json",
   launches: "jdt launch list --json",
-  tests: "jdt test sessions --json",
+  tests: "jdt test runs --json",
   projects: "jdt projects --json",
 };
 
@@ -115,7 +115,7 @@ async function renderLaunches() {
 }
 
 async function renderTests() {
-  return { title: "Tests", cmd: "jdt test sessions", body: cliCmd("jdt test sessions") };
+  return { title: "Tests", cmd: "jdt test runs", body: cliCmd("jdt test runs") };
 }
 
 async function renderProjects() {
@@ -176,7 +176,7 @@ Each section can also be refreshed with its standalone command:
   jdt errors                  compilation errors (with --project for one project)
   jdt launch configs          same as jdt status launch-configs
   jdt launch list             same as jdt status launches
-  jdt test sessions           same as jdt status tests
+  jdt test runs           same as jdt status tests
   jdt projects                same as jdt status projects
 
 Combine sections for focused refresh:

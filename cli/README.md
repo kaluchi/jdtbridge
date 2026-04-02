@@ -55,8 +55,8 @@ jdt source <FQMN> [<FQMN> ...]                         # (alias: src) source cod
 jdt build [--project <name>] [--incremental]           # (alias: b) build project (default: clean)
 jdt test run <FQN>[#method] [--project <name>] [-f]    # launch tests (non-blocking)
 jdt test run --project <name> [--package <pkg>] [-f]   # run tests in project
-jdt test status <session> [-f] [--all] [--ignored]     # show test progress/results
-jdt test sessions                                      # list test sessions
+jdt test status <testRunId> [-f] [--all] [--ignored]   # show test progress/results
+jdt test runs                                          # list test runs
 ```
 
 With `-f`, streams test progress until completion. `-q` suppresses the onboarding guide.
@@ -105,14 +105,14 @@ jdt move <FQN> <target.package>                        # move type to another pa
 ### Launches
 
 ```bash
-jdt launch list                                        # list launches (running + terminated)
-jdt launch configs                                     # list saved launch configurations
-jdt launch config <name> [--xml] [--json]              # show configuration details
-jdt launch run <config> [-f] [-q]                      # launch a configuration
-jdt launch debug <config> [-f] [-q]                    # launch in debug mode
-jdt launch logs <name> [-f] [--tail N]                 # show console output
-jdt launch stop <name>                                 # stop a running launch
-jdt launch clear [name]                                # remove terminated launches
+jdt launch configs                                     # list saved configurations (CONFIGID)
+jdt launch config <configId> [--xml] [--json]          # show configuration details
+jdt launch run <configId> [-f] [-q]                    # launch a configuration
+jdt launch debug <configId> [-f] [-q]                  # launch in debug mode
+jdt launch list                                        # list launches (LAUNCHID, CONFIGID)
+jdt launch logs <launchId> [-f] [--tail N]             # show console output
+jdt launch stop <launchId>                             # stop a running launch
+jdt launch clear [launchId]                            # remove terminated launches
 ```
 
 `-f` streams output in real-time until the process terminates.

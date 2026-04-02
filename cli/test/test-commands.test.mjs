@@ -340,30 +340,33 @@ describe("test commands", () => {
     expect(io.errors[0]).toContain("Session not found");
   });
 
-  // --- test sessions ---
+  // --- test runs ---
 
-  it("test sessions lists sessions", async () => {
+  it("test runs lists runs with TESTRUNID and CONFIGID", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([{
-        session: "test-1", label: "FooTest", state: "finished",
+        session: "FooTest", label: "FooTest", state: "finished", startedAt: 1775000,
         total: 5, completed: 5, passed: 4, failed: 1, errors: 0, ignored: 0, time: 2.3,
       }]));
     });
     const { testSessions } = await import("../src/commands/test-sessions.mjs");
     await testSessions();
-    expect(io.logs.some((l) => l.includes("test-1"))).toBe(true);
-    expect(io.logs.some((l) => l.includes("FooTest"))).toBe(true);
+    const out = io.logs[0];
+    expect(out).toContain("TESTRUNID");
+    expect(out).toContain("CONFIGID");
+    expect(out).toContain("FooTest:1775000");
+    expect(out).toContain("FooTest");
   });
 
-  it("test sessions shows empty message", async () => {
+  it("test runs shows empty message", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([]));
     });
     const { testSessions } = await import("../src/commands/test-sessions.mjs");
     await testSessions();
-    expect(io.logs[0]).toContain("no test sessions");
+    expect(io.logs[0]).toContain("no test runs");
   });
 
   it("test sessions does not exit 1 on error", async () => {
