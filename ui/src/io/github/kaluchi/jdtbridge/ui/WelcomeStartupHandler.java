@@ -33,33 +33,72 @@ public class WelcomeStartupHandler implements IStartup {
 
 	private IStatus check(org.eclipse.core.runtime.IProgressMonitor monitor) {
 		try {
-			if (isCliInstalled()) {
+			String cliVersion = getCliVersion();
+			if (cliVersion == null) {
+				Display.getDefault().asyncExec(
+						() -> showNotInstalledDialog());
 				return Status.OK_STATUS;
 			}
-			Display.getDefault().asyncExec(this::showSetupDialog);
+			var pluginVersion = getPluginVersion();
+			if (isOlder(cliVersion, pluginVersion)) {
+				String pv = pluginVersion.getMajor() + "."
+						+ pluginVersion.getMinor() + "."
+						+ pluginVersion.getMicro();
+				Display.getDefault().asyncExec(
+						() -> showUpdateDialog(
+								cliVersion, pv));
+			}
 		} catch (Exception e) {
 			LOG.warn("Welcome check failed", e);
 		}
 		return Status.OK_STATUS;
 	}
 
-	private boolean isCliInstalled() {
+	private String getCliVersion() {
 		try {
-			ProcessBuilder pb = ProcessUtil.command("jdt", "--version");
+			ProcessBuilder pb = ProcessUtil.command(
+					"jdt", "--version");
 			pb.redirectErrorStream(true);
 			Process process = pb.start();
+			String version = null;
 			try (BufferedReader reader = new BufferedReader(
-					new InputStreamReader(process.getInputStream(),
+					new InputStreamReader(
+							process.getInputStream(),
 							StandardCharsets.UTF_8))) {
-				reader.lines().forEach(line -> {}); // drain
+				version = reader.readLine();
 			}
-			return process.waitFor() == 0;
+			if (process.waitFor() != 0) return null;
+			return version != null ? version.trim() : null;
 		} catch (Exception e) {
-			return false;
+			return null;
 		}
 	}
 
-	private void showSetupDialog() {
+	private org.osgi.framework.Version getPluginVersion() {
+		var bundle = Platform.getBundle(
+				"io.github.kaluchi.jdtbridge");
+		if (bundle == null)
+			return org.osgi.framework.Version.emptyVersion;
+		return bundle.getVersion();
+	}
+
+	private org.osgi.framework.Version parseCliVersion(
+			String version) {
+		try {
+			return org.osgi.framework.Version.parseVersion(
+					version);
+		} catch (IllegalArgumentException e) {
+			return org.osgi.framework.Version.emptyVersion;
+		}
+	}
+
+	private boolean isOlder(String cliVersion,
+			org.osgi.framework.Version pluginVersion) {
+		var cli = parseCliVersion(cliVersion);
+		return cli.compareTo(pluginVersion) < 0;
+	}
+
+	private void showNotInstalledDialog() {
 		boolean openTerminal = MessageDialog.openQuestion(null,
 				"JDT Bridge Setup",
 				"The JDT Bridge CLI is not installed.\n\n"
@@ -67,12 +106,31 @@ public class WelcomeStartupHandler implements IStartup {
 						+ "  npm install -g @kaluchi/jdtbridge\n\n"
 						+ "Open a terminal to install now?");
 		if (openTerminal) {
-			try {
-				ProcessUtil.openTerminal(
-						"npm install -g @kaluchi/jdtbridge");
-			} catch (Exception e) {
-				LOG.error("Failed to open terminal for setup", e);
-			}
+			openInstallTerminal();
+		}
+	}
+
+	private void showUpdateDialog(String cliVersion,
+			String pluginVersion) {
+		boolean openTerminal = MessageDialog.openQuestion(null,
+				"JDT Bridge Update",
+				"CLI version (" + cliVersion
+						+ ") is older than plugin ("
+						+ pluginVersion + ").\n\n"
+						+ "Update with:\n"
+						+ "  npm install -g @kaluchi/jdtbridge\n\n"
+						+ "Open a terminal to update now?");
+		if (openTerminal) {
+			openInstallTerminal();
+		}
+	}
+
+	private void openInstallTerminal() {
+		try {
+			ProcessUtil.openTerminal(
+					"npm install -g @kaluchi/jdtbridge");
+		} catch (Exception e) {
+			LOG.error("Failed to open terminal for setup", e);
 		}
 	}
 }
