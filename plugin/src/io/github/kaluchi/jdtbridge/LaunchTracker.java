@@ -79,6 +79,10 @@ class LaunchTracker implements ILaunchesListener2 {
         int errLen() { synchronized (lock) { return stderr.length(); } }
     }
 
+    // Multi-key index: same TrackedLaunch accessible by
+    // configId, launchId (configId:pid), or testRunId (configId:timestamp).
+    // configId always points to the LATEST launch of that config.
+    // launchId/testRunId are stable — never overwritten.
     private final ConcurrentHashMap<String, TrackedLaunch> tracked =
             new ConcurrentHashMap<>();
 
@@ -131,8 +135,8 @@ class LaunchTracker implements ILaunchesListener2 {
     @Override
     public void launchesTerminated(ILaunch[] launches) {
         for (ILaunch launch : launches) {
-            String name = LaunchHandler.launchName(launch);
-            TrackedLaunch tl = tracked.get(name);
+            String configId = LaunchHandler.launchName(launch);
+            TrackedLaunch tl = tracked.get(configId);
             if (tl != null && tl.launch == launch) {
                 tl.terminated = true;
             }
@@ -148,14 +152,33 @@ class LaunchTracker implements ILaunchesListener2 {
     // -- internals --
 
     private void track(ILaunch launch) {
-        String name = LaunchHandler.launchName(launch);
-        TrackedLaunch tl = tracked.compute(name, (k, existing) -> {
-            if (existing != null && existing.launch == launch) {
+        String configId = LaunchHandler.launchName(launch);
+
+        // Find or create TrackedLaunch for this ILaunch instance
+        TrackedLaunch tl = tracked.compute(configId,
+                (k, existing) -> {
+            if (existing != null && existing.launch == launch)
                 return existing;
-            }
-            // New launch or different launch with same name
             return new TrackedLaunch(launch);
         });
+
+        // Register under launchId (configId:pid) when PID available
+        IProcess[] procs = launch.getProcesses();
+        if (procs.length > 0) {
+            String pid = procs[0].getAttribute(
+                    IProcess.ATTR_PROCESS_ID);
+            if (pid != null) {
+                tracked.putIfAbsent(configId + ":" + pid, tl);
+            }
+        }
+
+        // Register under testRunId (configId:timestamp) if available
+        String ts = launch.getAttribute(
+                DebugPlugin.ATTR_LAUNCH_TIMESTAMP);
+        if (ts != null) {
+            tracked.putIfAbsent(configId + ":" + ts, tl);
+        }
+
         attachStreams(launch, tl);
     }
 

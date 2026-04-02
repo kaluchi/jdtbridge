@@ -346,7 +346,7 @@ describe("test commands", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([{
-        session: "FooTest", label: "FooTest", state: "finished", startedAt: 1775000,
+        configId: "FooTest", testRunId: "FooTest:1775000", state: "finished", startedAt: 1775000,
         total: 5, completed: 5, passed: 4, failed: 1, errors: 0, ignored: 0, time: 2.3,
       }]));
     });

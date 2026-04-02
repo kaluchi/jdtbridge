@@ -15,7 +15,7 @@ export function formatTestStatus(result) {
       ? " (stopped)"
       : "";
 
-  const label = result.label || result.session;
+  const label = result.label || result.configId;
   const progress = result.state === "running"
     ? `${result.completed}/${result.total}`
     : `${result.total}/${result.total}`;

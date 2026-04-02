@@ -552,19 +552,12 @@ class LaunchHandler {
         String tailStr = params.get("tail");
         String stream = params.get("stream");
 
+        // LaunchTracker multi-key: accepts configId, launchId,
+        // or testRunId — all resolve to the TrackedLaunch.
         LaunchTracker.TrackedLaunch tl = tracker.get(name);
         if (tl == null) {
-            ILaunch target = findLaunch(name);
-            if (target == null) {
-                return HttpServer.jsonError(
-                        "Launch not found: " + name);
-            }
-            var obj = new JsonObject();
-            obj.addProperty("name", name);
-            obj.addProperty("terminated",
-                    target.isTerminated());
-            obj.addProperty("output", "");
-            return obj.toString();
+            return HttpServer.jsonError(
+                    "Launch not found: " + name);
         }
 
         String output = tl.getOutput(stream);

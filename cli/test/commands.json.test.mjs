@@ -321,14 +321,14 @@ describe("--json output", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { session: "test-123", label: "MyTest", total: 5, passed: 4, failed: 1, time: 2.5, state: "finished" },
+        { configId: "MyTest", testRunId: "MyTest:1775000", total: 5, passed: 4, failed: 1, time: 2.5, state: "finished" },
       ]));
     });
     const { testSessions } = await import("../src/commands/test-sessions.mjs");
     await testSessions(["--json"]);
     const data = parseJsonOutput(io.logs);
     expect(data).toBeInstanceOf(Array);
-    expect(data[0].session).toBe("test-123");
+    expect(data[0].configId).toBe("MyTest");
     expect(data[0].total).toBe(5);
     expect(data[0].passed).toBe(4);
   });

@@ -4,7 +4,12 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import java.util.List;
 import java.util.Map;
+
+import org.eclipse.jdt.internal.junit.JUnitCorePlugin;
+import org.eclipse.jdt.internal.junit.model.TestRunSession;
+import org.eclipse.jdt.junit.model.ITestElement;
 
 class TestSessionHandler {
 
@@ -71,7 +76,7 @@ class TestSessionHandler {
         }
 
         var result = new JsonObject();
-        result.addProperty("session", ts.name);
+        result.addProperty("configId", ts.name);
         if (ts.label != null)
             result.addProperty("label", ts.label);
         if (ts.project != null)
@@ -106,25 +111,60 @@ class TestSessionHandler {
         return result.toString();
     }
 
+    @SuppressWarnings("restriction")
     String handleSessions(Map<String, String> params) {
+        List<TestRunSession> sessions =
+                JUnitCorePlugin.getModel()
+                        .getTestRunSessions();
         var arr = new JsonArray();
-        for (var ts : tracker.all()) {
+        for (TestRunSession s : sessions) {
             var obj = new JsonObject();
-            obj.addProperty("session", ts.name);
-            if (ts.label != null)
-                obj.addProperty("label", ts.label);
-            obj.addProperty("state", ts.state);
-            obj.addProperty("total", ts.total);
+            String configId = s.getTestRunName();
+            long startTime = s.getStartTime();
+            obj.addProperty("configId", configId);
+            obj.addProperty("testRunId",
+                    startTime > 0
+                            ? configId + ":" + startTime
+                            : configId);
+
+            // LaunchId from ILaunch → PID
+            var launch = s.getLaunch();
+            if (launch != null) {
+                var procs = launch.getProcesses();
+                if (procs.length > 0) {
+                    String pid = procs[0].getAttribute(
+                            org.eclipse.debug.core.model
+                                    .IProcess.ATTR_PROCESS_ID);
+                    if (pid != null)
+                        obj.addProperty("launchId",
+                                configId + ":" + pid);
+                }
+            }
+
+            String state;
+            if (s.isRunning()) state = "running";
+            else if (s.isStarting()) state = "starting";
+            else state = "finished";
+            obj.addProperty("state", state);
+
+            obj.addProperty("total", s.getTotalCount());
             obj.addProperty("completed",
-                    ts.completed.get());
-            obj.addProperty("passed", ts.passed.get());
-            obj.addProperty("failed", ts.failed.get());
-            obj.addProperty("errors", ts.errors.get());
-            obj.addProperty("ignored", ts.ignored.get());
+                    s.getStartedCount());
+            obj.addProperty("passed",
+                    s.getStartedCount()
+                            - s.getFailureCount()
+                            - s.getErrorCount()
+                            - s.getAssumptionFailureCount());
+            obj.addProperty("failed", s.getFailureCount());
+            obj.addProperty("errors", s.getErrorCount());
+            obj.addProperty("ignored",
+                    s.getIgnoredCount());
+
+            double elapsed = s.getElapsedTimeInSeconds();
             obj.addProperty("time",
-                    Double.isNaN(ts.time)
-                            ? 0.0 : ts.time);
-            obj.addProperty("startedAt", ts.startedAt);
+                    Double.isNaN(elapsed) ? 0.0 : elapsed);
+            if (startTime > 0)
+                obj.addProperty("startedAt", startTime);
             arr.add(obj);
         }
         return arr.toString();

@@ -17,9 +17,8 @@ export async function testSessions(args = []) {
       const rows = data.map((s) => {
         const time = Number.isFinite(s.time) && s.time > 0
           ? `${s.time.toFixed(1)}s` : "";
-        const configId = s.session;
-        const testRunId = s.startedAt
-          ? `${configId}:${s.startedAt}` : configId;
+        const configId = s.configId;
+        const testRunId = s.testRunId;
         const startMs = s.startedAt || 0;
         let status;
         if (s.state === "running") {
