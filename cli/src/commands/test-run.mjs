@@ -119,7 +119,7 @@ Examples:
   jdt test run --project my-project -f                  run project tests + stream
   jdt test run com.example.MyTest -f --json             stream as JSONL
 
-The output shows session (for test commands) and launchId (for launch commands):
-  jdt test status <session> -f            test pass/fail details
+The output shows testRunId (for test commands) and launchId (for launch commands):
+  jdt test status <testRunId> -f          test pass/fail details
   jdt launch logs <launchId>              console output (stdout, stderr, stack traces)
   jdt launch logs <launchId> --tail 50    last 50 lines of console`;
