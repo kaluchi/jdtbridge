@@ -158,34 +158,37 @@ Returns all registered launches (running and terminated) as a JSON array. Most r
 
 Returns all saved launch configurations (Run → Run Configurations).
 
-### `GET /launch/console?name=<config-name>[&tail=<N>][&stream=stdout|stderr]`
+### `GET /launch/config?configId=<configId>[&format=xml]`
+
+Returns full configuration details as JSON (all attributes with types).
+With `format=xml`, returns raw .launch XML content.
+
+### `GET /launch/console?launchId=<launchId>[&tail=<N>][&stream=stdout|stderr]`
 
 Returns console output (stdout + stderr) of a launch as JSON.
 `tail` limits to last N lines. `stream` filters to stdout or stderr only.
-Returns `{name, terminated, output}`.
+Returns `{configId, launchId, terminated, output}`.
 
-### `GET /launch/console/stream?name=<config-name>[&tail=<N>][&stream=stdout|stderr]`
+### `GET /launch/console/stream?launchId=<launchId>[&tail=<N>][&stream=stdout|stderr]`
 
 Streams console output as `text/plain`. Connection stays open until the
 process terminates. Writes accumulated content first, then live output.
 Used by `jdt launch logs -f`.
 
-### `GET /launch/run?name=<config-name>[&debug]`
+### `GET /launch/run?configId=<configId>[&debug]`
 
 Launch a saved configuration. Returns immediately.
 Add `&debug` for debug mode.
-Returns `{ok, name, mode, type, pid, cmdline, workingDir}` — metadata
-fields (`pid`, `cmdline`, `workingDir`) are present when the process
-has started.
+Returns `{ok, configId, launchId, mode, type, pid, cmdline, workingDir}`.
 
-### `GET /launch/stop?name=<name>`
+### `GET /launch/stop?launchId=<launchId>`
 
 Terminate a running launch.
 
-### `GET /launch/clear[?name=<config-name>]`
+### `GET /launch/clear[?launchId=<launchId>]`
 
-Removes terminated launches and their console output. Without `name`,
-removes all terminated. With `name`, removes only that one.
+Removes terminated launches. Without `launchId`, removes all terminated.
+With `launchId`, removes only that one.
 
 ## Connection details
 

@@ -229,16 +229,16 @@ public class LaunchHandlerTest {
             var arr = JsonParser.parseString(listJson)
                     .getAsJsonArray();
             if (arr.isEmpty()) return; // no configs to test
-            String name = arr.get(0).getAsJsonObject()
+            String configId = arr.get(0).getAsJsonObject()
                     .get("configId").getAsString();
 
             String json = handler.handleConfig(
-                    Map.of("configId", name));
+                    Map.of("configId", configId));
             assertFalse(json.contains("\"error\""),
                     "Should not error: " + json);
             var obj = JsonParser.parseString(json)
                     .getAsJsonObject();
-            assertEquals(name, obj.get("configId").getAsString());
+            assertEquals(configId, obj.get("configId").getAsString());
             assertTrue(obj.has("type"),
                     "Should have type: " + json);
             assertTrue(obj.has("typeId"),
@@ -255,16 +255,16 @@ public class LaunchHandlerTest {
             var arr = JsonParser.parseString(listJson)
                     .getAsJsonArray();
             if (arr.isEmpty()) return;
-            String name = arr.get(0).getAsJsonObject()
+            String configId = arr.get(0).getAsJsonObject()
                     .get("configId").getAsString();
 
             String json = handler.handleConfig(
-                    Map.of("configId", name, "format", "xml"));
+                    Map.of("configId", configId, "format", "xml"));
             assertFalse(json.contains("\"error\""),
                     "Should not error: " + json);
             var obj = JsonParser.parseString(json)
                     .getAsJsonObject();
-            assertEquals(name, obj.get("configId").getAsString());
+            assertEquals(configId, obj.get("configId").getAsString());
             assertTrue(obj.has("xml"),
                     "Should have xml field: " + json);
             String xml = obj.get("xml").getAsString();
@@ -281,20 +281,20 @@ public class LaunchHandlerTest {
             String listJson = handler.handleConfigs(Map.of());
             var arr = JsonParser.parseString(listJson)
                     .getAsJsonArray();
-            String junitName = null;
+            String configId = null;
             for (var el : arr) {
                 var obj = el.getAsJsonObject();
                 String type = obj.get("type").getAsString();
                 if ("JUnit".equals(type)
                         || "JUnit Plug-in Test".equals(type)) {
-                    junitName = obj.get("configId").getAsString();
+                    configId = obj.get("configId").getAsString();
                     break;
                 }
             }
-            if (junitName == null) return;
+            if (configId == null) return;
 
             String json = handler.handleConfig(
-                    Map.of("configId", junitName));
+                    Map.of("configId", configId));
             var obj = JsonParser.parseString(json)
                     .getAsJsonObject();
             var attrs = obj.getAsJsonObject("attributes");
@@ -314,11 +314,11 @@ public class LaunchHandlerTest {
             var arr = JsonParser.parseString(listJson)
                     .getAsJsonArray();
             if (arr.isEmpty()) return;
-            String name = arr.get(0).getAsJsonObject()
+            String configId = arr.get(0).getAsJsonObject()
                     .get("configId").getAsString();
 
             String json = handler.handleConfig(
-                    Map.of("configId", name));
+                    Map.of("configId", configId));
             var obj = JsonParser.parseString(json)
                     .getAsJsonObject();
             var attrs = obj.getAsJsonObject("attributes");

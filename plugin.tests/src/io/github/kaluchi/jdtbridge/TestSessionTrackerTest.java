@@ -136,7 +136,7 @@ public class TestSessionTrackerTest {
         @Test
         void unknownSessionReturnsError() {
             String json = handler.handleStatus(
-                    Map.of("session", "xxx"));
+                    Map.of("testRunId", "xxx"));
             assertTrue(json.contains("error"),
                     "Should return error: " + json);
             assertTrue(json.contains("not found"),
@@ -156,7 +156,7 @@ public class TestSessionTrackerTest {
             ts.time = 1.5;
 
             String json = handler.handleStatus(
-                    Map.of("session", "my-session"));
+                    Map.of("testRunId", "my-session"));
             assertTrue(json.contains("\"state\":\"finished\""),
                     "Should have state: " + json);
             assertTrue(json.contains("\"total\":10"),
@@ -185,7 +185,7 @@ public class TestSessionTrackerTest {
             ts.emit(ev.toString());
 
             String json = handler.handleStatus(
-                    Map.of("session", "fail-session"));
+                    Map.of("testRunId", "fail-session"));
             assertTrue(json.contains("\"entries\""),
                     "Should have entries: " + json);
             assertTrue(json.contains("com.Foo#bar"),
@@ -207,7 +207,7 @@ public class TestSessionTrackerTest {
             ts.emit(ev.toString());
 
             String json = handler.handleStatus(
-                    Map.of("session", "ign-session",
+                    Map.of("testRunId", "ign-session",
                             "filter", "failures"));
             assertTrue(json.contains("\"entries\":[]"),
                     "Failures should be empty: " + json);
@@ -224,7 +224,7 @@ public class TestSessionTrackerTest {
             ts.emit(ev.toString());
 
             String json = handler.handleStatus(
-                    Map.of("session", "fail-only",
+                    Map.of("testRunId", "fail-only",
                             "filter", "ignored"));
             assertTrue(json.contains("\"entries\":[]"),
                     "Failures should be empty: " + json);
@@ -232,7 +232,7 @@ public class TestSessionTrackerTest {
 
         @Test
         void blankSessionReturnsError() {
-            String json = handler.handleStatus(Map.of("session", "   "));
+            String json = handler.handleStatus(Map.of("testRunId", "   "));
             assertTrue(json.contains("error"),
                     "Should return error: " + json);
             assertTrue(json.contains("Missing"),
@@ -251,7 +251,7 @@ public class TestSessionTrackerTest {
                     + "\"trace\":\"AssertionError\","
                     + "\"expected\":\"3\",\"actual\":\"2\"}");
             String json = handler.handleStatus(
-                    Map.of("session", "ea-session"));
+                    Map.of("testRunId", "ea-session"));
             assertTrue(json.contains("\"expected\":\"3\""),
                     "Should have expected: " + json);
             assertTrue(json.contains("\"actual\":\"2\""),
@@ -269,7 +269,7 @@ public class TestSessionTrackerTest {
             ts.emit(ev.toString());
 
             String json = handler.handleStatus(
-                    Map.of("session", "ign-only",
+                    Map.of("testRunId", "ign-only",
                             "filter", "ignored"));
             assertTrue(json.contains("IGNORED"),
                     "Should have IGNORED: " + json);
@@ -330,7 +330,7 @@ public class TestSessionTrackerTest {
             ts.total = 1;
             ts.time = Double.NaN;
             String json = handler2.handleStatus(
-                    Map.of("session", "nan-session"));
+                    Map.of("testRunId", "nan-session"));
             assertTrue(json.contains("\"time\":0.0"),
                     "NaN should be 0.0: " + json);
         }

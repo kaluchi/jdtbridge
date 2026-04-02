@@ -141,7 +141,7 @@ class TestHandler {
             wc.setAttribute(PDE_AUTOMATIC_ADD, true);
             wc.setAttribute(PDE_DEFAULT_AUTO_START, true);
             wc.setAttribute(PDE_DEFAULT_START_LEVEL, 4);
-            wc.setAttribute(PDE_INCLUDE_OPTIONAL, true);
+            wc.setAttribute(PDE_INCLUDE_OPTIONAL, false);
             // Fresh temp workspace per run — clearws ensures
             // clean state regardless of location path
             wc.setAttribute("location",
