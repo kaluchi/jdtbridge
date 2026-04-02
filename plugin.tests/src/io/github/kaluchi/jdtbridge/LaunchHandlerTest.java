@@ -104,7 +104,7 @@ public class LaunchHandlerTest {
         @Test
         void unknownNameReturnsError() {
             String json = handler.handleConsole(
-                    Map.of("name", "no-such-launch-xyz"));
+                    Map.of("launchId", "no-such-launch-xyz"));
             assertTrue(json.contains("error"),
                     "Should return error: " + json);
             assertTrue(json.contains("not found"),
@@ -116,7 +116,7 @@ public class LaunchHandlerTest {
             // Even for non-existent launch, tail param should not
             // cause crash
             String json = handler.handleConsole(
-                    Map.of("name", "no-such-launch", "tail", "10"));
+                    Map.of("launchId", "no-such-launch", "tail", "10"));
             assertTrue(json.contains("error"),
                     "Should return error: " + json);
         }
@@ -124,7 +124,7 @@ public class LaunchHandlerTest {
         @Test
         void invalidTailIsIgnored() {
             String json = handler.handleConsole(
-                    Map.of("name", "no-such-launch", "tail", "abc"));
+                    Map.of("launchId", "no-such-launch", "tail", "abc"));
             assertTrue(json.contains("error"),
                     "Should return error: " + json);
         }
@@ -132,7 +132,7 @@ public class LaunchHandlerTest {
         @Test
         void streamFilterDoesNotCrash() {
             String json = handler.handleConsole(
-                    Map.of("name", "no-such-launch",
+                    Map.of("launchId", "no-such-launch",
                             "stream", "stderr"));
             assertTrue(json.contains("error"),
                     "Should return error: " + json);
@@ -215,7 +215,7 @@ public class LaunchHandlerTest {
         @Test
         void unknownConfigReturnsError() {
             String json = handler.handleConfig(
-                    Map.of("name", "no-such-config-xyz-999"));
+                    Map.of("configId", "no-such-config-xyz-999"));
             assertTrue(json.contains("error"),
                     "Should return error: " + json);
             assertTrue(json.contains("not found"),
@@ -233,7 +233,7 @@ public class LaunchHandlerTest {
                     .get("configId").getAsString();
 
             String json = handler.handleConfig(
-                    Map.of("name", name));
+                    Map.of("configId", name));
             assertFalse(json.contains("\"error\""),
                     "Should not error: " + json);
             var obj = JsonParser.parseString(json)
@@ -259,7 +259,7 @@ public class LaunchHandlerTest {
                     .get("configId").getAsString();
 
             String json = handler.handleConfig(
-                    Map.of("name", name, "format", "xml"));
+                    Map.of("configId", name, "format", "xml"));
             assertFalse(json.contains("\"error\""),
                     "Should not error: " + json);
             var obj = JsonParser.parseString(json)
@@ -294,7 +294,7 @@ public class LaunchHandlerTest {
             if (junitName == null) return;
 
             String json = handler.handleConfig(
-                    Map.of("name", junitName));
+                    Map.of("configId", junitName));
             var obj = JsonParser.parseString(json)
                     .getAsJsonObject();
             var attrs = obj.getAsJsonObject("attributes");
@@ -318,7 +318,7 @@ public class LaunchHandlerTest {
                     .get("configId").getAsString();
 
             String json = handler.handleConfig(
-                    Map.of("name", name));
+                    Map.of("configId", name));
             var obj = JsonParser.parseString(json)
                     .getAsJsonObject();
             var attrs = obj.getAsJsonObject("attributes");
@@ -342,7 +342,7 @@ public class LaunchHandlerTest {
         @Test
         void clearByNameDoesNotCrash() {
             String json = handler.handleClear(
-                    Map.of("name", "no-such-launch"));
+                    Map.of("launchId", "no-such-launch"));
             assertTrue(json.contains("\"removed\":0"),
                     "Should remove 0: " + json);
         }
@@ -398,7 +398,7 @@ public class LaunchHandlerTest {
 
             // Clear only "remove-this"
             handler.handleClear(
-                    Map.of("name", "remove-this"));
+                    Map.of("launchId", "remove-this"));
 
             assertTrue(mgr.isRegistered(launch1),
                     "keep-this should still be registered");
@@ -457,7 +457,7 @@ public class LaunchHandlerTest {
 
                 // Console should return valid JSON
                 String consoleJson = handler.handleConsole(
-                        Map.of("name", "java -version"));
+                        Map.of("launchId", "java -version"));
                 assertFalse(consoleJson.contains("error"),
                         "Should not error: " + consoleJson);
                 assertTrue(
@@ -483,9 +483,9 @@ public class LaunchHandlerTest {
             mgr.addLaunch(launch);
             try {
                 String fullJson = handler.handleConsole(
-                        Map.of("name", "java -version"));
+                        Map.of("launchId", "java -version"));
                 String tailJson = handler.handleConsole(
-                        Map.of("name", "java -version",
+                        Map.of("launchId", "java -version",
                                 "tail", "1"));
 
                 var fullObj = JsonParser.parseString(fullJson)
@@ -521,7 +521,7 @@ public class LaunchHandlerTest {
             mgr.addLaunch(launch);
             try {
                 String json = handler.handleConsole(
-                        Map.of("name", "(unknown)"));
+                        Map.of("launchId", "(unknown)"));
                 assertFalse(json.contains("error"),
                         "Should not error: " + json);
                 assertTrue(json.contains("\"output\":\"\""),
@@ -546,7 +546,7 @@ public class LaunchHandlerTest {
             mgr.addLaunch(launch);
             try {
                 String json = handler.handleConsole(
-                        Map.of("name", "streams-test"));
+                        Map.of("launchId", "streams-test"));
                 assertFalse(json.contains("error"),
                         "Should not be error: " + json);
                 assertTrue(json.contains("\"output\""),
@@ -573,7 +573,7 @@ public class LaunchHandlerTest {
             mgr.addLaunch(launch);
             try {
                 String json = handler.handleConsole(
-                        Map.of("name", "terminated-flag-test"));
+                        Map.of("launchId", "terminated-flag-test"));
                 assertTrue(
                         json.contains("\"terminated\":true"),
                         "Should have terminated flag: " + json);
@@ -598,7 +598,7 @@ public class LaunchHandlerTest {
         @Test
         void unknownConfigReturnsError() {
             String json = handler.handleRun(
-                    Map.of("name", "no-such-config-xyz"));
+                    Map.of("configId", "no-such-config-xyz"));
             assertTrue(json.contains("error"),
                     "Should return error: " + json);
             assertTrue(json.contains("not found"),
@@ -619,7 +619,7 @@ public class LaunchHandlerTest {
         @Test
         void unknownLaunchReturnsError() {
             String json = handler.handleStop(
-                    Map.of("name", "no-such-launch-xyz"));
+                    Map.of("launchId", "no-such-launch-xyz"));
             assertTrue(json.contains("error"),
                     "Should return error: " + json);
         }
@@ -639,7 +639,7 @@ public class LaunchHandlerTest {
             mgr.addLaunch(launch);
             try {
                 String json = handler.handleStop(
-                        Map.of("name", "stop-test-terminated"));
+                        Map.of("launchId", "stop-test-terminated"));
                 assertTrue(json.contains("Already terminated"),
                         "Should say already terminated: " + json);
             } finally {
