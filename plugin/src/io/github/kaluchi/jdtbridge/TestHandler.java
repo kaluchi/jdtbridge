@@ -134,9 +134,11 @@ class TestHandler {
             // Headless: no workbench, no UI thread
             wc.setAttribute(PDE_RUN_IN_UI_THREAD, false);
             wc.setAttribute(PDE_APPLICATION, PDE_CORE_TEST_APP);
-            // Include all workspace + target bundles, auto-start
+            // Target platform bundles only — do not add workspace
+            // plugins automatically to avoid validation errors from
+            // non-OSGi projects (e.g. javax.persistence missing)
             wc.setAttribute(PDE_USE_DEFAULT, true);
-            wc.setAttribute(PDE_AUTOMATIC_ADD, true);
+            wc.setAttribute(PDE_AUTOMATIC_ADD, false);
             wc.setAttribute(PDE_DEFAULT_AUTO_START, true);
             wc.setAttribute(PDE_DEFAULT_START_LEVEL, 4);
             wc.setAttribute(PDE_INCLUDE_OPTIONAL, false);
