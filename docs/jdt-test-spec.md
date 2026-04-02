@@ -146,6 +146,11 @@ listener which may lag slightly.
 - **`test runs` not `test sessions`.** "Run" is what the user did.
   "Session" is an Eclipse internal term with no meaning to agents.
 
+- **configId as primary UX.** `test status` and `test runs` accept
+  plain configId — resolves to the most recent run, silently. Exact
+  testRunId is for advanced disambiguation. No warnings on ambiguity,
+  no `--latest` flag. Humans type configId, machines use exact IDs.
+
 ## Constraints
 
 - **JUnitModel is internal API.** `@SuppressWarnings("restriction")`.

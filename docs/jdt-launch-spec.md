@@ -10,20 +10,32 @@ Maven builds, PDE plugin tests, and custom agent types.
 
 ## Identity model
 
-Three IDs with `configId` as common prefix for cross-reference:
+Two IDs with `configId` as common prefix:
 
 | ID | Format | Example | Commands |
 |---|---|---|---|
 | `configId` | config name | `my-project` | `launch run`, `launch config` |
 | `launchId` | configId:pid | `my-project:29164` | `launch logs`, `launch stop` |
-| `testRunId` | configId:timestamp | `my-project:1775093689` | `test status`, `test runs` |
 
 `configId` identifies a saved launch configuration (persistent).
 `launchId` identifies a running/terminated process (session-scoped).
-`testRunId` identifies a test run with results (see [jdt-test-spec](jdt-test-spec.md)).
 
-All share the `configId` prefix — the relationship between a config,
-its launches, and its test runs is visible in any table.
+Both share the `configId` prefix — the relationship between a config
+and its launches is visible in any table.
+
+### configId as primary UX
+
+All launch commands that accept `launchId` also accept plain
+`configId`. When multiple launches exist for the same config,
+the most recent one is used — silently, without warnings.
+
+This is the primary UX: humans remember and type `configId`
+(`my-server`, `FooTest`). Nobody copies `my-server:29164`.
+Exact `launchId` is for advanced disambiguation when the user
+explicitly needs a specific launch — they see exact IDs in
+`launch list` and can copy from there.
+
+No `--latest` flag needed. No warnings on ambiguity. configId = latest.
 
 `ILaunch` in Eclipse has no intrinsic ID — we compose `launchId` from
 the config name and process PID. PID comes from
@@ -66,7 +78,7 @@ terminated entries without restarting.
 List all saved launch configurations in the workspace.
 
 ```
-NAME              TYPE                PROJECT      TARGET
+CONFIGID          TYPE                PROJECT      TARGET
 my-server         Java Application    my-server    com.example.Main
 ObjectMapperTest  JUnit               my-server    com.example.ObjectMapperTest
 jdtbridge-verify  Maven Build                      clean verify
@@ -74,7 +86,7 @@ AllTests          JUnit Plug-in Test  jdtbridge    io.github.kaluchi.jdtbridge.A
 ```
 
 Columns:
-- **NAME** — configuration name (unique identifier for `jdt launch run`)
+- **CONFIGID** — configuration name (unique identifier for `jdt launch run`)
 - **TYPE** — Eclipse launch type (human-readable)
 - **PROJECT** — Java project (from `org.eclipse.jdt.launching.PROJECT_ATTR`)
 - **TARGET** — synthesized FQMN, type-specific:
@@ -97,14 +109,14 @@ test classes from application entry points without checking `type`.
 Sort order: favorites first, then launch history, then alphabetical.
 This matches the Eclipse Run > Run Configurations dialog order.
 
-### `jdt launch config <name> [--xml] [--json]`
+### `jdt launch config <configId> [--xml] [--json]`
 
 Show full details of a single launch configuration.
 
 Default output (KEY VALUE table):
 ```
 KEY                                             VALUE
-Name                                            ObjectMapperTest
+ConfigId                                        ObjectMapperTest
 Type                                            JUnit
 Project                                         my-server
 Target                                          com.example.ObjectMapperTest
@@ -153,7 +165,7 @@ Design decisions:
   not on the server — keeps the API clean and the rendering consistent
   between `configs` and `config`.
 
-### `jdt launch run <name> [-f] [-q]`
+### `jdt launch run <configId> [-f] [-q]`
 
 Launch a saved configuration in run mode (non-blocking).
 
@@ -168,11 +180,11 @@ Launched my-server (run) [Java Application]
   Command:    java -cp ... com.example.Main
 ```
 
-### `jdt launch debug <name> [-f] [-q]`
+### `jdt launch debug <configId> [-f] [-q]`
 
 Same as `run` but attaches the Eclipse debugger.
 
-### `jdt launch logs <name> [-f] [--tail N] [--stdout] [--stderr]`
+### `jdt launch logs <launchId> [-f] [--tail N] [--stdout] [--stderr]`
 
 Show console output of a launch.
 
@@ -181,15 +193,15 @@ With `-f`: stream live until process exits (Ctrl+C to detach, process keeps runn
 `--tail N`: last N lines only.
 `--stdout`/`--stderr`: filter to one stream.
 
-### `jdt launch stop <name>`
+### `jdt launch stop <launchId>`
 
 Terminate a running launch. Returns error if already terminated.
 
-### `jdt launch clear [name]`
+### `jdt launch clear [launchId]`
 
 Remove terminated launches from the list.
-Without name: removes all terminated.
-With name: removes only that specific terminated launch.
+Without argument: removes all terminated.
+With launchId: removes only that specific terminated launch.
 
 ## HTTP API
 
@@ -228,8 +240,8 @@ Returns: `{ok, configId, launchId, mode, type, pid, cmdline, workingDir}`
 
 ### `GET /launch/console?launchId=<launchId>[&tail=N][&stream=stdout|stderr]`
 
-Accepts `launchId` (configId:pid) or plain `configId` for disambiguation.
-Returns: `{name, terminated, output}`
+Accepts `launchId` (configId:pid) or plain `configId` (latest launch).
+Returns: `{configId, launchId, terminated, output}`
 
 ### `GET /launch/console/stream?launchId=<launchId>[&tail=N][&stream=stdout|stderr]`
 
@@ -325,8 +337,8 @@ as typed elements (`stringAttribute`, `booleanAttribute`, `listAttribute`, etc.)
 Accessible via:
 - `ILaunchConfiguration.getAttributes()` — returns deserialized `Map<String, Object>`
   with proper types (String, Boolean, Integer, List, Map). Richer than parsing XML.
-- `jdt launch config <name>` — full attributes as JSON (default)
-- `jdt launch config <name> --xml` — raw .launch XML content
+- `jdt launch config <configId>` — full attributes as JSON (default)
+- `jdt launch config <configId> --xml` — raw .launch XML content
 
 ## Launch lifecycle
 
@@ -364,26 +376,15 @@ but stable across versions.
 
 Test launches are a special case of the launch system:
 
-- `jdt test run` creates a JUnit/PDE launch configuration and launches it
+- `jdt test run` finds or creates a JUnit/PDE launch configuration
+  (config reuse — see [jdt-test-spec](jdt-test-spec.md))
 - The resulting ILaunch appears in `jdt launch list`
-- Console output is accessible via `jdt launch logs`
-- Test-specific progress is tracked separately by `TestSessionTracker`
-
-Test launch configs created by `jdt test run` use timestamped names
-(e.g. `SearchIntegrationTest-1775075114208`) and are saved to disk.
-This is a known issue — configs accumulate. Future improvement: reuse
-configs with stable names (see Known Issues).
+- Console output is accessible via `jdt launch logs <launchId>`
+- Test-specific progress tracked by JUnitModel (Eclipse internal)
+- Test runs listed via `jdt test runs` with `testRunId`
+  (see [jdt-test-spec](jdt-test-spec.md))
 
 ## Known issues
-
-### Launch config accumulation from `jdt test run`
-
-Each `jdt test run` creates a new ILaunchConfigurationWorkingCopy with a
-unique timestamped name. Eclipse's `wc.launch()` persists it as a .launch file.
-Over time, workspace accumulates stale test configs.
-
-Planned fix: use stable names (just the class/package/project name without
-timestamp) and clean up the previous terminated ILaunch before creating a new one.
 
 ### Maven prerequisite in `jdt setup --skip-build`
 
