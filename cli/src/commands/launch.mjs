@@ -58,6 +58,22 @@ function configTarget(r) {
   return "";
 }
 
+export async function launchConfigDelete(args) {
+  const pos = extractPositional(args);
+  const configId = pos[0];
+  if (!configId) {
+    console.error("Usage: launch config delete <configId>");
+    process.exit(1);
+  }
+  const data = await get(
+    `/launch/config/delete?configId=${encodeURIComponent(configId)}`);
+  if (data.error) {
+    console.error(data.error);
+    return;
+  }
+  console.log(`Deleted ${data.configId}`);
+}
+
 export async function launchClear(args) {
   const pos = extractPositional(args);
   let url = "/launch/clear";
@@ -71,6 +87,10 @@ export async function launchClear(args) {
 }
 
 export async function launchConfig(args) {
+  if (args.includes("--delete")) {
+    return launchConfigDelete(
+      args.filter((a) => a !== "--delete"));
+  }
   const pos = extractPositional(args);
   const name = pos[0];
   if (!name) {

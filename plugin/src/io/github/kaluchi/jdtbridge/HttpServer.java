@@ -449,6 +449,8 @@ public class HttpServer {
                         launch.handleConfigs(params));
                 case "/launch/config" -> Response.json(
                         launch.handleConfig(params));
+                case "/launch/config/delete" -> Response.json(
+                        launch.handleConfigDelete(params));
                 case "/launch/clear" -> Response.json(
                         launch.handleClear(params));
                 case "/launch/console" -> Response.json(

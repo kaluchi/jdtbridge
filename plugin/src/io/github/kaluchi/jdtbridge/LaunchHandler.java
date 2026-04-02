@@ -196,6 +196,29 @@ class LaunchHandler {
         }
     }
 
+    String handleConfigDelete(Map<String, String> params) {
+        String configId = params.get("configId");
+        if (configId == null || configId.isBlank()) {
+            return HttpServer.jsonError(
+                    "Missing 'configId' parameter");
+        }
+        ILaunchConfiguration config = findConfig(configId);
+        if (config == null) {
+            return HttpServer.jsonError(
+                    "Launch configuration not found: "
+                    + configId);
+        }
+        try {
+            config.delete();
+            var result = new JsonObject();
+            result.addProperty("ok", true);
+            result.addProperty("configId", configId);
+            return result.toString();
+        } catch (Exception e) {
+            return HttpServer.jsonError(e.getMessage());
+        }
+    }
+
     // -- config summary (for /launch/configs list) --
 
     private JsonObject configSummary(
