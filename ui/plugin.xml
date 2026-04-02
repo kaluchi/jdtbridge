@@ -51,6 +51,8 @@
             <separator name="configs" visible="true"/>
             <dynamic id="io.github.kaluchi.jdtbridge.ui.menu.agentConfigs"
                      class="io.github.kaluchi.jdtbridge.ui.menus.AgentConfigsContribution"/>
+            <dynamic id="io.github.kaluchi.jdtbridge.ui.menu.editAgent"
+                     class="io.github.kaluchi.jdtbridge.ui.menus.EditAgentContribution"/>
             <separator name="tools" visible="true"/>
             <command commandId="io.github.kaluchi.jdtbridge.ui.commands.healthCheck"
                      label="Health Check"
