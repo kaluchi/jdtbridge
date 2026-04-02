@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
  */
 public class TestHandlerIntegrationTest {
 
-    private static final TestHandler handler = new TestHandler(new TestSessionTracker());
+    private static final TestHandler handler = new TestHandler();
 
     @BeforeAll
     public static void setUp() throws Exception {

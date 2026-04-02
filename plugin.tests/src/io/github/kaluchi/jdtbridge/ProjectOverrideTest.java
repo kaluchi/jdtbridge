@@ -34,7 +34,7 @@ public class ProjectOverrideTest {
     private static final String SOURCE_PROJECT = "override-source";
     private static final String LAUNCHER_PROJECT = "override-launcher";
     private static final TestHandler handler =
-            new TestHandler(new TestSessionTracker());
+            new TestHandler();
 
     private static final String SIMPLE_TEST_SRC = """
             package test.override;

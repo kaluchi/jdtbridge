@@ -121,7 +121,7 @@ public class TestSessionTrackerTest {
         @BeforeEach
         void setUp() {
             tracker = new TestSessionTracker();
-            handler = new TestSessionHandler(tracker);
+            handler = new TestSessionHandler();
         }
 
         @Test
@@ -285,8 +285,7 @@ public class TestSessionTrackerTest {
 
         @BeforeEach
         void setUp() {
-            handler = new TestSessionHandler(
-                    new TestSessionTracker());
+            handler = new TestSessionHandler();
         }
 
         @Test
@@ -324,7 +323,7 @@ public class TestSessionTrackerTest {
         @Test
         void nanTimeSerializedAsZero() {
             var tracker2 = new TestSessionTracker();
-            var handler2 = new TestSessionHandler(tracker2);
+            var handler2 = new TestSessionHandler();
             var ts = tracker2.preRegister("nan-session");
             ts.state = "finished";
             ts.total = 1;
