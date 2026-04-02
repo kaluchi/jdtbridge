@@ -22,6 +22,7 @@ jobs:
               - 'cli/**'
               - 'plugin/**'
               - 'plugin.tests/**'
+              - 'ui/**'
               - 'feature/**'
               - 'site/**'
               - 'branding/**'
