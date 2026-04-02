@@ -1,0 +1,20 @@
+<svg width="1100" height="800" viewBox="0 0 1100 800" xmlns="http://www.w3.org/2000/svg">
+  <!-- JDT Bridge marketplace logo — 11:8 aspect ratio (matches 110x80) -->
+  <!-- Scaled 25x from feature/icon.svg (32x32), vertically centered -->
+
+  <!-- Background: Eclipse Dark Purple -->
+  <rect width="1100" height="800" rx="150" fill="#2C2255"/>
+
+  <!-- Bridge arch -->
+  <!-- Original: M6 22 L6 14 A10 10 0 0 1 26 14 L26 22 -->
+  <!-- Centered: x 300-800, y 412.5-612.5 -->
+  <path d="M300 612.5 L300 412.5 A 250 250 0 0 1 800 412.5 L800 612.5"
+        stroke="#F7941E"
+        stroke-width="75"
+        fill="none"
+        stroke-linecap="round"/>
+
+  <!-- Connection dots -->
+  <circle cx="300" cy="612.5" r="62.5" fill="#F7941E"/>
+  <circle cx="800" cy="612.5" r="62.5" fill="#F7941E"/>
+</svg>
