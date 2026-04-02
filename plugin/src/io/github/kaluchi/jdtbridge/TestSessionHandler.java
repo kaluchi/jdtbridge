@@ -20,10 +20,10 @@ class TestSessionHandler {
     }
 
     String handleStatus(Map<String, String> params) {
-        String name = params.get("session");
+        String name = params.get("testRunId");
         if (name == null || name.isBlank()) {
             return HttpServer.jsonError(
-                    "Missing 'session' parameter");
+                    "Missing 'testRunId' parameter");
         }
         var ts = tracker.get(name);
         if (ts == null) {
@@ -77,6 +77,8 @@ class TestSessionHandler {
 
         var result = new JsonObject();
         result.addProperty("configId", ts.name);
+        result.addProperty("testRunId",
+                ts.name + ":" + ts.startedAt);
         if (ts.label != null)
             result.addProperty("label", ts.label);
         if (ts.project != null)
@@ -96,7 +98,7 @@ class TestSessionHandler {
     }
 
     String handleClear(Map<String, String> params) {
-        String name = params.get("session");
+        String name = params.get("testRunId");
         int removed = 0;
         for (var ts : tracker.all()) {
             if (!"finished".equals(ts.state)

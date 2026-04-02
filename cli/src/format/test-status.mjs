@@ -191,7 +191,7 @@ export async function followTestStream(session, args) {
   if (args.includes("--all")) filter = "all";
   else if (args.includes("--ignored")) filter = "ignored";
 
-  const url = `/test/status/stream?session=${encodeURIComponent(session)}&filter=${filter}`;
+  const url = `/test/status/stream?testRunId=${encodeURIComponent(session)}&filter=${filter}`;
 
   let detached = false;
   const onSigint = () => {

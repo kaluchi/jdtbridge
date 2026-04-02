@@ -284,12 +284,12 @@ describe("test commands", () => {
 
   // --- test status ---
 
-  it("test status sends session param", async () => {
+  it("test status sends testRunId param", async () => {
     await setupMock((req, res) => {
-      expect(req.url).toContain("session=test-123");
+      expect(req.url).toContain("testRunId=test-123");
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({
-        session: "test-123", state: "finished",
+        configId: "test-123", state: "finished",
         total: 5, completed: 5, passed: 4, failed: 1, errors: 0, ignored: 0,
         time: 2.3,
         entries: [{ fqmn: "Foo#bar", status: "FAIL", time: 0.1, trace: "err" }],
@@ -310,7 +310,7 @@ describe("test commands", () => {
     await setupMock((req, res) => {
       expect(req.url).toContain("filter=ignored");
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ session: "s", state: "finished", total: 0, completed: 0, passed: 0, failed: 0, errors: 0, ignored: 0, time: 0, entries: [] }));
+      res.end(JSON.stringify({ configId: "s", state: "finished", total: 0, completed: 0, passed: 0, failed: 0, errors: 0, ignored: 0, time: 0, entries: [] }));
     });
     const { testStatus } = await import("../src/commands/test-status.mjs");
     await testStatus(["s", "--ignored"]);
@@ -321,7 +321,7 @@ describe("test commands", () => {
       expect(req.url).toContain("filter=all");
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({
-        session: "s", state: "finished",
+        configId: "s", state: "finished",
         total: 0, completed: 0, passed: 0, failed: 0, errors: 0, ignored: 0,
         time: 0, entries: [],
       }));

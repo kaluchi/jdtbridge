@@ -175,10 +175,10 @@ class LaunchHandler {
     }
 
     String handleConfig(Map<String, String> params) {
-        String name = params.get("name");
+        String name = params.get("configId");
         if (name == null || name.isBlank()) {
             return HttpServer.jsonError(
-                    "Missing 'name' parameter");
+                    "Missing 'configId' parameter");
         }
         try {
             ILaunchConfiguration config = findConfig(name);
@@ -417,7 +417,7 @@ class LaunchHandler {
     }
 
     String handleClear(Map<String, String> params) {
-        String nameOrId = params.get("name");
+        String nameOrId = params.get("launchId");
         ILaunch[] launches = launchManager().getLaunches();
         int removed = 0;
 
@@ -439,10 +439,10 @@ class LaunchHandler {
     }
 
     String handleRun(Map<String, String> params) {
-        String name = params.get("name");
+        String name = params.get("configId");
         if (name == null || name.isBlank()) {
             return HttpServer.jsonError(
-                    "Missing 'name' parameter");
+                    "Missing 'configId' parameter");
         }
         String mode = params.containsKey("debug")
                 ? ILaunchManager.DEBUG_MODE
@@ -476,10 +476,10 @@ class LaunchHandler {
     }
 
     String handleStop(Map<String, String> params) {
-        String name = params.get("name");
+        String name = params.get("launchId");
         if (name == null || name.isBlank()) {
             return HttpServer.jsonError(
-                    "Missing 'name' parameter");
+                    "Missing 'launchId' parameter");
         }
         ILaunch target = findLaunch(name);
         if (target == null) {
@@ -518,10 +518,10 @@ class LaunchHandler {
     }
 
     String handleConsole(Map<String, String> params) {
-        String name = params.get("name");
+        String name = params.get("launchId");
         if (name == null || name.isBlank()) {
             return HttpServer.jsonError(
-                    "Missing 'name' parameter");
+                    "Missing 'launchId' parameter");
         }
 
         String tailStr = params.get("tail");

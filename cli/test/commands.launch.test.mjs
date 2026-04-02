@@ -142,7 +142,7 @@ describe("launch commands", () => {
 
   it("launch clear by name", async () => {
     await setupMock((req, res) => {
-      expect(req.url).toContain("name=old-test");
+      expect(req.url).toContain("launchId=old-test");
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ removed: 1 }));
     });

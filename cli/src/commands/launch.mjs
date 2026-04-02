@@ -61,7 +61,7 @@ function configTarget(r) {
 export async function launchClear(args) {
   const pos = extractPositional(args);
   let url = "/launch/clear";
-  if (pos[0]) url += `?name=${encodeURIComponent(pos[0])}`;
+  if (pos[0]) url += `?launchId=${encodeURIComponent(pos[0])}`;
   const result = await get(url);
   if (result.error) {
     console.error(result.error);
@@ -79,7 +79,7 @@ export async function launchConfig(args) {
   }
   const xml = args.includes("--xml");
   const json = args.includes("--json");
-  let url = `/launch/config?name=${encodeURIComponent(name)}`;
+  let url = `/launch/config?configId=${encodeURIComponent(name)}`;
   if (xml) url += "&format=xml";
   const data = await get(url);
   if (data.error) {
@@ -173,7 +173,7 @@ async function launchWithMode(args, mode) {
     process.exit(1);
   }
 
-  let url = `/launch/run?name=${encodeURIComponent(name)}`;
+  let url = `/launch/run?configId=${encodeURIComponent(name)}`;
   if (mode === "debug") url += "&debug";
   const result = await get(url, 30_000);
   if (result.error) {
@@ -246,7 +246,7 @@ export async function launchStop(args) {
     console.error("Usage: launch stop <name>");
     process.exit(1);
   }
-  const url = `/launch/stop?name=${encodeURIComponent(name)}`;
+  const url = `/launch/stop?launchId=${encodeURIComponent(name)}`;
   const result = await get(url);
   if (result.error) {
     console.error(result.error);
@@ -277,7 +277,7 @@ export async function launchLogs(args) {
   }
 
   // Snapshot mode
-  let url = `/launch/console?name=${encodeURIComponent(name)}`;
+  let url = `/launch/console?launchId=${encodeURIComponent(name)}`;
   if (flags.tail !== undefined && flags.tail !== true)
     url += `&tail=${flags.tail}`;
   if (args.includes("--stderr")) url += "&stream=stderr";
@@ -304,7 +304,7 @@ export const launchConsole = launchLogs;
  */
 async function followLogs(name, args) {
   const flags = parseFlags(args);
-  let url = `/launch/console/stream?name=${encodeURIComponent(name)}`;
+  let url = `/launch/console/stream?launchId=${encodeURIComponent(name)}`;
   if (flags.tail !== undefined && flags.tail !== true)
     url += `&tail=${flags.tail}`;
   if (args.includes("--stderr")) url += "&stream=stderr";

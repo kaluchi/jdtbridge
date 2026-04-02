@@ -30,7 +30,7 @@ export async function testStatus(args) {
   if (args.includes("--all")) filter = "all";
   else if (args.includes("--ignored")) filter = "ignored";
 
-  let url = `/test/status?session=${encodeURIComponent(session)}`;
+  let url = `/test/status?testRunId=${encodeURIComponent(session)}`;
   if (filter) url += `&filter=${filter}`;
 
   const data = await get(url, 30_000);

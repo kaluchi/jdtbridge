@@ -248,9 +248,9 @@ public class HttpServer {
      */
     private void handleConsoleStream(Socket socket,
             Map<String, String> params) {
-        String name = params.get("name");
+        String name = params.get("launchId");
         if (name == null || name.isBlank()) {
-            try { sendError(socket, 400, "Missing name"); }
+            try { sendError(socket, 400, "Missing launchId"); }
             catch (IOException e) { /* ignore */ }
             return;
         }
@@ -294,9 +294,9 @@ public class HttpServer {
      */
     private void handleTestStatusStream(Socket socket,
             Map<String, String> params) {
-        String session = params.get("session");
+        String session = params.get("testRunId");
         if (session == null || session.isBlank()) {
-            try { sendError(socket, 400, "Missing session"); }
+            try { sendError(socket, 400, "Missing testRunId"); }
             catch (IOException e) { /* ignore */ }
             return;
         }

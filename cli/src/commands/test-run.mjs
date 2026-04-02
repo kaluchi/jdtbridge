@@ -57,7 +57,7 @@ export async function testRun(args) {
   await sleep(500);
   try {
     const status = await get(
-      `/test/status?session=${encodeURIComponent(session)}`,
+      `/test/status?testRunId=${encodeURIComponent(session)}`,
       5_000,
     );
     if (status && !status.error && status.total > 0) {
