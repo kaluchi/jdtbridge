@@ -8,12 +8,34 @@ letting agents and terminal users list, inspect, run, monitor, and stop
 any launch configuration in the workspace — JUnit tests, Java applications,
 Maven builds, PDE plugin tests, and custom agent types.
 
+## Identity model
+
+Three IDs with `configId` as common prefix for cross-reference:
+
+| ID | Format | Example | Commands |
+|---|---|---|---|
+| `configId` | config name | `m8-shared` | `launch run`, `launch config` |
+| `launchId` | configId:pid | `m8-shared:29164` | `launch logs`, `launch stop` |
+| `testRunId` | configId:timestamp | `m8-shared:1775093689` | `test status`, `test runs` |
+
+`configId` identifies a saved launch configuration (persistent).
+`launchId` identifies a running/terminated process (session-scoped).
+`testRunId` identifies a test run with results (see [jdt-test-spec](jdt-test-spec.md)).
+
+All share the `configId` prefix — the relationship between a config,
+its launches, and its test runs is visible in any table.
+
+`ILaunch` in Eclipse has no intrinsic ID — we compose `launchId` from
+the config name and process PID. PID comes from
+`IProcess.ATTR_PROCESS_ID`. When multiple launches share a config name,
+`launchId` disambiguates them.
+
 ## Eclipse concepts mapped to CLI
 
 | Eclipse concept | CLI surface |
 |---|---|
-| Launch Configuration (saved .launch file) | `jdt launch configs`, `jdt launch config <name>` |
-| ILaunch (running/terminated process) | `jdt launch list`, `jdt launch logs`, `jdt launch stop` |
+| Launch Configuration (saved .launch file) | `jdt launch configs`, `jdt launch config <configId>` |
+| ILaunch (running/terminated process) | `jdt launch list`, `jdt launch logs <launchId>`, `jdt launch stop <launchId>` |
 | Launch Manager | Internal — mediates all launch operations |
 | Launch History (favorites + recent) | `jdt launch configs` sorts favorites first |
 | Console output (IStreamMonitor) | `jdt launch logs` (snapshot), `jdt launch logs -f` (stream) |

@@ -20,7 +20,7 @@ into a single output with markdown headers.
 | `errors` | `jdt errors --json` | Compilation errors (JSON for zero = `[]`) |
 | `launch-configs` | `jdt launch configs` | Saved launch configurations (name, type, project, target) |
 | `launches` | `jdt launch list` | Running/terminated launches |
-| `tests` | `jdt test sessions` | Recent test sessions with results |
+| `tests` | `jdt test runs` | Recent test runs with results |
 | `projects` | `jdt projects` | Workspace projects with repo mapping |
 | `guide` | `jdt status guide` | Usage guide with refresh commands |
 
