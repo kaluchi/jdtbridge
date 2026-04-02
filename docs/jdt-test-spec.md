@@ -103,29 +103,41 @@ youngest first. Each run is a separate entry. Same data as the
 Eclipse JUnit view dropdown.
 
 Key `TestRunSession` API:
-- `getTestRunName()` — config name
-- `getLaunch()` → `ILaunch` → PID, terminated state
+- `getTestRunName()` — config name (= configId)
+- `getLaunch()` → `ILaunch` → PID, ATTR_LAUNCH_TIMESTAMP
+- `getLaunch().getAttribute(ATTR_LAUNCH_TIMESTAMP)` — source of testRunId
 - `isRunning()`, `isStarting()`
 - `getTotalCount()`, `getStartedCount()`
 - `getErrorCount()`, `getFailureCount()`, `getIgnoredCount()`
 - `getElapsedTimeInSeconds()`
 - `getTestResult()` — OK, ERROR, FAILURE
-- `getAllFailedTestElements()` — failed tests with traces
-- `getChildren()` — full test tree
+- `getChildren()` — full test tree (suites → cases)
+- `addTestSessionListener(ITestSessionListener)` — live events
 
 Capacity controlled by `MAX_TEST_RUNS` preference (default 10).
 
-### Migration plan
+### testRunId composition
 
-Replace `TestSessionTracker` with reads from `JUnitModel`:
-- `test runs` → `getTestRunSessions()`
-- `test status` → find session by testRunId, read live state
-- `test run -f` → `ITestSessionListener` for live events
-- Remove `TestSessionTracker` class
+`testRunId = configId + ":" + ATTR_LAUNCH_TIMESTAMP`
 
-Evaluate whether `preRegister` (streaming before sessionStarted)
-is still needed — `JUnitModel` fires sessionStarted from a launch
-listener which may lag slightly.
+`ATTR_LAUNCH_TIMESTAMP` is set by Eclipse on `ILaunch` at the moment
+`config.launch()` is called — available immediately, no waiting.
+This is different from `TestRunSession.getStartTime()` which is set
+later when the JUnit remote runner connects.
+
+`TestSessionHandler.testRunId(session)` — single method that extracts
+testRunId from any `TestRunSession` via its `ILaunch`.
+
+### Implementation
+
+All test handlers read from `JUnitModel` directly:
+- `test runs` → `getTestRunSessions()` — list with counts, state, time
+- `test status` → `findSession(testRunId)` → snapshot from session tree
+- `test run -f` → `ITestSessionListener` on `TestRunSession` for live events
+- `test run` response waits for nothing — testRunId from launch timestamp
+
+No custom tracker. All data from Eclipse `JUnitModel` and
+`ITestSessionListener`.
 
 ## Design decisions
 
@@ -154,8 +166,7 @@ listener which may lag slightly.
 ## Constraints
 
 - **JUnitModel is internal API.** `@SuppressWarnings("restriction")`.
-  Stable across Eclipse versions. Same API our current tracker already
-  depends on via `JUnitCore.addTestRunListener`.
+  Stable across Eclipse versions.
 
 - **Run limit.** Eclipse caps at MAX_TEST_RUNS (default 10). Old runs
   evicted automatically. `jdt test runs` shows only what Eclipse keeps.
@@ -164,9 +175,10 @@ listener which may lag slightly.
   (run_in_ui_thread, application, clearws, location). Config reuse
   preserves them. `clearws=true` ensures clean workspace per run.
 
-- **Streaming latency.** JUnitModel fires sessionStarted after launch
-  listener fires. Brief gap between `test run` response and first
-  streaming event may exist.
+- **Streaming.** Uses `ITestSessionListener` on `TestRunSession` for
+  live `testEnded` events. Replay from `getChildren()` for already
+  completed tests. Session found via `findSession(testRunId)` which
+  matches by `ATTR_LAUNCH_TIMESTAMP` on `ILaunch`.
 
 ## Relationship to other specs
 
