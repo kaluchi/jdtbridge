@@ -74,7 +74,7 @@ export async function launchConfig(args) {
   const pos = extractPositional(args);
   const name = pos[0];
   if (!name) {
-    console.error("Usage: launch config <name> [--xml] [--json]");
+    console.error("Usage: launch config <configId> [--xml] [--json]");
     process.exit(1);
   }
   const xml = args.includes("--xml");
@@ -243,7 +243,7 @@ export async function launchStop(args) {
   const pos = extractPositional(args);
   const name = pos[0];
   if (!name) {
-    console.error("Usage: launch stop <name>");
+    console.error("Usage: launch stop <launchId>");
     process.exit(1);
   }
   const url = `/launch/stop?launchId=${encodeURIComponent(name)}`;
@@ -265,7 +265,7 @@ export async function launchLogs(args) {
   const name = pos[0];
   if (!name) {
     console.error(
-      "Usage: launch logs <name> [-f|--follow] [--tail N]",
+      "Usage: launch logs <launchId> [-f|--follow] [--tail N]",
     );
     process.exit(1);
   }

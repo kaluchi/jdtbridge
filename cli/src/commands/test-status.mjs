@@ -7,21 +7,21 @@ import {
 } from "../format/test-status.mjs";
 
 /**
- * Show test session status (snapshot or stream).
+ * Show test run status (snapshot or stream).
  * Analogous to `jdt launch logs`.
  */
 export async function testStatus(args) {
   const pos = extractPositional(args);
-  const session = pos[0];
+  const testRunId = pos[0];
 
-  if (!session) {
-    console.error("Usage: test status <session> [-f] [--all] [--ignored] [--json]");
+  if (!testRunId) {
+    console.error("Usage: test status <testRunId> [-f] [--all] [--ignored] [--json]");
     process.exit(1);
   }
 
   const follow = args.includes("-f") || args.includes("--follow");
   if (follow) {
-    const exitCode = await followTestStream(session, args);
+    const exitCode = await followTestStream(testRunId, args);
     process.exit(exitCode);
   }
 
@@ -30,7 +30,7 @@ export async function testStatus(args) {
   if (args.includes("--all")) filter = "all";
   else if (args.includes("--ignored")) filter = "ignored";
 
-  let url = `/test/status?testRunId=${encodeURIComponent(session)}`;
+  let url = `/test/status?testRunId=${encodeURIComponent(testRunId)}`;
   if (filter) url += `&filter=${filter}`;
 
   const data = await get(url, 30_000);
@@ -40,12 +40,12 @@ export async function testStatus(args) {
   });
 }
 
-export const help = `Show test session status (snapshot or live stream).
+export const help = `Show test run status (snapshot or live stream).
 
-Usage:  jdt test status <session> [-f] [--all] [--ignored] [--json]
+Usage:  jdt test status <testRunId> [-f] [--all] [--ignored] [--json]
 
 Without -f, returns a snapshot of the current state.
-With -f, streams test events until the session completes.
+With -f, streams test events until the test run completes.
 
 Flags:
   -f, --follow    stream events live until completion
@@ -61,5 +61,5 @@ Examples:
   jdt test status jdtbridge-test-1234567890 -f --json
 
 Console output (stdout, stderr, stack traces):
-  jdt launch logs <session-name>
-  jdt launch logs <session-name> --tail 50`;
+  jdt launch logs <launchId>
+  jdt launch logs <launchId> --tail 50`;

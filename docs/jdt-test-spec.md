@@ -86,7 +86,7 @@ Stable names without timestamp, matching Eclipse GUI convention:
 | Class | `FooTest` (simple name) |
 | Class#method | `FooTest.methodName` |
 | Package | `com.example.service` |
-| Project | `m8-server` |
+| Project | `my-server` |
 
 ## Data source: JUnitModel
 
@@ -94,7 +94,7 @@ Stable names without timestamp, matching Eclipse GUI convention:
 
 `TestSessionTracker` used a `ConcurrentHashMap` keyed by config name.
 Multiple runs of the same config overwrote each other — 3 runs of
-`m8-shared` showed as 1 entry. Eclipse JUnit view showed all 3.
+`my-project` showed as 1 entry. Eclipse JUnit view showed all 3.
 
 ### Eclipse's data source
 

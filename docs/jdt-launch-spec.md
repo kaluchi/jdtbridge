@@ -14,9 +14,9 @@ Three IDs with `configId` as common prefix for cross-reference:
 
 | ID | Format | Example | Commands |
 |---|---|---|---|
-| `configId` | config name | `m8-shared` | `launch run`, `launch config` |
-| `launchId` | configId:pid | `m8-shared:29164` | `launch logs`, `launch stop` |
-| `testRunId` | configId:timestamp | `m8-shared:1775093689` | `test status`, `test runs` |
+| `configId` | config name | `my-project` | `launch run`, `launch config` |
+| `launchId` | configId:pid | `my-project:29164` | `launch logs`, `launch stop` |
+| `testRunId` | configId:timestamp | `my-project:1775093689` | `test status`, `test runs` |
 
 `configId` identifies a saved launch configuration (persistent).
 `launchId` identifies a running/terminated process (session-scoped).
@@ -67,8 +67,8 @@ List all saved launch configurations in the workspace.
 
 ```
 NAME              TYPE                PROJECT      TARGET
-my-server         Java Application    m8-server    app.m8.Main
-ObjectMapperTest  JUnit               m8-server    app.m8.ObjectMapperTest
+my-server         Java Application    my-server    com.example.Main
+ObjectMapperTest  JUnit               my-server    com.example.ObjectMapperTest
 jdtbridge-verify  Maven Build                      clean verify
 AllTests          JUnit Plug-in Test  jdtbridge    io.github.kaluchi.jdtbridge.AllTests
 ```
@@ -106,8 +106,8 @@ Default output (KEY VALUE table):
 KEY                                             VALUE
 Name                                            ObjectMapperTest
 Type                                            JUnit
-Project                                         m8-server
-Target                                          app.m8ws.utils.ObjectMapperTest
+Project                                         my-server
+Target                                          com.example.ObjectMapperTest
 File                                            D:\...\ObjectMapperTest.launch
 org.eclipse.jdt.junit.TEST_KIND                 org.eclipse.jdt.junit.loader.junit5
 org.eclipse.jdt.launching.VM_ARGUMENTS          -ea
@@ -127,8 +127,8 @@ With `--json`, outputs raw server response:
   "typeId": "org.eclipse.jdt.junit.launchconfig",
   "file": "/path/to/.metadata/.plugins/org.eclipse.debug.core/.launches/ObjectMapperTest.launch",
   "attributes": {
-    "org.eclipse.jdt.launching.MAIN_TYPE": "app.m8ws.utils.ObjectMapperTest",
-    "org.eclipse.jdt.launching.PROJECT_ATTR": "m8-server",
+    "org.eclipse.jdt.launching.MAIN_TYPE": "com.example.ObjectMapperTest",
+    "org.eclipse.jdt.launching.PROJECT_ATTR": "my-server",
     "org.eclipse.jdt.junit.TEST_KIND": "org.eclipse.jdt.junit.loader.junit5",
     "org.eclipse.jdt.launching.VM_ARGUMENTS": "-Xmx512m"
   }
@@ -164,8 +164,8 @@ With `-q`: suppresses the guide.
 ```
 Launched my-server (run) [Java Application]
   PID:        12345
-  Working dir: /d/git/m8
-  Command:    java -cp ... app.m8.Main
+  Working dir: /d/git/my-app
+  Command:    java -cp ... com.example.Main
 ```
 
 ### `jdt launch debug <name> [-f] [-q]`

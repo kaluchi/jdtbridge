@@ -65,7 +65,7 @@ eclipse-jdt-search  clean   D:/git/eclipse-jdt-search  master
 $ jdt launch configs
 NAME              TYPE              PROJECT    TARGET
 jdtbridge-verify  Maven Build                  clean verify
-ObjectMapperTest  JUnit             m8-server  app.m8.ObjectMapperTest
+ObjectMapperTest  JUnit             my-server  com.example.ObjectMapperTest
 \`\`\`
 ```
 

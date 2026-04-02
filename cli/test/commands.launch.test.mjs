@@ -99,8 +99,8 @@ describe("launch commands", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { configId: "my-server", type: "Java Application", project: "m8-server", mainClass: "app.m8.Main" },
-        { configId: "AllTests", type: "JUnit", project: "m8-server", class: "app.m8.AllTests", runner: "JUnit 5" },
+        { configId: "my-server", type: "Java Application", project: "my-project", mainClass: "com.example.Main" },
+        { configId: "AllTests", type: "JUnit", project: "my-project", class: "com.example.AllTests", runner: "JUnit 5" },
         { configId: "jdtbridge-verify", type: "Maven Build", goals: "clean verify" },
       ]));
     });
@@ -112,10 +112,10 @@ describe("launch commands", () => {
     expect(out).toContain("PROJECT");
     expect(out).toContain("TARGET");
     expect(out).toContain("my-server");
-    expect(out).toContain("m8-server");
-    expect(out).toContain("app.m8.Main");
+    expect(out).toContain("my-project");
+    expect(out).toContain("com.example.Main");
     expect(out).toContain("AllTests");
-    expect(out).toContain("app.m8.AllTests");
+    expect(out).toContain("com.example.AllTests");
     expect(out).toContain("clean verify");
   });
 
@@ -336,8 +336,8 @@ describe("launch commands", () => {
       configId: "ObjectMapperTest", type: "JUnit", typeId: "org.eclipse.jdt.junit.launchconfig",
       file: "/ws/.metadata/.plugins/org.eclipse.debug.core/ObjectMapperTest.launch",
       attributes: {
-        "org.eclipse.jdt.launching.MAIN_TYPE": "app.m8.ObjectMapperTest",
-        "org.eclipse.jdt.launching.PROJECT_ATTR": "m8-server",
+        "org.eclipse.jdt.launching.MAIN_TYPE": "com.example.ObjectMapperTest",
+        "org.eclipse.jdt.launching.PROJECT_ATTR": "my-project",
         "org.eclipse.jdt.junit.TEST_KIND": "org.eclipse.jdt.junit.loader.junit5",
       },
     };
@@ -351,8 +351,8 @@ describe("launch commands", () => {
     expect(out).toContain("KEY");
     expect(out).toContain("VALUE");
     expect(out).toContain("ObjectMapperTest");
-    expect(out).toContain("m8-server");
-    expect(out).toContain("app.m8.ObjectMapperTest");
+    expect(out).toContain("my-project");
+    expect(out).toContain("com.example.ObjectMapperTest");
     expect(out).toContain("org.eclipse.jdt.junit.TEST_KIND");
   });
 
@@ -440,7 +440,7 @@ describe("launch commands", () => {
     const detail = {
       configId: "ObjectMapperTest", type: "JUnit", typeId: "org.eclipse.jdt.junit.launchconfig",
       file: "/ws/ObjectMapperTest.launch",
-      attributes: { "org.eclipse.jdt.launching.MAIN_TYPE": "app.m8.ObjectMapperTest" },
+      attributes: { "org.eclipse.jdt.launching.MAIN_TYPE": "com.example.ObjectMapperTest" },
     };
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
@@ -456,11 +456,11 @@ describe("launch commands", () => {
 
   it("launch config text omits Target when no class or goals", async () => {
     const detail = {
-      configId: "m8-server", type: "JUnit", typeId: "org.eclipse.jdt.junit.launchconfig",
+      configId: "my-project", type: "JUnit", typeId: "org.eclipse.jdt.junit.launchconfig",
       attributes: {
         "org.eclipse.jdt.launching.MAIN_TYPE": "",
-        "org.eclipse.jdt.junit.CONTAINER": "=m8-server",
-        "org.eclipse.jdt.launching.PROJECT_ATTR": "m8-server",
+        "org.eclipse.jdt.junit.CONTAINER": "=my-project",
+        "org.eclipse.jdt.launching.PROJECT_ATTR": "my-project",
       },
     };
     await setupMock((req, res) => {
@@ -468,7 +468,7 @@ describe("launch commands", () => {
       res.end(JSON.stringify(detail));
     });
     const { launchConfig } = await import("../src/commands/launch.mjs");
-    await launchConfig(["m8-server"]);
+    await launchConfig(["my-project"]);
     const out = io.logs.join("\n");
     expect(out).toContain("Project");
     expect(out).not.toContain("Target");
