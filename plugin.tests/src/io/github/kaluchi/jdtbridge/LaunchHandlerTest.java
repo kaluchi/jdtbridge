@@ -300,7 +300,7 @@ public class LaunchHandlerTest {
             var attrs = obj.getAsJsonObject("attributes");
             assertTrue(
                     attrs.has(
-                        "org.eclipse.jdt.launching.MAIN_TYPE_NAME")
+                        "org.eclipse.jdt.launching.MAIN_TYPE")
                     || attrs.has(
                         "org.eclipse.jdt.junit.CONTAINER"),
                     "JUnit config should have test class or "
