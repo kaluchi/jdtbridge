@@ -85,6 +85,10 @@ class TestSessionTracker extends TestRunListener {
         return ts;
     }
 
+    void registerAlias(String key, TrackedTestSession ts) {
+        sessions.putIfAbsent(key, ts);
+    }
+
     TrackedTestSession get(String name) {
         return sessions.get(name);
     }

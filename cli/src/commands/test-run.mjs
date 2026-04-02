@@ -54,7 +54,7 @@ export async function testRun(args) {
   await sleep(500);
   try {
     const status = await get(
-      `/test/status?testRunId=${encodeURIComponent(configId)}`,
+      `/test/status?testRunId=${encodeURIComponent(testRunId)}`,
       5_000,
     );
     if (status && !status.error && status.total > 0) {
@@ -75,7 +75,7 @@ export async function testRun(args) {
   const follow = args.includes("-f") || args.includes("--follow");
   if (follow) {
     if (!jsonFlag) console.log();
-    const exitCode = await followTestStream(configId, args);
+    const exitCode = await followTestStream(testRunId, args);
     process.exit(exitCode);
   }
 

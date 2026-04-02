@@ -246,6 +246,10 @@ class TestHandler {
                 ? configId + ":" + launchTimestamp
                 : configId;
 
+        // Register tracker under testRunId so streaming
+        // clients can find by exact testRunId
+        sessionTracker.registerAlias(testRunId, ts);
+
         var response = new JsonObject();
         response.addProperty("ok", true);
         response.addProperty("configId", configId);
