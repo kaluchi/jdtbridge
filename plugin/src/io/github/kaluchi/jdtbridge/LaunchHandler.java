@@ -91,21 +91,10 @@ class LaunchHandler {
     String handleList(Map<String, String> params) {
         ILaunch[] launches = launchManager().getLaunches();
         var arr = new JsonArray();
-        var seen = new java.util.HashSet<String>();
-
         for (int i = launches.length - 1; i >= 0; i--) {
-            ILaunch launch = launches[i];
-            String name = launchName(launch);
-            seen.add(name);
-            arr.add(launchEntry(launch, name));
+            arr.add(launchEntry(launches[i],
+                    launchName(launches[i])));
         }
-
-        for (var entry : tracker.all().entrySet()) {
-            if (seen.contains(entry.getKey())) continue;
-            LaunchTracker.TrackedLaunch tl = entry.getValue();
-            arr.add(launchEntry(tl.launch, entry.getKey()));
-        }
-
         return arr.toString();
     }
 
@@ -428,34 +417,20 @@ class LaunchHandler {
     }
 
     String handleClear(Map<String, String> params) {
-        String name = params.get("name");
+        String nameOrId = params.get("name");
         ILaunch[] launches = launchManager().getLaunches();
         int removed = 0;
-        var cleared = new java.util.HashSet<String>();
 
         for (ILaunch launch : launches) {
             if (!launch.isTerminated()) continue;
-            String lName = launchName(launch);
-            if (name != null && !name.isBlank()
-                    && !name.equals(lName)) {
-                continue;
+            String configId = launchName(launch);
+            if (nameOrId != null && !nameOrId.isBlank()) {
+                // Accept configId or launchId
+                ILaunch found = findLaunch(nameOrId);
+                if (found != launch) continue;
             }
             launchManager().removeLaunch(launch);
-            tracker.remove(lName);
-            cleared.add(lName);
             removed++;
-        }
-
-        for (var entry : tracker.all().entrySet()) {
-            if (cleared.contains(entry.getKey())) continue;
-            if (name != null && !name.isBlank()
-                    && !name.equals(entry.getKey())) {
-                continue;
-            }
-            if (entry.getValue().terminated) {
-                tracker.remove(entry.getKey());
-                removed++;
-            }
         }
 
         var result = new JsonObject();
