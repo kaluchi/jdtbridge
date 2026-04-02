@@ -65,13 +65,13 @@ public class LaunchHandlerTest {
         }
 
         @Test
-        void containsNameAndTerminated() {
-            // Any launch from previous test runs may be present
+        void containsIdentityFields() {
             String json = handler.handleList(Map.of());
-            // If there are launches, each should have name+terminated
             if (!json.equals("[]")) {
-                assertTrue(json.contains("\"name\""),
-                        "Should have name: " + json);
+                assertTrue(json.contains("\"configId\""),
+                        "Should have configId: " + json);
+                assertTrue(json.contains("\"launchId\""),
+                        "Should have launchId: " + json);
                 assertTrue(json.contains("\"terminated\""),
                         "Should have terminated: " + json);
             }
@@ -154,8 +154,8 @@ public class LaunchHandlerTest {
         void containsNameAndType() {
             String json = handler.handleConfigs(Map.of());
             if (!json.equals("[]")) {
-                assertTrue(json.contains("\"name\""),
-                        "Should have name: " + json);
+                assertTrue(json.contains("\"configId\""),
+                        "Should have configId: " + json);
                 assertTrue(json.contains("\"type\""),
                         "Should have type: " + json);
             }
@@ -230,7 +230,7 @@ public class LaunchHandlerTest {
                     .getAsJsonArray();
             if (arr.isEmpty()) return; // no configs to test
             String name = arr.get(0).getAsJsonObject()
-                    .get("name").getAsString();
+                    .get("configId").getAsString();
 
             String json = handler.handleConfig(
                     Map.of("name", name));
@@ -238,7 +238,7 @@ public class LaunchHandlerTest {
                     "Should not error: " + json);
             var obj = JsonParser.parseString(json)
                     .getAsJsonObject();
-            assertEquals(name, obj.get("name").getAsString());
+            assertEquals(name, obj.get("configId").getAsString());
             assertTrue(obj.has("type"),
                     "Should have type: " + json);
             assertTrue(obj.has("typeId"),
@@ -256,7 +256,7 @@ public class LaunchHandlerTest {
                     .getAsJsonArray();
             if (arr.isEmpty()) return;
             String name = arr.get(0).getAsJsonObject()
-                    .get("name").getAsString();
+                    .get("configId").getAsString();
 
             String json = handler.handleConfig(
                     Map.of("name", name, "format", "xml"));
@@ -264,7 +264,7 @@ public class LaunchHandlerTest {
                     "Should not error: " + json);
             var obj = JsonParser.parseString(json)
                     .getAsJsonObject();
-            assertEquals(name, obj.get("name").getAsString());
+            assertEquals(name, obj.get("configId").getAsString());
             assertTrue(obj.has("xml"),
                     "Should have xml field: " + json);
             String xml = obj.get("xml").getAsString();
@@ -287,7 +287,7 @@ public class LaunchHandlerTest {
                 String type = obj.get("type").getAsString();
                 if ("JUnit".equals(type)
                         || "JUnit Plug-in Test".equals(type)) {
-                    junitName = obj.get("name").getAsString();
+                    junitName = obj.get("configId").getAsString();
                     break;
                 }
             }
@@ -315,7 +315,7 @@ public class LaunchHandlerTest {
                     .getAsJsonArray();
             if (arr.isEmpty()) return;
             String name = arr.get(0).getAsJsonObject()
-                    .get("name").getAsString();
+                    .get("configId").getAsString();
 
             String json = handler.handleConfig(
                     Map.of("name", name));
@@ -577,8 +577,8 @@ public class LaunchHandlerTest {
                 assertTrue(
                         json.contains("\"terminated\":true"),
                         "Should have terminated flag: " + json);
-                assertTrue(json.contains("\"name\""),
-                        "Should have name: " + json);
+                assertTrue(json.contains("\"configId\""),
+                        "Should have configId: " + json);
             } finally {
                 mgr.removeLaunch(launch);
             }

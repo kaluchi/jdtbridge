@@ -570,8 +570,15 @@ class LaunchHandler {
             } catch (NumberFormatException e) { /* full */ }
         }
 
+        String cId = LaunchHandler.launchName(tl.launch);
+
         var obj = new JsonObject();
-        obj.addProperty("name", name);
+        obj.addProperty("configId", cId);
+        addProcessMetadata(tl.launch, obj);
+        // Compose launchId from configId + first PID
+        if (obj.has("pid"))
+            obj.addProperty("launchId",
+                    cId + ":" + obj.get("pid").getAsString());
         obj.addProperty("terminated", tl.terminated);
         obj.addProperty("output", result);
         return obj.toString();
