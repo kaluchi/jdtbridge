@@ -18,7 +18,7 @@ into a single output with markdown headers.
 | `git` | `jdt git list --no-files` | Repos, branches, dirty state |
 | `editors` | `jdt editors` | Open editor tabs (active first) |
 | `errors` | `jdt errors --json` | Compilation errors (JSON for zero = `[]`) |
-| `launch-configs` | `jdt launch configs` | Saved launch configurations (name, type, project, target) |
+| `launch-configs` | `jdt launch configs` | Saved launch configurations (configId, type, project, target) |
 | `launches` | `jdt launch list` | Running/terminated launches |
 | `tests` | `jdt test runs` | Recent test runs with results |
 | `projects` | `jdt projects` | Workspace projects with repo mapping |
@@ -63,7 +63,7 @@ eclipse-jdt-search  clean   D:/git/eclipse-jdt-search  master
 
 \`\`\`bash
 $ jdt launch configs
-NAME              TYPE              PROJECT    TARGET
+CONFIGID          TYPE              PROJECT    TARGET
 jdtbridge-verify  Maven Build                  clean verify
 ObjectMapperTest  JUnit             my-server  com.example.ObjectMapperTest
 \`\`\`
