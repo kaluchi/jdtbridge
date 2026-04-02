@@ -16,9 +16,6 @@ import java.util.stream.Collectors;
  * workspace projects on every request — no caching.
  * This ensures new/removed projects are visible immediately.
  * <p>
- * Session file is small (~200 bytes), project iteration is
- * ~39 path comparisons. Total cost: ~2ms per request.
- * <p>
  * Returns {@link ProjectScope#ALL} when no session or no
  * filtering is needed — never returns null.
  */
@@ -32,7 +29,8 @@ class SessionScope {
      * @return project scope, never null
      */
     ProjectScope resolve(String bridgeSessionId) {
-        if (bridgeSessionId == null || bridgeSessionId.isEmpty()) {
+        if (bridgeSessionId == null
+                || bridgeSessionId.isEmpty()) {
             return ProjectScope.ALL;
         }
         return load(bridgeSessionId);

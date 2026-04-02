@@ -115,19 +115,21 @@ class ProjectScope {
      */
     private boolean launchGroupInScope(
             ILaunchConfiguration group) throws CoreException {
-        var allConfigs = DebugPlugin.getDefault()
-                .getLaunchManager().getLaunchConfigurations();
+        var configsByName = Arrays.stream(DebugPlugin.getDefault()
+                        .getLaunchManager()
+                        .getLaunchConfigurations())
+                .collect(java.util.stream.Collectors.toMap(
+                        ILaunchConfiguration::getName,
+                        c -> c, (a, b) -> a));
         for (int i = 0; ; i++) {
             String childConfigId = group.getAttribute(
                     "org.eclipse.debug.core.launchGroup."
                             + i + ".name",
                     (String) null);
             if (childConfigId == null) break;
-            for (var config : allConfigs) {
-                if (childConfigId.equals(config.getName())
-                        && containsConfig(config)) {
-                    return true;
-                }
+            var child = configsByName.get(childConfigId);
+            if (child != null && containsConfig(child)) {
+                return true;
             }
         }
         return false;

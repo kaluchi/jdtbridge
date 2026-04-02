@@ -5,6 +5,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Set;
 
+import org.eclipse.core.runtime.CoreException;
+import org.eclipse.debug.core.DebugPlugin;
+import org.eclipse.debug.core.ILaunchConfiguration;
+import org.eclipse.debug.core.ILaunchConfigurationType;
+import org.eclipse.debug.core.ILaunchConfigurationWorkingCopy;
+import org.eclipse.debug.core.ILaunchManager;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -69,6 +75,68 @@ public class ProjectScopeTest {
             ProjectScope scope = ProjectScope.of(mutable);
             mutable.add("c");
             assertFalse(scope.containsProject("c"));
+        }
+    }
+
+    @Nested
+    class ContainsConfig {
+
+        private ILaunchConfigurationWorkingCopy createConfig(
+                String name) throws CoreException {
+            ILaunchManager mgr = DebugPlugin.getDefault()
+                    .getLaunchManager();
+            ILaunchConfigurationType type = mgr
+                    .getLaunchConfigurationType(
+                            "org.eclipse.jdt.junit.launchconfig");
+            return type.newInstance(null, name);
+        }
+
+        @Test
+        void allScopeAcceptsAnyConfig() throws Exception {
+            var config = createConfig("test-any");
+            config.setAttribute(
+                    "org.eclipse.jdt.launching.PROJECT_ATTR",
+                    "unknown-project");
+            assertTrue(ProjectScope.ALL.containsConfig(config));
+        }
+
+        @Test
+        void filteredScopeAcceptsMatchingProject()
+                throws Exception {
+            var scope = ProjectScope.of(Set.of("my-project"));
+            var config = createConfig("test-match");
+            config.setAttribute(
+                    "org.eclipse.jdt.launching.PROJECT_ATTR",
+                    "my-project");
+            assertTrue(scope.containsConfig(config));
+        }
+
+        @Test
+        void filteredScopeRejectsNonMatchingProject()
+                throws Exception {
+            var scope = ProjectScope.of(Set.of("my-project"));
+            var config = createConfig("test-reject");
+            config.setAttribute(
+                    "org.eclipse.jdt.launching.PROJECT_ATTR",
+                    "other-project");
+            assertFalse(scope.containsConfig(config));
+        }
+
+        @Test
+        void configWithoutProjectPassesViaWorkingDir()
+                throws Exception {
+            // No PROJECT_ATTR, no WORKING_DIR → passes
+            var scope = ProjectScope.of(Set.of("my-project"));
+            ILaunchManager mgr = DebugPlugin.getDefault()
+                    .getLaunchManager();
+            ILaunchConfigurationType mavenType = mgr
+                    .getLaunchConfigurationType(
+                            "org.eclipse.m2e.Maven2LaunchConfigurationType");
+            if (mavenType == null) return; // m2e not available
+            var config = mavenType.newInstance(
+                    null, "test-no-project");
+            // No working dir set → passes (permissive)
+            assertTrue(scope.containsConfig(config));
         }
     }
 }
