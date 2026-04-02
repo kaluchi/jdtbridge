@@ -28,7 +28,7 @@ class TestSessionTracker extends TestRunListener {
     }
 
     static class TrackedTestSession {
-        final String name;
+        final String configId;
         final long startedAt = System.currentTimeMillis();
         volatile String label;
         volatile String project;
@@ -45,8 +45,8 @@ class TestSessionTracker extends TestRunListener {
         private final List<TestEventListener> listeners =
                 new CopyOnWriteArrayList<>();
 
-        TrackedTestSession(String name) {
-            this.name = name;
+        TrackedTestSession(String configId) {
+            this.configId = configId;
         }
 
         void addListener(TestEventListener l) {
@@ -79,9 +79,9 @@ class TestSessionTracker extends TestRunListener {
      * Pre-register a session before the JVM starts so
      * streaming clients can connect immediately.
      */
-    TrackedTestSession preRegister(String name) {
-        TrackedTestSession ts = new TrackedTestSession(name);
-        sessions.put(name, ts);
+    TrackedTestSession preRegister(String configId) {
+        TrackedTestSession ts = new TrackedTestSession(configId);
+        sessions.put(configId, ts);
         return ts;
     }
 
@@ -89,8 +89,8 @@ class TestSessionTracker extends TestRunListener {
         sessions.putIfAbsent(key, ts);
     }
 
-    TrackedTestSession get(String name) {
-        return sessions.get(name);
+    TrackedTestSession get(String key) {
+        return sessions.get(key);
     }
 
     /** All tracked sessions (for listing). */
@@ -98,15 +98,14 @@ class TestSessionTracker extends TestRunListener {
         return sessions.values();
     }
 
-    /** Remove a session by name. */
-    void remove(String name) {
-        sessions.remove(name);
+    void remove(String key) {
+        sessions.remove(key);
     }
 
     /** Wait briefly for a session to appear. */
-    TrackedTestSession await(String name) {
+    TrackedTestSession await(String key) {
         for (int i = 0; i < 10; i++) {
-            TrackedTestSession ts = sessions.get(name);
+            TrackedTestSession ts = sessions.get(key);
             if (ts != null) return ts;
             try { Thread.sleep(500); }
             catch (InterruptedException e) {
@@ -121,9 +120,9 @@ class TestSessionTracker extends TestRunListener {
 
     @Override
     public void sessionStarted(ITestRunSession session) {
-        String name = session.getTestRunName();
+        String configId = session.getTestRunName();
         TrackedTestSession ts = sessions.computeIfAbsent(
-                name, TrackedTestSession::new);
+                configId, TrackedTestSession::new);
 
         // Resolve label from test tree
         ts.label = resolveLabel(session);
@@ -136,11 +135,11 @@ class TestSessionTracker extends TestRunListener {
         // Count total tests
         ts.total = countTests(session);
 
-        sessions.put(name, ts);
+        sessions.put(configId, ts);
 
         var startEvt = new JsonObject();
         startEvt.addProperty("event", "started");
-        startEvt.addProperty("session", name);
+        startEvt.addProperty("configId", configId);
         startEvt.addProperty("total", ts.total);
         if (ts.label != null)
             startEvt.addProperty("label", ts.label);
@@ -151,8 +150,8 @@ class TestSessionTracker extends TestRunListener {
 
     @Override
     public void testCaseFinished(ITestCaseElement tc) {
-        String sessionName = tc.getTestRunSession().getTestRunName();
-        TrackedTestSession ts = sessions.get(sessionName);
+        String configId = tc.getTestRunSession().getTestRunName();
+        TrackedTestSession ts = sessions.get(configId);
         if (ts == null) return;
 
         var result = tc.getTestResult(false);

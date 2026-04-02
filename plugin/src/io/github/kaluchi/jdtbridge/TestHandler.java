@@ -33,10 +33,7 @@ import org.osgi.framework.Version;
  */
 class TestHandler {
 
-    private final TestSessionTracker sessionTracker;
-
-    TestHandler(TestSessionTracker sessionTracker) {
-        this.sessionTracker = sessionTracker;
+    TestHandler() {
     }
 
     private static final String JUNIT_LAUNCH_TYPE =
@@ -220,11 +217,6 @@ class TestHandler {
         PreparedLaunch pl = prepareLaunch(params, errorOut);
         if (pl == null) return errorOut[0];
 
-        // Pre-register session so streaming clients can
-        // connect before sessionStarted fires
-        var ts = sessionTracker.preRegister(pl.configName());
-        ts.runner = pl.runner();
-
         ILaunch launch = pl.config().launch(
                 ILaunchManager.RUN_MODE,
                 new NullProgressMonitor(), true);
@@ -245,10 +237,6 @@ class TestHandler {
         String testRunId = launchTimestamp != null
                 ? configId + ":" + launchTimestamp
                 : configId;
-
-        // Register tracker under testRunId so streaming
-        // clients can find by exact testRunId
-        sessionTracker.registerAlias(testRunId, ts);
 
         var response = new JsonObject();
         response.addProperty("ok", true);
