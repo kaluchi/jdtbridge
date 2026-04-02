@@ -183,7 +183,7 @@ Add \`-q\` to suppress this guide.`;
  * Shared by test-run -f and test-status -f.
  * Returns exit code: 0 if all pass, 1 if any failures.
  */
-export async function followTestStream(session, args) {
+export async function followTestStream(configId, args) {
   const { getStreamLines } = await import("../client.mjs");
   const jsonFlag = args.includes("--json");
 
@@ -191,7 +191,7 @@ export async function followTestStream(session, args) {
   if (args.includes("--all")) filter = "all";
   else if (args.includes("--ignored")) filter = "ignored";
 
-  const url = `/test/status/stream?testRunId=${encodeURIComponent(session)}&filter=${filter}`;
+  const url = `/test/status/stream?testRunId=${encodeURIComponent(configId)}&filter=${filter}`;
 
   let detached = false;
   const onSigint = () => {

@@ -49,15 +49,12 @@ export async function testRun(args) {
   const configId = result.configId;
   const launchId = result.launchId;
   const testRunId = result.testRunId;
-  // test status API still uses "session" param — pass configId
-  // (will migrate to testRunId when TestSessionTracker is replaced)
-  const session = configId;
 
-  // Wait briefly for session to register total count
+  // Wait briefly for test run to register total count
   await sleep(500);
   try {
     const status = await get(
-      `/test/status?testRunId=${encodeURIComponent(session)}`,
+      `/test/status?testRunId=${encodeURIComponent(configId)}`,
       5_000,
     );
     if (status && !status.error && status.total > 0) {
@@ -78,7 +75,7 @@ export async function testRun(args) {
   const follow = args.includes("-f") || args.includes("--follow");
   if (follow) {
     if (!jsonFlag) console.log();
-    const exitCode = await followTestStream(session, args);
+    const exitCode = await followTestStream(configId, args);
     process.exit(exitCode);
   }
 
