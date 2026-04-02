@@ -122,7 +122,7 @@ Remaining attributes are shown with full Eclipse key names and all values
 With `--json`, outputs raw server response:
 ```json
 {
-  "name": "ObjectMapperTest",
+  "configId": "ObjectMapperTest",
   "type": "JUnit",
   "typeId": "org.eclipse.jdt.junit.launchconfig",
   "file": "/path/to/.metadata/.plugins/org.eclipse.debug.core/.launches/ObjectMapperTest.launch",
@@ -208,7 +208,7 @@ Fields vary by launch type. Only non-blank fields are included.
 `class` and `package` are mutually exclusive — `package` appears only
 when `class` is empty (package-level JUnit configs, parsed from CONTAINER).
 
-### `GET /launch/config?name=<configId>[&format=xml]`
+### `GET /launch/config?configId=<configId>[&format=xml]`
 
 Default: `{configId, type, typeId, file, attributes: {key: value, ...}}`
 
@@ -222,24 +222,24 @@ Attribute values preserve Eclipse types:
 - `Set<String>` -> JSON array
 - `Map<String, String>` -> JSON object
 
-### `GET /launch/run?name=<name>[&debug]`
+### `GET /launch/run?configId=<configId>[&debug]`
 
 Returns: `{ok, configId, launchId, mode, type, pid, cmdline, workingDir}`
 
-### `GET /launch/console?name=<launchId>[&tail=N][&stream=stdout|stderr]`
+### `GET /launch/console?launchId=<launchId>[&tail=N][&stream=stdout|stderr]`
 
 Accepts `launchId` (configId:pid) or plain `configId` for disambiguation.
 Returns: `{name, terminated, output}`
 
-### `GET /launch/console/stream?name=<launchId>[&tail=N][&stream=stdout|stderr]`
+### `GET /launch/console/stream?launchId=<launchId>[&tail=N][&stream=stdout|stderr]`
 
 SSE stream (text/plain). Streams console output until process terminates.
 
-### `GET /launch/stop?name=<launchId>`
+### `GET /launch/stop?launchId=<launchId>`
 
 Returns: `{ok, configId}`
 
-### `GET /launch/clear[?name=<launchId>]`
+### `GET /launch/clear[?launchId=<launchId>]`
 
 Returns: `{removed: N}`
 
