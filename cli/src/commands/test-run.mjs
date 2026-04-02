@@ -46,8 +46,14 @@ export async function testRun(args) {
     return;
   }
 
+  const configId = result.configId;
+  const launchId = result.launchId;
+  const testRunId = result.testRunId;
+  // test status API still uses "session" param — pass configId
+  // (will migrate to testRunId when TestSessionTracker is replaced)
+  const session = configId;
+
   // Wait briefly for session to register total count
-  const session = result.session;
   await sleep(500);
   try {
     const status = await get(
@@ -62,10 +68,12 @@ export async function testRun(args) {
     // ignore — total just won't be shown
   }
 
-  const launchId = result.pid ? `${session}:${result.pid}` : session;
+  // Enrich result with composed IDs for header/guide
+  result.launchId = launchId;
+  result.testRunId = testRunId;
 
   const jsonFlag = args.includes("--json");
-  if (!jsonFlag) console.log(formatTestRunHeader(result, launchId));
+  if (!jsonFlag) console.log(formatTestRunHeader(result));
 
   const follow = args.includes("-f") || args.includes("--follow");
   if (follow) {
@@ -76,7 +84,7 @@ export async function testRun(args) {
 
   const quiet = args.includes("-q") || args.includes("--quiet");
   if (!quiet) {
-    console.log(testRunGuide(session, launchId));
+    console.log(testRunGuide(testRunId, launchId));
   }
 }
 

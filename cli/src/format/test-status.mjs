@@ -137,14 +137,16 @@ function formatTime(t) {
  * Format the header printed at test run start.
  * Markdown-friendly: heading + backtick-wrapped values.
  */
-export function formatTestRunHeader(result, launchId) {
-  const label = result.label || result.session;
+export function formatTestRunHeader(result) {
+  const label = result.label || result.configId;
   const total = result.total ? ` (${result.total} tests)` : "";
   const parts = [`#### Test: ${label}${total}`];
-  parts.push(`Session:  \`${result.session}\``);
-  parts.push(`LaunchId: \`${launchId}\``);
-  if (result.project) parts.push(`Project:  \`${result.project}\``);
-  if (result.runner) parts.push(`Runner:   ${result.runner}`);
+  parts.push(`TestRunId: \`${result.testRunId}\``);
+  parts.push(`LaunchId:  \`${result.launchId}\``);
+  parts.push(`ConfigId:  \`${result.configId}\``);
+  parts.push(`Config:    ${result.reused ? "reused" : "created"}`);
+  if (result.project) parts.push(`Project:   \`${result.project}\``);
+  if (result.runner) parts.push(`Runner:    ${result.runner}`);
   return parts.join("\n");
 }
 
@@ -152,22 +154,22 @@ export function formatTestRunHeader(result, launchId) {
  * Onboarding guide printed after non-blocking launch.
  * Markdown-friendly: bold sections, backtick commands.
  */
-export function testRunGuide(session, launchId) {
+export function testRunGuide(testRunId, launchId) {
   return `
-**Test status** (session = ${session}):
-  \`jdt test status ${session}\`            failures only (default)
-  \`jdt test status ${session} -f\`         stream live until done
-  \`jdt test status ${session} --all\`      all tests including passed
-  \`jdt test status ${session} --ignored\`  only skipped/disabled tests
+**Test status** (testRunId = ${testRunId}):
+  \`jdt test status ${testRunId}\`            failures only (default)
+  \`jdt test status ${testRunId} -f\`         stream live until done
+  \`jdt test status ${testRunId} --all\`      all tests including passed
+  \`jdt test status ${testRunId} --ignored\`  only skipped/disabled tests
 
 **Console output** (launchId = ${launchId}):
   \`jdt launch logs ${launchId}\`
   \`jdt launch logs ${launchId} --tail 50\`
 
 **Manage:**
-  \`jdt test sessions\`                     list active/completed sessions
-  \`jdt launch stop ${launchId}\`           abort
-  \`jdt launch clear ${launchId}\`          remove
+  \`jdt test runs\`                          list test runs
+  \`jdt launch stop ${launchId}\`            abort
+  \`jdt launch clear ${launchId}\`           remove
 
 **Navigate** — FQMNs from status output are copy-pasteable:
   \`jdt source <FQMN>\`                     view test source

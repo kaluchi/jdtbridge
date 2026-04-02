@@ -65,7 +65,7 @@ describe("test commands", () => {
       if (req.url.includes("/test/run")) {
         expect(req.url).toContain("class=com.example.FooTest");
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: true, session: "jdtbridge-test-123", project: "my-project", runner: "JUnit 5" }));
+        res.end(JSON.stringify({ ok: true, configId: "FooTest", testRunId: "FooTest:1775000", launchId: "FooTest:100", pid: "100", reused: false, project: "my-project", runner: "JUnit 5" }));
       } else if (req.url.includes("/test/status")) {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ total: 5, label: "FooTest" }));
@@ -73,7 +73,7 @@ describe("test commands", () => {
     });
     const { testRun } = await import("../src/commands/test-run.mjs");
     await testRun(["com.example.FooTest", "-q"]);
-    expect(io.logs.some((l) => l.includes("jdtbridge-test-123"))).toBe(true);
+    expect(io.logs.some((l) => l.includes("FooTest"))).toBe(true);
   });
 
   it("test run sends project param", async () => {
@@ -81,7 +81,7 @@ describe("test commands", () => {
       if (req.url.includes("/test/run")) {
         expect(req.url).toContain("project=my-project");
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: true, session: "jdtbridge-test-456" }));
+        res.end(JSON.stringify({ ok: true, configId: "my-project", testRunId: "my-project:1775001", launchId: "my-project:200", pid: "200", reused: false }));
       } else if (req.url.includes("/test/status")) {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ total: 10, label: "my-project" }));
@@ -89,14 +89,14 @@ describe("test commands", () => {
     });
     const { testRun } = await import("../src/commands/test-run.mjs");
     await testRun(["--project", "my-project", "-q"]);
-    expect(io.logs.some((l) => l.includes("jdtbridge-test-456"))).toBe(true);
+    expect(io.logs.some((l) => l.includes("my-project"))).toBe(true);
   });
 
   it("test run prints onboarding guide without -q", async () => {
     await setupMock((req, res) => {
       if (req.url.includes("/test/run")) {
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: true, session: "jdtbridge-test-789" }));
+        res.end(JSON.stringify({ ok: true, configId: "FooTest", testRunId: "FooTest:1775002", launchId: "FooTest:300", pid: "300", reused: false }));
       } else if (req.url.includes("/test/status")) {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ total: 3, label: "FooTest" }));
@@ -133,7 +133,7 @@ describe("test commands", () => {
         expect(req.url).toContain("class=com.example.FooTest");
         expect(req.url).toContain("method=testBar");
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: true, session: "test-method-1" }));
+        res.end(JSON.stringify({ ok: true, configId: "FooTest", testRunId: "FooTest:1775003", launchId: "FooTest:400", pid: "400", reused: false }));
       } else if (req.url.includes("/test/status")) {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ total: 1 }));
@@ -141,7 +141,7 @@ describe("test commands", () => {
     });
     const { testRun } = await import("../src/commands/test-run.mjs");
     await testRun(["com.example.FooTest#testBar", "-q"]);
-    expect(io.logs.some((l) => l.includes("test-method-1"))).toBe(true);
+    expect(io.logs.some((l) => l.includes("FooTest"))).toBe(true);
   });
 
   it("test run sends package param", async () => {
@@ -150,7 +150,7 @@ describe("test commands", () => {
         expect(req.url).toContain("project=my-project");
         expect(req.url).toContain("package=com.example.dao");
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: true, session: "test-pkg-1" }));
+        res.end(JSON.stringify({ ok: true, configId: "com.example.service", testRunId: "com.example.service:1775004", launchId: "com.example.service:500", pid: "500", reused: false }));
       } else if (req.url.includes("/test/status")) {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ total: 5 }));
@@ -165,7 +165,7 @@ describe("test commands", () => {
       if (req.url.includes("/test/run")) {
         expect(req.url).toContain("no-refresh");
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: true, session: "test-norefresh-1" }));
+        res.end(JSON.stringify({ ok: true, configId: "FooTest", testRunId: "FooTest:1775005", launchId: "FooTest:600", pid: "600", reused: false }));
       } else if (req.url.includes("/test/status")) {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ total: 1 }));
@@ -179,7 +179,7 @@ describe("test commands", () => {
     await setupMock((req, res) => {
       if (req.url.includes("/test/run")) {
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: true, session: "test-fail-exit" }));
+        res.end(JSON.stringify({ ok: true, configId: "FailTest", testRunId: "FailTest:1775006", launchId: "FailTest:700", pid: "700", reused: false }));
       } else if (req.url.includes("/test/status/stream")) {
         res.writeHead(200, { "Content-Type": "application/x-ndjson" });
         res.write(JSON.stringify({ event: "finished", total: 2, passed: 1, failed: 1, errors: 0, ignored: 0, time: 1.0 }) + "\n");
@@ -197,7 +197,7 @@ describe("test commands", () => {
     await setupMock((req, res) => {
       if (req.url.includes("/test/run")) {
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: true, session: "test-pass-exit" }));
+        res.end(JSON.stringify({ ok: true, configId: "PassTest", testRunId: "PassTest:1775007", launchId: "PassTest:800", pid: "800", reused: false }));
       } else if (req.url.includes("/test/status/stream")) {
         res.writeHead(200, { "Content-Type": "application/x-ndjson" });
         res.write(JSON.stringify({ event: "finished", total: 2, passed: 2, failed: 0, errors: 0, ignored: 0, time: 1.0 }) + "\n");
@@ -215,7 +215,7 @@ describe("test commands", () => {
     await setupMock((req, res) => {
       if (req.url.includes("/test/run")) {
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: true, session: "test-stream-1" }));
+        res.end(JSON.stringify({ ok: true, configId: "test-stream-1", pid: "900" }));
       } else if (req.url.includes("/test/status/stream")) {
         res.writeHead(200, { "Content-Type": "application/x-ndjson" });
         res.write(JSON.stringify({ event: "case", fqmn: "Foo#bar", status: "FAIL", time: 0.1, trace: "err" }) + "\n");
@@ -237,7 +237,7 @@ describe("test commands", () => {
     await setupMock((req, res) => {
       if (req.url.includes("/test/run")) {
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: true, session: "test-jsonl-1" }));
+        res.end(JSON.stringify({ ok: true, configId: "JsonlTest", testRunId: "JsonlTest:1775009", launchId: "JsonlTest:901", pid: "901", reused: false }));
       } else if (req.url.includes("/test/status/stream")) {
         res.writeHead(200, { "Content-Type": "application/x-ndjson" });
         res.write(JSON.stringify({ event: "case", fqmn: "Foo#bar", status: "PASS", time: 0.1 }) + "\n");
@@ -266,7 +266,7 @@ describe("test commands", () => {
     await setupMock((req, res) => {
       if (req.url.includes("/test/run")) {
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: true, session: "test-jsonl-hdr" }));
+        res.end(JSON.stringify({ ok: true, configId: "HdrTest", testRunId: "HdrTest:1775010", launchId: "HdrTest:902", pid: "902", reused: false }));
       } else if (req.url.includes("/test/status/stream")) {
         res.writeHead(200, { "Content-Type": "application/x-ndjson" });
         res.write(JSON.stringify({ event: "finished", total: 0, passed: 0, failed: 0, errors: 0, ignored: 0, time: 0 }) + "\n");

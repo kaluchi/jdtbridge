@@ -194,85 +194,96 @@ describe("formatTestEvent", () => {
 
 describe("formatTestRunHeader", () => {
   it("includes markdown heading with label", () => {
-    const header = formatTestRunHeader({ session: "test-1", label: "FooTest" });
+    const header = formatTestRunHeader({ configId: "test-1", label: "FooTest", testRunId: "test-1:999", launchId: "test-1:100" });
     expect(header).toContain("#### Test: FooTest");
   });
 
-  it("includes launch session in backticks", () => {
-    const header = formatTestRunHeader({ session: "jdtbridge-test-123" });
-    expect(header).toContain("`jdtbridge-test-123`");
+  it("includes all three IDs", () => {
+    const header = formatTestRunHeader({ configId: "FooTest", testRunId: "FooTest:1775000", launchId: "FooTest:555" });
+    expect(header).toContain("TestRunId:");
+    expect(header).toContain("`FooTest:1775000`");
+    expect(header).toContain("LaunchId:");
+    expect(header).toContain("`FooTest:555`");
+    expect(header).toContain("ConfigId:");
+    expect(header).toContain("`FooTest`");
   });
 
   it("includes project and runner", () => {
     const header = formatTestRunHeader({
-      session: "test-1", label: "FooTest", project: "my-project", runner: "JUnit 5",
+      configId: "test-1", label: "FooTest", testRunId: "test-1:999", launchId: "test-1:100",
+      project: "my-project", runner: "JUnit 5",
     });
-    expect(header).toContain("Project: `my-project`");
-    expect(header).toContain("Runner: JUnit 5");
+    expect(header).toContain("my-project");
+    expect(header).toContain("JUnit 5");
   });
 
   it("includes total count", () => {
     const header = formatTestRunHeader({
-      session: "test-1", label: "FooTest", total: 42,
+      configId: "test-1", label: "FooTest", total: 42, testRunId: "test-1:999", launchId: "test-1:100",
     });
     expect(header).toContain("42 tests");
   });
 
-  it("handles missing optional fields", () => {
-    const header = formatTestRunHeader({ session: "test-1" });
-    expect(header).toContain("#### Test:");
-    expect(header).toContain("`test-1`");
-    expect(header).not.toContain("Project:");
-    expect(header).not.toContain("Runner:");
+  it("shows reused or created", () => {
+    const reused = formatTestRunHeader({ configId: "t", reused: true, testRunId: "t:1", launchId: "t:1" });
+    expect(reused).toContain("reused");
+    const created = formatTestRunHeader({ configId: "t", reused: false, testRunId: "t:1", launchId: "t:1" });
+    expect(created).toContain("created");
   });
+
 });
 
 describe("testRunGuide", () => {
-  it("includes session name in status commands", () => {
-    const guide = testRunGuide("my-session");
-    expect(guide).toContain("jdt test status my-session");
-    expect(guide).toContain("jdt test status my-session -f");
+  it("includes testRunId in status commands", () => {
+    const guide = testRunGuide("FooTest:1775000", "FooTest:123");
+    expect(guide).toContain("jdt test status FooTest:1775000");
+    expect(guide).toContain("jdt test status FooTest:1775000 -f");
   });
 
-  it("includes 'jdt launch logs' command", () => {
-    const guide = testRunGuide("my-session");
-    expect(guide).toContain("jdt launch logs my-session");
+  it("includes launchId in launch logs command", () => {
+    const guide = testRunGuide("FooTest:1775000", "FooTest:123");
+    expect(guide).toContain("jdt launch logs FooTest:123");
   });
 
-  it("includes 'jdt launch stop' command", () => {
-    const guide = testRunGuide("my-session");
-    expect(guide).toContain("jdt launch stop my-session");
+  it("includes launchId in launch stop command", () => {
+    const guide = testRunGuide("FooTest:1775000", "FooTest:123");
+    expect(guide).toContain("jdt launch stop FooTest:123");
   });
 
   it("includes 'jdt source' hint", () => {
-    const guide = testRunGuide("my-session");
+    const guide = testRunGuide("FooTest:1775000", "FooTest:123");
     expect(guide).toContain("jdt source");
   });
 
   it("includes --all flag explanation", () => {
-    const guide = testRunGuide("my-session");
+    const guide = testRunGuide("FooTest:1775000", "FooTest:123");
     expect(guide).toContain("--all");
     expect(guide).toContain("including passed");
   });
 
   it("includes --ignored flag explanation", () => {
-    const guide = testRunGuide("my-session");
+    const guide = testRunGuide("FooTest:1775000", "FooTest:123");
     expect(guide).toContain("--ignored");
     expect(guide).toContain("skipped");
   });
 
-  it("includes jdt launch clear command", () => {
-    const guide = testRunGuide("my-session");
-    expect(guide).toContain("jdt launch clear my-session");
+  it("includes launchId in launch clear command", () => {
+    const guide = testRunGuide("FooTest:1775000", "FooTest:123");
+    expect(guide).toContain("jdt launch clear FooTest:123");
+  });
+
+  it("includes jdt test runs command", () => {
+    const guide = testRunGuide("FooTest:1775000", "FooTest:123");
+    expect(guide).toContain("jdt test runs");
   });
 
   it("includes jdt test run rerun command", () => {
-    const guide = testRunGuide("my-session");
+    const guide = testRunGuide("FooTest:1775000", "FooTest:123");
     expect(guide).toContain("jdt test run <FQMN> -f");
   });
 
   it("includes -q suppression note", () => {
-    const guide = testRunGuide("my-session");
+    const guide = testRunGuide("FooTest:1775000", "FooTest:123");
     expect(guide).toContain("-q");
     expect(guide).toContain("suppress");
   });
