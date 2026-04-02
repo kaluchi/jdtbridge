@@ -295,13 +295,14 @@ Refactoring:
   move <FQN> <target.package>                 move type to another package
 
 Launches:
-  launch list                                 list launches (running + terminated)
   launch configs                              list saved launch configurations
-  launch run <config> [-f] [-q]               launch a configuration
-  launch debug <config> [-f] [-q]             launch in debug mode
-  launch logs <name> [-f] [--tail N]          show console output
-  launch stop <name>                          stop a running launch
-  launch clear [name]                         remove terminated launches
+  launch config <configId> [--xml] [--json]   show configuration details
+  launch run <configId> [-f] [-q]             launch a configuration
+  launch debug <configId> [-f] [-q]           launch in debug mode
+  launch list                                 list launches (running + terminated)
+  launch logs <launchId> [-f] [--tail N]      show console output
+  launch stop <launchId>                      stop a running launch
+  launch clear [launchId]                     remove terminated launches
 
 Editor:
   open <FQMN>                                 open in Eclipse editor
