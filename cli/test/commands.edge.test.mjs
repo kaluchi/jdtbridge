@@ -36,13 +36,13 @@ describe("command edge cases", () => {
     expect(io.logs[0]).toBe("(no implementors)");
   });
 
-  it("implementors shows no implementors message", async () => {
+  it("implementors with method shows no implementors message", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end("[]");
     });
     const { implementors } = await import("../src/commands/implementors.mjs");
-    await implementors(["app.Foo", "m"]);
+    await implementors(["app.Foo#m"]);
     expect(io.logs[0]).toBe("(no implementors)");
   });
 

@@ -347,7 +347,6 @@ class SearchHandler {
         return result.toString();
     }
 
-
     String handleTypeInfo(Map<String, String> params) throws Exception {
         String fqn = params.get("class");
         if (fqn == null || fqn.isBlank()) {

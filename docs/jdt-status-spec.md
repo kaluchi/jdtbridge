@@ -31,12 +31,12 @@ suppressed by `-q` or when specific sections are requested.
 ## Section order
 
 ```
-intro → git → editors → errors → launch-configs → launches → tests → projects → help → guide
+intro → git → editors → problems → launch-configs → launches → tests → projects → help → guide
 ```
 
 The order follows a workflow narrative:
 1. **Context** (intro) — what is this?
-2. **Code state** (git, editors, errors) — what's being worked on?
+2. **Code state** (git, editors, problems) — what's being worked on?
 3. **Execution** (launch-configs, launches, tests) — what's configured, running, tested?
 4. **Structure** (projects) — what exists in the workspace?
 5. **Reference** (help) — full command list
@@ -52,7 +52,7 @@ and launches are the "what is running" — definition before state.
 Multiple sections: each wrapped in `## Title` + `` ```bash `` code block.
 Each data section includes a description before the code fence — Eclipse-
 specific context (view names, key concepts). Descriptions are suppressed
-by `-q`. Single section (`jdt status errors`): bare output, no header,
+by `-q`. Single section (`jdt status problems`): bare output, no header,
 description, or fence.
 
 ```
@@ -188,13 +188,13 @@ refreshable.
   it's a clean data-only screenshot — no teaching, just state. First
   call: no `-q`. Subsequent refreshes: `-q`.
 
-- **Single section = bare output.** `jdt status errors` returns just the
-  errors output, no `##` header or code fence. This makes single-section
+- **Single section = bare output.** `jdt status problems` returns just the
+  problems output, no `##` header or code fence. This makes single-section
   calls drop-in replacements for the standalone command.
 
-- **Errors use JSON.** Unlike other sections that show text tables,
-  errors renders `--json` output. An empty `[]` is clearer than
-  "(no errors)" for programmatic consumption and agent context.
+- **Problems use JSON.** Unlike other sections that show text tables,
+  problems renders `--json` output. An empty `[]` is clearer than
+  "(no problems)" for programmatic consumption and agent context.
 
 ## Constraints
 
