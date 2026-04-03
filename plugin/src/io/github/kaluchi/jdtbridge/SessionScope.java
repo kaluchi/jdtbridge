@@ -45,6 +45,7 @@ class SessionScope {
         }
 
         String workingDir;
+        boolean projectScope;
         try {
             String json = Files.readString(sessionFile);
             JsonObject obj = JsonParser.parseString(json)
@@ -52,9 +53,15 @@ class SessionScope {
             workingDir = obj.has("workingDir")
                     ? obj.get("workingDir").getAsString()
                     : null;
+            projectScope = !obj.has("projectScope")
+                    || obj.get("projectScope").getAsBoolean();
         } catch (IOException | RuntimeException e) {
             Log.warn("Failed to read session file: "
                     + sessionFile, e);
+            return ProjectScope.ALL;
+        }
+
+        if (!projectScope) {
             return ProjectScope.ALL;
         }
 

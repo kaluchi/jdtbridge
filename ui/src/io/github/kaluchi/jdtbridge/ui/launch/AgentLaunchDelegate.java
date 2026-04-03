@@ -68,6 +68,8 @@ public class AgentLaunchDelegate
 			Activator.PLUGIN_ID + ".workingDir";
 	public static final String ATTR_AGENT_ARGS =
 			Activator.PLUGIN_ID + ".agentArgs";
+	public static final String ATTR_PROJECT_SCOPE =
+			Activator.PLUGIN_ID + ".projectScope";
 
 	@Override
 	public void launch(ILaunchConfiguration config, String mode,
@@ -78,6 +80,8 @@ public class AgentLaunchDelegate
 		String agent = config.getAttribute(ATTR_AGENT, "claude");
 		String workDirRaw = config.getAttribute(ATTR_WORKING_DIR, "");
 		String agentArgs = config.getAttribute(ATTR_AGENT_ARGS, "");
+		boolean projectScope = config.getAttribute(
+				ATTR_PROJECT_SCOPE, true);
 		String bridgeSessionId = config.getName() + "-"
 				+ System.currentTimeMillis();
 
@@ -104,7 +108,7 @@ public class AgentLaunchDelegate
 
 		Path sessionFile = writeSessionFile(
 				bridgeSessionId, provider, agent, workDir, agentArgs,
-				bridge, envVars);
+				projectScope, bridge, envVars);
 
 		try {
 			ProcessBuilder pb = ProcessUtil.command(
@@ -128,7 +132,8 @@ public class AgentLaunchDelegate
 
 	private Path writeSessionFile(String bridgeSessionId, String provider,
 			String agent, String workDir, String agentArgs,
-			BridgeConnection bridge, Map<String, String> envVars)
+			boolean projectScope, BridgeConnection bridge,
+			Map<String, String> envVars)
 			throws CoreException {
 		Path sessionsDir = BridgeConnection.resolveHome()
 				.resolve("sessions");
@@ -143,6 +148,7 @@ public class AgentLaunchDelegate
 			obj.addProperty("bridgePort", bridge.port);
 			obj.addProperty("bridgeToken", bridge.token);
 			obj.addProperty("bridgeHost", "127.0.0.1");
+			obj.addProperty("projectScope", projectScope);
 			if (agentArgs != null && !agentArgs.isBlank()) {
 				obj.addProperty("agentArgs", agentArgs.trim());
 			}
