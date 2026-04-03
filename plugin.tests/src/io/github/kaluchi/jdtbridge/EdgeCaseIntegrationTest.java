@@ -182,7 +182,7 @@ public class EdgeCaseIntegrationTest {
 
     @Test
     public void subtypesOfAbstract() throws Exception {
-        String json = search.handleSubtypes(
+        String json = search.handleImplementors(
                 Map.of("class", "test.edge.AbstractPet"), ProjectScope.ALL);
         JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
         assertNotNull(findByFqn(arr, "test.edge.Parrot"),
@@ -203,7 +203,7 @@ public class EdgeCaseIntegrationTest {
 
     @Test
     public void deepSubtypesOfAnimal() throws Exception {
-        String json = search.handleSubtypes(
+        String json = search.handleImplementors(
                 Map.of("class", "test.model.Animal"), ProjectScope.ALL);
         JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
         assertNotNull(findByFqn(arr, "test.model.Dog"),

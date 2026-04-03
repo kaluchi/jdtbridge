@@ -102,7 +102,7 @@ lifecycle management through `jdt` CLI.
 | # | Stakeholder | Commands used | Examples |
 |---|-------------|--------------|---------|
 | 1 | **Agent process** | Working commands | `jdt refs`, `jdt find`, `jdt build`, `jdt test run` |
-| 2 | **User in terminal** | Same as agent | `jdt refs`, `jdt find`, `! jdt errors` |
+| 2 | **User in terminal** | Same as agent | `jdt refs`, `jdt find`, `! jdt problems` |
 | 3 | **Eclipse plugin** | Service/admin | `jdt setup --check`, `jdt agent run/stop/list` |
 | 4 | **User launching agents** | Agent lifecycle | `jdt agent run`, `jdt agent stop` |
 

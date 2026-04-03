@@ -126,27 +126,27 @@ describe("--json output", () => {
     expect(data).toEqual([]);
   });
 
-  it("subtypes --json outputs valid JSON", async () => {
+  it("implementors --json outputs valid JSON", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
         { fqn: "com.example.FooImpl", file: "/my-server/src/FooImpl.java" },
       ]));
     });
-    const { subtypes } = await import("../src/commands/subtypes.mjs");
-    await subtypes(["com.example.Foo", "--json"]);
+    const { implementors } = await import("../src/commands/implementors.mjs");
+    await implementors(["com.example.Foo", "--json"]);
     const data = parseJsonOutput(io.logs);
     expect(data).toBeInstanceOf(Array);
     expect(data[0].fqn).toBe("com.example.FooImpl");
   });
 
-  it("subtypes --json returns [] for no results", async () => {
+  it("implementors --json returns [] for no results", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end("[]");
     });
-    const { subtypes } = await import("../src/commands/subtypes.mjs");
-    await subtypes(["com.example.Foo", "--json"]);
+    const { implementors } = await import("../src/commands/implementors.mjs");
+    await implementors(["com.example.Foo", "--json"]);
     const data = parseJsonOutput(io.logs);
     expect(data).toEqual([]);
   });
@@ -229,8 +229,8 @@ describe("--json output", () => {
         { severity: "ERROR", source: "JDT", file: "D:/projects/my-server/src/Foo.java", line: 10, message: "cannot resolve symbol" },
       ]));
     });
-    const { errors } = await import("../src/commands/errors.mjs");
-    await errors(["--json"]);
+    const { problems } = await import("../src/commands/problems.mjs");
+    await problems(["--json"]);
     const data = parseJsonOutput(io.logs);
     expect(data).toBeInstanceOf(Array);
     expect(data[0].severity).toBe("ERROR");
@@ -239,13 +239,13 @@ describe("--json output", () => {
     expect(data[0].file).toBe(toSandboxPath("D:/projects/my-server/src/Foo.java"));
   });
 
-  it("errors --json returns [] for no errors", async () => {
+  it("problems --json returns [] for no problems", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end("[]");
     });
-    const { errors } = await import("../src/commands/errors.mjs");
-    await errors(["--json"]);
+    const { problems } = await import("../src/commands/problems.mjs");
+    await problems(["--json"]);
     const data = parseJsonOutput(io.logs);
     expect(data).toEqual([]);
   });
@@ -518,8 +518,8 @@ describe("--json output", () => {
         { severity: "ERROR", source: "JDT", file: "D:/projects/my-server/src/Foo.java", line: 10, message: "bad" },
       ]));
     });
-    const { errors } = await import("../src/commands/errors.mjs");
-    await errors([]);
+    const { problems } = await import("../src/commands/problems.mjs");
+    await problems([]);
     expect(io.logs[0]).toContain("ERROR");
     expect(io.logs[0]).toContain("bad");
     expect(() => JSON.parse(io.logs.join("\n"))).toThrow(); // not JSON

@@ -4,7 +4,7 @@ import { toWsPath, toSandboxPath } from "../paths.mjs";
 import { output } from "../output.mjs";
 import { red, yellow } from "../color.mjs";
 
-export async function errors(args) {
+export async function problems(args) {
   const flags = parseFlags(args);
   const params = [];
   if (flags.file) params.push(`file=${encodeURIComponent(toWsPath(flags.file))}`);
@@ -12,13 +12,13 @@ export async function errors(args) {
   if (flags.warnings) params.push("warnings");
   if (flags.all) params.push("all");
 
-  let url = "/errors";
+  let url = "/problems";
   if (params.length > 0) url += "?" + params.join("&");
 
   const data = await get(url, 180_000);
 
   output(args, data, {
-    empty: "(no errors)",
+    empty: "(no problems)",
     text(data) {
       for (const r of data) {
         const sev = r.severity === "ERROR" ? red("ERROR") : yellow("WARN ");
@@ -29,9 +29,9 @@ export async function errors(args) {
   });
 }
 
-export const help = `Check compilation errors and diagnostics.
+export const help = `Eclipse Problems view — IMarker.PROBLEM markers.
 
-Usage:  jdt errors [--file <path>] [--project <name>]
+Usage:  jdt problems [--file <path>] [--project <name>]
                    [--warnings] [--all] [--json]
 
 Scope (pick one or omit for entire workspace):
@@ -47,7 +47,7 @@ Refreshes from disk and waits for auto-build before reading markers.
 Use 'jdt build' to trigger explicit builds.
 
 Examples:
-  jdt errors --project my-server
-  jdt errors --file my-server/src/main/java/.../Foo.java
-  jdt errors --project my-server --all --warnings
-  jdt errors --project my-server --json`;
+  jdt problems --project my-server
+  jdt problems --file my-server/src/main/java/.../Foo.java
+  jdt problems --project my-server --all --warnings
+  jdt problems --project my-server --json`;

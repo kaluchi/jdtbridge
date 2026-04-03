@@ -37,6 +37,15 @@ export function toSandboxPath(p) {
 }
 
 /**
+ * Format line range for display.
+ * Returns ":startLine-endLine" or "(no source)" when lines are unavailable.
+ */
+export function formatLineRange(startLine, endLine) {
+  if (startLine < 0) return " (source not attached)";
+  return `:${startLine}-${endLine}`;
+}
+
+/**
  * Convert Windows host path to Docker sandbox Linux path.
  * Always converts (runs on host to build paths for sandbox commands).
  * Non-drive paths get backslash normalization only.

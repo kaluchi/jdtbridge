@@ -243,11 +243,11 @@ public class SearchIntegrationTest {
         assertEquals(0, parseArray(json).size());
     }
 
-    // ---- /subtypes ----
+    // ---- /implementors (type mode) ----
 
     @Test
     public void subtypesOfInterface() throws Exception {
-        String json = handler.handleSubtypes(
+        String json = handler.handleImplementors(
                 Map.of("class", "test.model.Animal"), ALL);
         JsonArray arr = parseArray(json);
         assertNotNull(findByFqn(arr, "test.model.Dog"),
@@ -258,7 +258,7 @@ public class SearchIntegrationTest {
 
     @Test
     public void subtypesOfClass() throws Exception {
-        String json = handler.handleSubtypes(
+        String json = handler.handleImplementors(
                 Map.of("class", "test.model.Dog"), ALL);
         assertEquals(0, parseArray(json).size(),
                 "Dog has no subtypes");
@@ -266,7 +266,7 @@ public class SearchIntegrationTest {
 
     @Test
     public void subtypesNotFound() throws Exception {
-        String json = handler.handleSubtypes(
+        String json = handler.handleImplementors(
                 Map.of("class", "no.such.Type"), ALL);
         JsonObject obj = JsonParser.parseString(json)
                 .getAsJsonObject();
@@ -275,7 +275,7 @@ public class SearchIntegrationTest {
 
     @Test
     public void subtypesRejectsObject() throws Exception {
-        String json = handler.handleSubtypes(
+        String json = handler.handleImplementors(
                 Map.of("class", "java.lang.Object"), ALL);
         JsonObject obj = JsonParser.parseString(json)
                 .getAsJsonObject();
@@ -363,7 +363,7 @@ public class SearchIntegrationTest {
         assertNotNull(obj.get("error"));
     }
 
-    // ---- /implementors ----
+    // ---- /implementors (method mode) ----
 
     @Test
     public void implementorsOfInterfaceMethod() throws Exception {

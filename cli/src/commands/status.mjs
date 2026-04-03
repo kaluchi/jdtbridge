@@ -3,7 +3,7 @@
  * Each section maps to a standalone jdt command for incremental refresh.
  *
  * Architecture:
- *   Renderer  — returns { title, cmd, body } (pure data, no formatting)
+ *   Renderer  — returns { title, cmd, body, description? } (pure data)
  *   Compositor — assembles sections into markdown with code fences
  *   Helpers   — reposFromServer, gitCmd, ago (stateless utilities)
  */
@@ -13,7 +13,7 @@ import { basename } from "node:path";
 
 // ---- Public API ----
 
-const SECTION_NAMES = ["intro", "git", "editors", "errors", "launch-configs", "launches", "tests", "projects", "guide"];
+const SECTION_NAMES = ["intro", "git", "editors", "problems", "launch-configs", "launches", "tests", "projects", "help", "guide"];
 
 export async function status(args) {
   const jsonFlag = args.includes("--json");
@@ -21,10 +21,10 @@ export async function status(args) {
   const requested = args.filter((a) => !a.startsWith("-"));
   const sections = requested.length > 0
     ? requested.filter((s) => SECTION_NAMES.includes(s))
-    : SECTION_NAMES.filter((s) => s !== "guide");
+    : SECTION_NAMES.filter((s) => s !== "guide" && s !== "help");
 
   if (jsonFlag) {
-    const dataSections = sections.filter((s) => s !== "intro" && s !== "guide");
+    const dataSections = sections.filter((s) => !new Set(["intro", "guide", "help"]).has(s));
     const result = {};
     for (const name of dataSections) {
       const cmd = JSON_COMMANDS[name];
@@ -39,6 +39,7 @@ export async function status(args) {
     return;
   }
 
+  const META_SECTIONS = new Set(["intro", "guide", "help"]);
   const results = [];
 
   const showExtras = !quiet && requested.length === 0;
@@ -46,36 +47,42 @@ export async function status(args) {
   if (showExtras || sections.includes("intro")) results.push(introSection());
 
   for (const name of sections) {
-    if (name === "intro" || name === "guide") continue;
+    if (META_SECTIONS.has(name)) continue;
     const renderer = RENDERERS[name];
     if (renderer) results.push(await renderer());
   }
 
+  // Help before guide
+  if (showExtras || sections.includes("help")) results.push(helpSection());
   // Guide last
   if (showExtras) results.push(guideSection());
   if (sections.includes("guide") && !showExtras) results.push(guideSection());
 
-  const single = results.length === 1;
-  console.log(results.map((s) => formatSection(s, single)).join("\n\n"));
+  const bare = results.length === 1;
+  console.log(results.map((s) => formatSection(s, { bare, quiet })).join("\n\n"));
 }
 
 // ---- Compositor ----
 
 /**
  * Format a section object into markdown.
- * Single section: no ## header, just ```bash block.
- * Multiple sections: ## Title + ```bash block.
+ *
+ * @param {Object} section - { title, cmd, body, description? }
+ * @param {Object} opts
+ * @param {boolean} opts.bare  - single section: body only, no header/fence
+ * @param {boolean} opts.quiet - suppress description
  */
-function formatSection({ title, cmd, body }, single) {
-  if (single) return body;
-  return `## ${title}\n\n\`\`\`bash\n$ ${cmd}\n${body}\n\`\`\``;
+function formatSection({ title, cmd, body, description }, { bare, quiet }) {
+  if (bare) return body;
+  const desc = (!quiet && description) ? description + "\n\n" : "";
+  return `## ${title}\n\n${desc}\`\`\`bash\n$ ${cmd}\n${body}\n\`\`\``;
 }
 
 /** JSON commands for --json composite output. */
 const JSON_COMMANDS = {
   git: "jdt git --json",
   editors: "jdt editors --json",
-  errors: "jdt errors --json",
+  problems: "jdt problems --json",
   "launch-configs": "jdt launch configs --json",
   launches: "jdt launch list --json",
   tests: "jdt test runs --json",
@@ -87,7 +94,7 @@ const JSON_COMMANDS = {
 const RENDERERS = {
   git: renderGit,
   editors: renderEditors,
-  errors: renderErrors,
+  problems: renderProblems,
   "launch-configs": renderLaunchConfigs,
   launches: renderLaunches,
   tests: renderTests,
@@ -95,31 +102,73 @@ const RENDERERS = {
 };
 
 async function renderGit() {
-  return { title: "Git", cmd: "jdt git list --no-files", body: cliCmd("jdt git list --no-files") };
+  return {
+    title: "Git", cmd: "jdt git list --no-files",
+    body: cliCmd("jdt git list --no-files"),
+    description:
+      "Eclipse EGit — Git Repositories view, Team menu.\n"
+      + "REPO from project locations. BRANCH = HEAD ref. STATUS = git status.",
+  };
 }
 
 async function renderEditors() {
-  return { title: "Editors", cmd: "jdt editors", body: cliCmd("jdt editors") };
+  return {
+    title: "Editors", cmd: "jdt editors",
+    body: cliCmd("jdt editors"),
+    description:
+      "Eclipse editor area — open tabs. Active tab marked >.\n"
+      + "jdt open <FQMN> opens a type in the Java Editor (F3 equivalent).",
+  };
 }
 
-async function renderErrors() {
-  return { title: "Errors", cmd: "jdt errors --json", body: cliCmd("jdt errors --json") };
+async function renderProblems() {
+  return {
+    title: "Problems", cmd: "jdt problems --json",
+    body: cliCmd("jdt problems --json"),
+    description:
+      "Eclipse Problems view — IMarker.PROBLEM markers (errors, warnings).\n"
+      + "Updated on every build. [] = clean workspace.",
+  };
 }
 
 async function renderLaunchConfigs() {
-  return { title: "Launch Configs", cmd: "jdt launch configs", body: cliCmd("jdt launch configs") };
+  return {
+    title: "Launch Configs", cmd: "jdt launch configs",
+    body: cliCmd("jdt launch configs"),
+    description:
+      "Eclipse Run Configurations dialog (Run > Run Configurations...).\n"
+      + "CONFIGTYPE = ILaunchConfigurationType. CONFIGID = launch config name.",
+  };
 }
 
 async function renderLaunches() {
-  return { title: "Launches", cmd: "jdt launch list", body: cliCmd("jdt launch list") };
+  return {
+    title: "Launches", cmd: "jdt launch list",
+    body: cliCmd("jdt launch list"),
+    description:
+      "Eclipse Debug view + Console view. Running and terminated processes.\n"
+      + "LaunchId = handle for jdt launch logs/stop/clear.",
+  };
 }
 
 async function renderTests() {
-  return { title: "Tests", cmd: "jdt test runs", body: cliCmd("jdt test runs") };
+  return {
+    title: "Tests", cmd: "jdt test runs",
+    body: cliCmd("jdt test runs"),
+    description:
+      "Eclipse JUnit view. PDE test runner for plugin tests, JUnit for plain.\n"
+      + "TestRunId = handle for jdt test status.",
+  };
 }
 
 async function renderProjects() {
-  return { title: "Projects", cmd: "jdt projects", body: cliCmd("jdt projects") };
+  return {
+    title: "Projects", cmd: "jdt projects",
+    body: cliCmd("jdt projects"),
+    description:
+      "Eclipse Package Explorer / Project Explorer.\n"
+      + "LOCATION = filesystem path. REPO = git root if EGit-managed.",
+  };
 }
 
 function introSection() {
@@ -135,17 +184,20 @@ running instance. Same IDE, different interface.
 
 The sections below are live output from that instance.
 Each section is produced by a command shown in its header:
-  ## Intro      -> jdt status intro
-  ## Git        -> jdt status git
-  ## Editors    -> jdt status editors
-  ...
-  ## Guide      -> jdt status guide
-That command can be run standalone for a fresh snapshot: jdt status errors
-Several commands can be combined in one call: jdt status git editors projects
-Beyond this dashboard, jdt has 30+ more commands.
-Run jdt help for the full reference.
+  ## Git     -> jdt status git
+  ## Problems -> jdt status problems
+That command can be run standalone for a fresh snapshot.
+Several commands can be combined: jdt status git editors projects
 
--q suppresses this intro and the guide at the end.`,
+-q suppresses intro, help, guide, and section descriptions.`,
+  };
+}
+
+function helpSection() {
+  return {
+    title: "Help",
+    cmd: "jdt help",
+    body: cliCmd("jdt help"),
   };
 }
 
@@ -153,49 +205,18 @@ function guideSection() {
   return {
     title: "Guide",
     cmd: "jdt status guide",
-    body: `This dashboard is a composite of standalone commands.
-Refresh the full dashboard or individual sections.
--q suppresses this guide. Selecting sections suppresses it too.
+    body: `After editing code:
 
-  jdt status                  all sections + intro + guide
-  jdt status -q               all sections, no intro/guide
-  jdt status intro            only intro
-  jdt status git              only git repos and branches
-  jdt status editors          only open editor tabs
-  jdt status errors           only compilation errors
-  jdt status launch-configs   only saved launch configurations
-  jdt status launches         only running launches
-  jdt status tests            only test results
-  jdt status projects         only project list
-  jdt status guide            only this guide
-
-Each section can also be refreshed with its standalone command:
-
-  jdt git                     same as jdt status git
-  jdt editors                 same as jdt status editors
-  jdt errors                  compilation errors (with --project for one project)
-  jdt launch configs          same as jdt status launch-configs
-  jdt launch list             same as jdt status launches
-  jdt test runs               same as jdt status tests
-  jdt projects                same as jdt status projects
-
-Combine sections for focused refresh:
-
-  jdt status editors errors   what's open + what's broken
-  jdt status git tests        repo state + test results
-  jdt status git projects     repos + project list
-
-Specialized refresh after editing code:
-
-  jdt errors                  check compilation after edit
-  jdt errors --project X      check one project only (faster)
+  jdt problems                check compilation after edit
+  jdt problems --project X    check one project only (faster)
   jdt test run FQN -f -q      run one test, stream result
   jdt build --project X       trigger build if auto-build is off
 
-For full command reference:
+Refreshing the dashboard:
 
-  jdt help                    all available commands
-  jdt help <command>          detailed usage for a command`,
+  jdt status -q               all sections, no intro/help/guide
+  jdt status editors problems   combine specific sections
+  jdt help <command>          detailed usage for any command`,
   };
 }
 
@@ -253,7 +274,7 @@ export function ago(ms) {
 }
 
 // Exported for compositor testing
-export { formatSection, guideSection, SECTION_NAMES, JSON_COMMANDS };
+export { formatSection, helpSection, guideSection, SECTION_NAMES, JSON_COMMANDS };
 
 export const help = `CLI screenshot of Eclipse — composite view of IDE state.
 
@@ -263,22 +284,21 @@ Sections (default: all):
   intro           context for AI agents (shown by default, suppressed by -q)
   git             git repos, branches, modified files
   editors         open editor tabs (active first)
-  errors          compilation errors
+  problems        IMarker.PROBLEM (errors, warnings)
   launch-configs  saved launch configurations (name, type, project, target)
   launches        running launches
   tests           recent test sessions
   projects        workspace projects with repo mapping
-  guide           usage guide (shown by default, suppressed by -q)
+  help            full jdt command reference (shown by default, suppressed by -q)
+  guide           hints and patterns (shown by default, suppressed by -q)
 
 Options:
+  -q, --quiet  suppress meta-sections (intro, help, guide) and descriptions
   --json       composite JSON of all data sections
 
 Examples:
   jdt status                    full dashboard
-  jdt status -q                 full dashboard, no intro/guide
-  jdt status intro              only intro
-  jdt status editors errors     only editors + errors
-  jdt status git                only git state
-  jdt status guide              only usage guide
-  jdt status --json             all sections as JSON
-  jdt status errors --json      single section as JSON`;
+  jdt status -q                 full dashboard, no intro/help/guide
+  jdt status editors problems   editors + problems
+  jdt status help               command reference
+  jdt status --json             all sections as JSON`;

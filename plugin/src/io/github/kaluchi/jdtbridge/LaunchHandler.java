@@ -127,7 +127,7 @@ class LaunchHandler {
                 ? name + ":" + pid : name;
         entry.addProperty("launchId", launchId);
         entry.addProperty("configId", name);
-        entry.addProperty("type", type);
+        entry.addProperty("configType", type);
         entry.addProperty("mode", mode);
         entry.addProperty("terminated", terminated);
 
@@ -238,7 +238,7 @@ class LaunchHandler {
         obj.addProperty("configId", config.getName());
         try {
             String typeName = config.getType().getName();
-            obj.addProperty("type", typeName);
+            obj.addProperty("configType", typeName);
 
             String project = config.getAttribute(
                     ATTR_PROJECT_NAME, (String) null);
@@ -321,8 +321,8 @@ class LaunchHandler {
             throws CoreException {
         var obj = new JsonObject();
         obj.addProperty("configId", config.getName());
-        obj.addProperty("type", config.getType().getName());
-        obj.addProperty("typeId",
+        obj.addProperty("configType", config.getType().getName());
+        obj.addProperty("configTypeId",
                 config.getType().getIdentifier());
 
         java.io.File launchFile = resolveLaunchFile(config);
@@ -498,7 +498,7 @@ class LaunchHandler {
             String configId = launchName(launch);
             response.addProperty("configId", configId);
             response.addProperty("mode", mode);
-            response.addProperty("type",
+            response.addProperty("configType",
                     launchType(launch));
             addProcessMetadata(launch, response);
             // Add launchId after process metadata (has pid)

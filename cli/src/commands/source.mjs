@@ -1,7 +1,7 @@
 import { get } from "../client.mjs";
 import { extractPositional, parseFqmn } from "../args.mjs";
 import { formatHierEntry } from "../format/hierarchy.mjs";
-import { toSandboxPath } from "../paths.mjs";
+import { toSandboxPath, formatLineRange } from "../paths.mjs";
 import { output } from "../output.mjs";
 
 export async function source(args) {
@@ -215,7 +215,7 @@ function formatMarkdown(result) {
       : ot.fqmn;
     lines.push(`overrides [M] \`${fqmn}\``);
   }
-  lines.push(`\`${toSandboxPath(result.file)}:${result.startLine}-${result.endLine}\``);
+  lines.push(`\`${toSandboxPath(result.file)}${formatLineRange(result.startLine, result.endLine)}\``);
   lines.push("");
 
   // Source

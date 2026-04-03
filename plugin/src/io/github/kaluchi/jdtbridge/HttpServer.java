@@ -411,14 +411,12 @@ public class HttpServer {
                         search.handleFind(params, scope));
                 case "/references" -> Response.json(
                         search.handleReferences(params, scope));
-                case "/subtypes" -> Response.json(
-                        search.handleSubtypes(params, scope));
-                case "/hierarchy" -> Response.json(
-                        search.handleHierarchy(params, scope));
                 case "/implementors" -> Response.json(
                         search.handleImplementors(params, scope));
-                case "/errors" -> Response.json(
-                        diagnostics.handleErrors(params, scope));
+                case "/hierarchy" -> Response.json(
+                        search.handleHierarchy(params, scope));
+                case "/problems" -> Response.json(
+                        diagnostics.handleProblems(params, scope));
                 case "/build" -> Response.json(
                         diagnostics.handleBuild(params));
                 case "/refresh" -> Response.json(

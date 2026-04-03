@@ -11,12 +11,11 @@ export async function launchList(args = []) {
     empty: "(no launches)",
     text(data) {
       const rows = data.map((r) => {
-        const status = r.terminated
-          ? `terminated${r.exitCode !== undefined ? ` (${r.exitCode})` : ""}`
-          : "running";
-        return [r.launchId, r.configId, r.type, r.mode, status, r.pid || ""];
+        const status = r.terminated ? "terminated" : "running";
+        const exitCode = r.exitCode !== undefined ? String(r.exitCode) : "";
+        return [r.launchId, r.configId, r.configType, r.mode, r.pid || "", status, exitCode];
       });
-      console.log(formatTable(["LAUNCHID", "CONFIGID", "TYPE", "MODE", "STATUS", "PID"], rows));
+      console.log(formatTable(["LAUNCHID", "CONFIGID", "CONFIGTYPE", "MODE", "PID", "STATUS", "EXITCODE"], rows));
     },
   });
 }
@@ -29,12 +28,12 @@ export async function launchConfigs(args = []) {
     text(data) {
       const rows = data.map((r) => [
         r.configId,
-        r.type,
+        r.configType,
         r.project || "",
         configTarget(r),
       ]);
       console.log(
-        formatTable(["CONFIGID", "TYPE", "PROJECT", "TARGET"], rows),
+        formatTable(["CONFIGID", "CONFIGTYPE", "PROJECT", "TARGET"], rows),
       );
     },
   });
@@ -144,7 +143,7 @@ function printConfigDetail(data) {
   // Header
   const rows = [
     ["ConfigId", data.configId],
-    ["Type", data.type],
+    ["ConfigType", data.configType],
   ];
   if (project) rows.push(["Project", project]);
   if (target) rows.push(["Target", target]);
@@ -222,7 +221,7 @@ function formatLaunched(result) {
   const configId = result.configId;
   const launchId = result.launchId;
   const parts = [`Launched ${configId} (${result.mode})`];
-  if (result.type) parts[0] += ` [${result.type}]`;
+  if (result.configType) parts[0] += ` [${result.configType}]`;
   if (result.pid) parts.push(`  PID:        ${result.pid}`);
   if (launchId !== configId) parts.push(`  LaunchId:   ${launchId}`);
   if (result.workingDir) parts.push(`  Working dir: ${result.workingDir}`);
@@ -369,7 +368,7 @@ export const launchListHelp = `List all launches (running and terminated).
 
 Usage:  jdt launch list [--json]
 
-Shows LAUNCHID (configId:pid), CONFIGID, TYPE, MODE, STATUS, PID.
+Shows LAUNCHID, CONFIGID, CONFIGTYPE, MODE, PID, STATUS, EXITCODE.
 Use LAUNCHID with launch logs/stop. Use CONFIGID with launch run/config.
 
 Options:
@@ -383,7 +382,7 @@ export const launchConfigsHelp = `List saved launch configurations.
 
 Usage:  jdt launch configs [--json]
 
-Shows CONFIGID, TYPE, PROJECT, and TARGET (class, method, main class, or goals).
+Shows CONFIGID, CONFIGTYPE, PROJECT, and TARGET (class, method, main class, or goals).
 Use CONFIGID with launch run and launch config.
 
 Options:

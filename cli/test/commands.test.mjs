@@ -164,16 +164,16 @@ describe("commands (integration)", () => {
     expect(io.logs[0]).toBe("(no results)");
   });
 
-  it("subtypes shows FQN and file", async () => {
+  it("implementors shows FQN and file", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { fqn: "com.example.FooImpl", file: "/my-server/src/FooImpl.java" },
+        { fqn: "com.example.FooImpl", file: "/my-server/src/FooImpl.java", startLine: 5, endLine: 50 },
       ]));
     });
-    const { subtypes } = await import("../src/commands/subtypes.mjs");
-    await subtypes(["com.example.Foo"]);
-    expect(io.logs[0]).toContain("com.example.FooImpl");
+    const { implementors } = await import("../src/commands/implementors.mjs");
+    await implementors(["com.example.Foo"]);
+    expect(io.logs[0]).toBe("`com.example.FooImpl`  my-server/src/FooImpl.java:5-50");
   });
 
   it("hierarchy shows all sections", async () => {
@@ -196,17 +196,16 @@ describe("commands (integration)", () => {
     expect(out).toContain("com.example.Bar");
   });
 
-  it("implementors shows FQN, file, and line", async () => {
+  it("implementors with method shows FQN, file, and line", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { fqn: "com.example.FooImpl", file: "/my-server/src/FooImpl.java", line: 25 },
+        { fqn: "com.example.FooImpl", file: "/my-server/src/FooImpl.java", startLine: 25, endLine: 35 },
       ]));
     });
     const { implementors } = await import("../src/commands/implementors.mjs");
-    await implementors(["com.example.Foo", "doStuff"]);
-    expect(io.logs[0]).toContain("com.example.FooImpl");
-    expect(io.logs[0]).toContain(":25");
+    await implementors(["com.example.Foo#doStuff"]);
+    expect(io.logs[0]).toBe("`com.example.FooImpl`  my-server/src/FooImpl.java:25-35");
   });
 
   it("errors shows formatted error lines", async () => {
@@ -216,22 +215,22 @@ describe("commands (integration)", () => {
         { severity: "ERROR", source: "JDT", file: "D:/projects/my-server/src/Foo.java", line: 10, message: "cannot resolve symbol" },
       ]));
     });
-    const { errors } = await import("../src/commands/errors.mjs");
-    await errors([]);
+    const { problems } = await import("../src/commands/problems.mjs");
+    await problems([]);
     expect(io.logs[0]).toContain("ERROR");
     expect(io.logs[0]).toContain("[JDT]");
     expect(io.logs[0]).toContain("cannot resolve symbol");
     expect(io.logs[0]).toContain(toSandboxPath("D:/projects/my-server/src/Foo.java") + ":10");
   });
 
-  it("errors shows no errors message", async () => {
+  it("problems shows no problems message", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end("[]");
     });
-    const { errors } = await import("../src/commands/errors.mjs");
-    await errors([]);
-    expect(io.logs[0]).toBe("(no errors)");
+    const { problems } = await import("../src/commands/problems.mjs");
+    await problems([]);
+    expect(io.logs[0]).toBe("(no problems)");
   });
 
   it("organize-imports shows result", async () => {
@@ -451,7 +450,7 @@ describe("commands (integration)", () => {
     expect(io.logs[0]).toContain("Total: 2 types");
   });
 
-  it("references shows grouped output", async () => {
+  it("references shows markdown snippets", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
@@ -461,8 +460,14 @@ describe("commands (integration)", () => {
     });
     const { references } = await import("../src/commands/references.mjs");
     await references(["com.example.Foo"]);
-    expect(io.logs[0]).toBe("my-server/src/Bar.java:10");
-    expect(io.logs[1]).toContain("in Bar.init()");
+    const out = io.logs[0];
+    expect(out).toContain("#### `Bar.init()`");
+    expect(out).toContain("`my-server/src/Bar.java:10`");
+    expect(out).toContain("```java");
+    expect(out).toContain("new Foo();");
+    expect(out).toContain("#### `Bar.run()`");
+    expect(out).toContain("foo.go();");
+    expect(out).toContain("---");
   });
 
 

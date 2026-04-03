@@ -5,7 +5,6 @@ import { projects, help as projectsHelp } from "./commands/projects.mjs";
 import { projectInfo, help as projectInfoHelp } from "./commands/project-info.mjs";
 import { find, help as findHelp } from "./commands/find.mjs";
 import { references, help as referencesHelp } from "./commands/references.mjs";
-import { subtypes, help as subtypesHelp } from "./commands/subtypes.mjs";
 import { hierarchy, help as hierarchyHelp } from "./commands/hierarchy.mjs";
 import { implementors, help as implementorsHelp } from "./commands/implementors.mjs";
 import { typeInfo, help as typeInfoHelp } from "./commands/type-info.mjs";
@@ -14,7 +13,7 @@ import { build, help as buildHelp } from "./commands/build.mjs";
 import { testRun, help as testRunHelp } from "./commands/test-run.mjs";
 import { testStatus, help as testStatusHelp } from "./commands/test-status.mjs";
 import { testSessions, help as testSessionsHelp } from "./commands/test-sessions.mjs";
-import { errors, help as errorsHelp } from "./commands/errors.mjs";
+import { problems, help as problemsHelp } from "./commands/problems.mjs";
 import { refresh, help as refreshHelp } from "./commands/refresh.mjs";
 import { maven, help as mavenHelp } from "./commands/maven.mjs";
 import {
@@ -190,14 +189,13 @@ const commands = {
   "project-info": { fn: projectInfo, help: projectInfoHelp },
   find: { fn: find, help: findHelp },
   references: { fn: references, help: referencesHelp },
-  subtypes: { fn: subtypes, help: subtypesHelp },
-  hierarchy: { fn: hierarchy, help: hierarchyHelp },
   implementors: { fn: implementors, help: implementorsHelp },
+  hierarchy: { fn: hierarchy, help: hierarchyHelp },
   "type-info": { fn: typeInfo, help: typeInfoHelp },
   source: { fn: source, help: sourceHelp },
   build: { fn: build, help: buildHelp },
   test: { fn: testDispatch, help: testHelp },
-  errors: { fn: errors, help: errorsHelp },
+  problems: { fn: problems, help: problemsHelp },
   refresh: { fn: refresh, help: refreshHelp },
   maven: { fn: maven, help: mavenHelp },
   "organize-imports": { fn: organizeImports, help: organizeImportsHelp },
@@ -217,7 +215,6 @@ const commands = {
 const aliases = {
   refs: "references",
   impl: "implementors",
-  subt: "subtypes",
   hier: "hierarchy",
   pi: "project-info",
   ti: "type-info",
@@ -225,7 +222,7 @@ const aliases = {
   ed: "editors",
   src: "source",
   b: "build",
-  err: "errors",
+  err: "problems",
   r: "refresh",
   fmt: "format",
 };
@@ -259,72 +256,92 @@ function printFullSubcommandHelp(parentName, subcommands) {
   }
 }
 
-function printOverview() {
-  console.log(`Eclipse JDT Bridge — semantic Java analysis via Eclipse JDT SearchEngine.
-Requires: Eclipse running with the jdtbridge plugin.
-
-Dashboard:
-  status [sections...] [-q]                   CLI screenshot of Eclipse (start here)
-
-Search & navigation:
-  find <Name|*Pattern*|pkg> [--source-only]   find types by name, wildcard, or package
-  references${fmtAliases("references")} <FQMN> [--field <name>]         references to type/method/field
-  subtypes${fmtAliases("subtypes")} <FQN>                              all subtypes/implementors
-  hierarchy${fmtAliases("hierarchy")} <FQN>                             full hierarchy (supers + interfaces + subtypes)
-  implementors${fmtAliases("implementors")} <FQMN>                            implementations of interface method
-  type-info${fmtAliases("type-info")} <FQN>                             class overview (fields, methods, line numbers)
-  source${fmtAliases("source")} <FQMN>                              source + resolved references (navigation)
-
-Testing & building:
-  build${fmtAliases("build")} [--project <name>] [--clean]      build project (incremental or clean)
-  test run <FQN> [-f] [-q]                    launch tests (non-blocking)
-  test status <testRunId> [-f] [--all]        show test progress/results
-  test runs                                   list test runs
-
-Diagnostics:
-  errors${fmtAliases("errors")} [--file <path>] [--project <name>]   compilation errors
-  refresh${fmtAliases("refresh")} [<file> ...] [--project <name>]  explicitly notify Eclipse of file changes
-
-Maven:
-  maven update [--project <name>]             update Maven project (Alt+F5)
-
-Refactoring:
-  organize-imports${fmtAliases("organize-imports")} <file>                     organize imports
-  format${fmtAliases("format")} <file>                               format with Eclipse project settings
-  rename <FQMN> <newName> [--field <old>]     rename type/method/field
-  move <FQN> <target.package>                 move type to another package
-
-Launches:
-  launch configs                              list saved launch configurations
-  launch config <configId> [--xml] [--json]   show configuration details
-  launch run <configId> [-f] [-q]             launch a configuration
-  launch debug <configId> [-f] [-q]           launch in debug mode
-  launch list                                 list launches (running + terminated)
-  launch logs <launchId> [-f] [--tail N]      show console output
-  launch stop <launchId>                      stop a running launch
-  launch clear [launchId]                     remove terminated launches
-
-Editor:
-  open <FQMN>                                 open in Eclipse editor
-
-Workspace detail:
-  projects                                    list workspace projects (name, location, repo)
-  project-info${fmtAliases("project-info")} <name> [--lines N]             project overview (adaptive detail)
-  editors${fmtAliases("editors")}                                    list open editors (FQN, project, path)
-  git [list] [repo...] [--no-files]           git repos, branches, dirty state
-
-Agents:
-  agent run <provider> <agent> [--name <id>]  launch agent session
-  agent list                                  running agent sessions
-  agent stop <name>                           stop agent by session ID
-  agent logs <name> [-f]                      stream agent output
-  agent providers                             available providers
-
-Setup:
-  setup [--check|--remove]                    install/check/remove Eclipse plugin
-
-Use "jdt help <command>" for detailed usage of any command.`);
+/** Strip ANSI escape codes to get visible character count. */
+function stripAnsi(str) {
+  return str.replace(/\x1b\[[0-9;]*m/g, "");
 }
+
+const HELP_COL = 53;
+
+/** Pad left part to HELP_COL (visible width), minimum 2 spaces before desc. */
+function helpLine(left, desc) {
+  const visible = stripAnsi(left).length;
+  const pad = Math.max(2, HELP_COL - visible);
+  return left + " ".repeat(pad) + desc;
+}
+
+function a(cmd) { return fmtAliases(cmd); }
+
+function printOverview() {
+  const h = helpLine;
+  console.log([
+    "Eclipse JDT Bridge — semantic Java analysis via Eclipse JDT SearchEngine.",
+    "Requires: Eclipse running with the jdtbridge plugin.",
+    "",
+    "Dashboard:",
+    h("  status [sections...] [-q]",                       "CLI screenshot of Eclipse (start here)"),
+    "",
+    "Search & navigation:",
+    h(`  find <Name|*Pattern*|pkg> [--source-only]`,       "table: type declarations by name/wildcard/package"),
+    h(`  references${a("references")} <FQMN> [--field <name>]`, "markdown: call sites as code snippets"),
+    h(`  implementors${a("implementors")} <FQN>[#method]`,    "list: type or method implementors"),
+    h(`  hierarchy${a("hierarchy")} <FQN>`,                "markdown: supers + interfaces + subtypes"),
+    h(`  type-info${a("type-info")} <FQN>`,                "text: class overview (fields, methods, lines)"),
+    h(`  source${a("source")} <FQMN>`,                     "markdown: source + resolved references"),
+    "",
+    "Testing & building:",
+    h(`  build${a("build")} [--project <name>] [--clean]`, "build project (incremental or clean)"),
+    h("  test run <FQN> [-f] [-q]",                        "launch JUnit/PDE tests (non-blocking)"),
+    h("  test status <testRunId> [-f] [--all]",            "text: test progress and results"),
+    h("  test runs",                                       "table: recent test sessions"),
+    "",
+    "Diagnostics:",
+    h(`  problems${a("problems")} [--file <path>] [--project <name>]`, "text: IMarker.PROBLEM (errors, warnings)"),
+    h(`  refresh${a("refresh")} [<file> ...] [--project <name>]`,  "notify Eclipse of external file changes"),
+    "",
+    "Maven:",
+    h("  maven update [--project <name>]",                 "update Maven project (Alt+F5)"),
+    "",
+    "Refactoring:",
+    h(`  organize-imports${a("organize-imports")} <file>`,  "organize imports"),
+    h(`  format${a("format")} <file>`,                      "format with Eclipse project settings"),
+    h("  rename <FQMN> <newName> [--field <old>]",         "rename type/method/field"),
+    h("  move <FQN> <target.package>",                     "move type to another package"),
+    "",
+    "Launches:",
+    h("  launch configs",                                  "table: saved ILaunchConfigurations"),
+    h("  launch config <configId> [--xml] [--json]",       "text/JSON/XML: configuration details"),
+    h("  launch run <configId> [-f] [-q]",                 "run a launch configuration"),
+    h("  launch debug <configId> [-f] [-q]",               "run with Eclipse debugger attached"),
+    h("  launch list",                                     "table: running + terminated ILaunches"),
+    h("  launch logs <launchId> [-f] [--tail N]",          "text: console output (stdout/stderr)"),
+    h("  launch stop <launchId>",                          "terminate a running ILaunch"),
+    h("  launch clear [launchId]",                         "remove terminated ILaunches from list"),
+    "",
+    "Editor:",
+    h("  open <FQMN>",                                    "open in Eclipse editor"),
+    "",
+    "Workspace detail:",
+    h("  projects",                                        "table: workspace projects (name, location, repo)"),
+    h(`  project-info${a("project-info")} <name> [--lines N]`, "text: project overview (adaptive detail)"),
+    h(`  editors${a("editors")}`,                          "table: open editor tabs (FQN, project, path)"),
+    h("  git [list] [repo...] [--no-files]",               "table: git repos, branches, dirty state"),
+    "",
+    "Agents:",
+    h("  agent run <provider> <agent> [--name <id>]",      "launch agent session via Eclipse"),
+    h("  agent list",                                      "table: running agent sessions"),
+    h("  agent stop <name>",                               "terminate agent by session ID"),
+    h("  agent logs <name> [-f]",                          "text: stream agent console output"),
+    h("  agent providers",                                 "table: available agent providers"),
+    "",
+    "Setup:",
+    h("  setup [--check|--remove]",                        "install/check/remove Eclipse plugin"),
+    "",
+    'Use "jdt help <command>" for detailed usage of any command.',
+  ].join("\n"));
+}
+
+export { helpLine, stripAnsi, HELP_COL };
 
 export async function run(argv) {
   const [command, ...rest] = argv;

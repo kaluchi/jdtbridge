@@ -59,15 +59,15 @@ the config name and process PID. PID comes from
 List active and terminated launches (current Eclipse session).
 
 ```
-LAUNCHID                 CONFIGID          TYPE                MODE  STATUS          PID
-my-server:12345          my-server         Java Application    run   running         12345
-ObjectMapperTest:67890   ObjectMapperTest  JUnit               run   terminated (0)  67890
+LAUNCHID                 CONFIGID          CONFIGTYPE          MODE  PID    STATUS      EXITCODE
+my-server:12345          my-server         Java Application    run   12345  running
+ObjectMapperTest:67890   ObjectMapperTest  JUnit               run   67890  terminated  0
 ```
 
 `LAUNCHID` is `configId:pid` — unique per launch instance. Use it with
 `launch logs`, `launch stop`. `CONFIGID` links back to `launch configs`.
 
-JSON fields: `launchId`, `configId`, `type`, `mode`, `terminated`, `started`, `exitCode`, `pid`.
+JSON fields: `launchId`, `configId`, `configType`, `mode`, `terminated`, `started`, `exitCode`, `pid`.
 
 Launches are ephemeral — they exist only for the current Eclipse session.
 Restarting Eclipse clears the list. Use `jdt launch clear` to remove
@@ -78,7 +78,7 @@ terminated entries without restarting.
 List all saved launch configurations in the workspace.
 
 ```
-CONFIGID          TYPE                PROJECT      TARGET
+CONFIGID          CONFIGTYPE          PROJECT      TARGET
 my-server         Java Application    my-server    com.example.Main
 ObjectMapperTest  JUnit               my-server    com.example.ObjectMapperTest
 jdtbridge-verify  Maven Build                      clean verify
@@ -87,7 +87,7 @@ AllTests          JUnit Plug-in Test  jdtbridge    io.github.kaluchi.jdtbridge.A
 
 Columns:
 - **CONFIGID** — configuration name (unique identifier for `jdt launch run`)
-- **TYPE** — Eclipse launch type (human-readable)
+- **CONFIGTYPE** — Eclipse ILaunchConfigurationType (human-readable name)
 - **PROJECT** — Java project (from `org.eclipse.jdt.launching.PROJECT_ATTR`)
 - **TARGET** — synthesized FQMN, type-specific:
   - JUnit class: `class#method` (FQMN from `MAIN_TYPE` + `TESTNAME`)
@@ -135,8 +135,8 @@ With `--json`, outputs raw server response:
 ```json
 {
   "configId": "ObjectMapperTest",
-  "type": "JUnit",
-  "typeId": "org.eclipse.jdt.junit.launchconfig",
+  "configType": "JUnit",
+  "configTypeId": "org.eclipse.jdt.junit.launchconfig",
   "file": "/path/to/.metadata/.plugins/org.eclipse.debug.core/.launches/ObjectMapperTest.launch",
   "attributes": {
     "org.eclipse.jdt.launching.MAIN_TYPE": "com.example.ObjectMapperTest",
@@ -207,7 +207,7 @@ With launchId: removes only that specific terminated launch.
 
 ### `GET /launch/list`
 
-Returns: `[{launchId, configId, type, mode, terminated, started, exitCode, pid}]`
+Returns: `[{launchId, configId, configType, mode, terminated, started, exitCode, pid}]`
 
 `launchId` = `configId:pid`. Uniquely identifies a launch instance.
 `configId` = launch configuration name. Links to `/launch/configs`.
@@ -236,7 +236,7 @@ Attribute values preserve Eclipse types:
 
 ### `GET /launch/run?configId=<configId>[&debug]`
 
-Returns: `{ok, configId, launchId, mode, type, pid, cmdline, workingDir}`
+Returns: `{ok, configId, launchId, mode, configType, pid, cmdline, workingDir}`
 
 ### `GET /launch/console?launchId=<launchId>[&tail=N][&stream=stdout|stderr]`
 

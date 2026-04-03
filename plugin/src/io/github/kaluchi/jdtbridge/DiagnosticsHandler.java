@@ -19,7 +19,7 @@ class DiagnosticsHandler {
     private static final String JDT_PROBLEM_MARKER =
             "org.eclipse.jdt.core.problem";
 
-    String handleErrors(Map<String, String> params,
+    String handleProblems(Map<String, String> params,
             ProjectScope projectScope) throws Exception {
         String filePath = params.get("file");
         String projectName = params.get("project");

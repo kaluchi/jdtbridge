@@ -129,9 +129,9 @@ public class ProjectScopeIntegrationTest {
             // Test project has deliberate compile errors
             var params = new java.util.HashMap<String, String>();
             params.put("project", TestFixture.PROJECT_NAME);
-            String scopedJson = diagnostics.handleErrors(
+            String scopedJson = diagnostics.handleProblems(
                     params, SCOPED);
-            String allJson = diagnostics.handleErrors(
+            String allJson = diagnostics.handleProblems(
                     params, ProjectScope.ALL);
             // Both should return same result since we explicitly
             // specified the project — scope only adds extra filter
@@ -143,7 +143,7 @@ public class ProjectScopeIntegrationTest {
         @Test
         void excludedScopeFiltersOutMarkers() throws Exception {
             // Workspace-wide errors filtered by excluded scope
-            String json = diagnostics.handleErrors(
+            String json = diagnostics.handleProblems(
                     java.util.Map.of(), EXCLUDED);
             assertEquals(0, parseArray(json).size(),
                     "Excluded scope should have no errors");

@@ -261,10 +261,11 @@ class SearchHandler {
         return arr.toString();
     }
 
-    String handleSubtypes(Map<String, String> params,
+    String handleImplementors(Map<String, String> params,
             ProjectScope scope)
             throws CoreException {
         String fqn = params.get("class");
+        String methodName = params.get("method");
         if (fqn == null || fqn.isBlank()) {
             return HttpServer.jsonError("Missing 'class' parameter");
         }
@@ -278,6 +279,32 @@ class SearchHandler {
             return HttpServer.jsonError("Type not found: " + fqn);
         }
 
+        // Method mode: find implementations of a specific method
+        if (methodName != null && !methodName.isBlank()) {
+            IMethod method = JdtUtils.findMethod(type, methodName,
+                    params.get("paramTypes"));
+            if (method == null) {
+                return HttpServer.jsonError(
+                        "Method not found: " + methodName
+                        + " in " + fqn);
+            }
+            var impls = JdtUtils.findImplementations(method);
+            var arr = new JsonArray();
+            for (var entry : impls.entrySet()) {
+                IMethod m = entry.getValue();
+                IType sub = m.getDeclaringType();
+                if (sub.isAnonymous()) continue;
+                var e = typeEntry(sub);
+                e.addProperty("fqmn", entry.getKey());
+                int[] implRange = getLinesOfMember(m);
+                e.addProperty("startLine", implRange[0]);
+                e.addProperty("endLine", implRange[1]);
+                arr.add(e);
+            }
+            return arr.toString();
+        }
+
+        // Type mode: all subtypes
         ITypeHierarchy hierarchy = type.newTypeHierarchy(null);
         var arr = new JsonArray();
         for (IType sub : hierarchy.getAllSubtypes(type)) {
@@ -320,45 +347,6 @@ class SearchHandler {
         return result.toString();
     }
 
-    String handleImplementors(Map<String, String> params,
-            ProjectScope scope)
-            throws CoreException {
-        String fqn = params.get("class");
-        String methodName = params.get("method");
-        if (fqn == null || fqn.isBlank()) {
-            return HttpServer.jsonError("Missing 'class' parameter");
-        }
-        if (methodName == null || methodName.isBlank()) {
-            return HttpServer.jsonError("Missing 'method' parameter");
-        }
-
-        IType type = JdtUtils.findType(fqn);
-        if (type == null) {
-            return HttpServer.jsonError("Type not found: " + fqn);
-        }
-
-        IMethod method = JdtUtils.findMethod(type, methodName,
-                params.get("paramTypes"));
-        if (method == null) {
-            return HttpServer.jsonError("Method not found: " + methodName
-                    + " in " + fqn);
-        }
-
-        var impls = JdtUtils.findImplementations(method);
-        var arr = new JsonArray();
-        for (var entry : impls.entrySet()) {
-            IMethod m = entry.getValue();
-            IType sub = m.getDeclaringType();
-            if (sub.isAnonymous()) continue;
-            var e = new JsonObject();
-            e.addProperty("fqn",
-                    sub.getFullyQualifiedName());
-            e.addProperty("file", filePath(sub));
-            e.addProperty("line", getLineOfMember(m));
-            arr.add(e);
-        }
-        return arr.toString();
-    }
 
     String handleTypeInfo(Map<String, String> params) throws Exception {
         String fqn = params.get("class");
@@ -402,7 +390,9 @@ class SearchHandler {
             if (!mods.isEmpty()) {
                 field.addProperty("modifiers", mods);
             }
-            field.addProperty("line", getLineOfMember(f));
+            int[] fieldRange = getLinesOfMember(f);
+            field.addProperty("startLine", fieldRange[0]);
+            field.addProperty("endLine", fieldRange[1]);
             fields.add(field);
         }
         result.add("fields", fields);
@@ -413,7 +403,9 @@ class SearchHandler {
             me.addProperty("name", m.getElementName());
             me.addProperty("signature",
                     buildSignature(m));
-            me.addProperty("line", getLineOfMember(m));
+            int[] methodRange = getLinesOfMember(m);
+            me.addProperty("startLine", methodRange[0]);
+            me.addProperty("endLine", methodRange[1]);
             methods.add(me);
         }
         result.add("methods", methods);
@@ -685,8 +677,22 @@ class SearchHandler {
         obj.addProperty("fqn",
                 type.getFullyQualifiedName());
         obj.addProperty("file", filePath(type));
-        if (type.isBinary())
+        obj.addProperty("project",
+                type.getJavaProject().getElementName());
+        int[] typeRange = getLinesOfMember(type);
+        obj.addProperty("startLine", typeRange[0]);
+        obj.addProperty("endLine", typeRange[1]);
+        if (type.isBinary()) {
             obj.addProperty("binary", true);
+            try {
+                var pkg = type.getPackageFragment();
+                var root = (IPackageFragmentRoot) pkg.getParent();
+                obj.addProperty("library",
+                        root.getPath().lastSegment());
+            } catch (Exception e) {
+                // no library info available
+            }
+        }
         return obj;
     }
 
@@ -742,10 +748,11 @@ class SearchHandler {
         return sig.toString();
     }
 
-    private int getLineOfMember(IMember member) {
+    private int[] getLinesOfMember(IMember member) {
         try {
-            ISourceRange range = member.getNameRange();
-            if (range != null && range.getOffset() >= 0) {
+            ISourceRange nameRange = member.getNameRange();
+            ISourceRange sourceRange = member.getSourceRange();
+            if (nameRange != null && nameRange.getOffset() >= 0) {
                 ICompilationUnit cu = member.getCompilationUnit();
                 String source;
                 if (cu != null) {
@@ -755,14 +762,23 @@ class SearchHandler {
                     source = cf != null ? cf.getSource() : null;
                 }
                 if (source != null) {
-                    return offsetToLine(source, range.getOffset());
+                    int start = offsetToLine(source,
+                            nameRange.getOffset());
+                    int end = sourceRange != null
+                            && sourceRange.getLength() > 0
+                            ? offsetToLine(source,
+                                    sourceRange.getOffset()
+                                    + sourceRange.getLength())
+                            : start;
+                    return new int[]{start, end};
                 }
             }
         } catch (JavaModelException e) {
-            Log.warn("getLineOfMember failed", e);
+            Log.warn("getLinesOfMember failed", e);
         }
-        return -1;
+        return new int[]{-1, -1};
     }
+
 
     private int offsetToLine(String source, int offset) {
         int line = 1;

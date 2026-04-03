@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { run } from "../src/cli.mjs";
+import { run, helpLine, stripAnsi, HELP_COL } from "../src/cli.mjs";
 
 describe("cli dispatcher", () => {
   let logs;
@@ -90,5 +90,58 @@ describe("cli dispatcher", () => {
   it("'help test status' shows test status help", async () => {
     await run(["help", "test", "status"]);
     expect(logs.some((l) => l.includes("snapshot or live stream"))).toBe(true);
+  });
+
+  it("help overview has aligned descriptions", async () => {
+    await run(["--help"]);
+    const output = logs.join("\n");
+    // Command lines: indented 2 spaces, longer than HELP_COL
+    const cmdLines = output.split("\n").filter((line) => {
+      const plain = stripAnsi(line);
+      return /^  \S/.test(plain) && plain.length > HELP_COL;
+    });
+    expect(cmdLines.length).toBeGreaterThan(20);
+    for (const line of cmdLines) {
+      const plain = stripAnsi(line);
+      // Find description start: after last 2+ space gap
+      const match = plain.match(/^(.+?)\s{2,}(\S.*)$/);
+      expect(match).not.toBeNull();
+      const descStart = plain.indexOf(match[2], match[1].length);
+      // Description never starts before HELP_COL
+      expect(descStart).toBeGreaterThanOrEqual(HELP_COL);
+    }
+  });
+});
+
+describe("helpLine", () => {
+  it("pads short left to HELP_COL", () => {
+    const line = helpLine("  status [-q]", "dashboard");
+    const plain = stripAnsi(line);
+    expect(plain.indexOf("dashboard")).toBe(HELP_COL);
+  });
+
+  it("uses minimum 2-space gap for long left", () => {
+    const longLeft = "  " + "x".repeat(HELP_COL);
+    const line = helpLine(longLeft, "desc");
+    const plain = stripAnsi(line);
+    expect(plain.indexOf("desc")).toBe(HELP_COL + 2 + 2); // 2 indent + HELP_COL x's + 2 gap
+  });
+
+  it("handles ANSI codes in left part", () => {
+    const left = "  cmd \x1b[2m(alias)\x1b[22m <arg>";
+    const line = helpLine(left, "description");
+    const plain = stripAnsi(line);
+    // Visible: "  cmd (alias) <arg>" = 19 chars → description at HELP_COL
+    expect(plain.indexOf("description")).toBe(HELP_COL);
+  });
+});
+
+describe("stripAnsi", () => {
+  it("strips dim codes", () => {
+    expect(stripAnsi("\x1b[2mtext\x1b[22m")).toBe("text");
+  });
+
+  it("returns plain text unchanged", () => {
+    expect(stripAnsi("hello")).toBe("hello");
   });
 });

@@ -26,14 +26,14 @@ describe("command edge cases", () => {
     }));
   }
 
-  it("subtypes shows no subtypes message", async () => {
+  it("implementors shows no implementors message", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end("[]");
     });
-    const { subtypes } = await import("../src/commands/subtypes.mjs");
-    await subtypes(["app.Foo"]);
-    expect(io.logs[0]).toBe("(no subtypes)");
+    const { implementors } = await import("../src/commands/implementors.mjs");
+    await implementors(["app.Foo"]);
+    expect(io.logs[0]).toBe("(no implementors)");
   });
 
   it("implementors shows no implementors message", async () => {
@@ -143,8 +143,8 @@ describe("command edge cases", () => {
         { severity: "WARNING", source: null, file: "/my-app/src/A.java", line: 1, message: "unused" },
       ]));
     });
-    const { errors } = await import("../src/commands/errors.mjs");
-    await errors(["--warnings"]);
+    const { problems } = await import("../src/commands/problems.mjs");
+    await problems(["--warnings"]);
     expect(io.logs[0]).toContain("WARN");
   });
 

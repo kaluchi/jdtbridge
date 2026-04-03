@@ -162,8 +162,8 @@ public class HttpIntegrationTest {
     }
 
     @Test
-    public void errorsEndpoint() throws Exception {
-        String body = authedGet("/errors?project="
+    public void problemsEndpoint() throws Exception {
+        String body = authedGet("/problems?project="
                 + TestFixture.PROJECT_NAME + "&no-refresh");
         assertTrue(body.contains("BrokenClass"),
                 "Should contain BrokenClass error: " + body);

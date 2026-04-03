@@ -49,22 +49,16 @@ describe("command validation", () => {
     await expect(rename(["com.example.Foo"])).rejects.toThrow("exit(1)");
   });
 
-  it("subtypes exits on missing args", async () => {
+  it("implementors exits on missing args", async () => {
     await setupMock((req, res) => res.end());
-    const { subtypes } = await import("../src/commands/subtypes.mjs");
-    await expect(subtypes([])).rejects.toThrow("exit(1)");
+    const { implementors } = await import("../src/commands/implementors.mjs");
+    await expect(implementors([])).rejects.toThrow("exit(1)");
   });
 
   it("hierarchy exits on missing args", async () => {
     await setupMock((req, res) => res.end());
     const { hierarchy } = await import("../src/commands/hierarchy.mjs");
     await expect(hierarchy([])).rejects.toThrow("exit(1)");
-  });
-
-  it("implementors exits on missing method", async () => {
-    await setupMock((req, res) => res.end());
-    const { implementors } = await import("../src/commands/implementors.mjs");
-    await expect(implementors(["com.example.Foo"])).rejects.toThrow("exit(1)");
   });
 
   it("type-info exits on missing args", async () => {
@@ -125,10 +119,10 @@ describe("command validation", () => {
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
-  it("subtypes exits on server error", async () => {
+  it("implementors exits on server error", async () => {
     await setupMock(errorServer());
-    const { subtypes } = await import("../src/commands/subtypes.mjs");
-    await subtypes(["app.Foo"]);
+    const { implementors } = await import("../src/commands/implementors.mjs");
+    await implementors(["app.Foo"]);
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
@@ -153,10 +147,10 @@ describe("command validation", () => {
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
-  it("errors exits on server error", async () => {
+  it("problems exits on server error", async () => {
     await setupMock(errorServer());
-    const { errors } = await import("../src/commands/errors.mjs");
-    await errors([]);
+    const { problems } = await import("../src/commands/problems.mjs");
+    await problems([]);
     expect(io.errors[0]).toContain("Something went wrong");
   });
 

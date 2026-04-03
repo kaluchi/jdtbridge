@@ -1,50 +1,97 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
-  formatSection, guideSection, reposFromServer,
+  formatSection, helpSection, guideSection, reposFromServer,
   buildDirtyMap, ago, cliCmd, SECTION_NAMES, JSON_COMMANDS,
 } from "../src/commands/status.mjs";
 
 // ---- formatSection ----
 
 describe("formatSection", () => {
-  const s = { title: "Errors", cmd: "jdt errors --json", body: "[]" };
+  const s = { title: "Problems", cmd: "jdt problems --json", body: "[]" };
 
-  it("single section: body only, no header, no fence, no command", () => {
-    const out = formatSection(s, true);
+  it("bare: body only, no header, no fence", () => {
+    const out = formatSection(s, { bare: true, quiet: false });
     expect(out).toBe("[]");
   });
 
-  it("multiple sections: has ## header", () => {
-    const out = formatSection(s, false);
-    expect(out).toContain("## Errors");
-    expect(out).toContain("```bash");
-    expect(out).toContain("$ jdt errors --json");
+  it("bare ignores quiet", () => {
+    const out = formatSection(s, { bare: true, quiet: true });
+    expect(out).toBe("[]");
   });
 
-  it("multiple sections: code fence wraps body", () => {
-    const out = formatSection(s, false);
+  it("multi: has ## header and code fence", () => {
+    const out = formatSection(s, { bare: false, quiet: false });
+    expect(out).toContain("## Problems");
     expect(out).toContain("```bash");
-    expect(out).toContain("$ jdt errors --json");
+    expect(out).toContain("$ jdt problems --json");
+  });
+
+  it("multi: code fence wraps body", () => {
+    const out = formatSection(s, { bare: false, quiet: false });
     expect(out).toContain("[]");
     expect(out).toMatch(/```$/);
   });
 
+  it("description shown when not quiet", () => {
+    const section = { title: "Git", cmd: "jdt git", body: "output", description: "Git repos." };
+    const out = formatSection(section, { bare: false, quiet: false });
+    expect(out).toContain("Git repos.");
+    expect(out).toContain("## Git");
+    expect(out).toContain("output");
+  });
+
+  it("description suppressed when quiet", () => {
+    const section = { title: "Git", cmd: "jdt git", body: "output", description: "Git repos." };
+    const out = formatSection(section, { bare: false, quiet: true });
+    expect(out).not.toContain("Git repos.");
+    expect(out).toContain("## Git");
+    expect(out).toContain("output");
+  });
+
+  it("description suppressed when bare", () => {
+    const section = { title: "Git", cmd: "jdt git", body: "output", description: "Git repos." };
+    const out = formatSection(section, { bare: true, quiet: false });
+    expect(out).toBe("output");
+  });
+
+  it("no description field: no extra blank lines", () => {
+    const out = formatSection(s, { bare: false, quiet: false });
+    expect(out).toBe("## Problems\n\n```bash\n$ jdt problems --json\n[]\n```");
+  });
+
   it("multiline body preserved", () => {
     const multi = { title: "T", cmd: "cmd", body: "line1\nline2\nline3" };
-    const out = formatSection(multi, true);
+    const out = formatSection(multi, { bare: true, quiet: false });
     expect(out).toContain("line1\nline2\nline3");
   });
 
-  it("empty body single", () => {
+  it("empty body bare", () => {
     const empty = { title: "T", cmd: "cmd", body: "" };
-    const out = formatSection(empty, true);
+    const out = formatSection(empty, { bare: true, quiet: false });
     expect(out).toBe("");
   });
 
   it("empty body multi has fence", () => {
     const empty = { title: "T", cmd: "cmd", body: "" };
-    const out = formatSection(empty, false);
+    const out = formatSection(empty, { bare: false, quiet: false });
     expect(out).toContain("```bash");
+  });
+});
+
+// ---- helpSection ----
+
+describe("helpSection", () => {
+  it("returns section object with title, cmd, body", () => {
+    const h = helpSection();
+    expect(h.title).toBe("Help");
+    expect(h.cmd).toBe("jdt help");
+    expect(typeof h.body).toBe("string");
+  });
+
+  it("body contains jdt help output", () => {
+    const h = helpSection();
+    // jdt help starts with this line
+    expect(h.body).toContain("Eclipse JDT Bridge");
   });
 });
 
@@ -58,42 +105,17 @@ describe("guideSection", () => {
     expect(typeof g.body).toBe("string");
   });
 
-  it("body contains all section names", () => {
-    const g = guideSection();
-    expect(g.body).toContain("jdt status git");
-    expect(g.body).toContain("jdt status editors");
-    expect(g.body).toContain("jdt status errors");
-    expect(g.body).toContain("jdt status launches");
-    expect(g.body).toContain("jdt status tests");
-    expect(g.body).toContain("jdt status projects");
-    expect(g.body).toContain("jdt status guide");
-  });
-
-  it("body contains standalone commands", () => {
-    const g = guideSection();
-    expect(g.body).toContain("jdt editors");
-    expect(g.body).toContain("jdt errors");
-    expect(g.body).toContain("jdt launch list");
-    expect(g.body).toContain("jdt test runs");
-    expect(g.body).toContain("jdt projects");
-  });
-
-  it("body contains combined examples", () => {
-    const g = guideSection();
-    expect(g.body).toContain("jdt status editors errors");
-    expect(g.body).toContain("jdt status git tests");
-  });
-
   it("body contains specialized refresh", () => {
     const g = guideSection();
-    expect(g.body).toContain("jdt errors --project X");
+    expect(g.body).toContain("jdt problems --project X");
     expect(g.body).toContain("jdt test run FQN");
     expect(g.body).toContain("jdt build --project X");
   });
 
-  it("body explains -q behavior", () => {
+  it("body contains dashboard refresh hints", () => {
     const g = guideSection();
-    expect(g.body).toContain("-q suppresses this guide");
+    expect(g.body).toContain("jdt status -q");
+    expect(g.body).toContain("jdt help <command>");
   });
 });
 
@@ -101,34 +123,47 @@ describe("guideSection", () => {
 
 describe("SECTION_NAMES", () => {
   it("contains all sections", () => {
+    expect(SECTION_NAMES).toContain("intro");
     expect(SECTION_NAMES).toContain("git");
     expect(SECTION_NAMES).toContain("editors");
-    expect(SECTION_NAMES).toContain("errors");
+    expect(SECTION_NAMES).toContain("problems");
+    expect(SECTION_NAMES).toContain("launch-configs");
     expect(SECTION_NAMES).toContain("launches");
     expect(SECTION_NAMES).toContain("tests");
     expect(SECTION_NAMES).toContain("projects");
+    expect(SECTION_NAMES).toContain("help");
     expect(SECTION_NAMES).toContain("guide");
   });
 
-  it("has 9 sections", () => {
-    expect(SECTION_NAMES.length).toBe(9);
-    expect(SECTION_NAMES).toContain("launch-configs");
+  it("has 10 sections", () => {
+    expect(SECTION_NAMES.length).toBe(10);
   });
 
-  it("contains intro", () => {
-    expect(SECTION_NAMES).toContain("intro");
+  it("help comes after projects and before guide", () => {
+    const helpIdx = SECTION_NAMES.indexOf("help");
+    const projectsIdx = SECTION_NAMES.indexOf("projects");
+    const guideIdx = SECTION_NAMES.indexOf("guide");
+    expect(helpIdx).toBeGreaterThan(projectsIdx);
+    expect(helpIdx).toBeLessThan(guideIdx);
   });
 });
 
 // ---- JSON_COMMANDS ----
 
 describe("JSON_COMMANDS", () => {
-  const dataSections = SECTION_NAMES.filter((s) => s !== "intro" && s !== "guide");
+  const metaSections = new Set(["intro", "guide", "help"]);
+  const dataSections = SECTION_NAMES.filter((s) => !metaSections.has(s));
 
   it("covers all data sections", () => {
     for (const name of dataSections) {
       expect(JSON_COMMANDS[name]).toBeDefined();
       expect(JSON_COMMANDS[name]).toContain("--json");
+    }
+  });
+
+  it("excludes meta sections", () => {
+    for (const name of metaSections) {
+      expect(JSON_COMMANDS[name]).toBeUndefined();
     }
   });
 
@@ -241,16 +276,11 @@ describe("ago", () => {
 // ---- buildDirtyMap ----
 
 describe("buildDirtyMap", () => {
-  // Mock gitCmd by providing repos with known paths
-  // buildDirtyMap calls gitCmd internally — these tests verify
-  // the mapping logic with the real gitCmd (which returns "" for non-existent repos)
-
   it("returns empty map for empty repos", () => {
     expect(buildDirtyMap([])).toEqual({});
   });
 
   it("returns empty map for repos with no dirty files", () => {
-    // Non-existent repo path — gitCmd returns ""
     const repos = [{ path: "/nonexistent/repo", name: "r", branch: "m", projects: [] }];
     expect(buildDirtyMap(repos)).toEqual({});
   });
@@ -280,34 +310,34 @@ describe("cliCmd", () => {
   });
 });
 
-// ---- Integration: formatSection + guideSection ----
+// ---- Integration: formatSection + sections ----
 
 describe("integration", () => {
-  it("guide as single section: body only", () => {
-    const out = formatSection(guideSection(), true);
+  it("guide as bare: body only", () => {
+    const out = formatSection(guideSection(), { bare: true, quiet: false });
     expect(out).not.toContain("## Guide");
     expect(out).not.toContain("```");
     expect(out).toContain("jdt status");
   });
 
-  it("guide as multi section has header", () => {
-    const out = formatSection(guideSection(), false);
+  it("guide as multi has header", () => {
+    const out = formatSection(guideSection(), { bare: false, quiet: false });
     expect(out).toContain("## Guide");
   });
 
   it("section objects are composable", () => {
     const a = { title: "A", cmd: "cmd-a", body: "output-a" };
     const b = { title: "B", cmd: "cmd-b", body: "output-b" };
-    const combined = [a, b].map((s) => formatSection(s, false)).join("\n\n");
+    const combined = [a, b].map((s) => formatSection(s, { bare: false, quiet: false })).join("\n\n");
     expect(combined).toContain("## A");
     expect(combined).toContain("## B");
     expect(combined).toContain("output-a");
     expect(combined).toContain("output-b");
   });
 
-  it("single section: just body", () => {
+  it("bare section: just body", () => {
     const s = { title: "X", cmd: "c", body: "b" };
-    const out = formatSection(s, true);
+    const out = formatSection(s, { bare: true, quiet: false });
     expect(out).toBe("b");
   });
 
@@ -316,9 +346,18 @@ describe("integration", () => {
       { title: "A", cmd: "a", body: "1" },
       { title: "B", cmd: "b", body: "2" },
     ];
-    const single = results.length === 1; // false
-    const parts = results.map((s) => formatSection(s, single));
+    const parts = results.map((s) => formatSection(s, { bare: false, quiet: false }));
     expect(parts[0]).toContain("## A");
     expect(parts[1]).toContain("## B");
+  });
+
+  it("description appears between header and fence", () => {
+    const s = { title: "T", cmd: "c", body: "b", description: "Desc here." };
+    const out = formatSection(s, { bare: false, quiet: false });
+    const headerIdx = out.indexOf("## T");
+    const descIdx = out.indexOf("Desc here.");
+    const fenceIdx = out.indexOf("```bash");
+    expect(descIdx).toBeGreaterThan(headerIdx);
+    expect(descIdx).toBeLessThan(fenceIdx);
   });
 });

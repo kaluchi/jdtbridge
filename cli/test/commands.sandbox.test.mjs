@@ -90,8 +90,8 @@ describe("sandbox paths and bulk assertions", () => {
       ]));
     });
     mockSandboxPaths();
-    const { errors } = await import("../src/commands/errors.mjs");
-    await errors([]);
+    const { problems } = await import("../src/commands/problems.mjs");
+    await problems([]);
     expect(io.logs[0]).toContain("/d/git/project/src/Foo.java:10");
   });
 
@@ -103,48 +103,35 @@ describe("sandbox paths and bulk assertions", () => {
       ]));
     });
     mockSandboxPaths();
-    const { errors } = await import("../src/commands/errors.mjs");
-    await errors([]);
+    const { problems } = await import("../src/commands/problems.mjs");
+    await problems([]);
     expect(io.logs[0]).toContain("/my-server/src/Foo.java:5");
   });
 
-  it("subtypes converts path in sandbox", async () => {
+  it("implementors shows FQN and file", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { fqn: "com.example.Dog", file: "D:/git/project/src/Dog.java" },
+        { fqn: "com.example.Dog", file: "D:/git/project/src/Dog.java", startLine: 3, endLine: 40 },
       ]));
     });
-    mockSandboxPaths();
-    const { subtypes } = await import("../src/commands/subtypes.mjs");
-    await subtypes(["com.example.Animal"]);
-    expect(io.logs[0]).toContain("/d/git/project/src/Dog.java");
+    const { implementors } = await import("../src/commands/implementors.mjs");
+    await implementors(["com.example.Animal"]);
+    expect(io.logs[0]).toBe("`com.example.Dog`  D:/git/project/src/Dog.java:3-40");
+    expect(io.logs[0]).toContain("D:/git/project/src/Dog.java");
   });
 
-  it("subtypes converts JAR path in sandbox", async () => {
+  it("implementors shows FQN, file, and line", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { fqn: "com.example.Impl", file: "D:/git/m8/m8-core" },
+        { fqn: "com.example.FooImpl", file: "D:/git/project/src/FooImpl.java", startLine: 15, endLine: 28 },
       ]));
     });
-    mockSandboxPaths();
-    const { subtypes } = await import("../src/commands/subtypes.mjs");
-    await subtypes(["com.example.Base"]);
-    expect(io.logs[0]).toContain("/d/git/m8/m8-core");
-  });
-
-  it("implementors converts path in sandbox", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { fqn: "com.example.FooImpl", file: "D:/git/project/src/FooImpl.java", line: 15 },
-      ]));
-    });
-    mockSandboxPaths();
     const { implementors } = await import("../src/commands/implementors.mjs");
     await implementors(["com.example.Foo#bar"]);
-    expect(io.logs[0]).toContain("/d/git/project/src/FooImpl.java:15");
+    expect(io.logs[0]).toContain("`com.example.FooImpl`");
+    expect(io.logs[0]).toContain("D:/git/project/src/FooImpl.java:15-28");
   });
 
   it("type-info converts path in sandbox", async () => {
@@ -187,7 +174,10 @@ describe("sandbox paths and bulk assertions", () => {
     mockSandboxPaths();
     const { references } = await import("../src/commands/references.mjs");
     await references(["com.example.Foo"]);
-    expect(io.logs[0]).toContain("/d/git/project/src/Caller.java:42");
+    const out = io.logs[0];
+    expect(out).toContain("`/d/git/project/src/Caller.java:42`");
+    expect(out).toContain("```java");
+    expect(out).toContain("foo.bar();");
   });
 
   it("references converts binary project path in sandbox", async () => {
@@ -200,8 +190,9 @@ describe("sandbox paths and bulk assertions", () => {
     mockSandboxPaths();
     const { references } = await import("../src/commands/references.mjs");
     await references(["com.example.Foo"]);
-    expect(io.logs[0]).toContain("m8-core");
-    expect(io.logs[0]).toContain("dep.jar");
+    const out = io.logs[0];
+    expect(out).toContain("#### `com.Dep#use()`");
+    expect(out).toContain("`m8-core (dep.jar)`");
   });
 
   it("hierarchy converts file path in sandbox", async () => {
@@ -244,10 +235,10 @@ describe("sandbox paths and bulk assertions", () => {
 
     const cases = [
       { mod: "../src/commands/find.mjs", fn: "find", args: ["X"], expected: "(no results)" },
-      { mod: "../src/commands/subtypes.mjs", fn: "subtypes", args: ["X"], expected: "(no subtypes)" },
+      { mod: "../src/commands/implementors.mjs", fn: "implementors", args: ["X"], expected: "(no implementors)" },
       { mod: "../src/commands/implementors.mjs", fn: "implementors", args: ["X", "m"], expected: "(no implementors)" },
       { mod: "../src/commands/references.mjs", fn: "references", args: ["X"], expected: "(no references)" },
-      { mod: "../src/commands/errors.mjs", fn: "errors", args: [], expected: "(no errors)" },
+      { mod: "../src/commands/problems.mjs", fn: "problems", args: [], expected: "(no problems)" },
     ];
 
     for (const { mod, fn, args, expected } of cases) {
@@ -271,9 +262,9 @@ describe("sandbox paths and bulk assertions", () => {
 
     const cases = [
       { mod: "../src/commands/find.mjs", fn: "find", args: ["X"] },
-      { mod: "../src/commands/subtypes.mjs", fn: "subtypes", args: ["X"] },
+      { mod: "../src/commands/implementors.mjs", fn: "implementors", args: ["X"] },
       { mod: "../src/commands/references.mjs", fn: "references", args: ["X"] },
-      { mod: "../src/commands/errors.mjs", fn: "errors", args: [] },
+      { mod: "../src/commands/problems.mjs", fn: "problems", args: [] },
       { mod: "../src/commands/type-info.mjs", fn: "typeInfo", args: ["X"] },
       { mod: "../src/commands/hierarchy.mjs", fn: "hierarchy", args: ["X"] },
       { mod: "../src/commands/projects.mjs", fn: "projects", args: [] },
@@ -299,7 +290,7 @@ describe("sandbox paths and bulk assertions", () => {
   it("missing args still exit 1", async () => {
     const cases = [
       { mod: "../src/commands/find.mjs", fn: "find", args: [] },
-      { mod: "../src/commands/subtypes.mjs", fn: "subtypes", args: [] },
+      { mod: "../src/commands/implementors.mjs", fn: "implementors", args: [] },
       { mod: "../src/commands/type-info.mjs", fn: "typeInfo", args: [] },
       { mod: "../src/commands/hierarchy.mjs", fn: "hierarchy", args: [] },
       { mod: "../src/commands/references.mjs", fn: "references", args: [] },

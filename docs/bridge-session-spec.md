@@ -30,6 +30,7 @@ Written by `AgentLaunchDelegate` (ui bundle) at launch time:
   "provider": "local",
   "agent": "claude",
   "workingDir": "D:\\git\\eclipse-jdt-search",
+  "projectScope": true,
   "bridgePort": 56480,
   "bridgeToken": "abc123...",
   "bridgeHost": "127.0.0.1",
@@ -37,9 +38,14 @@ Written by `AgentLaunchDelegate` (ui bundle) at launch time:
 }
 ```
 
-Key field: `workingDir` -- the agent's working directory, set in
-AgentTab when creating the launch configuration. Typically the root
-of a git repository or Maven multi-module project.
+Key fields:
+- `workingDir` -- the agent's working directory, set in AgentTab when
+  creating the launch configuration. Typically the root of a git
+  repository or Maven multi-module project.
+- `projectScope` -- boolean, default `true`. When `true`, bridge
+  responses are filtered to projects under `workingDir`. When `false`,
+  full workspace is visible regardless of `workingDir`. Controlled by
+  "Scope to projects in working directory" checkbox in AgentTab.
 
 Deleted automatically when the agent process terminates
 (`AgentLaunchDelegate.registerCleanup`). Whoever creates
@@ -57,6 +63,9 @@ SessionScope.resolve(bridgeSessionId)
     |
     +-- read ~/.jdtbridge/sessions/<bridgeSessionId>.json
     |   workingDir = "D:\git\eclipse-jdt-search"
+    |   projectScope = true
+    |
+    +-- projectScope == false --> ProjectScope.ALL (no filtering)
     |
     +-- file missing --> ProjectScope.ALL (agent terminated)
     |
@@ -122,7 +131,7 @@ Endpoint            Filtering method
 /hierarchy          scope.searchScope()
 /implementors       scope.searchScope()
 /source             scope.searchScope() (incoming refs)
-/errors             scope.containsProject(marker project)
+/problems           scope.containsProject(marker project)
 /editors            scope.containsProject(file project)
 /launch/list        scope.containsLaunch(launch)
 /launch/configs     scope.containsConfig(config)

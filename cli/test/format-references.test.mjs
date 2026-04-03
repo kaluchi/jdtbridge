@@ -14,53 +14,61 @@ describe("formatReferences", () => {
     console.log = origLog;
   });
 
-  it("formats source reference with file:line, in, content", () => {
+  it("formats source reference as markdown snippet", () => {
     formatReferences([
       { file: "/my-server/src/Foo.java", line: 42, in: "Bar.baz(String)", content: "foo.doStuff();" },
     ]);
-    expect(logs[0]).toBe("my-server/src/Foo.java:42");
-    expect(logs[1]).toContain("in Bar.baz(String)");
-    expect(logs[2]).toContain("| foo.doStuff();");
+    const out = logs[0];
+    expect(out).toContain("#### `Bar.baz(String)`");
+    expect(out).toContain("`my-server/src/Foo.java:42`");
+    expect(out).toContain("```java");
+    expect(out).toContain("foo.doStuff();");
   });
 
-  it("groups binary references by project and jar", () => {
+  it("formats binary reference: header + location on separate lines", () => {
     formatReferences([
       { file: "/libs/some.jar", line: -1, project: "my-core", in: "SomeClass.method()", content: null },
     ]);
-    expect(logs[0]).toContain("my-core");
-    expect(logs[0]).toContain("some.jar");
-    expect(logs[1]).toContain("SomeClass.method()");
+    const out = logs[0];
+    expect(out).toContain("#### `SomeClass.method()`");
+    expect(out).toContain("`my-core (some.jar)`");
   });
 
-  it("separates groups with blank line", () => {
+  it("separates multiple refs with ---", () => {
     formatReferences([
       { file: "/my-app/src/A.java", line: 10, in: "A.m()", content: "x" },
       { file: "/my-app/src/B.java", line: 20, in: "B.m()", content: "y" },
     ]);
-    expect(logs.includes("")).toBe(true);
+    const out = logs[0];
+    expect(out).toContain("---");
   });
 
   it("handles source ref without in or content", () => {
     formatReferences([
       { file: "/my-app/src/A.java", line: 5, in: null, content: null },
     ]);
-    expect(logs[0]).toBe("my-app/src/A.java:5");
-    expect(logs).toHaveLength(1);
+    const out = logs[0];
+    expect(out).toContain("#### my-app/src/A.java");
+    expect(out).toContain("`my-app/src/A.java:5`");
+    expect(out).not.toContain("```");
   });
 
   it("handles binary ref with content", () => {
     formatReferences([
       { file: "/libs/x.jar", line: -1, project: "dep", in: "C.m()", content: "call()" },
     ]);
-    expect(logs[0]).toContain("dep");
-    expect(logs[1]).toContain("C.m()");
-    expect(logs[2]).toContain("| call()");
+    const out = logs[0];
+    expect(out).toContain("#### `C.m()`");
+    expect(out).toContain("`dep (x.jar)`");
+    expect(out).toContain("```java");
+    expect(out).toContain("call()");
   });
 
   it("handles binary ref without project", () => {
     formatReferences([
       { file: "/libs/x.jar", line: 0, project: null, in: null, content: null },
     ]);
-    expect(logs[0]).toContain("?");
+    const out = logs[0];
+    expect(out).toContain("?");
   });
 });

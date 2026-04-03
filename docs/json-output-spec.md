@@ -169,7 +169,7 @@ it("--json outputs valid JSON", async () => {
 # Every command should produce parseable JSON
 jdt find Animal --json | node -e "JSON.parse(require('fs').readFileSync(0,'utf8'))"
 jdt refs test.model.Dog#bark --json | node -e "..."
-jdt errors --json | node -e "..."
+jdt problems --json | node -e "..."
 ```
 
 ## Rollout plan

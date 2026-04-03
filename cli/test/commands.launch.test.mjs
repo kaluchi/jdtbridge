@@ -32,8 +32,8 @@ describe("launch commands", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { launchId: "my-server:12345", configId: "my-server", type: "Java Application", mode: "run", terminated: false, pid: "12345" },
-        { launchId: "ObjectMapperTest:99", configId: "ObjectMapperTest", type: "JUnit", mode: "run", terminated: true, exitCode: 0, pid: "99" },
+        { launchId: "my-server:12345", configId: "my-server", configType: "Java Application", mode: "run", terminated: false, pid: "12345" },
+        { launchId: "ObjectMapperTest:99", configId: "ObjectMapperTest", configType: "JUnit", mode: "run", terminated: true, exitCode: 0, pid: "99" },
       ]));
     });
     const { launchList } = await import("../src/commands/launch.mjs");
@@ -41,11 +41,13 @@ describe("launch commands", () => {
     const out = io.logs[0];
     expect(out).toContain("LAUNCHID");
     expect(out).toContain("CONFIGID");
+    expect(out).toContain("CONFIGTYPE");
     expect(out).toContain("STATUS");
+    expect(out).toContain("EXITCODE");
     expect(out).toContain("my-server:12345");
     expect(out).toContain("running");
     expect(out).toContain("ObjectMapperTest:99");
-    expect(out).toContain("terminated (0)");
+    expect(out).toContain("terminated");
   });
 
   it("launch list empty", async () => {
@@ -99,16 +101,16 @@ describe("launch commands", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { configId: "my-server", type: "Java Application", project: "my-project", mainClass: "com.example.Main" },
-        { configId: "AllTests", type: "JUnit", project: "my-project", class: "com.example.AllTests", runner: "JUnit 5" },
-        { configId: "jdtbridge-verify", type: "Maven Build", goals: "clean verify" },
+        { configId: "my-server", configType: "Java Application", project: "my-project", mainClass: "com.example.Main" },
+        { configId: "AllTests", configType: "JUnit", project: "my-project", class: "com.example.AllTests", runner: "JUnit 5" },
+        { configId: "jdtbridge-verify", configType: "Maven Build", goals: "clean verify" },
       ]));
     });
     const { launchConfigs } = await import("../src/commands/launch.mjs");
     await launchConfigs();
     const out = io.logs[0];
     expect(out).toContain("CONFIGID");
-    expect(out).toContain("TYPE");
+    expect(out).toContain("CONFIGTYPE");
     expect(out).toContain("PROJECT");
     expect(out).toContain("TARGET");
     expect(out).toContain("my-server");
@@ -333,7 +335,7 @@ describe("launch commands", () => {
 
   it("launch config shows KEY VALUE table by default", async () => {
     const detail = {
-      configId: "ObjectMapperTest", type: "JUnit", typeId: "org.eclipse.jdt.junit.launchconfig",
+      configId: "ObjectMapperTest", configType: "JUnit", configTypeId: "org.eclipse.jdt.junit.launchconfig",
       file: "/ws/.metadata/.plugins/org.eclipse.debug.core/ObjectMapperTest.launch",
       attributes: {
         "org.eclipse.jdt.launching.MAIN_TYPE": "com.example.ObjectMapperTest",
@@ -358,7 +360,7 @@ describe("launch commands", () => {
 
   it("launch config text shows synthesized Target as FQMN", async () => {
     const detail = {
-      configId: "FooTest", type: "JUnit", typeId: "org.eclipse.jdt.junit.launchconfig",
+      configId: "FooTest", configType: "JUnit", configTypeId: "org.eclipse.jdt.junit.launchconfig",
       attributes: {
         "org.eclipse.jdt.launching.MAIN_TYPE": "com.example.FooTest",
         "org.eclipse.jdt.junit.TESTNAME": "shouldPass",
@@ -378,7 +380,7 @@ describe("launch commands", () => {
 
   it("launch config text shows Java Application target", async () => {
     const detail = {
-      configId: "MyApp", type: "Java Application", typeId: "org.eclipse.jdt.launching.localJavaApplication",
+      configId: "MyApp", configType: "Java Application", configTypeId: "org.eclipse.jdt.launching.localJavaApplication",
       attributes: {
         "org.eclipse.jdt.launching.MAIN_TYPE": "com.example.Main",
         "org.eclipse.jdt.launching.PROJECT_ATTR": "my-app",
@@ -398,7 +400,7 @@ describe("launch commands", () => {
 
   it("launch config text shows Maven goals as target", async () => {
     const detail = {
-      configId: "my-build", type: "Maven Build", typeId: "org.eclipse.m2e.Maven2LaunchConfigurationType",
+      configId: "my-build", configType: "Maven Build", configTypeId: "org.eclipse.m2e.Maven2LaunchConfigurationType",
       attributes: { "M2_GOALS": "clean verify", "M2_THREADS": 4 },
     };
     await setupMock((req, res) => {
@@ -414,7 +416,7 @@ describe("launch commands", () => {
 
   it("launch config text aligns multiline values", async () => {
     const detail = {
-      configId: "Test", type: "JUnit", typeId: "org.eclipse.jdt.junit.launchconfig",
+      configId: "Test", configType: "JUnit", configTypeId: "org.eclipse.jdt.junit.launchconfig",
       attributes: {
         "org.eclipse.jdt.launching.VM_ARGUMENTS": "-ea\n-javaagent:mock.jar",
         "org.eclipse.jdt.launching.MAIN_TYPE": "com.Test",
@@ -438,7 +440,7 @@ describe("launch commands", () => {
 
   it("launch config --json outputs raw JSON", async () => {
     const detail = {
-      configId: "ObjectMapperTest", type: "JUnit", typeId: "org.eclipse.jdt.junit.launchconfig",
+      configId: "ObjectMapperTest", configType: "JUnit", configTypeId: "org.eclipse.jdt.junit.launchconfig",
       file: "/ws/ObjectMapperTest.launch",
       attributes: { "org.eclipse.jdt.launching.MAIN_TYPE": "com.example.ObjectMapperTest" },
     };
@@ -456,7 +458,7 @@ describe("launch commands", () => {
 
   it("launch config text omits Target when no class or goals", async () => {
     const detail = {
-      configId: "my-project", type: "JUnit", typeId: "org.eclipse.jdt.junit.launchconfig",
+      configId: "my-project", configType: "JUnit", configTypeId: "org.eclipse.jdt.junit.launchconfig",
       attributes: {
         "org.eclipse.jdt.launching.MAIN_TYPE": "",
         "org.eclipse.jdt.junit.CONTAINER": "=my-project",
@@ -502,7 +504,7 @@ describe("launch commands", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { configId: "FooTest.bar", type: "JUnit", project: "proj", class: "com.FooTest", method: "bar" },
+        { configId: "FooTest.bar", configType: "JUnit", project: "proj", class: "com.FooTest", method: "bar" },
       ]));
     });
     const { launchConfigs } = await import("../src/commands/launch.mjs");

@@ -39,7 +39,7 @@ public class DiagnosticsIntegrationTest {
     public void errorsFindsCompilationError() throws Exception {
         Map<String, String> params = new HashMap<>();
         params.put("project", TestFixture.PROJECT_NAME);
-        String json = handler.handleErrors(params, ProjectScope.ALL);
+        String json = handler.handleProblems(params, ProjectScope.ALL);
         JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
         assertTrue(arr.size() > 0, "Should have errors");
         JsonObject error = arr.get(0).getAsJsonObject();
@@ -58,7 +58,7 @@ public class DiagnosticsIntegrationTest {
         Map<String, String> params = new HashMap<>();
         params.put("file",
                 "/" + TestFixture.PROJECT_NAME + "/src/test/model/Dog.java");
-        String json = handler.handleErrors(params, ProjectScope.ALL);
+        String json = handler.handleProblems(params, ProjectScope.ALL);
         JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
         assertEquals(0, arr.size(), "Dog.java should have no errors");
     }
@@ -68,7 +68,7 @@ public class DiagnosticsIntegrationTest {
         Map<String, String> params = new HashMap<>();
         params.put("project", TestFixture.PROJECT_NAME);
         params.put("warnings", "");
-        String json = handler.handleErrors(params, ProjectScope.ALL);
+        String json = handler.handleProblems(params, ProjectScope.ALL);
         JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
         boolean hasError = false;
         boolean hasWarning = false;
@@ -91,7 +91,7 @@ public class DiagnosticsIntegrationTest {
     public void errorsProjectNotFound() throws Exception {
         Map<String, String> params = new HashMap<>();
         params.put("project", "no-such-project-xyz");
-        String json = handler.handleErrors(params, ProjectScope.ALL);
+        String json = handler.handleProblems(params, ProjectScope.ALL);
         JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
         assertNotNull(obj.get("error"), "Should have error field");
     }

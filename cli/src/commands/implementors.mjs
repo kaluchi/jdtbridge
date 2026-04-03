@@ -1,18 +1,19 @@
 import { get } from "../client.mjs";
 import { extractPositional, parseFqmn } from "../args.mjs";
-import { stripProject, toSandboxPath } from "../paths.mjs";
+import { stripProject, toSandboxPath, formatLineRange } from "../paths.mjs";
 import { output } from "../output.mjs";
 
 export async function implementors(args) {
   const pos = extractPositional(args);
   const parsed = parseFqmn(pos[0]);
   const fqn = parsed.className;
-  const method = parsed.method || pos[1];
-  if (!fqn || !method) {
-    console.error("Usage: implementors <FQN>#<method>[(param types)] [--json]");
+  if (!fqn) {
+    console.error("Usage: implementors <FQN>[#method[(param types)]] [--json]");
     process.exit(1);
   }
-  let url = `/implementors?class=${encodeURIComponent(fqn)}&method=${encodeURIComponent(method)}`;
+
+  let url = `/implementors?class=${encodeURIComponent(fqn)}`;
+  if (parsed.method) url += `&method=${encodeURIComponent(parsed.method)}`;
   if (parsed.paramTypes) {
     url += `&paramTypes=${encodeURIComponent(parsed.paramTypes.join(","))}`;
   }
@@ -23,16 +24,23 @@ export async function implementors(args) {
     empty: "(no implementors)",
     text(data) {
       for (const r of data) {
-        console.log(`${r.fqn}  ${toSandboxPath(stripProject(r.file))}:${r.line}`);
+        const file = toSandboxPath(stripProject(r.file));
+        const name = r.fqmn || r.fqn;
+        console.log(`\`${name}\`  ${file}${formatLineRange(r.startLine, r.endLine)}`);
       }
     },
   });
 }
 
-export const help = `Find implementations of an interface method across all implementing classes.
+export const help = `Find implementors of a type or method.
 
-Usage:  jdt implementors <FQN>#<method>[(param types)] [--json]
+Usage:  jdt implementors <FQN>[#method[(param types)]] [--json]
+
+  <FQN>            all classes that extend/implement the type
+  <FQN>#method     concrete method implementations in subtypes
 
 Examples:
+  jdt implementors com.example.core.HasId
   jdt implementors com.example.core.HasId#getId
-  jdt implementors com.example.core.HasId#getId --json`;
+  jdt implementors "com.example.core.HasId#process(String)"
+  jdt implementors com.example.core.HasId --json`;
