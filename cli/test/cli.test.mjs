@@ -65,7 +65,7 @@ describe("cli dispatcher", () => {
     const output = logs.join("\n");
     expect(output).toContain("refs");
     expect(output).toContain("impl");
-    expect(output).toContain("subt");
+    expect(output).toContain("impl");
     expect(output).toContain("hier");
     expect(output).toContain("src");
     expect(output).toContain("err");

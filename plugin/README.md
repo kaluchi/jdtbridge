@@ -34,17 +34,13 @@ Find all references to a type, method, or field. Filters out inaccurate matches 
 
 `paramTypes` is a comma-separated list of parameter types for disambiguating overloaded methods (e.g., `paramTypes=String,int`). Supports simple names and FQN; generics are stripped for matching.
 
-### `GET /subtypes?class=<FQN>`
+### `GET /implementors?class=<FQN>[&method=<name>][&paramTypes=<types>]`
 
-Find all direct and indirect subtypes/implementors of a type.
+Find implementors of a type or method. Without `method` — all subtypes via ITypeHierarchy. With `method` — concrete method implementations in subtypes.
 
 ### `GET /hierarchy?class=<FQN>`
 
 Full type hierarchy: superclass chain, all super interfaces, and all subtypes.
-
-### `GET /implementors?class=<FQN>&method=<name>[&paramTypes=<types>]`
-
-Find implementations of an interface method across all implementing classes.
 
 ### `GET /type-info?class=<FQN>`
 

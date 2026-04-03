@@ -91,8 +91,8 @@ jdt err --project my-server | head -5
 # Where does this Spring method throw or catch?
 jdt src org.springframework.jdbc.core.JdbcTemplate#query | grep -n 'throw\|catch'
 
-# All subtypes of a Spring base class — including library internals.
-jdt subtypes org.springframework.jdbc.object.SqlOperation
+# All implementors of a Spring base class — including library internals.
+jdt impl org.springframework.jdbc.object.SqlOperation
 ```
 
 An agent's context window is finite. Every irrelevant token displaces useful reasoning. MCP's [own community recognizes this](https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1576) — token bloat from tool schemas and unfiltered results is a known problem, with projects like [model-context-shell](https://github.com/StacklokLabs/model-context-shell) trying to retrofit Unix-style pipes onto MCP.

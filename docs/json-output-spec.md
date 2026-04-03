@@ -53,12 +53,11 @@ Adding `--json` is mechanical — early exit before `formatTable`.
 | Command | Data source | Current output | JSON shape |
 |---------|-------------|----------------|------------|
 | `find` | `GET /find` | table | `[{kind, fqn, binary, file, origin}]` |
-| `references` | `GET /references` | grouped table | `[{caller, file, line, snippet}]` |
-| `subtypes` | `GET /subtypes` | table | `[{kind, fqn, file}]` |
+| `references` | `GET /references` | markdown | `[{file, line, in, content}]` |
+| `implementors` | `GET /implementors` | list | `[{fqn, fqmn?, file, project, startLine, endLine, binary?, library?}]` |
 | `hierarchy` | `GET /hierarchy` | tree | `{type, supertypes[], interfaces[], subtypes[]}` |
-| `implementors` | `GET /implementors` | table | `[{fqn, method, file, line}]` |
 | `type-info` | `GET /type-info` | formatted text | `{fqn, kind, fields[], methods[], supertypes[]}` |
-| `errors` | `GET /errors` | table | `[{file, line, col, severity, message}]` |
+| `problems` | `GET /problems` | table | `[{file, line, col, severity, message}]` |
 | `projects` | `GET /projects` | table | `[{name, location, repo}]` |
 | `editors` | `GET /editors` | table | `[{fqn, project, path, active}]` |
 | `test sessions` | `GET /test/sessions` | table | `[{session, label, total, passed, failed, time, status}]` |

@@ -42,9 +42,8 @@ jdt status [sections...] [-q]                          # workspace overview (sta
 ```bash
 jdt find <Name|*Pattern*|pkg> [--source-only]          # find types by name, wildcard, or package
 jdt references <FQMN> [--field <name>]                 # (alias: refs) references to type/method/field
-jdt subtypes <FQN>                                     # (alias: subt) all subtypes/implementors
+jdt implementors <FQN>[#method]                        # (alias: impl) type or method implementors
 jdt hierarchy <FQN>                                    # (alias: hier) supers + interfaces + subtypes
-jdt implementors <FQMN>                                # (alias: impl) implementations of interface method
 jdt type-info <FQN>                                    # (alias: ti) class overview (fields, methods)
 jdt source <FQMN> [<FQMN> ...]                         # (alias: src) source code (project + libraries)
 ```

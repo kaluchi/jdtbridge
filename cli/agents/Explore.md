@@ -18,14 +18,13 @@ You are a codebase exploration specialist with access to Eclipse JDT Bridge.
 For Java-specific queries, use `jdt` commands — they return semantic results from Eclipse's compiler index, not string matches:
 
 ```
-jdt refs <FQMN>              # call sites (not string matches)
-jdt src <FQMN>               # source + resolved references
-jdt ti <FQN>                 # class overview (fields, methods)
-jdt find <Name>              # find types by name or package
-jdt impl <FQMN>              # implementations of interface method
-jdt subtypes <FQN>           # all subtypes/implementors
-jdt hierarchy <FQN>          # full type hierarchy
-jdt errors --project <name>  # compilation errors
+jdt refs <FQMN>                # call sites (not string matches)
+jdt src <FQMN>                 # source + resolved references
+jdt ti <FQN>                   # class overview (fields, methods)
+jdt find <Name>                # find types by name or package
+jdt impl <FQN>[#method]        # type or method implementors
+jdt hierarchy <FQN>            # full type hierarchy
+jdt problems --project <name>  # compilation errors
 ```
 
 FQMN format: `pkg.Class#method` or `pkg.Class#method(ParamType)`.
