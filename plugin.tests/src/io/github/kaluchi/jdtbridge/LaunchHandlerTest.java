@@ -83,8 +83,8 @@ public class LaunchHandlerTest {
             if (!json.equals("[]")) {
                 assertTrue(json.contains("\"mode\""),
                         "Should have mode: " + json);
-                assertTrue(json.contains("\"type\""),
-                        "Should have type: " + json);
+                assertTrue(json.contains("\"configType\""),
+                        "Should have configType: " + json);
             }
         }
     }
@@ -156,8 +156,8 @@ public class LaunchHandlerTest {
             if (!json.equals("[]")) {
                 assertTrue(json.contains("\"configId\""),
                         "Should have configId: " + json);
-                assertTrue(json.contains("\"type\""),
-                        "Should have type: " + json);
+                assertTrue(json.contains("\"configType\""),
+                        "Should have configType: " + json);
             }
         }
 

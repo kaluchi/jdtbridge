@@ -108,30 +108,30 @@ describe("sandbox paths and bulk assertions", () => {
     expect(io.logs[0]).toContain("/my-server/src/Foo.java:5");
   });
 
-  it("implementors shows FQN and file", async () => {
+  it("implementors converts path in sandbox (type mode)", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
         { fqn: "com.example.Dog", file: "D:/git/project/src/Dog.java", startLine: 3, endLine: 40 },
       ]));
     });
+    mockSandboxPaths();
     const { implementors } = await import("../src/commands/implementors.mjs");
     await implementors(["com.example.Animal"]);
-    expect(io.logs[0]).toBe("`com.example.Dog`  D:/git/project/src/Dog.java:3-40");
-    expect(io.logs[0]).toContain("D:/git/project/src/Dog.java");
+    expect(io.logs[0]).toContain("/d/git/project/src/Dog.java:3-40");
   });
 
-  it("implementors shows FQN, file, and line", async () => {
+  it("implementors converts path in sandbox (method mode)", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
         { fqn: "com.example.FooImpl", file: "D:/git/project/src/FooImpl.java", startLine: 15, endLine: 28 },
       ]));
     });
+    mockSandboxPaths();
     const { implementors } = await import("../src/commands/implementors.mjs");
     await implementors(["com.example.Foo#bar"]);
-    expect(io.logs[0]).toContain("`com.example.FooImpl`");
-    expect(io.logs[0]).toContain("D:/git/project/src/FooImpl.java:15-28");
+    expect(io.logs[0]).toContain("/d/git/project/src/FooImpl.java:15-28");
   });
 
   it("type-info converts path in sandbox", async () => {
