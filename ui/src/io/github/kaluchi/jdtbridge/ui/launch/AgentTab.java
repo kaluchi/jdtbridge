@@ -187,11 +187,10 @@ public class AgentTab extends AbstractLaunchConfigurationTab {
 	@Override
 	public void setDefaults(
 			ILaunchConfigurationWorkingCopy config) {
-		String provider = "local";
-		String agent = "claude";
 		config.setAttribute(AgentLaunchDelegate.ATTR_PROVIDER,
-				provider);
-		config.setAttribute(AgentLaunchDelegate.ATTR_AGENT, agent);
+				"local");
+		config.setAttribute(AgentLaunchDelegate.ATTR_AGENT,
+				"claude");
 		config.setAttribute(AgentLaunchDelegate.ATTR_WORKING_DIR, "");
 		config.setAttribute(AgentLaunchDelegate.ATTR_PROJECT_SCOPE,
 				true);
