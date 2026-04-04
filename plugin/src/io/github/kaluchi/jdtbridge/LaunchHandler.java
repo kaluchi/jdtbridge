@@ -218,8 +218,9 @@ class LaunchHandler {
             return HttpServer.jsonError(
                     "Missing launch configuration XML in request body");
         }
-        // Check if configId already exists
-        if (findConfig(configId) != null) {
+        // Check if configId already exists (API cache + file on disk)
+        if (findConfig(configId) != null
+                || launchFileExists(configId)) {
             return HttpServer.jsonError(
                     "Launch configuration \"" + configId
                     + "\" already exists. "
@@ -601,6 +602,19 @@ class LaunchHandler {
             }
         } catch (Exception e) { /* ignored */ }
         return null;
+    }
+
+    /** Check .launch file exists on disk (handles LaunchManager cache lag). */
+    private boolean launchFileExists(String configId) {
+        try {
+            java.nio.file.Path launchFile = DebugPlugin.getDefault()
+                    .getStateLocation().toPath()
+                    .resolve(".launches")
+                    .resolve(configId + ".launch");
+            return Files.exists(launchFile);
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     String handleConsole(Map<String, String> params) {
