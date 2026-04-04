@@ -90,24 +90,6 @@ export async function launchImport(args) {
   console.log(`Imported: ${importResult.configId}`);
 }
 
-export const launchImportHelp = `Import a .launch file into the current workspace.
-
-Usage:
-  jdt launch config --import <path> [--configid <name>]
-
-Arguments:
-  <path>             path to a .launch file on disk
-
-Flags:
-  --configid <name>  override configuration name (default: filename)
-
-The CLI reads the file and sends its content to Eclipse.
-Fails if a configuration with the same name already exists.
-
-Examples:
-  jdt launch config --import launches/jdtbridge-verify.launch
-  jdt launch config --import my-build.launch --configid custom-build`;
-
 export async function launchConfigDelete(args) {
   const pos = extractPositional(args);
   const configId = pos[0];
@@ -467,7 +449,7 @@ Fails if --import target already exists. Use --delete first or
 Examples:
   jdt launch config my-server
   jdt launch config my-server --xml
-  jdt launch config --import launches/my-build.launch
+  jdt launch config --import /path/to/my-build.launch
   jdt launch config --import my.launch --configid custom-name
   jdt launch config --delete old-config`;
 
