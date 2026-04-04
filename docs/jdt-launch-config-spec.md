@@ -13,11 +13,11 @@ commands (`configs`, `config`, `run`, `debug`, `logs`, `stop`, `clear`).
 
 ### Problem
 
-Launch configurations live in workspace metadata
-(`<workspace>/.metadata/.plugins/org.eclipse.debug.core/.launches/`).
-They are not visible in VCS. When a developer clones a repo and opens
-it in a fresh workspace, no launch configs exist — they must recreate
-them manually or copy `.launch` files between workspaces.
+Eclipse stores launch configurations in workspace metadata
+(`<workspace>/.metadata/.plugins/org.eclipse.debug.core/.launches/`),
+outside the project directory. A fresh workspace has no launch
+configs — the developer recreates them manually or copies `.launch`
+files from another workspace.
 
 ### What it does
 
