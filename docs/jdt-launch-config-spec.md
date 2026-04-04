@@ -3,8 +3,8 @@
 ## Overview
 
 Operations on Eclipse launch configurations beyond listing and
-inspection: import from file (sharing via VCS), delete, and future
-operations (duplicate, edit).
+inspection: import from file, delete, and future operations
+(duplicate, edit).
 
 See [jdt-launch-spec.md](jdt-launch-spec.md) for the core launch
 commands (`configs`, `config`, `run`, `debug`, `logs`, `stop`, `clear`).
