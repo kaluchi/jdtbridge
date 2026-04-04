@@ -6,6 +6,7 @@ import { readWorkspaces, writeWorkspaces, listPins, readPin } from "../home.mjs"
 import { discoverInstances } from "../discovery.mjs";
 import {
   workspacePathsMatch,
+  normalizeWorkspacePath,
   writePinFiles,
   cleanStalePins,
 } from "../resolve.mjs";
@@ -41,70 +42,52 @@ export async function use(args) {
 
 async function handleList(flags) {
   const workspaces = readWorkspaces();
-  const instances = await discoverInstances();
-  const allWorkspaces = syncNewInstances(workspaces, instances);
+  const liveInstances = await discoverInstances();
+  const allWorkspaces = syncNewInstances(workspaces, liveInstances);
   const updated = allWorkspaces.length > workspaces.length;
-
-  // Resolve currently pinned workspace
   const pinnedWorkspace = resolvePinnedWorkspace();
 
-  // Build display rows
-  const rows = allWorkspaces.map((entry, i) => {
-    const inst = instances.find(
-      inst => workspacePathsMatch(inst.workspace, entry.workspace),
+  // Build enriched model — one pass, shared by text and JSON
+  const enriched = allWorkspaces.map((wsEntry, idx) => {
+    const liveInstance = liveInstances.find(
+      li => workspacePathsMatch(li.workspace, wsEntry.workspace),
     );
-    const isNew = i >= workspaces.length;
-    const pinned = pinnedWorkspace &&
-      workspacePathsMatch(entry.workspace, pinnedWorkspace);
-
-    let status;
-    if (isNew) status = yellow("*new*");
-    else if (inst) status = green("online");
-    else status = dim("offline");
-
-    return [
-      String(i + 1),
-      entry.alias || "",
-      entry.workspace,
-      status,
-      pinned ? bold("pinned") : "",
-      inst?.version || "",
-      inst ? String(inst.port) : "",
-    ];
+    const isNew = idx >= workspaces.length;
+    return {
+      index: idx + 1,
+      alias: wsEntry.alias || null,
+      workspace: wsEntry.workspace,
+      status: isNew ? "new" : liveInstance ? "online" : "offline",
+      pinned: !!pinnedWorkspace &&
+        workspacePathsMatch(wsEntry.workspace, pinnedWorkspace),
+      port: liveInstance?.port || null,
+      version: liveInstance?.version || null,
+    };
   });
 
-  // Clean stale pins
-  cleanStalePins(instances);
-
-  // Save updated registry
+  cleanStalePins(liveInstances);
   if (updated) writeWorkspaces(allWorkspaces);
 
   if (flags.json) {
-    const jsonData = allWorkspaces.map((entry, i) => {
-      const inst = instances.find(
-        inst => workspacePathsMatch(inst.workspace, entry.workspace),
-      );
-      const pinned = pinnedWorkspace &&
-        workspacePathsMatch(entry.workspace, pinnedWorkspace);
-      return {
-        index: i + 1,
-        alias: entry.alias || null,
-        workspace: entry.workspace,
-        status: i >= workspaces.length ? "new"
-          : inst ? "online" : "offline",
-        pinned: !!pinned,
-        port: inst?.port || null,
-        version: inst?.version || null,
-      };
-    });
-    printJson(jsonData);
+    printJson(enriched);
     return;
   }
 
-  if (rows.length === 0) {
+  if (enriched.length === 0) {
     console.log("No workspaces registered. Start an Eclipse instance first.");
     return;
   }
+
+  const STATUS_COLOR = { new: yellow, online: green, offline: dim };
+  const rows = enriched.map(ws => [
+    String(ws.index),
+    ws.alias || "",
+    ws.workspace,
+    (STATUS_COLOR[ws.status] || dim)(ws.status === "new" ? "*new*" : ws.status),
+    ws.pinned ? bold("pinned") : "",
+    ws.version || "",
+    ws.port ? String(ws.port) : "",
+  ]);
 
   console.log(
     formatTable(
@@ -118,46 +101,46 @@ async function handleList(flags) {
 
 async function handlePin(target) {
   const workspaces = readWorkspaces();
-  const instances = await discoverInstances();
-  const allWorkspaces = syncNewInstances(workspaces, instances);
+  const liveInstances = await discoverInstances();
+  const allWorkspaces = syncNewInstances(workspaces, liveInstances);
   if (allWorkspaces.length > workspaces.length) {
     writeWorkspaces(allWorkspaces);
   }
 
-  const entry = resolveTarget(allWorkspaces, target);
-  if (!entry) {
+  const wsEntry = resolveTarget(allWorkspaces, target);
+  if (!wsEntry) {
     console.error(`No workspace matching: ${target}`);
     process.exit(1);
   }
 
-  const inst = instances.find(
-    i => workspacePathsMatch(i.workspace, entry.workspace),
+  const liveInstance = liveInstances.find(
+    li => workspacePathsMatch(li.workspace, wsEntry.workspace),
   );
-  if (!inst) {
+  if (!liveInstance) {
     console.error(
-      `Workspace offline — no running Eclipse instance for:\n  ${entry.workspace}`,
+      `Workspace offline — no running Eclipse instance for:\n  ${wsEntry.workspace}`,
     );
     process.exit(1);
   }
 
-  writePinFiles(entry.workspace);
+  writePinFiles(wsEntry.workspace);
 
-  const aliasLabel = entry.alias ? ` (${entry.alias})` : "";
+  const aliasLabel = wsEntry.alias ? ` (${wsEntry.alias})` : "";
   console.log(
-    `Pinned to: ${bold(entry.workspace)}${aliasLabel} port ${inst.port}`,
+    `Pinned to: ${bold(wsEntry.workspace)}${aliasLabel} port ${liveInstance.port}`,
   );
 }
 
 function handlePins(flags) {
   const files = listPins();
   const termId = resolveTerminalId();
-  const pins = files.map(f => {
-    const pin = readPin(f);
-    const { pinType, pinKey } = parsePinFilename(f);
+  const pins = files.map(pinFilename => {
+    const pinData = readPin(pinFilename);
+    const { pinType, pinKey } = parsePinFilename(pinFilename);
     const active = pinType === "terminal"
       ? termId === pinKey
       : String(process.ppid) === pinKey;
-    return { file: f, pinType, pinKey, active, ...pin };
+    return { file: pinFilename, pinType, pinKey, active, ...pinData };
   });
 
   if (flags.json) {
@@ -197,17 +180,16 @@ function parsePinFilename(filename) {
 
 function handleAlias(target, aliasValue) {
   const workspaces = readWorkspaces();
-  const entry = resolveTarget(workspaces, target);
-  if (!entry) {
+  const wsEntry = resolveTarget(workspaces, target);
+  if (!wsEntry) {
     console.error(`No workspace matching: ${target}`);
     process.exit(1);
   }
 
   if (aliasValue === "" || aliasValue === true) {
-    // Remove alias
-    delete entry.alias;
+    delete wsEntry.alias;
     writeWorkspaces(workspaces);
-    console.log(`Alias removed for: ${entry.workspace}`);
+    console.log(`Alias removed for: ${wsEntry.workspace}`);
     return;
   }
 
@@ -218,34 +200,32 @@ function handleAlias(target, aliasValue) {
     process.exit(1);
   }
 
-  // Check uniqueness
-  const existing = workspaces.find(
-    w => w.alias === aliasValue && w !== entry,
+  const conflicting = workspaces.find(
+    w => w.alias === aliasValue && w !== wsEntry,
   );
-  if (existing) {
+  if (conflicting) {
     console.error(
-      `Alias "${aliasValue}" already used by: ${existing.workspace}`,
+      `Alias "${aliasValue}" already used by: ${conflicting.workspace}`,
     );
     process.exit(1);
   }
 
-  entry.alias = aliasValue;
+  wsEntry.alias = aliasValue;
   writeWorkspaces(workspaces);
-  console.log(`Alias set: ${bold(aliasValue)} → ${entry.workspace}`);
+  console.log(`Alias set: ${bold(aliasValue)} → ${wsEntry.workspace}`);
 }
 
 function handleDelete(target) {
   const workspaces = readWorkspaces();
-  const entry = resolveTarget(workspaces, target);
-  if (!entry) {
+  const wsEntry = resolveTarget(workspaces, target);
+  if (!wsEntry) {
     console.error(`No workspace matching: ${target}`);
     process.exit(1);
   }
 
-  const idx = workspaces.indexOf(entry);
-  workspaces.splice(idx, 1);
+  workspaces.splice(workspaces.indexOf(wsEntry), 1);
   writeWorkspaces(workspaces);
-  console.log(`Removed: ${entry.workspace}`);
+  console.log(`Removed: ${wsEntry.workspace}`);
 }
 
 /**
@@ -282,31 +262,29 @@ function resolveTarget(workspaces, target) {
   if (byAlias) return byAlias;
 
   // Path (exact or substring)
-  const normTarget = normalizePath(target);
+  const normTarget = normalizeWorkspacePath(target);
   return workspaces.find(w =>
-    normalizePath(w.workspace).includes(normTarget),
+    normalizeWorkspacePath(w.workspace).includes(normTarget),
   ) || null;
-}
-
-/** Lowercase, forward-slash normalized path for comparison. */
-function normalizePath(p) {
-  return p.toLowerCase().replace(/\\/g, "/");
 }
 
 /**
  * Sync new instances into workspaces list (in-memory only).
  * Returns the combined list.
  */
-function syncNewInstances(workspaces, instances) {
-  const knownPaths = new Set(workspaces.map(w => normalizePath(w.workspace)));
+function syncNewInstances(workspaces, liveInstances) {
+  const knownPaths = new Set(
+    workspaces.map(w => normalizeWorkspacePath(w.workspace)),
+  );
   const combined = [...workspaces];
-  for (const inst of instances) {
-    if (!knownPaths.has(normalizePath(inst.workspace))) {
+  for (const liveInstance of liveInstances) {
+    const normPath = normalizeWorkspacePath(liveInstance.workspace);
+    if (!knownPaths.has(normPath)) {
       combined.push({
-        workspace: inst.workspace,
+        workspace: liveInstance.workspace,
         addedAt: new Date().toISOString(),
       });
-      knownPaths.add(normalizePath(inst.workspace));
+      knownPaths.add(normPath);
     }
   }
   return combined;

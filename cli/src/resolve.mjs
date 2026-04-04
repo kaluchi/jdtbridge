@@ -110,6 +110,11 @@ export function cleanStalePins(liveInstances) {
   }
 }
 
+/** Lowercase, forward-slash normalized path for comparison. */
+export function normalizeWorkspacePath(p) {
+  return p.toLowerCase().replace(/\\/g, "/");
+}
+
 /**
  * Case-insensitive, backslash-normalized workspace path comparison.
  * @param {string} a
@@ -117,8 +122,7 @@ export function cleanStalePins(liveInstances) {
  * @returns {boolean}
  */
 export function workspacePathsMatch(a, b) {
-  const normalize = p => p.toLowerCase().replace(/\\/g, "/");
-  return normalize(a) === normalize(b);
+  return normalizeWorkspacePath(a) === normalizeWorkspacePath(b);
 }
 
 /**

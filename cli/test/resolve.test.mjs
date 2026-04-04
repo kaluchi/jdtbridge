@@ -93,6 +93,58 @@ describe("resolve", () => {
       expect(inst).toBeNull();
     });
 
+    it("uses ppid pin when ppid alive and workspace online", async () => {
+      writeInstance("inst1", {
+        port: 58800, token: "a", pid: process.pid,
+        workspace: "/ws/one",
+      });
+      writeInstance("inst2", {
+        port: 58900, token: "b", pid: process.pid,
+        workspace: "/ws/two",
+      });
+
+      const { writePin } = await import("../src/home.mjs");
+      // ppid is process.ppid — alive by definition during test
+      writePin(`ppid-${process.ppid}.json`, {
+        workspace: "/ws/two",
+        pinnedAt: new Date().toISOString(),
+      });
+
+      const { resolveInstance } = await import("../src/resolve.mjs");
+      const resolvedInstance = await resolveInstance();
+      expect(resolvedInstance.port).toBe(58900);
+      expect(resolvedInstance.workspace).toBe("/ws/two");
+    });
+
+    it("ppid pin takes priority over terminal pin", async () => {
+      process.env.WT_SESSION = "shared-terminal-id";
+      writeInstance("inst1", {
+        port: 58800, token: "a", pid: process.pid,
+        workspace: "/ws/one",
+      });
+      writeInstance("inst2", {
+        port: 58900, token: "b", pid: process.pid,
+        workspace: "/ws/two",
+      });
+
+      const { writePin } = await import("../src/home.mjs");
+      // ppid pin → workspace one, terminal pin → workspace two
+      writePin(`ppid-${process.ppid}.json`, {
+        workspace: "/ws/one",
+        pinnedAt: new Date().toISOString(),
+      });
+      writePin("term-shared-terminal-id.json", {
+        workspace: "/ws/two",
+        pinnedAt: new Date().toISOString(),
+      });
+
+      const { resolveInstance } = await import("../src/resolve.mjs");
+      const resolvedInstance = await resolveInstance();
+      // ppid pin wins — workspace one
+      expect(resolvedInstance.port).toBe(58800);
+      expect(resolvedInstance.workspace).toBe("/ws/one");
+    });
+
     it("uses terminal pin when available", async () => {
       process.env.WT_SESSION = "test-session-id";
       writeInstance("inst1", {
