@@ -84,7 +84,8 @@ ConfigId is validated: no path separators (`/`, `\`) or `..` allowed.
 2. Check if configId already exists (LaunchManager cache + file on disk).
 3. Write XML to temp file named `<configId>.launch`.
 4. Call `LaunchManager.importConfigurations(File[])` — Eclipse's
-   built-in import API. Copies file to workspace `.launches/`,
+   built-in import API. Copies file to
+   `<workspace>/.metadata/.plugins/org.eclipse.debug.core/.launches/`,
    registers with LaunchManager, fires change notifications.
 5. Clean up temp file in `finally` block.
 6. Return success with configId.
