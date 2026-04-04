@@ -273,7 +273,7 @@ public class HttpServer {
                     sessionHeader);
 
             long startNs = System.nanoTime();
-            Response resp = dispatch(path, params, scope);
+            Response resp = dispatch(path, params, body, scope);
             long durationMs = (System.nanoTime() - startNs) / 1_000_000;
             sendResponse(socket, resp);
 
@@ -442,7 +442,8 @@ public class HttpServer {
     }
 
     private Response dispatch(String path,
-            Map<String, String> params, ProjectScope scope) {
+            Map<String, String> params, String requestBody,
+            ProjectScope scope) {
         try {
             return switch (path) {
                 case "/projects" -> Response.json(
@@ -498,6 +499,8 @@ public class HttpServer {
                         launch.handleConfig(params));
                 case "/launch/config/delete" -> Response.json(
                         launch.handleConfigDelete(params));
+                case "/launch/import" -> Response.json(
+                        launch.handleImport(params, requestBody));
                 case "/launch/clear" -> Response.json(
                         launch.handleClear(params));
                 case "/launch/console" -> Response.json(

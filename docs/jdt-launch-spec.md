@@ -315,6 +315,11 @@ Returns: `{removed: N}`
 - `io.github.kaluchi.jdtbridge.workingDir` — working directory
 - `io.github.kaluchi.jdtbridge.agentArgs` — agent arguments
 
+## Launch configuration operations
+
+Import, delete, duplicate, and edit operations are specified in
+[jdt-launch-config-spec.md](jdt-launch-config-spec.md).
+
 ## Launch configuration storage
 
 `.launch` files are always stored in the workspace metadata directory:

@@ -207,6 +207,55 @@ class LaunchHandler {
         }
     }
 
+    String handleImport(Map<String, String> params,
+            String launchXmlContent) {
+        String configId = params.get("configId");
+        if (configId == null || configId.isBlank()) {
+            return HttpServer.jsonError(
+                    "Missing 'configId' parameter");
+        }
+        if (launchXmlContent == null || launchXmlContent.isBlank()) {
+            return HttpServer.jsonError(
+                    "Missing launch configuration XML in request body");
+        }
+        // Check if configId already exists
+        if (findConfig(configId) != null) {
+            return HttpServer.jsonError(
+                    "Launch configuration \"" + configId
+                    + "\" already exists. "
+                    + "Use --configid to import with a different name.");
+        }
+        try {
+            // Write XML to temp file named as the target configId
+            java.nio.file.Path tempDir = Files.createTempDirectory(
+                    "jdtbridge-import");
+            java.nio.file.Path tempLaunchFile = tempDir.resolve(
+                    configId + ".launch");
+            Files.writeString(tempLaunchFile, launchXmlContent);
+
+            // Use Eclipse's built-in import API — handles file copy,
+            // LaunchManager registration, and change notification
+            var launchManager =
+                    (org.eclipse.debug.internal.core.LaunchManager)
+                    DebugPlugin.getDefault().getLaunchManager();
+            launchManager.importConfigurations(
+                    new java.io.File[] { tempLaunchFile.toFile() },
+                    null);
+
+            // Cleanup temp
+            Files.deleteIfExists(tempLaunchFile);
+            Files.deleteIfExists(tempDir);
+
+            var importResult = new JsonObject();
+            importResult.addProperty("configId", configId);
+            importResult.addProperty("imported", true);
+            return importResult.toString();
+        } catch (Exception importException) {
+            return HttpServer.jsonError(
+                    "Import failed: " + importException.getMessage());
+        }
+    }
+
     String handleConfigDelete(Map<String, String> params) {
         String configId = params.get("configId");
         if (configId == null || configId.isBlank()) {

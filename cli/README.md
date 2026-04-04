@@ -112,6 +112,8 @@ jdt launch list                                        # list launches (LAUNCHID
 jdt launch logs <launchId> [-f] [--tail N]             # show console output
 jdt launch stop <launchId>                             # stop a running launch
 jdt launch clear [launchId]                            # remove terminated launches
+jdt launch config --import <path> [--configid <name>]  # import .launch file
+jdt launch config --delete <configId>                  # delete a configuration
 ```
 
 `-f` streams output in real-time until the process terminates.

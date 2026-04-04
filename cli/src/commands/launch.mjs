@@ -1,4 +1,6 @@
-import { get, getStream } from "../client.mjs";
+import { readFileSync } from "node:fs";
+import { basename } from "node:path";
+import { get, post, getStream } from "../client.mjs";
 import { extractPositional, parseFlags } from "../args.mjs";
 import { output } from "../output.mjs";
 import { printJson } from "../json-output.mjs";
@@ -57,6 +59,55 @@ function configTarget(r) {
   return "";
 }
 
+export async function launchImport(args) {
+  const flags = parseFlags(args);
+  const positional = extractPositional(args);
+  const launchFilePath = positional[0];
+  if (!launchFilePath) {
+    console.error("Usage: jdt launch config --import <path> [--configid <name>]");
+    process.exit(1);
+  }
+
+  let launchFileContent;
+  try {
+    launchFileContent = readFileSync(launchFilePath, "utf8");
+  } catch (readError) {
+    console.error(`Cannot read file: ${launchFilePath}`);
+    process.exit(1);
+  }
+
+  const configId = flags.configid
+    || basename(launchFilePath, ".launch");
+
+  const importResult = await post(
+    `/launch/import?configId=${encodeURIComponent(configId)}`,
+    launchFileContent,
+  );
+  if (importResult.error) {
+    console.error(importResult.error);
+    process.exit(1);
+  }
+  console.log(`Imported: ${importResult.configId}`);
+}
+
+export const launchImportHelp = `Import a .launch file into the current workspace.
+
+Usage:
+  jdt launch config --import <path> [--configid <name>]
+
+Arguments:
+  <path>             path to a .launch file on disk
+
+Flags:
+  --configid <name>  override configuration name (default: filename)
+
+The CLI reads the file and sends its content to Eclipse.
+Fails if a configuration with the same name already exists.
+
+Examples:
+  jdt launch config --import launches/jdtbridge-verify.launch
+  jdt launch config --import my-build.launch --configid custom-build`;
+
 export async function launchConfigDelete(args) {
   const pos = extractPositional(args);
   const configId = pos[0];
@@ -89,6 +140,10 @@ export async function launchConfig(args) {
   if (args.includes("--delete")) {
     return launchConfigDelete(
       args.filter((a) => a !== "--delete"));
+  }
+  if (args.includes("--import")) {
+    return launchImport(
+      args.filter((a) => a !== "--import"));
   }
   const pos = extractPositional(args);
   const name = pos[0];
@@ -392,22 +447,29 @@ Examples:
   jdt launch configs
   jdt launch configs --json`;
 
-export const launchConfigHelp = `Show details of a launch configuration.
+export const launchConfigHelp = `Show, import, or delete a launch configuration.
 
-Usage:  jdt launch config <configId> [--xml] [--json]
+Usage:
+  jdt launch config <configId> [--xml] [--json]       show details
+  jdt launch config --import <path> [--configid <n>]  import .launch file
+  jdt launch config --delete <configId>               delete configuration
 
-Default output is a KEY VALUE table with synthesized header
-(ConfigId, Type, Project, Target) and all raw Eclipse attributes.
-
-Options:
+Show options:
   --xml     output raw .launch XML instead of table
   --json    output raw JSON with typed attribute values
+
+Import options:
+  --configid <name>  override config name (default: filename)
+
+Fails if --import target already exists. Use --delete first or
+--configid to import with a different name.
 
 Examples:
   jdt launch config my-server
   jdt launch config my-server --xml
-  jdt launch config my-server --json
-  jdt launch config ObjectMapperTest --json | jq .attributes`;
+  jdt launch config --import launches/my-build.launch
+  jdt launch config --import my.launch --configid custom-name
+  jdt launch config --delete old-config`;
 
 export const launchRunHelp = `Launch a saved configuration (non-blocking).
 

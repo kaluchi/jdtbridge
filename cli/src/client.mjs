@@ -144,6 +144,47 @@ function doGet(inst, path, timeoutMs) {
 }
 
 /**
+ * HTTP POST request with string body, returns parsed JSON.
+ * @param {string} path - URL path with query string
+ * @param {string} body - request body
+ * @param {string} [contentType="application/xml"]
+ * @param {number} [timeoutMs=10000]
+ * @returns {Promise<any>}
+ */
+export async function post(path, body, contentType = "application/xml", timeoutMs = 10_000) {
+  const inst = await connect();
+  return new Promise((resolve, reject) => {
+    const opts = requestOpts(inst, path, "POST", timeoutMs);
+    opts.headers = {
+      ...opts.headers,
+      "Content-Type": contentType,
+      "Content-Length": Buffer.byteLength(body),
+    };
+    const req = request(opts, (res) => {
+      let responseData = "";
+      res.on("data", (chunk) => (responseData += chunk));
+      res.on("end", () => {
+        if (res.statusCode !== 200) {
+          reject(new Error(`HTTP ${res.statusCode}: ${responseData}`));
+          return;
+        }
+        try {
+          resolve(parseJson(responseData));
+        } catch (parseError) {
+          reject(parseError);
+        }
+      });
+    });
+    req.on("timeout", () => {
+      req.destroy();
+      reject(new Error("Request timed out"));
+    });
+    req.on("error", reject);
+    req.end(body);
+  });
+}
+
+/**
  * HTTP GET request, returns raw response with headers.
  * Used for /source which returns text/plain.
  * @param {string} path
