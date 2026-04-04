@@ -3,8 +3,8 @@
 ## Overview
 
 Operations on Eclipse launch configurations beyond listing and
-inspection. Covers importing configurations from files (for sharing
-via VCS), and future operations like delete, duplicate, and edit.
+inspection: import from file (sharing via VCS), delete, and future
+operations (duplicate, edit).
 
 See [jdt-launch-spec.md](jdt-launch-spec.md) for the core launch
 commands (`configs`, `config`, `run`, `debug`, `logs`, `stop`, `clear`).
@@ -17,7 +17,21 @@ Launch configurations live in workspace metadata
 (`<workspace>/.metadata/.plugins/org.eclipse.debug.core/.launches/`).
 They are not visible in VCS. When a developer clones a repo and opens
 it in a fresh workspace, no launch configs exist — they must recreate
-them manually or copy files between workspaces.
+them manually or copy `.launch` files between workspaces.
+
+### What it does
+
+Reads a `.launch` file from disk (source) and imports it into the
+current Eclipse workspace (destination) via the plugin's HTTP API.
+
+**Source**: any `.launch` file — from VCS (`launches/` directory in
+repo), from another workspace's `.metadata/`, from a temp directory.
+The CLI reads the file and sends its XML content to the plugin.
+
+**Destination**: the currently connected Eclipse workspace. The plugin
+uses `LaunchManager.importConfigurations()` — Eclipse's built-in
+import API — to copy the file into the workspace's `.launches/`
+directory and register it with the launch infrastructure.
 
 ### Command
 
@@ -25,11 +39,6 @@ them manually or copy files between workspaces.
 jdt launch config --import <path>
 jdt launch config --import <path> --configid <name>
 ```
-
-Imports a `.launch` file into the current workspace. The CLI reads
-the file from disk, sends its **content** (not the path) to the
-plugin. This works regardless of where the file lives — repo,
-temp directory, another workspace, network mount.
 
 - `<path>` — path to a `.launch` file on disk
 - `--configid <name>` — override the configuration name.
@@ -91,12 +100,14 @@ ConfigId is validated: no path separators (`/`, `\`) or `..` allowed.
 
 ### Plugin implementation
 
-1. Read XML content from request body.
-2. Check if configId already exists in `LaunchManager`.
-3. Write to `<workspace>/.metadata/.plugins/org.eclipse.debug.core/.launches/<configId>.launch`.
-4. Call `LaunchManager.getLaunchConfigurations()` to refresh
-   (or use `ILaunchManager` API to create from XML).
-5. Return success with configId.
+1. Validate configId — reject path separators and `..`.
+2. Check if configId already exists (LaunchManager cache + file on disk).
+3. Write XML to temp file named `<configId>.launch`.
+4. Call `LaunchManager.importConfigurations(File[])` — Eclipse's
+   built-in import API. Copies file to workspace `.launches/`,
+   registers with LaunchManager, fires change notifications.
+5. Clean up temp file in `finally` block.
+6. Return success with configId.
 
 ### CLI implementation
 
@@ -148,8 +159,8 @@ list). Complex — deferred until concrete use cases emerge.
 ## Relationship to other specs
 
 - **[jdt-launch-spec](jdt-launch-spec.md)** — core launch commands.
-  Import adds a new subcommand to the `jdt launch` namespace.
-  `launch configs` and `launch config` continue to list and inspect.
+  Import and delete are flags on `jdt launch config` (alongside
+  `--xml` and `--json`).
 - **[ui-integration-spec](ui-integration-spec.md)** — Eclipse UI
   creates launch configs via Run Configurations dialog. Import
   is the CLI equivalent for headless/VCS workflows.
