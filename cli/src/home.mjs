@@ -1,6 +1,6 @@
 // JDTBRIDGE_HOME management — config dir, instances, plugin artifacts.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 
@@ -55,6 +55,74 @@ export function writeConfig(updates) {
   const merged = { ...current, ...updates };
   writeFileSync(configPath, JSON.stringify(merged, null, 2) + "\n");
   return merged;
+}
+
+/** Directory for jdt use data (workspace registry + pins). */
+export function useDir() {
+  const dir = join(getHome(), "use");
+  ensureDir(dir);
+  return dir;
+}
+
+/** Directory for per-terminal / per-process pin files. */
+export function pinsDir() {
+  const dir = join(useDir(), "pins");
+  ensureDir(dir);
+  return dir;
+}
+
+/** Read workspaces.json — known workspace registry. Returns [] if missing. */
+export function readWorkspaces() {
+  const file = join(useDir(), "workspaces.json");
+  if (!existsSync(file)) return [];
+  try {
+    const data = JSON.parse(readFileSync(file, "utf8"));
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Write workspaces.json — full replacement, not merge. */
+export function writeWorkspaces(entries) {
+  writeFileSync(
+    join(useDir(), "workspaces.json"),
+    JSON.stringify(entries, null, 2) + "\n",
+  );
+}
+
+/** Read a single pin file from pins/. Returns parsed JSON or null. */
+export function readPin(filename) {
+  const file = join(pinsDir(), filename);
+  if (!existsSync(file)) return null;
+  try {
+    return JSON.parse(readFileSync(file, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+/** Write a pin file to pins/. */
+export function writePin(filename, data) {
+  writeFileSync(
+    join(pinsDir(), filename),
+    JSON.stringify(data, null, 2) + "\n",
+  );
+}
+
+/** Delete a pin file. Silent if missing. */
+export function deletePin(filename) {
+  const file = join(pinsDir(), filename);
+  try { unlinkSync(file); } catch { /* missing — ok */ }
+}
+
+/** List all pin filenames in pins/. */
+export function listPins() {
+  try {
+    return readdirSync(pinsDir()).filter(f => f.endsWith(".json"));
+  } catch {
+    return [];
+  }
 }
 
 /** Reset cached home path (for testing). */

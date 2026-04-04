@@ -51,14 +51,17 @@ instances and auto-adds new ones to `workspaces.json`.
 
 ```
 $ jdt use
-  #  ALIAS  WORKSPACE                           STATUS   VERSION  PORT
-  1  jdt    D:\eclipse-workspace-jdtbridge      online   2.4.0    58800
-  2  web    D:\eclipse-workspace-webapp         online   2.4.0    59100
-  3         C:\Users\John\Projects\legacy       offline
-  4         D:\eclipse-workspace-experiment     *new*    2.4.0    58801
+#  ALIAS  WORKSPACE                           STATUS   PINNED  VERSION  PORT
+1  jdt    D:\eclipse-workspace-jdtbridge      online   pinned  2.4.0    58800
+2  web    D:\eclipse-workspace-webapp         online           2.4.0    59100
+3         C:\Users\John\Projects\legacy       offline
+4         D:\eclipse-workspace-experiment     *new*            2.4.0    58801
 
 Pin this terminal:  jdt use <N|alias|path>
 ```
+
+The `PINNED` column shows which workspace is pinned in the current
+terminal. Determined from ppid pin or terminal ID pin.
 
 Status values:
 
@@ -119,9 +122,20 @@ $ jdt use --delete 3
 Removed: C:\Users\John\Projects\legacy
 ```
 
+### `jdt use --pins`
+
+Show active pin files for debugging. Compatible with `--json`.
+
+```
+$ jdt use --pins
+TYPE      ID                    WORKSPACE                       STATUS  PINNED AT
+ppid      42512                 D:\eclipse-workspace-jdtbridge  stale   2026-04-04T02:49:02Z
+terminal  0679187d-a3ea-4c9...  D:\eclipse-workspace-jdtbridge  active  2026-04-04T02:49:02Z
+```
+
 ### `jdt use --json`
 
-JSON output with live status for scripting:
+JSON output with live status for scripting. Includes `pinned` field.
 
 ```json
 [
@@ -130,6 +144,7 @@ JSON output with live status for scripting:
     "alias": "jdt",
     "workspace": "D:\\eclipse-workspace-jdtbridge",
     "status": "online",
+    "pinned": true,
     "port": 58800,
     "version": "2.4.0"
   },
@@ -138,6 +153,7 @@ JSON output with live status for scripting:
     "alias": "web",
     "workspace": "D:\\eclipse-workspace-webapp",
     "status": "online",
+    "pinned": false,
     "port": 59100,
     "version": "2.4.0"
   }

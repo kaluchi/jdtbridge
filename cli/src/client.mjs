@@ -1,8 +1,8 @@
 // HTTP client for JDT Bridge server.
 
 import { request } from "node:http";
-import { findInstance, discoverInstances, probe } from "./discovery.mjs";
-import { getPinnedBridge } from "./bridge-env.mjs";
+import { discoverInstances, probe } from "./discovery.mjs";
+import { resolveInstance } from "./resolve.mjs";
 import { proxyAwareOptions } from "./proxy.mjs";
 import { red, bold } from "./color.mjs";
 
@@ -15,25 +15,10 @@ let _instance;
  * @param {string} [workspaceHint]
  * @returns {import('./discovery.mjs').Instance}
  */
-export async function connect(workspaceHint) {
+export async function connect() {
   if (_instance) return _instance;
 
-  // Pinned connection — skip discovery entirely
-  const pinned = getPinnedBridge();
-  if (pinned) {
-    _instance = {
-      port: pinned.port,
-      token: pinned.token,
-      host: pinned.host,
-      workspace: "",
-      pid: 0,
-      file: "",
-      session: pinned.session,
-    };
-    return _instance;
-  }
-
-  _instance = await findInstance(workspaceHint);
+  _instance = await resolveInstance();
   if (!_instance) {
     console.error(
       bold(red("Eclipse JDT Bridge not running.")) +

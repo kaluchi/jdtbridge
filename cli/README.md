@@ -145,11 +145,20 @@ jdt agent providers                                    # available providers
 
 Providers: `local` (system terminal with bridge env vars), `sandbox` (Docker with bridge connectivity).
 
+### Instance management
+
+```bash
+jdt use                                                # list known workspaces
+jdt use <N|alias|path>                                 # pin terminal to workspace
+jdt use <N|alias> --alias <name>                       # set alias for workspace
+jdt use --delete <N|alias>                             # remove workspace from registry
+```
+
 ## Instance discovery
 
-The CLI reads `~/.jdtbridge/instances/*.json` to find running Eclipse instances. Each file contains port, auth token, PID, and workspace path. Stale instances are filtered by PID liveness.
+The CLI reads `~/.jdtbridge/instances/*.json` to find running Eclipse instances. Each file contains port, auth token, PID, and workspace path.
 
-When multiple instances are running, use `--workspace <hint>` or the CLI picks the first live one.
+With multiple instances, `jdt use` pins the current terminal to a specific workspace via terminal session ID detection (`WT_SESSION`, `ITERM_SESSION_ID`, etc.). See [docs/jdt-use-spec.md](../docs/jdt-use-spec.md).
 
 Override the home directory with `JDTBRIDGE_HOME` environment variable.
 

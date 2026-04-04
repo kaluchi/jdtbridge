@@ -67,6 +67,7 @@ import {
   launchConsoleHelp,
 } from "./commands/launch.mjs";
 import { setup, help as setupHelp } from "./commands/setup.mjs";
+import { use, help as useHelp } from "./commands/use.mjs";
 import { isConnectionError } from "./client.mjs";
 import { bold, red, dim } from "./color.mjs";
 import { installTelemetry } from "./telemetry.mjs";
@@ -209,6 +210,7 @@ const commands = {
   launch: { fn: launchDispatch, help: launchHelp },
   agent: { fn: agentDispatch, help: agentHelp },
   setup: { fn: setup, help: setupHelp },
+  use: { fn: use, help: useHelp },
 };
 
 /** Short aliases for frequently used commands. */
@@ -332,6 +334,9 @@ function printOverview() {
     h("  agent stop <name>",                               "terminate agent by session ID"),
     h("  agent logs <name> [-f]",                          "text: stream agent console output"),
     h("  agent providers",                                 "table: available agent providers"),
+    "",
+    "Instance management:",
+    h("  use [N|alias|path] [--alias <name>] [--delete]",  "pin terminal to Eclipse workspace"),
     "",
     "Setup:",
     h("  setup [--check|--remove]",                        "install/check/remove Eclipse plugin"),

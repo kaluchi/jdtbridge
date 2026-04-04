@@ -14,18 +14,15 @@ function stopServer(server) {
   return new Promise((resolve) => server.close(resolve));
 }
 
-function mockDiscovery(port, token = null) {
-  vi.doMock("../src/bridge-env.mjs", () => ({
-    getPinnedBridge: () => null,
-  }));
-  vi.doMock("../src/discovery.mjs", () => ({
-    discoverInstances: async () => [],
-    findInstance: async () => ({
+function mockResolve(port, token = null) {
+  vi.doMock("../src/resolve.mjs", () => ({
+    resolveInstance: async () => ({
       port,
       token,
       pid: process.pid,
       workspace: "/test",
       host: "127.0.0.1",
+      file: "",
     }),
   }));
 }
@@ -49,7 +46,7 @@ describe("client", () => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(["my-server", "my-client"]));
     }));
-    mockDiscovery(port);
+    mockResolve(port);
     const { get } = await import("../src/client.mjs");
     const result = await get("/projects");
     expect(result).toEqual(["my-server", "my-client"]);
@@ -61,7 +58,7 @@ describe("client", () => {
       res.writeHead(500);
       res.end("Internal Server Error");
     }));
-    mockDiscovery(port);
+    mockResolve(port);
     const { get } = await import("../src/client.mjs");
     await expect(get("/fail")).rejects.toThrow("HTTP 500");
   });
@@ -72,7 +69,7 @@ describe("client", () => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end("not json{{{");
     }));
-    mockDiscovery(port);
+    mockResolve(port);
     const { get } = await import("../src/client.mjs");
     await expect(get("/bad")).rejects.toThrow("Invalid JSON");
   });
@@ -83,7 +80,7 @@ describe("client", () => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end('{"total":0,"passed":0,"failed":0,"errors":0,"ignored":0,"time":NaN,"failures":[]}');
     }));
-    mockDiscovery(port);
+    mockResolve(port);
     const { get } = await import("../src/client.mjs");
     const result = await get("/test");
     expect(result.time).toBeNull();
@@ -97,7 +94,7 @@ describe("client", () => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end("[]");
     }));
-    mockDiscovery(port, "secret123");
+    mockResolve(port, "secret123");
     const { get } = await import("../src/client.mjs");
     await get("/projects");
     expect(receivedAuth).toBe("Bearer secret123");
@@ -111,7 +108,7 @@ describe("client", () => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end("[]");
     }));
-    mockDiscovery(port, null);
+    mockResolve(port, null);
     const { get } = await import("../src/client.mjs");
     await get("/projects");
     expect(receivedAuth).toBeUndefined();
@@ -122,13 +119,17 @@ describe("client", () => {
     ({ server, port } = await startServer((req, res) => {
       // Never respond — let it time out
     }));
-    mockDiscovery(port);
+    mockResolve(port);
     const { get } = await import("../src/client.mjs");
     await expect(get("/slow", 100)).rejects.toThrow("timed out");
   });
 
   it("get() rejects on connection refused", async () => {
-    mockDiscovery(1); // port 1 — nothing listening
+    mockResolve(1); // port 1 — nothing listening
+    vi.doMock("../src/discovery.mjs", () => ({
+      discoverInstances: async () => [],
+      probe: async () => {},
+    }));
     const { get, isConnectionError } = await import("../src/client.mjs");
     try {
       await get("/fail");
@@ -151,7 +152,7 @@ describe("client", () => {
       });
       res.end("public class Foo {}");
     }));
-    mockDiscovery(port);
+    mockResolve(port);
     const { getRaw } = await import("../src/client.mjs");
     const result = await getRaw("/source?class=Foo");
     expect(result.body).toBe("public class Foo {}");
@@ -165,7 +166,7 @@ describe("client", () => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ data: "ok" }));
     }));
-    mockDiscovery(port);
+    mockResolve(port);
     const { getRaw } = await import("../src/client.mjs");
     const result = await getRaw("/test");
     expect(result.body).toContain("ok");
@@ -177,7 +178,7 @@ describe("client", () => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Type not found" }));
     }));
-    mockDiscovery(port);
+    mockResolve(port);
     const { getRaw } = await import("../src/client.mjs");
     await expect(getRaw("/source?class=Missing")).rejects.toThrow(
       "Type not found",
@@ -190,7 +191,7 @@ describe("client", () => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end("broken{{{");
     }));
-    mockDiscovery(port);
+    mockResolve(port);
     const { getRaw } = await import("../src/client.mjs");
     await expect(getRaw("/bad")).rejects.toThrow("Invalid JSON");
   });
@@ -201,7 +202,7 @@ describe("client", () => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end('{"time":NaN}');
     }));
-    mockDiscovery(port);
+    mockResolve(port);
     const { getRaw } = await import("../src/client.mjs");
     const result = await getRaw("/test");
     expect(result.body).toContain('"time":NaN');
@@ -213,7 +214,7 @@ describe("client", () => {
       res.writeHead(404);
       res.end("Not Found");
     }));
-    mockDiscovery(port);
+    mockResolve(port);
     const { getRaw } = await import("../src/client.mjs");
     await expect(getRaw("/missing")).rejects.toThrow("HTTP 404");
   });
@@ -221,7 +222,7 @@ describe("client", () => {
   it("getRaw() rejects on timeout", async () => {
     let port;
     ({ server, port } = await startServer(() => {}));
-    mockDiscovery(port);
+    mockResolve(port);
     const { getRaw } = await import("../src/client.mjs");
     await expect(getRaw("/slow", 100)).rejects.toThrow("timed out");
   });
@@ -257,7 +258,7 @@ describe("client", () => {
       res.write('{"b":2}\n');
       res.end();
     }));
-    mockDiscovery(port);
+    mockResolve(port);
     const { getStreamLines } = await import("../src/client.mjs");
     const lines = [];
     await getStreamLines("/test", (line) => lines.push(line));
@@ -273,7 +274,7 @@ describe("client", () => {
       res.write('"value"}\n');
       res.end();
     }));
-    mockDiscovery(port);
+    mockResolve(port);
     const { getStreamLines } = await import("../src/client.mjs");
     const lines = [];
     await getStreamLines("/test", (line) => lines.push(line));
@@ -286,7 +287,7 @@ describe("client", () => {
       res.writeHead(404, { "Content-Type": "text/plain" });
       res.end("Not found");
     }));
-    mockDiscovery(port);
+    mockResolve(port);
     const { getStreamLines } = await import("../src/client.mjs");
     await expect(getStreamLines("/test", () => {})).rejects.toThrow("Not found");
   });
@@ -299,7 +300,7 @@ describe("client", () => {
       res.write('{"b":2}');  // no trailing newline
       res.end();
     }));
-    mockDiscovery(port);
+    mockResolve(port);
     const { getStreamLines } = await import("../src/client.mjs");
     const lines = [];
     await getStreamLines("/test", (line) => lines.push(line));
@@ -309,12 +310,8 @@ describe("client", () => {
   // --- connect() ---
 
   it("connect() exits when no instance found", async () => {
-    vi.doMock("../src/bridge-env.mjs", () => ({
-      getPinnedBridge: () => null,
-    }));
-    vi.doMock("../src/discovery.mjs", () => ({
-      discoverInstances: async () => [],
-      findInstance: async () => null,
+    vi.doMock("../src/resolve.mjs", () => ({
+      resolveInstance: async () => null,
     }));
     const origExit = process.exit;
     const origError = console.error;
@@ -391,7 +388,7 @@ describe("client", () => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end("[]");
     }));
-    mockDiscovery(port);
+    mockResolve(port);
     const { get, resetClient } = await import("../src/client.mjs");
     await get("/a");
     resetClient();

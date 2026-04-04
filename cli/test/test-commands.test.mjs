@@ -49,12 +49,8 @@ describe("test commands", () => {
 
   async function setupMock(handler) {
     ({ server, port } = await startServer(handler));
-    vi.doMock("../src/bridge-env.mjs", () => ({
-      getPinnedBridge: () => null,
-    }));
-    vi.doMock("../src/discovery.mjs", () => ({
-      discoverInstances: async () => [],
-      findInstance: async () => ({ port, token: null, pid: process.pid, workspace: "/test", host: "127.0.0.1" }),
+    vi.doMock("../src/resolve.mjs", () => ({
+      resolveInstance: async () => ({ port, token: null, pid: process.pid, workspace: "/test", host: "127.0.0.1", file: "" }),
     }));
   }
 
