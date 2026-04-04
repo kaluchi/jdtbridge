@@ -65,8 +65,10 @@ eclipse-jdt-search/
 ```
 
 These are standard Eclipse `.launch` XML files. They reference
-project names, classpath entries, and Maven goals — all workspace-
-relative. Portable across machines with the same project structure.
+launch type IDs (requires matching plugins installed), Maven goals,
+and working directories via `${workspace_loc}` variables.
+Portable across machines if Eclipse has the same plugins and the
+workspace contains the referenced projects.
 
 ### Protocol
 
