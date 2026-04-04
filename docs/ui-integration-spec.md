@@ -461,7 +461,128 @@ ui/
 
 ---
 
-## 16. Phased Delivery
+## 16. HTTP Server Preferences
+
+### Problem
+
+The bridge HTTP server binds to `127.0.0.1:0` (loopback, random port).
+Docker containers using `--add-host=host.docker.internal:host-gateway`
+cannot reach loopback — traffic arrives on the host's gateway interface.
+Custom agent setups (non-sandbox provider) need configurable bind address
+and predictable ports for firewall/networking rules.
+
+See [kaluchi/jdtbridge#93](https://github.com/kaluchi/jdtbridge/issues/93).
+
+### Preferences
+
+Stored per-workspace via Eclipse `InstanceScope` preferences.
+Each Eclipse instance reads its own workspace preferences at startup
+and on preference change (hot rebind).
+
+| Preference | Key | Default | Values |
+|---|---|---|---|
+| Bind address | `httpBindAddress` | `loopback` | `loopback`, `all` |
+| Fixed port | `httpFixedPort` | `0` | 0 (auto) or 1024–65535 |
+
+Preference node: `io.github.kaluchi.jdtbridge.ui` (UI bundle ID).
+Plugin reads via `InstanceScope.INSTANCE.getNode(uiBundleId)` — no
+UI dependency, headless-safe.
+
+### Preference page UI
+
+Window > Preferences > JDT Bridge:
+
+```
+JDT Bridge settings for AI agent integration.
+
+Terminal command:     [wt.exe                    ]
+
+── HTTP Server ─────────────────────────────────
+Bind address:  (•) Loopback only (127.0.0.1)
+               ( ) All interfaces (0.0.0.0)
+
+⚠ All interfaces exposes the bridge to your
+  network. Use only with trusted networks.
+
+Port:  [0         ]  [Check]
+0 = auto-assigned by OS on each restart.
+Fixed port enables stable Docker/firewall rules.
+```
+
+- **Bind address** — radio buttons. Security warning shown dynamically
+  when "All interfaces" is selected.
+- **Port** — integer field with Check button. Validates range
+  (0 or 1024–65535). Check probes `new ServerSocket(port).close()` to
+  test availability.
+- **Port conflict** — if configured port is in use at startup, server
+  falls back to auto-assigned port with a log warning. Instance file
+  always contains the actual port, not the configured one.
+
+### Hot rebind (no Eclipse restart)
+
+When preferences change:
+
+1. `PreferenceChangeListener` in plugin fires
+2. Plugin calls `HttpServer.rebind(newAddress, newPort)`
+3. `rebind()` opens new `ServerSocket`, then closes old one
+4. Plugin rewrites instance file with new port
+5. CLI discovers new port via instance file on next command
+
+In-flight requests on the old socket complete normally (executor
+thread pool stays alive). New connections go to the new socket.
+
+### Running agents warning
+
+Before applying changes, preference page checks for running agent
+launches via `DebugPlugin.getDefault().getLaunchManager().getLaunches()`.
+If any non-terminated JDT Bridge Agent launches exist, shows warning:
+
+```
+Running agents detected.
+Running agents will keep using the old connection.
+Restart them to use the new bind address/port.
+```
+
+Agents launched from Eclipse have `JDT_BRIDGE_PORT/TOKEN` baked into
+their environment at launch time. They cannot pick up the new port
+without restart.
+
+### Architecture
+
+```
+UI bundle (preferences page)
+  │ writes to InstanceScope
+  ▼
+workspace/.metadata/.plugins/.../io.github.kaluchi.jdtbridge.ui.prefs
+  │ PreferenceChangeListener
+  ▼
+Plugin bundle (HttpServer)
+  │ rebind(address, port)
+  ▼
+~/.jdtbridge/instances/<hash>.json  (rewritten with new port)
+  │ discovery
+  ▼
+CLI (jdt commands resolve new port)
+```
+
+No circular dependency. Plugin reads preferences from UI bundle's
+node via `InstanceScope` (string-based node ID, no class import).
+
+### Files
+
+Plugin:
+  HttpServer.java              — start(address, port), rebind(), getBindAddress()
+  Activator.java               — reads preferences, registers listener, triggers rebind
+  Log.java                     — existing logging (warn on port conflict)
+
+UI:
+  preferences/PreferenceConstants.java  — HTTP_BIND_ADDRESS, HTTP_FIXED_PORT
+  preferences/PreferenceInitializer.java — defaults (loopback, 0)
+  preferences/BridgePreferencePage.java  — custom layout with radio, Check button, warnings
+
+---
+
+## 17. Phased Delivery
 
 ### Phase 1 — Foundation
 - Create `ui/` plugin module with build integration

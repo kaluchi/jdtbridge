@@ -8,6 +8,8 @@ import java.nio.file.Path;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import io.github.kaluchi.jdtbridge.Activator;
+
 /**
  * Reads bridge connection info from {@code ~/.jdtbridge/instances/}.
  * Used by the launch delegate to inject JDT_BRIDGE_* env vars
@@ -32,7 +34,7 @@ public class BridgeConnection {
 	 * @return connection info, or {@code null} if no bridge is running
 	 */
 	public static BridgeConnection find() {
-		Path home = resolveHome();
+		Path home = Activator.getHome();
 		Path instancesDir = home.resolve("instances");
 		if (!Files.isDirectory(instancesDir)) {
 			return null;
@@ -64,10 +66,6 @@ public class BridgeConnection {
 	}
 
 	public static Path resolveHome() {
-		String env = System.getenv("JDTBRIDGE_HOME");
-		if (env != null && !env.isEmpty()) {
-			return Path.of(env);
-		}
-		return Path.of(System.getProperty("user.home"), ".jdtbridge");
+		return Activator.getHome();
 	}
 }

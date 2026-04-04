@@ -12,5 +12,8 @@ public class PreferenceInitializer extends AbstractPreferenceInitializer {
 		IPreferenceStore store = Activator.getDefault().getPreferenceStore();
 		store.setDefault(PreferenceConstants.TERMINAL_COMMAND,
 				PreferenceConstants.defaultTerminalCommand());
+		store.setDefault(PreferenceConstants.HTTP_BIND_ADDRESS,
+				PreferenceConstants.BIND_LOOPBACK);
+		store.setDefault(PreferenceConstants.HTTP_FIXED_PORT, 0);
 	}
 }

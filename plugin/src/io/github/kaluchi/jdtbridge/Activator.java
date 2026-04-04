@@ -14,6 +14,8 @@ import java.security.SecureRandom;
 import java.util.Set;
 
 import org.eclipse.core.resources.ResourcesPlugin;
+import org.eclipse.core.runtime.preferences.IEclipsePreferences;
+import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
 
@@ -25,6 +27,8 @@ public class Activator implements BundleActivator {
 
     private HttpServer server;
     private Path bridgeFile;
+    private String currentToken;
+    private BundleContext bundleContext;
 
     @Override
     public void start(BundleContext context) throws Exception {
@@ -43,18 +47,26 @@ public class Activator implements BundleActivator {
             return;
         }
 
-        String token = generateToken();
+        bundleContext = context;
+        currentToken = generateToken();
+
+        var bindAddress = ServerPreferences.resolveBindAddress();
+        int configuredPort = ServerPreferences.resolveFixedPort();
 
         server = new HttpServer();
-        server.setToken(token);
-        server.start();
+        server.setToken(currentToken);
+        server.start(bindAddress, configuredPort);
 
-        int port = server.getPort();
         String version = context.getBundle().getVersion().toString();
         String location = context.getBundle().getLocation();
-        writeBridgeFile(port, token, version, location);
+        writeBridgeFile(server.getPort(), currentToken,
+                version, location);
 
-        Log.info("HTTP server started on port " + port);
+        Log.info("HTTP server started on "
+                + bindAddress.getHostAddress() + ":"
+                + server.getPort());
+
+        registerPreferenceListener();
     }
 
     @Override
@@ -92,6 +104,44 @@ public class Activator implements BundleActivator {
         Files.writeString(bridgeFile, content);
         setPosixOwnerOnly(bridgeFile);
         setPosixOwnerOnly(instancesDir);
+    }
+
+    private void registerPreferenceListener() {
+        try {
+            IEclipsePreferences prefNode = InstanceScope.INSTANCE
+                    .getNode(ServerPreferences.PREFERENCE_NODE);
+            prefNode.addPreferenceChangeListener(event -> {
+                String key = event.getKey();
+                if (ServerPreferences.HTTP_BIND_ADDRESS.equals(key)
+                        || ServerPreferences.HTTP_FIXED_PORT
+                                .equals(key)) {
+                    handleServerPreferenceChange();
+                }
+            });
+        } catch (Exception e) {
+            Log.warn("Failed to register preference listener", e);
+        }
+    }
+
+    private void handleServerPreferenceChange() {
+        if (server == null) return;
+        try {
+            var bindAddress = ServerPreferences.resolveBindAddress();
+            int port = ServerPreferences.resolveFixedPort();
+            server.rebind(bindAddress, port);
+
+            String version = bundleContext.getBundle()
+                    .getVersion().toString();
+            String location = bundleContext.getBundle().getLocation();
+            writeBridgeFile(server.getPort(), currentToken,
+                    version, location);
+
+            Log.info("Server rebound to "
+                    + bindAddress.getHostAddress() + ":"
+                    + server.getPort());
+        } catch (IOException e) {
+            Log.error("Failed to rebind server", e);
+        }
     }
 
     private static Path resolveHome() {
@@ -139,7 +189,7 @@ public class Activator implements BundleActivator {
         }
     }
 
-    static Path getHome() {
+    public static Path getHome() {
         return resolveHome();
     }
 
