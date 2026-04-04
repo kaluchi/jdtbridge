@@ -1,7 +1,6 @@
 package io.github.kaluchi.jdtbridge;
 
 import java.net.InetAddress;
-import java.net.UnknownHostException;
 
 import org.eclipse.core.runtime.Platform;
 
@@ -28,10 +27,10 @@ public class ServerPreferences {
     /** Read bind address from workspace preferences. */
     public static InetAddress resolveBindAddress() {
         try {
-            String value = Platform.getPreferencesService().getString(
-                    PREFERENCE_NODE, HTTP_BIND_ADDRESS,
-                    BIND_LOOPBACK, null);
-            if (BIND_ALL.equals(value)) {
+            String bindAddressMode = Platform.getPreferencesService()
+                    .getString(PREFERENCE_NODE, HTTP_BIND_ADDRESS,
+                            BIND_LOOPBACK, null);
+            if (BIND_ALL.equals(bindAddressMode)) {
                 return InetAddress.getByName("0.0.0.0");
             }
         } catch (Exception e) {

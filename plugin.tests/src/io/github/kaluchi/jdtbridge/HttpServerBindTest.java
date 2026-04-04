@@ -3,15 +3,12 @@ package io.github.kaluchi.jdtbridge;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.charset.StandardCharsets;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Nested;
@@ -203,7 +200,7 @@ public class HttpServerBindTest {
         @Test
         void returnsNullBeforeStart() {
             server = new HttpServer();
-            assertEquals(null, server.getBindAddress());
+            assertNull(server.getBindAddress());
         }
 
         @Test
@@ -218,27 +215,8 @@ public class HttpServerBindTest {
     // --- helpers ---
 
     private static int findFreePort() throws Exception {
-        try (ServerSocket ss = new ServerSocket(0)) {
-            return ss.getLocalPort();
-        }
-    }
-
-    private static String httpGet(int port, String path,
-            String token) throws Exception {
-        try (Socket socket = new Socket("127.0.0.1", port)) {
-            socket.setSoTimeout(3000);
-            OutputStream out = socket.getOutputStream();
-            String req = "GET " + path + " HTTP/1.1\r\n"
-                    + "Host: localhost\r\n"
-                    + "Authorization: Bearer " + token + "\r\n"
-                    + "\r\n";
-            out.write(req.getBytes(StandardCharsets.UTF_8));
-            out.flush();
-
-            BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(socket.getInputStream(),
-                            StandardCharsets.UTF_8));
-            return reader.readLine();
+        try (ServerSocket tempSocket = new ServerSocket(0)) {
+            return tempSocket.getLocalPort();
         }
     }
 }

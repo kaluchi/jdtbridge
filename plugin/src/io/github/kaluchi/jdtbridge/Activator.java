@@ -29,6 +29,7 @@ public class Activator implements BundleActivator {
     private Path bridgeFile;
     private String currentToken;
     private BundleContext bundleContext;
+    private volatile boolean rebindScheduled;
 
     @Override
     public void start(BundleContext context) throws Exception {
@@ -110,25 +111,47 @@ public class Activator implements BundleActivator {
         try {
             IEclipsePreferences prefNode = InstanceScope.INSTANCE
                     .getNode(ServerPreferences.PREFERENCE_NODE);
-            prefNode.addPreferenceChangeListener(event -> {
-                String key = event.getKey();
-                if (ServerPreferences.HTTP_BIND_ADDRESS.equals(key)
+            prefNode.addPreferenceChangeListener(
+                    preferenceChange -> {
+                String changedKey = preferenceChange.getKey();
+                if (ServerPreferences.HTTP_BIND_ADDRESS
+                        .equals(changedKey)
                         || ServerPreferences.HTTP_FIXED_PORT
-                                .equals(key)) {
-                    handleServerPreferenceChange();
+                                .equals(changedKey)) {
+                    scheduleRebind();
                 }
             });
-        } catch (Exception e) {
-            Log.warn("Failed to register preference listener", e);
+        } catch (Exception preferenceListenerException) {
+            Log.warn("Failed to register preference listener",
+                    preferenceListenerException);
         }
     }
 
-    private void handleServerPreferenceChange() {
+    /**
+     * Coalesce multiple preference changes (address + port written
+     * sequentially) into a single rebind. Runs off UI thread.
+     */
+    private void scheduleRebind() {
+        if (rebindScheduled) return;
+        rebindScheduled = true;
+        new Thread(() -> {
+            try {
+                Thread.sleep(100); // coalesce rapid changes
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            rebindScheduled = false;
+            performRebind();
+        }, "jdtbridge-rebind").start();
+    }
+
+    private void performRebind() {
         if (server == null) return;
         try {
             var bindAddress = ServerPreferences.resolveBindAddress();
-            int port = ServerPreferences.resolveFixedPort();
-            server.rebind(bindAddress, port);
+            int fixedPort = ServerPreferences.resolveFixedPort();
+            server.rebind(bindAddress, fixedPort);
 
             String version = bundleContext.getBundle()
                     .getVersion().toString();
@@ -139,8 +162,8 @@ public class Activator implements BundleActivator {
             Log.info("Server rebound to "
                     + bindAddress.getHostAddress() + ":"
                     + server.getPort());
-        } catch (IOException e) {
-            Log.error("Failed to rebind server", e);
+        } catch (IOException rebindException) {
+            Log.error("Failed to rebind server", rebindException);
         }
     }
 

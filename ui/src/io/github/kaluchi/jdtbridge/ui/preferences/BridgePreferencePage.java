@@ -61,96 +61,102 @@ public class BridgePreferencePage extends PreferencePage
 	}
 
 	private void createTerminalSection(Composite parent) {
-		Composite row = new Composite(parent, SWT.NONE);
-		row.setLayout(new GridLayout(2, false));
-		row.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+		Composite terminalRow = new Composite(parent, SWT.NONE);
+		terminalRow.setLayout(new GridLayout(2, false));
+		terminalRow.setLayoutData(
+				new GridData(SWT.FILL, SWT.CENTER, true, false));
 
-		Label label = new Label(row, SWT.NONE);
-		label.setText("Terminal command:");
+		Label terminalLabel = new Label(terminalRow, SWT.NONE);
+		terminalLabel.setText("Terminal command:");
 
-		terminalCommandField = new Text(row, SWT.BORDER);
+		terminalCommandField = new Text(terminalRow, SWT.BORDER);
 		terminalCommandField.setLayoutData(
 				new GridData(SWT.FILL, SWT.CENTER, true, false));
 	}
 
 	private void createHttpServerSection(Composite parent) {
-		Group group = new Group(parent, SWT.NONE);
-		group.setText("HTTP Server");
-		group.setLayout(new GridLayout(3, false));
-		group.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+		Group serverGroup = new Group(parent, SWT.NONE);
+		serverGroup.setText("HTTP Server");
+		serverGroup.setLayout(new GridLayout(3, false));
+		serverGroup.setLayoutData(
+				new GridData(SWT.FILL, SWT.CENTER, true, false));
 
 		// Bind address radios
-		Label bindLabel = new Label(group, SWT.NONE);
-		bindLabel.setText("Bind address:");
+		Label bindAddressLabel = new Label(serverGroup, SWT.NONE);
+		bindAddressLabel.setText("Bind address:");
 
-		Composite radioGroup = new Composite(group, SWT.NONE);
-		radioGroup.setLayout(new GridLayout(1, false));
-		GridData radioData = new GridData(SWT.FILL, SWT.CENTER, true, false);
-		radioData.horizontalSpan = 2;
-		radioGroup.setLayoutData(radioData);
+		Composite bindRadioGroup = new Composite(serverGroup, SWT.NONE);
+		bindRadioGroup.setLayout(new GridLayout(1, false));
+		GridData bindRadioLayout = new GridData(
+				SWT.FILL, SWT.CENTER, true, false);
+		bindRadioLayout.horizontalSpan = 2;
+		bindRadioGroup.setLayoutData(bindRadioLayout);
 
-		bindLoopbackRadio = new Button(radioGroup, SWT.RADIO);
+		bindLoopbackRadio = new Button(bindRadioGroup, SWT.RADIO);
 		bindLoopbackRadio.setText("Loopback only (127.0.0.1)");
 
-		bindAllRadio = new Button(radioGroup, SWT.RADIO);
+		bindAllRadio = new Button(bindRadioGroup, SWT.RADIO);
 		bindAllRadio.setText("All interfaces (0.0.0.0)");
 
 		// Security warning (spans full width)
-		bindWarningLabel = new Label(group, SWT.WRAP);
+		bindWarningLabel = new Label(serverGroup, SWT.WRAP);
 		bindWarningLabel.setText(
 				"\u26A0 All interfaces exposes the bridge to your "
 				+ "network. Use only with trusted networks.");
-		GridData warnData = new GridData(SWT.FILL, SWT.CENTER, true, false);
-		warnData.horizontalSpan = 3;
-		warnData.widthHint = 400;
-		bindWarningLabel.setLayoutData(warnData);
+		GridData warningLayout = new GridData(
+				SWT.FILL, SWT.CENTER, true, false);
+		warningLayout.horizontalSpan = 3;
+		warningLayout.widthHint = 400;
+		bindWarningLabel.setLayoutData(warningLayout);
 		bindWarningLabel.setVisible(false);
 
 		bindLoopbackRadio.addSelectionListener(new SelectionAdapter() {
 			@Override
-			public void widgetSelected(SelectionEvent e) {
+			public void widgetSelected(SelectionEvent selectionEvent) {
 				bindWarningLabel.setVisible(false);
 			}
 		});
 		bindAllRadio.addSelectionListener(new SelectionAdapter() {
 			@Override
-			public void widgetSelected(SelectionEvent e) {
+			public void widgetSelected(SelectionEvent selectionEvent) {
 				bindWarningLabel.setVisible(true);
 			}
 		});
 
 		// Port field
-		Label portLabel = new Label(group, SWT.NONE);
+		Label portLabel = new Label(serverGroup, SWT.NONE);
 		portLabel.setText("Port:");
 
-		portField = new Text(group, SWT.BORDER);
+		portField = new Text(serverGroup, SWT.BORDER);
 		portField.setLayoutData(
 				new GridData(SWT.FILL, SWT.CENTER, true, false));
 
-		Button checkButton = new Button(group, SWT.PUSH);
-		checkButton.setText("Check");
-		checkButton.addSelectionListener(new SelectionAdapter() {
+		Button portCheckButton = new Button(serverGroup, SWT.PUSH);
+		portCheckButton.setText("Check");
+		portCheckButton.addSelectionListener(new SelectionAdapter() {
 			@Override
-			public void widgetSelected(SelectionEvent e) {
+			public void widgetSelected(SelectionEvent selectionEvent) {
 				checkPortAvailability();
 			}
 		});
 
 		// Port hint
-		Label portHint = new Label(group, SWT.WRAP);
-		portHint.setText(
+		Label portHintLabel = new Label(serverGroup, SWT.WRAP);
+		portHintLabel.setText(
 				"0 = auto-assigned by OS. "
 				+ "Fixed port enables stable Docker/firewall rules.");
-		GridData hintData = new GridData(SWT.FILL, SWT.CENTER, true, false);
-		hintData.horizontalSpan = 3;
-		hintData.widthHint = 400;
-		portHint.setLayoutData(hintData);
+		GridData portHintLayout = new GridData(
+				SWT.FILL, SWT.CENTER, true, false);
+		portHintLayout.horizontalSpan = 3;
+		portHintLayout.widthHint = 400;
+		portHintLabel.setLayoutData(portHintLayout);
 
 		// Port check status
-		portStatusLabel = new Label(group, SWT.NONE);
-		GridData statusData = new GridData(SWT.FILL, SWT.CENTER, true, false);
-		statusData.horizontalSpan = 3;
-		portStatusLabel.setLayoutData(statusData);
+		portStatusLabel = new Label(serverGroup, SWT.NONE);
+		GridData portStatusLayout = new GridData(
+				SWT.FILL, SWT.CENTER, true, false);
+		portStatusLayout.horizontalSpan = 3;
+		portStatusLabel.setLayoutData(portStatusLayout);
 	}
 
 	private void loadValues() {
@@ -158,15 +164,17 @@ public class BridgePreferencePage extends PreferencePage
 		terminalCommandField.setText(
 				store.getString(PreferenceConstants.TERMINAL_COMMAND));
 
-		String bindAddress = store.getString(
+		String bindAddressMode = store.getString(
 				PreferenceConstants.HTTP_BIND_ADDRESS);
-		boolean isAll = PreferenceConstants.BIND_ALL.equals(bindAddress);
-		bindLoopbackRadio.setSelection(!isAll);
-		bindAllRadio.setSelection(isAll);
-		bindWarningLabel.setVisible(isAll);
+		boolean isAllInterfaces =
+				PreferenceConstants.BIND_ALL.equals(bindAddressMode);
+		bindLoopbackRadio.setSelection(!isAllInterfaces);
+		bindAllRadio.setSelection(isAllInterfaces);
+		bindWarningLabel.setVisible(isAllInterfaces);
 
-		int port = store.getInt(PreferenceConstants.HTTP_FIXED_PORT);
-		portField.setText(String.valueOf(port));
+		int configuredPort = store.getInt(
+				PreferenceConstants.HTTP_FIXED_PORT);
+		portField.setText(String.valueOf(configuredPort));
 	}
 
 	@Override
@@ -202,71 +210,82 @@ public class BridgePreferencePage extends PreferencePage
 	}
 
 	private boolean validatePort() {
-		String text = portField.getText().trim();
+		String portText = portField.getText().trim();
 		try {
-			int port = Integer.parseInt(text);
-			if (port == 0) return true;
-			if (port < 1024 || port > 65535) {
-				setErrorMessage("Port must be 0 (auto) or 1024\u201365535.");
+			int portNumber = Integer.parseInt(portText);
+			if (portNumber == 0) return true;
+			if (portNumber < 1024 || portNumber > 65535) {
+				setErrorMessage(
+						"Port must be 0 (auto) or 1024\u201365535.");
 				return false;
 			}
 			setErrorMessage(null);
 			return true;
-		} catch (NumberFormatException e) {
+		} catch (NumberFormatException invalidPortNumber) {
 			setErrorMessage("Port must be a number.");
 			return false;
 		}
 	}
 
 	private void checkPortAvailability() {
-		String text = portField.getText().trim();
+		String portText = portField.getText().trim();
 		try {
-			int port = Integer.parseInt(text);
-			if (port == 0) {
-				portStatusLabel.setText("Auto-assign: always available.");
+			int portNumber = Integer.parseInt(portText);
+			if (portNumber == 0) {
+				portStatusLabel.setText(
+						"Auto-assign: always available.");
 				return;
 			}
-			if (port < 1024 || port > 65535) {
-				portStatusLabel.setText("Invalid range (1024\u201365535).");
+			if (portNumber < 1024 || portNumber > 65535) {
+				portStatusLabel.setText(
+						"Invalid range (1024\u201365535).");
 				return;
 			}
-			try (ServerSocket probe = new ServerSocket(
-					port, 1, InetAddress.getLoopbackAddress())) {
-				portStatusLabel.setText(
-						"Port " + port + " is available.");
-			} catch (Exception e) {
-				portStatusLabel.setText(
-						"Port " + port + " is in use.");
+			InetAddress probeAddress;
+			try {
+				probeAddress = bindAllRadio.getSelection()
+						? InetAddress.getByName("0.0.0.0")
+						: InetAddress.getLoopbackAddress();
+			} catch (Exception addressException) {
+				probeAddress = InetAddress.getLoopbackAddress();
 			}
-		} catch (NumberFormatException e) {
+			try (ServerSocket portProbe = new ServerSocket(
+					portNumber, 1, probeAddress)) {
+				portStatusLabel.setText(
+						"Port " + portNumber + " is available.");
+			} catch (Exception portBindException) {
+				portStatusLabel.setText(
+						"Port " + portNumber + " is in use.");
+			}
+		} catch (NumberFormatException invalidPortNumber) {
 			portStatusLabel.setText("Enter a valid number.");
 		}
 	}
 
 	private void warnRunningAgents() {
 		try {
-			ILaunch[] launches = DebugPlugin.getDefault()
+			ILaunch[] agentLaunches = DebugPlugin.getDefault()
 					.getLaunchManager().getLaunches();
-			boolean agentsRunning = Arrays.stream(launches)
-					.filter(l -> !l.isTerminated())
-					.anyMatch(l -> {
+			boolean hasRunningAgents = Arrays.stream(agentLaunches)
+					.filter(launch -> !launch.isTerminated())
+					.anyMatch(launch -> {
 						try {
 							return AGENT_LAUNCH_TYPE.equals(
-									l.getLaunchConfiguration()
+									launch.getLaunchConfiguration()
 											.getType().getIdentifier());
-						} catch (Exception e) {
+						} catch (Exception launchConfigException) {
 							return false;
 						}
 					});
 
-			if (agentsRunning) {
+			if (hasRunningAgents) {
 				MessageDialog.openWarning(getShell(),
 						"Running agents detected",
 						"Running agents will keep using the old "
 						+ "connection.\nRestart them to use the new "
 						+ "bind address/port.");
 			}
-		} catch (Exception e) {
+		} catch (Exception debugPluginException) {
 			// DebugPlugin not available — skip
 		}
 	}

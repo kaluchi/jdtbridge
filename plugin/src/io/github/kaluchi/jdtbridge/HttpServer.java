@@ -81,9 +81,7 @@ public class HttpServer {
         launchTracker.start();
         serverSocket = bindWithFallback(bindAddress, port);
         running = true;
-        Thread t = new Thread(this::acceptLoop, "jdtbridge-http");
-        t.setDaemon(true);
-        t.start();
+        startAcceptLoop(serverSocket);
     }
 
     /**
@@ -94,17 +92,17 @@ public class HttpServer {
             throws IOException {
         ServerSocket oldSocket = serverSocket;
         serverSocket = bindWithFallback(bindAddress, port);
+        startAcceptLoop(serverSocket);
         if (oldSocket != null) {
-            try { oldSocket.close(); } catch (IOException e) { /* ok */ }
+            try { oldSocket.close(); } catch (IOException ignored) { }
         }
-        // Old acceptLoop dies when old socket closes.
-        // Start new acceptLoop on the new socket.
-        Thread t = new Thread(this::acceptLoop, "jdtbridge-http");
-        t.setDaemon(true);
-        t.start();
-        Log.info("Server rebound to "
-                + serverSocket.getInetAddress().getHostAddress()
-                + ":" + serverSocket.getLocalPort());
+    }
+
+    private void startAcceptLoop(ServerSocket listenSocket) {
+        Thread acceptThread = new Thread(
+                () -> acceptLoop(listenSocket), "jdtbridge-http");
+        acceptThread.setDaemon(true);
+        acceptThread.start();
     }
 
     /** Returns the actual port the server is listening on. */
@@ -151,17 +149,14 @@ public class HttpServer {
         }
     }
 
-    private void acceptLoop() {
-        // Capture socket reference — this loop serves only this socket.
-        // On rebind, this socket is closed and a new thread is started.
-        ServerSocket listenSocket = serverSocket;
+    private void acceptLoop(ServerSocket listenSocket) {
         while (running && !listenSocket.isClosed()) {
             try {
-                Socket socket = listenSocket.accept();
-                executor.submit(() -> handle(socket));
-            } catch (IOException e) {
+                Socket clientSocket = listenSocket.accept();
+                executor.submit(() -> handle(clientSocket));
+            } catch (IOException acceptException) {
                 if (running && !listenSocket.isClosed()) {
-                    Log.error("Accept error", e);
+                    Log.error("Accept error", acceptException);
                 }
             }
         }
