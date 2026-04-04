@@ -245,7 +245,7 @@ describe("jdt use", () => {
     await use(["--pins", "--json"]);
     const json = JSON.parse(io.logs.join(""));
     expect(json).toHaveLength(1);
-    expect(json[0].type).toBe("ppid");
+    expect(json[0].pinType).toBe("ppid");
     expect(json[0].workspace).toBe("D:\\ws\\alpha");
   });
 

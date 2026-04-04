@@ -42,26 +42,8 @@ export async function use(args) {
 async function handleList(flags) {
   const workspaces = readWorkspaces();
   const instances = await discoverInstances();
-  let updated = false;
-
-  // Match live instances against registry, append new ones
-  const knownPaths = new Set(
-    workspaces.map(w => w.workspace.toLowerCase().replace(/\\/g, "/")),
-  );
-  const newEntries = [];
-  for (const inst of instances) {
-    const norm = inst.workspace.toLowerCase().replace(/\\/g, "/");
-    if (!knownPaths.has(norm)) {
-      newEntries.push({
-        workspace: inst.workspace,
-        addedAt: new Date().toISOString(),
-      });
-      knownPaths.add(norm);
-      updated = true;
-    }
-  }
-
-  const allWorkspaces = [...workspaces, ...newEntries];
+  const allWorkspaces = syncNewInstances(workspaces, instances);
+  const updated = allWorkspaces.length > workspaces.length;
 
   // Resolve currently pinned workspace
   const pinnedWorkspace = resolvePinnedWorkspace();
@@ -138,6 +120,9 @@ async function handlePin(target) {
   const workspaces = readWorkspaces();
   const instances = await discoverInstances();
   const allWorkspaces = syncNewInstances(workspaces, instances);
+  if (allWorkspaces.length > workspaces.length) {
+    writeWorkspaces(allWorkspaces);
+  }
 
   const entry = resolveTarget(allWorkspaces, target);
   if (!entry) {
@@ -168,14 +153,11 @@ function handlePins(flags) {
   const termId = resolveTerminalId();
   const pins = files.map(f => {
     const pin = readPin(f);
-    const type = f.startsWith("term-") ? "terminal" : "ppid";
-    const id = f.startsWith("term-")
-      ? f.slice(5, -5)
-      : f.slice(5, -5);
-    const active = type === "terminal"
-      ? termId === id
-      : String(process.ppid) === id;
-    return { file: f, type, id, active, ...pin };
+    const { pinType, pinKey } = parsePinFilename(f);
+    const active = pinType === "terminal"
+      ? termId === pinKey
+      : String(process.ppid) === pinKey;
+    return { file: f, pinType, pinKey, active, ...pin };
   });
 
   if (flags.json) {
@@ -189,16 +171,28 @@ function handlePins(flags) {
   }
 
   const rows = pins.map(p => [
-    p.type,
-    p.id.length > 20 ? p.id.slice(0, 17) + "..." : p.id,
+    p.pinType,
+    p.pinKey,
     p.workspace || "",
     p.active ? green("active") : dim("stale"),
     p.pinnedAt || "",
   ]);
   console.log(formatTable(
-    ["TYPE", "ID", "WORKSPACE", "STATUS", "PINNED AT"],
+    ["PINTYPE", "PINKEY", "WORKSPACE", "STATUS", "PINNED_AT"],
     rows,
   ));
+}
+
+/** Parse pin filename. "term-abc.json" → {pinType:"terminal", pinKey:"abc"} */
+function parsePinFilename(filename) {
+  const name = filename.replace(/\.json$/, "");
+  const dash = name.indexOf("-");
+  const prefix = name.slice(0, dash);
+  const pinKey = name.slice(dash + 1);
+  return {
+    pinType: prefix === "term" ? "terminal" : prefix,
+    pinKey,
+  };
 }
 
 function handleAlias(target, aliasValue) {
@@ -288,10 +282,15 @@ function resolveTarget(workspaces, target) {
   if (byAlias) return byAlias;
 
   // Path (exact or substring)
-  const norm = target.toLowerCase().replace(/\\/g, "/");
+  const normTarget = normalizePath(target);
   return workspaces.find(w =>
-    w.workspace.toLowerCase().replace(/\\/g, "/").includes(norm),
+    normalizePath(w.workspace).includes(normTarget),
   ) || null;
+}
+
+/** Lowercase, forward-slash normalized path for comparison. */
+function normalizePath(p) {
+  return p.toLowerCase().replace(/\\/g, "/");
 }
 
 /**
@@ -299,18 +298,15 @@ function resolveTarget(workspaces, target) {
  * Returns the combined list.
  */
 function syncNewInstances(workspaces, instances) {
-  const knownPaths = new Set(
-    workspaces.map(w => w.workspace.toLowerCase().replace(/\\/g, "/")),
-  );
+  const knownPaths = new Set(workspaces.map(w => normalizePath(w.workspace)));
   const combined = [...workspaces];
   for (const inst of instances) {
-    const norm = inst.workspace.toLowerCase().replace(/\\/g, "/");
-    if (!knownPaths.has(norm)) {
+    if (!knownPaths.has(normalizePath(inst.workspace))) {
       combined.push({
         workspace: inst.workspace,
         addedAt: new Date().toISOString(),
       });
-      knownPaths.add(norm);
+      knownPaths.add(normalizePath(inst.workspace));
     }
   }
   return combined;

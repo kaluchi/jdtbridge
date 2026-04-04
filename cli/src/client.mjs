@@ -11,8 +11,7 @@ let _instance;
 
 /**
  * Ensure we have a connected instance. Call before any HTTP request.
- * Instant — reads instance files without probing.
- * @param {string} [workspaceHint]
+ * Instant — resolves via env vars, pins, or discovery without probing.
  * @returns {import('./discovery.mjs').Instance}
  */
 export async function connect() {
