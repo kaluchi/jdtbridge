@@ -49,6 +49,12 @@ verified by the main agent.**
    compilation errors, running launches, test results, and project list
    in one call. This is your orientation command — run it first to
    understand what the developer is working on.
+   - If `jdtbridge-verify` or `jdtbridge-package` are missing from
+     launch configs, import them:
+     ```bash
+     jdt launch config --import launches/jdtbridge-verify.launch
+     jdt launch config --import launches/jdtbridge-package.launch
+     ```
 
 3. Verify `jdtbridge.target` exists in repo root (gitignored, per-developer).
    Without it, Tycho builds fail. If missing, create it pointing to the
