@@ -71,9 +71,8 @@ relative. Portable across machines with the same project structure.
 ### Protocol
 
 ```
-POST /launch/import
+POST /launch/import?configId=jdtbridge-verify
 Content-Type: application/xml
-X-Launch-ConfigId: jdtbridge-verify
 
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <launchConfiguration type="org.eclipse.m2e.Maven2LaunchConfigurationType">
@@ -81,10 +80,12 @@ X-Launch-ConfigId: jdtbridge-verify
 </launchConfiguration>
 ```
 
-- **Content-Type**: `application/xml` — raw `.launch` file content.
-- **X-Launch-ConfigId**: the desired configId. Required.
+- **configId**: query parameter, required.
+- **Body**: raw `.launch` file XML content.
 - **Response 200**: `{ "configId": "jdtbridge-verify", "imported": true }`
-- **Response 409**: `{ "error": "Launch configuration \"...\" already exists." }`
+- **Response 200 error**: `{ "error": "Launch configuration \"...\" already exists." }`
+
+ConfigId is validated: no path separators (`/`, `\`) or `..` allowed.
 
 ### Plugin implementation
 
@@ -101,10 +102,9 @@ X-Launch-ConfigId: jdtbridge-verify
 // commands/launch.mjs — launchImport()
 const launchFileContent = readFileSync(filePath, "utf8");
 const configId = flags.configid || basename(filePath, ".launch");
-const result = await postXml(
-    `/launch/import`,
+const importResult = await post(
+    `/launch/import?configId=${encodeURIComponent(configId)}`,
     launchFileContent,
-    { "X-Launch-ConfigId": configId },
 );
 ```
 
@@ -112,15 +112,14 @@ The CLI has no knowledge of launch configuration internals.
 It reads the file as opaque XML and sends it to the server.
 The server validates and installs.
 
-## Delete (future)
+## Delete
 
 ```bash
 jdt launch config --delete <configId>
 ```
 
 Deletes a saved launch configuration from the workspace.
-Fails if the configuration has running launches (use `jdt launch stop`
-first). Not implemented yet — documented for planning.
+Already implemented in `LaunchHandler.handleConfigDelete()`.
 
 ## Duplicate (future)
 
@@ -157,7 +156,7 @@ list). Complex — deferred until concrete use cases emerge.
 
 CLI:
   commands/launch.mjs        — launchImport() added to existing dispatch
-  client.mjs                 — postXml() helper (new, for XML POST)
+  client.mjs                 — post() helper (new, for XML POST with reconnect)
 
 Plugin:
   LaunchHandler.java         — handleImport() endpoint

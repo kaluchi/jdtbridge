@@ -218,6 +218,13 @@ class LaunchHandler {
             return HttpServer.jsonError(
                     "Missing launch configuration XML in request body");
         }
+        // Reject path separators in configId (prevent path traversal)
+        if (configId.contains("/") || configId.contains("\\")
+                || configId.contains("..")) {
+            return HttpServer.jsonError(
+                    "Invalid configId: must not contain "
+                    + "path separators or '..'");
+        }
         // Check if configId already exists (API cache + file on disk)
         if (findConfig(configId) != null
                 || launchFileExists(configId)) {
@@ -226,15 +233,15 @@ class LaunchHandler {
                     + "\" already exists. "
                     + "Use --configid to import with a different name.");
         }
+        java.nio.file.Path tempDir = null;
+        java.nio.file.Path tempLaunchFile = null;
         try {
-            // Write XML to temp file named as the target configId
-            java.nio.file.Path tempDir = Files.createTempDirectory(
-                    "jdtbridge-import");
-            java.nio.file.Path tempLaunchFile = tempDir.resolve(
+            tempDir = Files.createTempDirectory("jdtbridge-import");
+            tempLaunchFile = tempDir.resolve(
                     configId + ".launch");
             Files.writeString(tempLaunchFile, launchXmlContent);
 
-            // Use Eclipse's built-in import API — handles file copy,
+            // Eclipse's built-in import API — handles file copy,
             // LaunchManager registration, and change notification
             var launchManager =
                     (org.eclipse.debug.internal.core.LaunchManager)
@@ -243,10 +250,6 @@ class LaunchHandler {
                     new java.io.File[] { tempLaunchFile.toFile() },
                     null);
 
-            // Cleanup temp
-            Files.deleteIfExists(tempLaunchFile);
-            Files.deleteIfExists(tempDir);
-
             var importResult = new JsonObject();
             importResult.addProperty("configId", configId);
             importResult.addProperty("imported", true);
@@ -254,6 +257,16 @@ class LaunchHandler {
         } catch (Exception importException) {
             return HttpServer.jsonError(
                     "Import failed: " + importException.getMessage());
+        } finally {
+            try {
+                if (tempLaunchFile != null)
+                    Files.deleteIfExists(tempLaunchFile);
+                if (tempDir != null)
+                    Files.deleteIfExists(tempDir);
+            } catch (IOException cleanupException) {
+                Log.warn("Failed to clean temp import files",
+                        cleanupException);
+            }
         }
     }
 

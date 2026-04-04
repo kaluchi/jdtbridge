@@ -153,6 +153,18 @@ function doGet(inst, path, timeoutMs) {
  */
 export async function post(path, body, contentType = "application/xml", timeoutMs = 10_000) {
   const inst = await connect();
+  try {
+    return await doPost(inst, path, body, contentType, timeoutMs);
+  } catch (postError) {
+    if (!isConnectionError(postError)) throw postError;
+    if (await reconnect()) {
+      return doPost(_instance, path, body, contentType, timeoutMs);
+    }
+    throw postError;
+  }
+}
+
+function doPost(inst, path, body, contentType, timeoutMs) {
   return new Promise((resolve, reject) => {
     const opts = requestOpts(inst, path, "POST", timeoutMs);
     opts.headers = {

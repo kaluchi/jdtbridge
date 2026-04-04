@@ -100,7 +100,7 @@ Subcommands:
   jdt launch logs <launchId> [-f] [--tail N]      show console output
   jdt launch stop <launchId>                      stop a running launch
   jdt launch clear [launchId]                     remove terminated launches
-  jdt launch config --import <path> [--configid]  import .launch file
+  jdt launch config --import <path> [--configid <name>]  import .launch file
 
 LaunchId is configId:pid (e.g. my-server:12345) for disambiguation.
 Plain configId works when there is only one launch with that name.
