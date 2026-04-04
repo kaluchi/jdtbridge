@@ -461,7 +461,6 @@ class LaunchHandler {
 
         for (ILaunch launch : launches) {
             if (!launch.isTerminated()) continue;
-            String configId = launchName(launch);
             if (nameOrId != null && !nameOrId.isBlank()) {
                 // Accept configId or launchId
                 ILaunch found = findLaunch(nameOrId);

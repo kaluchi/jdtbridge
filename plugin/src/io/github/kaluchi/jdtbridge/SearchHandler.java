@@ -36,6 +36,7 @@ import org.eclipse.jdt.core.search.SearchRequestor;
 /**
  * Handlers for JDT search and code inspection operations.
  */
+@SuppressWarnings("restriction")
 class SearchHandler {
 
     String handleProjects(ProjectScope scope) throws Exception {

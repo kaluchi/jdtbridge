@@ -1,24 +1,22 @@
 package io.github.kaluchi.jdtbridge;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import java.util.Map;
-
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-
 import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IType;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.eclipse.core.runtime.CoreException;
+
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Generics erasure contract: all FQMNs in source output must be
@@ -392,13 +390,7 @@ public class GenericErasureTest {
             var json = sourceJson(
                     "test.model.Animal", "name");
             var impls = json.getAsJsonArray("implementations");
-            boolean foundParrot = false;
-            for (var e : impls) {
-                if (str(e.getAsJsonObject(), "fqmn")
-                        .contains("Parrot")) {
-                    foundParrot = true;
-                }
-            }
+            assertNotNull(impls, "Should have implementations array");
             // Parrot inherits name() from AbstractPet,
             // doesn't override directly — may or may not
             // appear depending on whether it has own method

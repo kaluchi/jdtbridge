@@ -100,7 +100,6 @@ public class AgentLaunchDelegate
 		}
 
 		// Custom env vars from Environment tab
-		@SuppressWarnings("unchecked")
 		Map<String, String> envVars = config.getAttribute(
 				org.eclipse.debug.core.ILaunchManager
 						.ATTR_ENVIRONMENT_VARIABLES,

@@ -1,9 +1,5 @@
 package io.github.kaluchi.jdtbridge.ui;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-
 import org.eclipse.core.runtime.ILog;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Platform;
@@ -13,7 +9,9 @@ import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.ui.IStartup;
 
-import io.github.kaluchi.jdtbridge.ui.ProcessUtil;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Replaces the core plugin's browser-based welcome with a native dialog.

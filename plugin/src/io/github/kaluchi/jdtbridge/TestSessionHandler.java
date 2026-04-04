@@ -2,22 +2,19 @@ package io.github.kaluchi.jdtbridge;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-
-import java.util.List;
-import java.util.Map;
-
 import org.eclipse.debug.core.DebugPlugin;
 import org.eclipse.debug.core.ILaunch;
 import org.eclipse.jdt.internal.junit.JUnitCorePlugin;
-import org.eclipse.jdt.internal.junit.model.TestCaseElement;
 import org.eclipse.jdt.internal.junit.model.TestRunSession;
 import org.eclipse.jdt.junit.model.ITestCaseElement;
 import org.eclipse.jdt.junit.model.ITestElement;
 import org.eclipse.jdt.junit.model.ITestElement.FailureTrace;
 import org.eclipse.jdt.junit.model.ITestElementContainer;
-import org.eclipse.jdt.junit.model.ITestSuiteElement;
 
+import java.util.List;
+import java.util.Map;
+
+@SuppressWarnings("restriction")
 class TestSessionHandler {
 
     static String testRunId(TestRunSession session) {
@@ -33,7 +30,6 @@ class TestSessionHandler {
     TestSessionHandler() {
     }
 
-    @SuppressWarnings("restriction")
     String handleStatus(Map<String, String> params) {
         String testRunId = params.get("testRunId");
         if (testRunId == null || testRunId.isBlank()) {
@@ -91,7 +87,7 @@ class TestSessionHandler {
         return result.toString();
     }
 
-    TestRunSession findSession(String testRunId) {
+	TestRunSession findSession(String testRunId) {
         List<TestRunSession> sessions =
                 JUnitCorePlugin.getModel()
                         .getTestRunSessions();
@@ -169,7 +165,6 @@ class TestSessionHandler {
         }
     }
 
-    @SuppressWarnings("restriction")
     String handleClear(Map<String, String> params) {
         String testRunId = params.get("testRunId");
         var model = JUnitCorePlugin.getModel();
@@ -191,7 +186,6 @@ class TestSessionHandler {
         return result.toString();
     }
 
-    @SuppressWarnings("restriction")
     String handleSessions(Map<String, String> params,
             ProjectScope scope) {
         List<TestRunSession> sessions =

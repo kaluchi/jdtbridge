@@ -1,16 +1,11 @@
 package io.github.kaluchi.jdtbridge;
 
 import com.google.gson.JsonObject;
-
-import java.util.Map;
-import java.util.jar.Manifest;
-
 import org.eclipse.core.resources.ResourcesPlugin;
+import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.NullProgressMonitor;
-import org.eclipse.core.runtime.CoreException;
 import org.eclipse.debug.core.DebugPlugin;
-import org.eclipse.jdt.internal.junit.JUnitCorePlugin;
 import org.eclipse.debug.core.ILaunch;
 import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.debug.core.ILaunchConfigurationType;
@@ -27,6 +22,9 @@ import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.junit.JUnitCore;
 import org.eclipse.jdt.launching.IJavaLaunchConfigurationConstants;
 import org.osgi.framework.Version;
+
+import java.util.Map;
+import java.util.jar.Manifest;
 
 /**
  * Handler for /test endpoint: run JUnit tests via Eclipse's

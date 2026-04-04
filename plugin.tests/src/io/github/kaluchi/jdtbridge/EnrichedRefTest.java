@@ -406,6 +406,7 @@ public class EnrichedRefTest {
             // Marker has @Retention annotation — that's a type
             // ref inside its source range
             var refs = ReferenceCollector.collect(markerType);
+            assertNotNull(refs, "Should collect refs for Marker");
             // The Marker type itself, when referenced by others,
             // should have annotation kind. Test via type-info:
             assertTrue(markerType.isAnnotation(),
@@ -455,6 +456,7 @@ public class EnrichedRefTest {
         void staticTrueInJson() throws Exception {
             var refs = collectAll(
                     "test.service.EnrichedRefService");
+            assertNotNull(refs, "Should collect refs");
             IType type = JdtUtils.findType(
                     "test.service.EnrichedRefService");
             IMethod method = JdtUtils.findMethod(
