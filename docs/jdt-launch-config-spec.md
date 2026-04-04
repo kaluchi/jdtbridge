@@ -29,9 +29,9 @@ from another workspace's `.metadata/`, from anywhere.
 The CLI reads the file and sends its XML content to the plugin.
 
 **Destination**: the currently connected Eclipse workspace. The plugin
-uses `LaunchManager.importConfigurations()` — Eclipse's built-in
-import API — to copy the file into the workspace's `.launches/`
-directory and register it with the launch infrastructure.
+uses `LaunchManager.importConfigurations()` to copy the file into
+`<workspace>/.metadata/.plugins/org.eclipse.debug.core/.launches/`
+and register it with the launch infrastructure.
 
 ### Command
 
