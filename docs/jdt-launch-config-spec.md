@@ -24,8 +24,8 @@ files from another workspace.
 Reads a `.launch` file from disk (source) and imports it into the
 current Eclipse workspace (destination) via the plugin's HTTP API.
 
-**Source**: any `.launch` file — from VCS (`launches/` directory in
-repo), from another workspace's `.metadata/`, from a temp directory.
+**Source**: any `.launch` file on disk — from the project directory,
+from another workspace's `.metadata/`, from anywhere.
 The CLI reads the file and sends its XML content to the plugin.
 
 **Destination**: the currently connected Eclipse workspace. The plugin
@@ -50,34 +50,14 @@ command fails with an error. No silent overwrite.
 ### Examples
 
 ```bash
-# Import from repo
-jdt launch config --import launches/jdtbridge-verify.launch
-
-# Import with custom name
-jdt launch config --import launches/jdtbridge-verify.launch --configid my-verify
+jdt launch config --import /path/to/my-build.launch
+jdt launch config --import /path/to/my-build.launch --configid custom-name
 
 # Fails — already exists
-$ jdt launch config --import launches/jdtbridge-verify.launch
-Error: Launch configuration "jdtbridge-verify" already exists.
+$ jdt launch config --import my-build.launch
+Error: Launch configuration "my-build" already exists.
 Use --configid to import with a different name.
 ```
-
-### Storage in VCS
-
-Recommended directory: `launches/` in project root, tracked in git.
-
-```
-eclipse-jdt-search/
-  launches/
-    jdtbridge-verify.launch
-    jdtbridge-package.launch
-```
-
-These are standard Eclipse `.launch` XML files. They reference
-launch type IDs (requires matching plugins installed), Maven goals,
-and working directories via `${workspace_loc}` variables.
-Portable across machines if Eclipse has the same plugins and the
-workspace contains the referenced projects.
 
 ### Protocol
 
@@ -108,22 +88,6 @@ ConfigId is validated: no path separators (`/`, `\`) or `..` allowed.
    registers with LaunchManager, fires change notifications.
 5. Clean up temp file in `finally` block.
 6. Return success with configId.
-
-### CLI implementation
-
-```javascript
-// commands/launch.mjs — launchImport()
-const launchFileContent = readFileSync(filePath, "utf8");
-const configId = flags.configid || basename(filePath, ".launch");
-const importResult = await post(
-    `/launch/import?configId=${encodeURIComponent(configId)}`,
-    launchFileContent,
-);
-```
-
-The CLI has no knowledge of launch configuration internals.
-It reads the file as opaque XML and sends it to the server.
-The server validates and installs.
 
 ## Delete
 
@@ -163,7 +127,7 @@ list). Complex — deferred until concrete use cases emerge.
   `--xml` and `--json`).
 - **[ui-integration-spec](ui-integration-spec.md)** — Eclipse UI
   creates launch configs via Run Configurations dialog. Import
-  is the CLI equivalent for headless/VCS workflows.
+  is the CLI equivalent for headless workflows.
 
 ## Files
 
@@ -174,5 +138,3 @@ CLI:
 Plugin:
   LaunchHandler.java         — handleImport() endpoint
 
-Data:
-  launches/                  — shared .launch files in VCS (project root)
