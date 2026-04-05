@@ -5,12 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
-import java.nio.charset.StandardCharsets;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Nested;
@@ -146,8 +142,6 @@ public class DualSocketTest {
             remoteServer.setToken("remote-token-v1");
             remoteServer.start(
                     InetAddress.getByName("0.0.0.0"), 0);
-            int firstRemotePort = remoteServer.getPort();
-
             // Stop and restart remote
             remoteServer.stop();
             remoteServer = new HttpServer();

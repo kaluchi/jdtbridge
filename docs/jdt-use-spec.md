@@ -144,7 +144,7 @@ terminal  0679187d-a3ea-4c9...  D:\eclipse-workspace-jdtbridge  active  2026-04-
 
 ### Remote instances
 
-When `jdt setup --remote` creates an instance file (e.g. inside
+When `jdt setup remote` creates an instance file (e.g. inside
 a Docker container), `jdt use` shows it alongside local instances.
 See [jdt-setup-spec.md](jdt-setup-spec.md) for remote setup details.
 

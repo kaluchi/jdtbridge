@@ -21,15 +21,6 @@ public class PreferenceConstants {
 	public static final String REMOTE_TOKEN =
 			ServerPreferences.REMOTE_TOKEN;
 
-	// Deprecated (kept for migration)
-	public static final String HTTP_BIND_ADDRESS =
-			ServerPreferences.HTTP_BIND_ADDRESS;
-	public static final String HTTP_FIXED_PORT =
-			ServerPreferences.HTTP_FIXED_PORT;
-	public static final String BIND_LOOPBACK =
-			ServerPreferences.BIND_LOOPBACK;
-	public static final String BIND_ALL = ServerPreferences.BIND_ALL;
-
 	public static String defaultTerminalCommand() {
 		String os = System.getProperty("os.name", "").toLowerCase();
 		if (os.contains("win")) {

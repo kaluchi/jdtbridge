@@ -3,7 +3,7 @@
 ## Overview
 
 `jdt setup remote` configures CLI to connect to a remote Eclipse
-instance. Creates instance files in `~/.jdtbridge/instances/`.
+instance. Creates instance files in `~/.jdtbridge/remote-instances/`.
 
 ## Principles
 
@@ -105,7 +105,7 @@ User copies from terminal output.
 $ jdt setup remote --bridge-socket host.docker.internal:7777 --token abc123 \
     --add-mount-point /mnt/workspace --add-mount-point /mnt/m8
 
-Wrote ~/.jdtbridge/instances/remote-a1b2c3.json:
+Wrote ~/.jdtbridge/remote-instances/a1b2c3.json:
   bridge-socket: host.docker.internal:7777
   token:         ******bc123
 
@@ -123,7 +123,7 @@ Scanning mount points for .project files...
 ```
 $ jdt setup remote --bridge-socket host.docker.internal:7777
 
-Wrote ~/.jdtbridge/instances/remote-a1b2c3.json:
+Wrote ~/.jdtbridge/remote-instances/a1b2c3.json:
   bridge-socket: host.docker.internal:7777
   token:         e240be6743978f011bfd326c9d3c392d (no --token, auto-generated, shown once)
 ```
@@ -134,7 +134,7 @@ Wrote ~/.jdtbridge/instances/remote-a1b2c3.json:
 $ jdt setup remote --bridge-socket host.docker.internal:7777 \
     --add-mount-point /mnt/automation
 
-Updated ~/.jdtbridge/instances/remote-a1b2c3.json:
+Updated ~/.jdtbridge/remote-instances/a1b2c3.json:
   mount-points: added /mnt/automation
 
 Scanning /mnt/automation for .project files...
@@ -151,7 +151,7 @@ Scanning /mnt/automation for .project files...
 $ jdt setup remote --bridge-socket host.docker.internal:7777 \
     --remove-mount-point /mnt/automation
 
-Updated ~/.jdtbridge/instances/remote-a1b2c3.json:
+Updated ~/.jdtbridge/remote-instances/a1b2c3.json:
   mount-points: removed /mnt/automation
 
 Removed from cache:
@@ -169,7 +169,7 @@ Only changed fields:
 ```
 $ jdt setup remote --bridge-socket host.docker.internal:7777 --token new-token
 
-Updated ~/.jdtbridge/instances/remote-a1b2c3.json:
+Updated ~/.jdtbridge/remote-instances/a1b2c3.json:
   token: ******token (was: ******bc123)
 ```
 
@@ -256,7 +256,7 @@ $ jdt setup remote
   myapp-server     /mnt/m8/myapp-server         /mnt/m8
   myapp-shared     /mnt/m8/myapp-shared         /mnt/m8
 
-  File: ~/.jdtbridge/instances/remote-a1b2c3.json
+  File: ~/.jdtbridge/remote-instances/a1b2c3.json
 
 ── 192.168.1.100:8888 ─────────────────────────────────────────
 
@@ -267,7 +267,7 @@ $ jdt setup remote
   PROJECT          LOCAL_PATH                        MOUNT_POINT
   webapp           /home/user/projects/webapp        /home/user/projects
 
-  File: ~/.jdtbridge/instances/remote-d4e5f6.json
+  File: ~/.jdtbridge/remote-instances/d4e5f6.json
 
 ────────────────────────────────────────────────────────────────
 
@@ -291,8 +291,7 @@ Remove a remote instance:
 
 Verification phase. When combined with config flags (`--token`,
 `--add-mount-point`), config is written first, then check runs.
-Check itself is read-only — rescans mount points in memory,
-does not persist to cache.
+Check rescans mount points and persists updated cache.
 
 ### Algorithm
 
@@ -300,14 +299,14 @@ does not persist to cache.
 
 2. Rescan mount-points — find `.project` files, parse `<name>`,
    build fresh project set A (project name → local path).
-   This replaces stale cache with current state.
+   Persist to cache file.
 
 3. TCP probe — connect to bridge-socket.
    Failure → report, skip remaining steps for this remote.
 
 4. Auth + project list — `GET /projects` with `Authorization: Bearer <token>`.
    401 → report token rejected, skip project comparison.
-   200 → token accepted, response contains project list for step 6.
+   200 → token accepted, response contains project list for step 5.
 
 5. Compare sets (using project list from step 4):
    - `A ∩ B` — mapped and verified (project in both cache and Eclipse)
@@ -349,7 +348,7 @@ $ jdt setup remote --check
   PROJECT          LOCAL_PATH
   old-project      /mnt/workspace/old-project
 
-  File: ~/.jdtbridge/instances/remote-a1b2c3.json
+  File: ~/.jdtbridge/remote-instances/a1b2c3.json
 
 ── 192.168.1.100:8888 ─────────────────────────────────────────
 
@@ -365,7 +364,7 @@ $ jdt setup remote --check
   PROJECT          LOCAL_PATH                        MOUNT_POINT
   webapp           /home/user/projects/webapp        /home/user/projects
 
-  File: ~/.jdtbridge/instances/remote-d4e5f6.json
+  File: ~/.jdtbridge/remote-instances/d4e5f6.json
 
 ────────────────────────────────────────────────────────────────
 
@@ -393,7 +392,7 @@ All output as JSON. Composable with `--check` and no-args status.
 [
   {
     "bridge-socket": "host.docker.internal:7777",
-    "file": "~/.jdtbridge/instances/remote-a1b2c3.json",
+    "file": "~/.jdtbridge/remote-instances/a1b2c3.json",
     "token": "******c392d",
     "mount-points": ["/mnt/workspace", "/mnt/m8"],
     "projects": [
@@ -405,7 +404,7 @@ All output as JSON. Composable with `--check` and no-args status.
   },
   {
     "bridge-socket": "192.168.1.100:8888",
-    "file": "~/.jdtbridge/instances/remote-d4e5f6.json",
+    "file": "~/.jdtbridge/remote-instances/d4e5f6.json",
     "token": "******54d2f",
     "mount-points": ["/home/user/projects"],
     "projects": [
@@ -421,7 +420,7 @@ Eclipse comparison:
 [
   {
     "bridge-socket": "host.docker.internal:7777",
-    "file": "~/.jdtbridge/instances/remote-a1b2c3.json",
+    "file": "~/.jdtbridge/remote-instances/a1b2c3.json",
     "check": {
       "tcp": true,
       "token": true,
@@ -445,7 +444,7 @@ Eclipse comparison:
   },
   {
     "bridge-socket": "192.168.1.100:8888",
-    "file": "~/.jdtbridge/instances/remote-d4e5f6.json",
+    "file": "~/.jdtbridge/remote-instances/d4e5f6.json",
     "check": {
       "tcp": false,
       "tcpError": "connection refused"
@@ -461,6 +460,11 @@ Eclipse comparison:
 
 `jdt setup remote --bridge-socket host:port --json` — single remote,
 same structure but single object (not array).
+
+JSON project list key depends on context:
+- `--json` (no check): `"projects"` — from cache, no verification
+- `--check --json` online: `"mapped"` — verified against Eclipse
+- `--check --json` offline: `"cached"` — from cache, not verified
 
 ## Instance file format
 
@@ -481,7 +485,7 @@ workspace hash in `Activator.workspaceHash()`.
 ## Project path cache
 
 Per-remote cache file alongside instance file:
-`~/.jdtbridge/instances/~/.jdtbridge/remote-instances/<hash>.cache.json`
+`~/.jdtbridge/remote-instances/<hash>.project-path-cache.json`
 
 ```json
 {
@@ -565,6 +569,9 @@ $ jdt use
 #  ALIAS  WORKSPACE   STATUS   PINNED  HOST                    PORT   PLUGIN
 1         /mnt/dev    online   pinned  host.docker.internal    7777   2.5.0
 2         /mnt/stage  online           192.168.1.100           8888   2.4.0
+
+WORKSPACE for remote instances = first mount-point from config.
+If no mount-points configured, shows bridge-socket as identifier.
 ```
 
 ## Token sources
@@ -592,7 +599,7 @@ $ jdt use
 
 CLI:
   commands/setup.mjs         — `remote` subcommand
-  discovery.mjs              — reads instance files with host field
+  discovery.mjs              — reads instance files (local + remote-instances)
   paths.mjs                  — path translation using project path cache
 
 Plugin:

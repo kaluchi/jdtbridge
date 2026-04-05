@@ -1,7 +1,5 @@
 package io.github.kaluchi.jdtbridge;
 
-import java.net.InetAddress;
-
 import org.eclipse.core.runtime.Platform;
 
 /**
@@ -47,15 +45,6 @@ public class ServerPreferences {
 
     /** Persisted remote token. */
     public static final String REMOTE_TOKEN = "remoteToken";
-
-    // --- Deprecated (kept for migration) ---
-
-    /** @deprecated Use LOCAL_PORT */
-    public static final String HTTP_FIXED_PORT = "httpFixedPort";
-    /** @deprecated Use REMOTE_ENABLED */
-    public static final String HTTP_BIND_ADDRESS = "httpBindAddress";
-    public static final String BIND_LOOPBACK = "loopback";
-    public static final String BIND_ALL = "all";
 
     // --- Resolution ---
 
@@ -134,22 +123,4 @@ public class ServerPreferences {
         }
     }
 
-    // --- Kept for backward compat ---
-
-    /** @deprecated Use resolveLocalPort() */
-    public static InetAddress resolveBindAddress() {
-        if (resolveRemoteEnabled()) {
-            try {
-                return InetAddress.getByName("0.0.0.0");
-            } catch (Exception e) {
-                Log.warn("Failed to resolve bind address", e);
-            }
-        }
-        return InetAddress.getLoopbackAddress();
-    }
-
-    /** @deprecated Use resolveLocalPort() */
-    public static int resolveFixedPort() {
-        return resolveLocalPort();
-    }
 }
