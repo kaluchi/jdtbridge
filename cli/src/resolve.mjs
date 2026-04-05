@@ -6,6 +6,7 @@ import { getPinnedBridge } from "./bridge-env.mjs";
 import { discoverInstances } from "./discovery.mjs";
 import { resolveTerminalId } from "./terminal-id.mjs";
 import { readPin, writePin, deletePin, listPins } from "./home.mjs";
+import { normalizePath } from "./paths.mjs";
 
 /**
  * Resolve the target Eclipse instance.
@@ -112,7 +113,7 @@ export function cleanStalePins(liveInstances) {
 
 /** Lowercase, forward-slash normalized path for comparison. */
 export function normalizeWorkspacePath(p) {
-  return p.toLowerCase().replace(/\\/g, "/");
+  return normalizePath(p).toLowerCase();
 }
 
 /**

@@ -6,6 +6,7 @@ import { request } from "node:http";
 import { instancesDir, remoteInstancesDir } from "./home.mjs";
 import { proxyAwareOptions } from "./proxy.mjs";
 import { getPinnedBridge } from "./bridge-env.mjs";
+import { normalizePath } from "./paths.mjs";
 
 /**
  * @typedef {Object} Instance
@@ -96,9 +97,9 @@ export async function findInstance(workspaceHint) {
   if (instances.length === 1) return instances[0];
 
   if (workspaceHint) {
-    const normalized = workspaceHint.replace(/\\/g, "/").toLowerCase();
+    const normalized = normalizePath(workspaceHint).toLowerCase();
     const match = instances.find((i) =>
-      i.workspace.replace(/\\/g, "/").toLowerCase().includes(normalized),
+      normalizePath(i.workspace).toLowerCase().includes(normalized),
     );
     if (match) return match;
   }

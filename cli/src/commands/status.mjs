@@ -10,6 +10,7 @@
 
 import { execSync } from "node:child_process";
 import { basename } from "node:path";
+import { normalizePath } from "../paths.mjs";
 
 // ---- Public API ----
 
@@ -225,7 +226,7 @@ Refreshing the dashboard:
 export function reposFromServer(projects) {
   const seen = new Map();
   for (const p of projects) {
-    const repo = (p.repo || "").replace(/\\/g, "/");
+    const repo = normalizePath(p.repo || "");
     if (!repo) continue;
     if (!seen.has(repo)) {
       seen.set(repo, { path: repo, name: basename(repo), branch: p.branch || "", projects: [] });

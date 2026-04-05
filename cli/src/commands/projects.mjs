@@ -1,6 +1,6 @@
 import { basename } from "node:path";
 import { get } from "../client.mjs";
-import { toSandboxPath } from "../paths.mjs";
+import { toSandboxPath, normalizePath } from "../paths.mjs";
 import { output } from "../output.mjs";
 import { formatTable } from "../format/table.mjs";
 
@@ -14,7 +14,7 @@ export async function projects(args = []) {
       const rows = data.map((p) => {
         const name = p.name || p;
         const loc = toSandboxPath(p.location || "");
-        const repo = (p.repo || "").replace(/\\/g, "/");
+        const repo = normalizePath(p.repo || "");
         const repoName = repo ? basename(repo) : "";
         if (repoName) repoSet.add(repoName);
         return [`\`${name}\``, loc, repoName];

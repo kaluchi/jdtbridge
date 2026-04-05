@@ -4,6 +4,7 @@ import { execSync, spawn } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { request } from "node:http";
+import { normalizePath } from "./paths.mjs";
 
 const IS_WIN = process.platform === "win32";
 
@@ -253,7 +254,7 @@ export function runDirector(eclipsePath, profile, extraArgs) {
 
 /** Install a feature via p2 director from a local repository. */
 export function p2Install(eclipsePath, profile, repoPath, featureIU) {
-  const repoUrl = `file:///${repoPath.replace(/\\/g, "/")}`;
+  const repoUrl = `file:///${normalizePath(repoPath)}`;
   return runDirector(eclipsePath, profile, [
     "-repository",
     `"${repoUrl}"`,

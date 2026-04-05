@@ -112,7 +112,7 @@ describe("jdt setup remote", () => {
       const remoteDir = join(testDir, "remote-instances");
       const instanceFiles = existsSync(remoteDir)
         ? require("fs").readdirSync(remoteDir)
-            .filter(f => f.endsWith(".json") && !f.includes("cache"))
+            .filter(f => f.endsWith(".json"))
         : [];
       expect(instanceFiles.length).toBe(1);
       const instanceData = JSON.parse(
@@ -249,7 +249,7 @@ describe("jdt setup remote", () => {
       // Should rescan but not duplicate
       const remoteDir = join(testDir, "remote-instances");
       const instanceFiles = require("fs").readdirSync(remoteDir)
-        .filter(f => f.endsWith(".json") && !f.includes("cache"));
+        .filter(f => f.endsWith(".json"));
       const instanceData = JSON.parse(
         readFileSync(join(remoteDir, instanceFiles[0]), "utf8"));
       const mountPointCount = instanceData["mount-points"]
@@ -320,7 +320,7 @@ describe("jdt setup remote", () => {
       // Verify mount point removed from config
       const remoteDir = join(testDir, "remote-instances");
       const instanceFiles = require("fs").readdirSync(remoteDir)
-        .filter(f => f.endsWith(".json") && !f.includes("cache"));
+        .filter(f => f.endsWith(".json"));
       const instanceData = JSON.parse(
         readFileSync(join(remoteDir, instanceFiles[0]), "utf8"));
       expect(instanceData["mount-points"]).not.toContain(mountDir2);
@@ -482,7 +482,7 @@ describe("jdt setup remote", () => {
 
       const remoteDir = join(testDir, "remote-instances");
       const instanceFiles = require("fs").readdirSync(remoteDir)
-        .filter(f => f.endsWith(".json") && !f.includes("cache"));
+        .filter(f => f.endsWith(".json"));
       const instanceData = JSON.parse(
         readFileSync(join(remoteDir, instanceFiles[0]), "utf8"));
 
@@ -503,7 +503,7 @@ describe("jdt setup remote", () => {
 
       const remoteDir = join(testDir, "remote-instances");
       const instanceFiles = require("fs").readdirSync(remoteDir)
-        .filter(f => f.endsWith(".json") && !f.includes("cache"));
+        .filter(f => f.endsWith(".json"));
       const instanceData = JSON.parse(
         readFileSync(join(remoteDir, instanceFiles[0]), "utf8"));
 
@@ -530,7 +530,7 @@ describe("jdt setup remote", () => {
 
       const remoteDir = join(testDir, "remote-instances");
       const instanceFiles = require("fs").readdirSync(remoteDir)
-        .filter(f => f.endsWith(".json") && !f.includes("cache"));
+        .filter(f => f.endsWith(".json"));
       const instanceData = JSON.parse(
         readFileSync(join(remoteDir, instanceFiles[0]), "utf8"));
 
@@ -644,7 +644,7 @@ describe("jdt setup remote", () => {
       // Mount points should be unchanged
       const remoteDir = join(testDir, "remote-instances");
       const files = readdirSync(remoteDir)
-        .filter(f => f.endsWith(".json") && !f.includes("cache"));
+        .filter(f => f.endsWith(".json"));
       const data = JSON.parse(readFileSync(
         join(remoteDir, files[0]), "utf8"));
       expect(data["mount-points"]).toContain(mountDir);

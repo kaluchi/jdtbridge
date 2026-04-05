@@ -24,7 +24,7 @@ export function toWsPath(p) {
 export function convertDrivePath(p) {
   const m = /^([A-Za-z]):[/\\]/.exec(p);
   if (!m) return null;
-  return "/" + m[1].toLowerCase() + p.slice(2).replace(/\\/g, "/");
+  return "/" + m[1].toLowerCase() + normalizePath(p.slice(2));
 }
 
 /**
@@ -51,5 +51,10 @@ export function formatLineRange(startLine, endLine) {
  * Non-drive paths get backslash normalization only.
  */
 export function hostToSandboxPath(p) {
-  return convertDrivePath(p) ?? p.replace(/\\/g, "/");
+  return convertDrivePath(p) ?? normalizePath(p);
+}
+
+/** Normalize backslashes to forward slashes. */
+export function normalizePath(p) {
+  return p.replace(/\\/g, "/");
 }

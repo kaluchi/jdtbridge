@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { createHash, randomBytes } from "node:crypto";
 import { remoteInstancesDir, remoteProjectPathsDir } from "../home.mjs";
 import { parseFlags } from "../args.mjs";
-
+import { normalizePath } from "../paths.mjs";
 import { printJson } from "../json-output.mjs";
 import { formatTable } from "../format/table.mjs";
 
@@ -311,8 +311,10 @@ async function handleConfigure(bridgeSocket, flags, addMountPoints,
   }
   instanceData["mount-points"] = existingMountPoints;
 
-  // Write instance file
-  writeFileSync(filePath, JSON.stringify(instanceData, null, 2) + "\n");
+  // Write instance file (atomic: temp + rename)
+  const tmpInstancePath = filePath + ".tmp";
+  writeFileSync(tmpInstancePath, JSON.stringify(instanceData, null, 2) + "\n");
+  renameSync(tmpInstancePath, filePath);
 
   // Report what was written
   if (!jsonOutput) {
@@ -407,9 +409,8 @@ function printRemoteStatus(remoteInstance) {
       && Object.keys(cacheData.projects).length > 0) {
     const projectRows = Object.entries(cacheData.projects).map(
       ([projectName, localPath]) => {
-        const norm = p => p.replace(/\\/g, "/");
         const matchingMountPoint = mountPoints.find(
-          mountPoint => norm(localPath).startsWith(norm(mountPoint)));
+          mountPoint => normalizePath(localPath).startsWith(normalizePath(mountPoint)));
         return [projectName, localPath, matchingMountPoint || ""];
       });
     console.log(formatTable(
@@ -426,7 +427,6 @@ function buildInstanceJson(remoteInstance) {
   const cachePath = cacheFilePath(remoteInstance["bridge-socket"]);
   const cacheData = readInstanceFile(cachePath);
   const mountPoints = remoteInstance["mount-points"] || [];
-  const norm = p => p.replace(/\\/g, "/");
   return {
     "bridge-socket": remoteInstance["bridge-socket"],
     file: remoteInstance.file,
@@ -436,7 +436,7 @@ function buildInstanceJson(remoteInstance) {
       ? Object.entries(cacheData.projects).map(
           ([projectName, localPath]) => {
             const mountPoint = mountPoints.find(
-              mp => norm(localPath).startsWith(norm(mp)));
+              mp => normalizePath(localPath).startsWith(normalizePath(mp)));
             return { project: projectName, localPath,
               mountPoint: mountPoint || null };
           })

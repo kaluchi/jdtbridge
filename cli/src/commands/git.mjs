@@ -7,7 +7,7 @@ import { execSync } from "node:child_process";
 import { basename } from "node:path";
 import { get } from "../client.mjs";
 import { extractPositional, parseFlags } from "../args.mjs";
-import { toSandboxPath } from "../paths.mjs";
+import { toSandboxPath, normalizePath } from "../paths.mjs";
 import { output } from "../output.mjs";
 import { formatTable } from "../format/table.mjs";
 import { green, yellow } from "../color.mjs";
@@ -82,7 +82,7 @@ async function gitList(args = []) {
 function reposFromProjects(projects) {
   const seen = new Map();
   for (const p of projects) {
-    const repo = (p.repo || "").replace(/\\/g, "/");
+    const repo = normalizePath(p.repo || "");
     if (!repo) continue;
     if (!seen.has(repo)) {
       seen.set(repo, { path: repo, name: basename(repo), branch: p.branch || "" });
