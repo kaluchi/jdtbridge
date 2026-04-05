@@ -64,13 +64,17 @@ describe("jdt setup remote", () => {
   // --- No args ---
 
   describe("no arguments", () => {
-    it("shows onboarding when no instances", async () => {
+    it("shows onboarding with examples when no instances", async () => {
       await runSetupRemote([]);
       const output = io.logs.join("\n");
       expect(output).toContain("No remote instances configured");
       expect(output).toContain("--bridge-socket");
       expect(output).toContain("--token");
       expect(output).toContain("--add-mount-point");
+      expect(output).toContain("host.docker.internal");
+      expect(output).toContain("SSH tunnel");
+      expect(output).toContain("<eclipse-host>");
+      expect(output).toContain("<mounted-directory>");
     });
 
     it("shows JSON empty array when no instances", async () => {
@@ -208,6 +212,8 @@ describe("jdt setup remote", () => {
       expect(output).toContain("Updated");
       expect(output).toContain("added");
       expect(output).toContain("proj-b");
+      // Should show specific mount path, not generic "mount points"
+      expect(output).toContain(mountDir2);
     });
 
     it("reuses token when not specified on update", async () => {
@@ -326,6 +332,35 @@ describe("jdt setup remote", () => {
       expect(instanceData["mount-points"]).not.toContain(mountDir2);
       expect(instanceData["mount-points"]).toContain(mountDir1);
     });
+
+    it("shows removed projects table", async () => {
+      const mountDir1 = join(testDir, "mount1");
+      const mountDir2 = join(testDir, "mount2");
+      createProjectDir(mountDir1, "keep-this");
+      createProjectDir(mountDir2, "remove-this");
+
+      await runSetupRemote([
+        "--bridge-socket", "host.docker.internal:7777",
+        "--token", "tok",
+        "--add-mount-point", mountDir1,
+        "--add-mount-point", mountDir2,
+      ]);
+      io.logs.length = 0;
+
+      await runSetupRemote([
+        "--bridge-socket", "host.docker.internal:7777",
+        "--remove-mount-point", mountDir2,
+      ]);
+      const output = io.logs.join("\n");
+      expect(output).toContain("Removed from cache");
+      expect(output).toContain("remove-this");
+      // Removed section is between "Removed from cache" and "Scanning"
+      const removedSection = output.split("Removed from cache")[1]
+        .split("Scanning")[0];
+      expect(removedSection).toContain("remove-this");
+      expect(removedSection).not.toContain("keep-this");
+      expect(output).toContain("1 projects cached");
+    });
   });
 
   // --- .project scanning ---
@@ -406,6 +441,33 @@ describe("jdt setup remote", () => {
         "host.docker.internal:7777");
       expect(jsonOutput[0].projects).toHaveLength(1);
       expect(jsonOutput[0].projects[0].project).toBe("proj");
+    });
+
+    it("outputs single remote JSON with --bridge-socket --json", async () => {
+      const mountDir = join(testDir, "mount");
+      createProjectDir(mountDir, "proj");
+
+      await runSetupRemote([
+        "--bridge-socket", "host.docker.internal:7777",
+        "--token", "tok123",
+        "--add-mount-point", mountDir,
+      ]);
+      io.logs.length = 0;
+
+      await runSetupRemote([
+        "--bridge-socket", "host.docker.internal:7777", "--json",
+      ]);
+      const jsonOutput = JSON.parse(io.logs.join(""));
+      // Single object, not array
+      expect(jsonOutput["bridge-socket"]).toBe(
+        "host.docker.internal:7777");
+      expect(jsonOutput.projects).toHaveLength(1);
+    });
+
+    it("fails --bridge-socket --json for nonexistent remote", async () => {
+      await expect(runSetupRemote([
+        "--bridge-socket", "nonexistent:9999", "--json",
+      ])).rejects.toThrow("exit(1)");
     });
   });
 

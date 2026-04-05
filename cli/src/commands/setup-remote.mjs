@@ -183,6 +183,19 @@ export async function setupRemote(args) {
     return handleDelete(bridgeSocket);
   }
 
+  // --json query for specific remote (no mutations)
+  if (jsonOutput && !flags.token && addMountPoints.length === 0
+      && removeMountPoints.length === 0 && !checkMode) {
+    const filePath = instanceFilePath(bridgeSocket);
+    const instanceData = readInstanceFile(filePath);
+    if (!instanceData) {
+      console.error(`No remote instance for ${bridgeSocket}`);
+      process.exit(1);
+    }
+    printJson(buildInstanceJson({ ...instanceData, file: filePath }));
+    return;
+  }
+
   // Configure / update
   return handleConfigure(bridgeSocket, flags, addMountPoints,
       removeMountPoints, mountPointOps, checkMode, jsonOutput);
@@ -203,12 +216,39 @@ async function handleNoArgs(jsonOutput) {
     console.log("     - Set a fixed port");
     console.log("     - Copy the remote token");
     console.log();
-    console.log("  2. Here, configure the connection and mount points:");
+    console.log("  2. Here, configure the connection and mount points where your");
+    console.log("     project sources are accessible:");
     console.log();
     console.log("     jdt setup remote \\");
     console.log("       --bridge-socket <eclipse-host>:<eclipse-port> \\");
     console.log("       --token <paste-token-from-step-1> \\");
-    console.log("       --add-mount-point <mounted-directory>");
+    console.log("       --add-mount-point <mounted-directory> \\");
+    console.log("       --add-mount-point <another-mounted-directory>");
+    console.log();
+    console.log("     <eclipse-host> — hostname or IP where Eclipse is running.");
+    console.log("       For Docker on the same machine: host.docker.internal");
+    console.log("       For SSH tunnel: localhost");
+    console.log("       For remote machine: IP or hostname");
+    console.log();
+    console.log("     <eclipse-port> — the fixed port you set in Eclipse preferences.");
+    console.log();
+    console.log("     <mounted-directory> — each directory on this machine that");
+    console.log("       contains Eclipse project sources (with .project files).");
+    console.log("       Add as many --add-mount-point flags as you have mount points.");
+    console.log();
+    console.log("     Examples:");
+    console.log();
+    console.log("     Docker container, Eclipse on same machine:");
+    console.log("       jdt setup remote \\");
+    console.log("         --bridge-socket host.docker.internal:7777 \\");
+    console.log("         --token <token> \\");
+    console.log("         --add-mount-point /workspace");
+    console.log();
+    console.log("     Remote machine via SSH tunnel:");
+    console.log("       jdt setup remote \\");
+    console.log("         --bridge-socket localhost:7777 \\");
+    console.log("         --token <token> \\");
+    console.log("         --add-mount-point /home/user/projects");
     console.log();
     console.log("     After configuring, verify:");
     console.log("       jdt setup remote --check");
@@ -349,22 +389,66 @@ async function handleConfigure(bridgeSocket, flags, addMountPoints,
   // Scan mount points (on new instance or any mount-point change)
   const mountPoints = instanceData["mount-points"] || [];
   if (mountPoints.length > 0 && (mountPointsChanged || !isUpdate)) {
+    // Read old cache to compute diff for remove output
+    const oldCacheData = readInstanceFile(cacheFilePath(bridgeSocket));
+    const oldProjects = oldCacheData?.projects || {};
+
     const scannedProjects = scanAllMountPoints(mountPoints);
     writeCacheFile(bridgeSocket, mountPoints, scannedProjects);
 
     if (!jsonOutput) {
-      console.log("Scanning mount points for .project files...");
-      console.log();
-      if (scannedProjects.length > 0) {
-        const projectRows = scannedProjects.map(scannedProject => [
-          scannedProject.projectName,
-          scannedProject.localPath,
-          scannedProject.mountPoint,
-        ]);
-        console.log(formatTable(
-          ["PROJECT", "LOCAL_PATH", "MOUNT_POINT"],
-          projectRows));
+      // Show removed projects (were in old cache, not in new scan)
+      if (removeMountPoints.length > 0) {
+        const removedProjects = Object.entries(oldProjects)
+          .filter(([name]) => !scannedProjects.some(
+            sp => sp.projectName === name));
+        if (removedProjects.length > 0) {
+          console.log("Removed from cache:");
+          console.log();
+          const removedRows = removedProjects.map(
+            ([projectName, localPath]) => {
+              const mp = removeMountPoints.find(
+                rmp => normalizePath(localPath).startsWith(
+                  normalizePath(rmp)));
+              return [projectName, localPath, mp || ""];
+            });
+          console.log(formatTable(
+            ["PROJECT", "LOCAL_PATH", "MOUNT_POINT"], removedRows));
+          console.log();
+        }
+      }
+
+      // Show added/scanned projects
+      if (addMountPoints.length > 0 && isUpdate) {
+        // On update, scan only newly added mount points for display
+        const addedProjects = scannedProjects.filter(
+          sp => addMountPoints.some(amp =>
+            normalizePath(sp.localPath).startsWith(
+              normalizePath(amp))));
+        if (addedProjects.length > 0) {
+          const scanPaths = addMountPoints.join(", ");
+          console.log(`Scanning ${scanPaths} for .project files...`);
+          console.log();
+          const projectRows = addedProjects.map(sp => [
+            sp.projectName, sp.localPath, sp.mountPoint,
+          ]);
+          console.log(formatTable(
+            ["PROJECT", "LOCAL_PATH", "MOUNT_POINT"], projectRows));
+          console.log();
+        }
+      } else {
+        // New instance — show all scanned
+        const scanPaths = mountPoints.join(", ");
+        console.log(`Scanning ${scanPaths} for .project files...`);
         console.log();
+        if (scannedProjects.length > 0) {
+          const projectRows = scannedProjects.map(sp => [
+            sp.projectName, sp.localPath, sp.mountPoint,
+          ]);
+          console.log(formatTable(
+            ["PROJECT", "LOCAL_PATH", "MOUNT_POINT"], projectRows));
+          console.log();
+        }
       }
       console.log(`${scannedProjects.length} projects cached.`);
     }
@@ -373,7 +457,7 @@ async function handleConfigure(bridgeSocket, flags, addMountPoints,
     const remainingProjects = scanAllMountPoints(mountPoints);
     writeCacheFile(bridgeSocket, mountPoints, remainingProjects);
     if (!jsonOutput) {
-      console.log(`${remainingProjects.length} projects in cache.`);
+      console.log(`${remainingProjects.length} projects cached.`);
     }
   }
 
