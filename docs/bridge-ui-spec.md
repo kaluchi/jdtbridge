@@ -315,14 +315,10 @@ External Tools works as a power-user escape hatch for custom/unsupported
 agents. Not suitable for onboarding — user must manually construct
 commands and add env vars.
 
-### 10.3. Menu Actions (convenience shortcuts)
+### 10.3. Menu
 
-```
-Right-click project > JDT Bridge > Launch Claude Code
-  → creates transient launch config
-  → calls jdt agent run local claude --name <generated>
-  → visible in Debug view
-```
+See [bridge-ui-menu-spec.md](bridge-ui-menu-spec.md).
+Main menu and context menu structure, commands, dynamic contributions.
 
 ---
 
@@ -425,7 +421,7 @@ requires session-aware request routing. Deferred.
 ```
 eclipse-jdt-search/
   plugin/            io.github.kaluchi.jdtbridge          (core, headless)
-  ui/                io.github.kaluchi.jdtbridge.ui       (NEW)
+  ui/                io.github.kaluchi.jdtbridge.ui
   plugin.tests/      io.github.kaluchi.jdtbridge.tests
   branding/          io.github.kaluchi.jdtbridge.branding
   feature/           feature.xml (includes plugin + ui + branding)
@@ -433,152 +429,45 @@ eclipse-jdt-search/
   cli/               @kaluchi/jdtbridge npm package
 ```
 
-Core never depends on UI. UI depends on core.
+Core never depends on UI. UI depends on core
+(`Require-Bundle: io.github.kaluchi.jdtbridge`).
 
 ### ui/ plugin contents
 
 ```
 ui/
   META-INF/MANIFEST.MF
-  plugin.xml                    Commands, menus, views, preferences, launch UI
+  plugin.xml                    Commands, menus, preferences, launch UI
   src/io/github/kaluchi/jdtbridge/ui/
-    commands/                   Menu action handlers
-      LaunchAgentHandler.java
-      HealthCheckHandler.java
-      SetupHooksHandler.java
-    launch/                     Launch configuration UI
-      AgentLaunchTabGroup.java
-      AgentTab.java             Provider + agent selection
-      ProjectScopeTab.java      Project filtering
-    views/
-      DashboardView.java        Health status + quick actions
-      ActivityMonitorView.java  Telemetry / request log
+    Activator.java              AbstractUIPlugin, preference store
+    BridgeConnection.java       Reads instance files for launch delegate
+    ProcessUtil.java            Process builder for jdt CLI commands
+    WelcomeStartupHandler.java  Startup check, version dialog
+    commands/
+      HealthCheckHandler.java   Bridge diagnostics command
+      NewAgentHandler.java      New agent launch dialog
+      OpenTerminalHandler.java  System terminal with bridge env vars
+    launch/
+      AgentLaunchDelegate.java  ILaunchConfigurationDelegate2
+      AgentTab.java             Provider + agent selection tab
+      AgentTabGroup.java        Tab group for agent launch configs
+    menus/
+      AgentConfigsContribution.java  Dynamic menu: saved agent configs
+      EditAgentContribution.java     Dynamic menu: edit configurations
     preferences/
-      BridgePreferencePage.java
-    onboarding/
-      OnboardingWizard.java     First-run wizard (replaces browser welcome)
+      BridgePreferencePage.java      Dual socket preference page
+      PreferenceConstants.java       Delegates to ServerPreferences
+      PreferenceInitializer.java     Default values
 ```
 
 ---
 
 ## 16. HTTP Server Preferences
 
-### Problem
+See [bridge-ui-preferences-spec.md](bridge-ui-preferences-spec.md).
 
-The bridge HTTP server binds to `127.0.0.1:0` (loopback, random port).
-Docker containers using `--add-host=host.docker.internal:host-gateway`
-cannot reach loopback — traffic arrives on the host's gateway interface.
-Custom agent setups (non-sandbox provider) need configurable bind address
-and predictable ports for firewall/networking rules.
-
-See [kaluchi/jdtbridge#93](https://github.com/kaluchi/jdtbridge/issues/93).
-
-### Preferences
-
-Stored per-workspace via Eclipse `InstanceScope` preferences.
-Each Eclipse instance reads its own workspace preferences at startup
-and on preference change (hot rebind).
-
-| Preference | Key | Default | Values |
-|---|---|---|---|
-| Bind address | `httpBindAddress` | `loopback` | `loopback`, `all` |
-| Fixed port | `httpFixedPort` | `0` | 0 (auto) or 1024–65535 |
-
-Preference node: `io.github.kaluchi.jdtbridge.ui` (UI bundle ID).
-Plugin reads via `InstanceScope.INSTANCE.getNode(uiBundleId)` — no
-UI dependency, headless-safe.
-
-### Preference page UI
-
-Window > Preferences > JDT Bridge:
-
-```
-JDT Bridge settings for AI agent integration.
-
-Terminal command:     [wt.exe                    ]
-
-── HTTP Server ─────────────────────────────────
-Bind address:  (•) Loopback only (127.0.0.1)
-               ( ) All interfaces (0.0.0.0)
-
-⚠ All interfaces exposes the bridge to your
-  network. Use only with trusted networks.
-
-Port:  [0         ]  [Check]
-0 = auto-assigned by OS on each restart.
-Fixed port enables stable Docker/firewall rules.
-```
-
-- **Bind address** — radio buttons. Security warning shown dynamically
-  when "All interfaces" is selected.
-- **Port** — integer field with Check button. Validates range
-  (0 or 1024–65535). Check probes `new ServerSocket(port).close()` to
-  test availability.
-- **Port conflict** — if configured port is in use at startup, server
-  falls back to auto-assigned port with a log warning. Instance file
-  always contains the actual port, not the configured one.
-
-### Hot rebind (no Eclipse restart)
-
-When preferences change:
-
-1. `PreferenceChangeListener` in plugin fires
-2. Plugin calls `HttpServer.rebind(newAddress, newPort)`
-3. `rebind()` opens new `ServerSocket`, then closes old one
-4. Plugin rewrites instance file with new port
-5. CLI discovers new port via instance file on next command
-
-In-flight requests on the old socket complete normally (executor
-thread pool stays alive). New connections go to the new socket.
-
-### Running agents warning
-
-Before applying changes, preference page checks for running agent
-launches via `DebugPlugin.getDefault().getLaunchManager().getLaunches()`.
-If any non-terminated JDT Bridge Agent launches exist, shows warning:
-
-```
-Running agents detected.
-Running agents will keep using the old connection.
-Restart them to use the new bind address/port.
-```
-
-Agents launched from Eclipse have `JDT_BRIDGE_PORT/TOKEN` baked into
-their environment at launch time. They cannot pick up the new port
-without restart.
-
-### Architecture
-
-```
-UI bundle (preferences page)
-  │ writes to InstanceScope
-  ▼
-workspace/.metadata/.plugins/.../io.github.kaluchi.jdtbridge.ui.prefs
-  │ PreferenceChangeListener
-  ▼
-Plugin bundle (HttpServer)
-  │ rebind(address, port)
-  ▼
-~/.jdtbridge/instances/<hash>.json  (rewritten with new port)
-  │ discovery
-  ▼
-CLI (jdt commands resolve new port)
-```
-
-No circular dependency. Plugin reads preferences from UI bundle's
-node via `InstanceScope` (string-based node ID, no class import).
-
-### Files
-
-Plugin:
-  HttpServer.java              — start(address, port), rebind(), getBindAddress()
-  Activator.java               — reads preferences, registers listener, triggers rebind
-  Log.java                     — existing logging (warn on port conflict)
-
-UI:
-  preferences/PreferenceConstants.java  — HTTP_BIND_ADDRESS, HTTP_FIXED_PORT
-  preferences/PreferenceInitializer.java — defaults (loopback, 0)
-  preferences/BridgePreferencePage.java  — custom layout with radio, Check button, warnings
+Two sockets (local loopback + optional remote), per-socket token
+management, dual socket architecture, hot rebind.
 
 ---
 
