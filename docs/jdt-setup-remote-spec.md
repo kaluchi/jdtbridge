@@ -106,13 +106,13 @@ Wrote ~/.jdtbridge/instances/remote-a1b2c3.json:
   bridge-socket: host.docker.internal:7777
   token:         ******bc123
 
-Scanning mount points...
+Scanning mount points for .project files...
 
-  MOUNT_POINT      PROJECT                     LOCAL_PATH
-  /mnt/workspace   inside                      /mnt/workspace/inside
-  /mnt/m8          myapp-core                  /mnt/m8/myapp-core
-  /mnt/m8          myapp-server                /mnt/m8/myapp-server
-  /mnt/m8          myapp-shared                /mnt/m8/myapp-shared
+  PROJECT          LOCAL_PATH                   MOUNT_POINT
+  inside           /mnt/workspace/inside        /mnt/workspace
+  myapp-core       /mnt/m8/myapp-core           /mnt/m8
+  myapp-server     /mnt/m8/myapp-server         /mnt/m8
+  myapp-shared     /mnt/m8/myapp-shared         /mnt/m8
 
 4 projects cached.
 ```
@@ -134,10 +134,10 @@ $ jdt setup remote --bridge-socket host.docker.internal:7777 \
 Updated ~/.jdtbridge/instances/remote-a1b2c3.json:
   mount-points: added /mnt/automation
 
-Scanning /mnt/automation...
+Scanning /mnt/automation for .project files...
 
-  MOUNT_POINT       PROJECT      LOCAL_PATH
-  /mnt/automation   automation   /mnt/automation
+  PROJECT      LOCAL_PATH         MOUNT_POINT
+  automation   /mnt/automation    /mnt/automation
 
 1 project cached. Total: 5 projects.
 ```
