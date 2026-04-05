@@ -144,16 +144,23 @@ terminal  0679187d-a3ea-4c9...  D:\eclipse-workspace-jdtbridge  active  2026-04-
 
 ### Remote instances
 
-When `jdt setup remote` creates an instance file (e.g. inside
-a Docker container), `jdt use` shows it alongside local instances.
-See [jdt-setup-spec.md](jdt-setup-spec.md) for remote setup details.
+`jdt use` must be fast — no network probes. It reads instance
+files and checks local PID liveness only.
+
+For remote instances (from `~/.jdtbridge/remote-instances/`):
+- STATUS = `remote` (no probe, no PID to check)
+- To verify connection: `jdt setup remote --check`
+- Switching works the same: `jdt use <N>` or `jdt use <alias>`
+
+See [jdt-setup-remote-spec.md](jdt-setup-remote-spec.md) for
+remote setup and `--check`.
 
 Example inside a Linux container connected to a remote Eclipse:
 
 ```
 $ jdt use
 #  ALIAS  WORKSPACE   STATUS  PINNED  HOST                    PORT   PLUGIN
-1         /workspace  online  pinned  host.docker.internal    7777   2.5.0
+1         /workspace  remote  pinned  host.docker.internal    7777   2.5.0
 ```
 
 Multiple remote Eclipse instances:
@@ -161,9 +168,9 @@ Multiple remote Eclipse instances:
 ```
 $ jdt use
 #  ALIAS  WORKSPACE        STATUS   PINNED  HOST                    PORT   PLUGIN
-1  dev    /mnt/dev         online   pinned  host.docker.internal    7777   2.5.0
-2  stage  /mnt/staging     online           192.168.1.100           8888   2.4.0
-3  prod   /mnt/production  offline          10.0.0.5                9999
+1  dev    /mnt/dev         remote   pinned  host.docker.internal    7777   2.5.0
+2  stage  /mnt/staging     remote           192.168.1.100           8888   2.4.0
+3  prod   /mnt/production  remote           10.0.0.5                9999
 ```
 
 Switching works the same as local: `jdt use 2` or `jdt use stage`.
