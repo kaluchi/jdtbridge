@@ -268,8 +268,8 @@ describe("setup command", () => {
       );
     });
 
-    it("does not restart Eclipse if it was not running", async () => {
-      const startEclipseFn = vi.fn();
+    it("starts Eclipse even if it was not running before install", async () => {
+      const startEclipseFn = vi.fn().mockReturnValue(12345);
       mockDeps({
         eclipse: {
           isEclipseRunning: () => false,
@@ -278,10 +278,7 @@ describe("setup command", () => {
       });
       const { setup } = await importSetup();
       await setup(["--skip-build"]);
-      expect(startEclipseFn).not.toHaveBeenCalled();
-      expect(
-        io.logs.some((l) => l.includes("Start Eclipse to activate")),
-      ).toBe(true);
+      expect(startEclipseFn).toHaveBeenCalled();
     });
 
     it("shows Setup complete on success", async () => {

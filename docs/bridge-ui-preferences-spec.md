@@ -30,15 +30,15 @@ JDT Bridge settings for AI agent integration.
 
 Terminal command:  [wt.exe]
 
-┌ Local 127.0.0.1 [x] (always on) ──────────────────────┐
-│ Port:   [7777        ]  Copy  Check                    │
-│ Token:  [******b7173 ]  Copy  Replace...               │
+┌ Local 127.0.0.1 [x] ──────────────────────────────────┐
+│ Port:   [auto → :52311 listening ]  Copy Replace Check │
+│ Token:  [******b7173             ]  Copy Replace...    │
 │ [x] Regenerate token on Eclipse restart                │
 └────────────────────────────────────────────────────────┘
 
-┌ Remote 0.0.0.0 [ ] (disabled) ─────────────────────────┐
-│ Port:   [8888        ]  Copy  Check                    │
-│ Token:  [******c123  ]  Copy  Replace...               │
+┌ Remote 0.0.0.0 [ ] ───────────────────────────────────┐
+│ Port:   [8888 listening          ]  Copy Replace Check │
+│ Token:  [******c123              ]  Copy Replace...    │
 │ [ ] Regenerate token on Eclipse restart                │
 │                                                        │
 │ ⚠ Binds to all interfaces. Traffic is not encrypted.  │
@@ -50,21 +50,61 @@ Terminal command:  [wt.exe]
 └────────────────────────────────────────────────────────┘
 ```
 
+### Port field
+
+Read-only text field doubles as status display. Shows configured
+port, live port (when different), and server state in one line.
+
+Format by state:
+
+| Configured | Live state | Field text |
+|------------|------------|------------|
+| `0` (auto) | running on 52311 | `auto → :52311 listening` |
+| `0` (auto) | not started | `auto` |
+| `8888` | running on 8888 | `8888 pinned, listening` |
+| `8888` | not started | `8888 pinned` |
+| `8888` | check failed | `8888 pinned, connection refused` |
+| any | remote disabled | `8888 disabled` |
+
+Populated on page open from `Activator.getInstance()`.
+Updated after Check button probe.
+
+- **Copy** — copies the actual running port (from Activator),
+  not the configured value. Useful when port is 0 (auto).
+- **Replace...** — opens InputDialog with validation:
+  - Digits only
+  - Local: 0 (auto) or 1024–65535
+  - Remote: 1024–65535 only (0 not allowed)
+  - Must differ from the other socket's port
+  After OK, field updates with new configured value + refreshed status.
+- **Check** — HTTP `GET /status` to the server's actual port on the
+  socket's bind address. Verifies the server is reachable through the
+  OS network stack. Updates the port field text with result.
+
+### Token field
+
+Read-only. Masked display (******xxxxx, last 5 chars).
+
+- **Copy** — copies full unmasked token to clipboard
+- **Replace...** — opens InputDialog. Empty input = auto-generate.
+
+### Group headers
+
+No status label in headers — all status is in the port field.
+
+- **Local** — checkbox always checked, disabled (can't turn off)
+- **Remote** — checkbox toggles section. When unchecked, all
+  controls grayed out, port field shows `<port> disabled`
+
+### Per-section behavior
+
 **Local section:**
 - Always on (checkbox disabled, checked)
-- Port 0 = auto-assigned. Copy copies actual running port.
-  Check shows actual port from `Activator.getInstance().getLocalPort()`
-- Token read-only field with masked value (******xxxxx)
-- Copy copies full token to clipboard
-- Replace... opens dialog (empty = auto-generate on OK)
-- Regenerate checkbox on by default (current behavior)
+- Regenerate checkbox on by default
 
 **Remote section:**
 - Checkbox enables/disables entire section
-- When disabled: all controls grayed out
-- Port must be fixed (1024–65535), 0 not allowed for remote
-- Port must differ from local port
-- Token management identical to local
+- When disabled: all controls grayed out, port field shows "disabled"
 - Regenerate checkbox off by default (fixed token for containers)
 - Warning text about security
 

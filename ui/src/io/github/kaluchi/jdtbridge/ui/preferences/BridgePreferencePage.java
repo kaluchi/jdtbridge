@@ -1,7 +1,5 @@
 package io.github.kaluchi.jdtbridge.ui.preferences;
 
-import java.net.InetAddress;
-import java.net.ServerSocket;
 import java.security.SecureRandom;
 import java.util.Arrays;
 
@@ -39,17 +37,16 @@ public class BridgePreferencePage extends PreferencePage
 	// Local socket controls
 	private Text localPortField;
 	private Text localTokenField;
-	private Label localPortStatusLabel;
 	private Button localRegenerateTokenCheckbox;
+	private int localConfiguredPort;
 
 	// Remote socket controls
 	private Button remoteEnabledCheckbox;
 	private Text remotePortField;
 	private Text remoteTokenField;
-	private Label remotePortStatusLabel;
 	private Button remoteRegenerateTokenCheckbox;
 	private Composite remoteContent;
-	private Label remoteStatusLabel;
+	private int remoteConfiguredPort;
 
 	public BridgePreferencePage() {
 		setDescription("JDT Bridge settings for AI agent integration.");
@@ -96,7 +93,7 @@ public class BridgePreferencePage extends PreferencePage
 				new GridData(SWT.FILL, SWT.CENTER, true, false));
 
 		Composite localHeader = new Composite(localGroup, SWT.NONE);
-		localHeader.setLayout(new GridLayout(3, false));
+		localHeader.setLayout(new GridLayout(2, false));
 		localHeader.setLayoutData(
 				new GridData(SWT.FILL, SWT.CENTER, true, false));
 
@@ -106,9 +103,6 @@ public class BridgePreferencePage extends PreferencePage
 		Button localEnabledCheckbox = new Button(localHeader, SWT.CHECK);
 		localEnabledCheckbox.setSelection(true);
 		localEnabledCheckbox.setEnabled(false);
-
-		Label localStatusLabel = new Label(localHeader, SWT.NONE);
-		localStatusLabel.setText("(always on)");
 
 		Composite localContent = new Composite(localGroup, SWT.NONE);
 		localContent.setLayout(new GridLayout(6, false));
@@ -122,7 +116,8 @@ public class BridgePreferencePage extends PreferencePage
 		localPortLabelLayout.widthHint = 40;
 		localPortLabel.setLayoutData(localPortLabelLayout);
 
-		localPortField = new Text(localContent, SWT.BORDER);
+		localPortField = new Text(
+				localContent, SWT.BORDER | SWT.READ_ONLY);
 		GridData localPortLayout = new GridData(
 				SWT.LEFT, SWT.CENTER, false, false);
 		localPortLayout.widthHint = 200;
@@ -132,27 +127,17 @@ public class BridgePreferencePage extends PreferencePage
 		localPortCopyButton.setText("Copy");
 		localPortCopyButton.addSelectionListener(new SelectionAdapter() {
 			@Override
-			public void widgetSelected(SelectionEvent selectionEvent) {
+			public void widgetSelected(SelectionEvent e) {
 				copyActualPort(true);
 			}
 		});
 
-		Button localPortCheckButton = new Button(localContent, SWT.PUSH);
-		localPortCheckButton.setText("Check");
-		localPortCheckButton.addSelectionListener(new SelectionAdapter() {
-			@Override
-			public void widgetSelected(SelectionEvent selectionEvent) {
-				checkPortAvailability(localPortField,
-						localPortStatusLabel,
-						InetAddress.getLoopbackAddress());
-			}
-		});
+		createPortReplaceButton(localContent, localPortField, true);
 
-		localPortStatusLabel = new Label(localContent, SWT.NONE);
-		GridData localPortStatusLayout = new GridData(
-				SWT.LEFT, SWT.CENTER, false, false);
-		localPortStatusLayout.horizontalSpan = 2;
-		localPortStatusLabel.setLayoutData(localPortStatusLayout);
+		createPortCheckButton(localContent, localPortField, true);
+
+		// spacer for 6th column
+		new Label(localContent, SWT.NONE);
 
 		// Token
 		Label localTokenLabel = new Label(localContent, SWT.NONE);
@@ -161,7 +146,8 @@ public class BridgePreferencePage extends PreferencePage
 		localTokenLabelLayout.widthHint = 40;
 		localTokenLabel.setLayoutData(localTokenLabelLayout);
 
-		localTokenField = new Text(localContent, SWT.BORDER | SWT.READ_ONLY);
+		localTokenField = new Text(
+				localContent, SWT.BORDER | SWT.READ_ONLY);
 		GridData localTokenLayout = new GridData(
 				SWT.LEFT, SWT.CENTER, false, false);
 		localTokenLayout.widthHint = 200;
@@ -170,7 +156,8 @@ public class BridgePreferencePage extends PreferencePage
 		createTokenButtons(localContent, localTokenField);
 
 		// Regenerate checkbox
-		localRegenerateTokenCheckbox = new Button(localContent, SWT.CHECK);
+		localRegenerateTokenCheckbox = new Button(
+				localContent, SWT.CHECK);
 		localRegenerateTokenCheckbox.setText(
 				"Regenerate token on Eclipse restart");
 		GridData localRegenLayout = new GridData();
@@ -185,7 +172,7 @@ public class BridgePreferencePage extends PreferencePage
 				new GridData(SWT.FILL, SWT.CENTER, true, false));
 
 		Composite remoteHeader = new Composite(remoteGroup, SWT.NONE);
-		remoteHeader.setLayout(new GridLayout(3, false));
+		remoteHeader.setLayout(new GridLayout(2, false));
 		remoteHeader.setLayoutData(
 				new GridData(SWT.FILL, SWT.CENTER, true, false));
 
@@ -193,9 +180,6 @@ public class BridgePreferencePage extends PreferencePage
 		remoteLabel.setText("Remote 0.0.0.0");
 
 		remoteEnabledCheckbox = new Button(remoteHeader, SWT.CHECK);
-
-		remoteStatusLabel = new Label(remoteHeader, SWT.NONE);
-		remoteStatusLabel.setText("(disabled)");
 
 		remoteContent = new Composite(remoteGroup, SWT.NONE);
 		remoteContent.setLayout(new GridLayout(6, false));
@@ -209,7 +193,8 @@ public class BridgePreferencePage extends PreferencePage
 		remotePortLabelLayout.widthHint = 40;
 		remotePortLabel.setLayoutData(remotePortLabelLayout);
 
-		remotePortField = new Text(remoteContent, SWT.BORDER);
+		remotePortField = new Text(
+				remoteContent, SWT.BORDER | SWT.READ_ONLY);
 		GridData remotePortLayout = new GridData(
 				SWT.LEFT, SWT.CENTER, false, false);
 		remotePortLayout.widthHint = 200;
@@ -221,33 +206,17 @@ public class BridgePreferencePage extends PreferencePage
 		remotePortCopyButton.addSelectionListener(
 				new SelectionAdapter() {
 			@Override
-			public void widgetSelected(SelectionEvent selectionEvent) {
+			public void widgetSelected(SelectionEvent e) {
 				copyActualPort(false);
 			}
 		});
 
-		Button remotePortCheckButton = new Button(
-				remoteContent, SWT.PUSH);
-		remotePortCheckButton.setText("Check");
-		remotePortCheckButton.addSelectionListener(
-				new SelectionAdapter() {
-			@Override
-			public void widgetSelected(SelectionEvent selectionEvent) {
-				try {
-					checkPortAvailability(remotePortField,
-							remotePortStatusLabel,
-							InetAddress.getByName("0.0.0.0"));
-				} catch (Exception addressException) {
-					remotePortStatusLabel.setText("error");
-				}
-			}
-		});
+		createPortReplaceButton(remoteContent, remotePortField, false);
 
-		remotePortStatusLabel = new Label(remoteContent, SWT.NONE);
-		GridData remotePortStatusLayout = new GridData(
-				SWT.LEFT, SWT.CENTER, false, false);
-		remotePortStatusLayout.horizontalSpan = 2;
-		remotePortStatusLabel.setLayoutData(remotePortStatusLayout);
+		createPortCheckButton(remoteContent, remotePortField, false);
+
+		// spacer for 6th column
+		new Label(remoteContent, SWT.NONE);
 
 		// Token
 		Label remoteTokenLabel = new Label(remoteContent, SWT.NONE);
@@ -272,8 +241,7 @@ public class BridgePreferencePage extends PreferencePage
 				"Regenerate token on Eclipse restart");
 		GridData remoteRegenLayout = new GridData();
 		remoteRegenLayout.horizontalSpan = 6;
-		remoteRegenerateTokenCheckbox.setLayoutData(
-				remoteRegenLayout);
+		remoteRegenerateTokenCheckbox.setLayoutData(remoteRegenLayout);
 
 		// Warning
 		Label remoteWarningLabel = new Label(remoteContent, SWT.WRAP);
@@ -295,36 +263,185 @@ public class BridgePreferencePage extends PreferencePage
 		remoteEnabledCheckbox.addSelectionListener(
 				new SelectionAdapter() {
 			@Override
-			public void widgetSelected(SelectionEvent selectionEvent) {
+			public void widgetSelected(SelectionEvent e) {
 				boolean remoteSelected =
 						remoteEnabledCheckbox.getSelection();
 				setRemoteContentEnabled(remoteSelected);
-				remoteStatusLabel.setText(
-						remoteSelected ? "(enabled)" : "(disabled)");
-				remoteStatusLabel.getParent().layout();
+				updatePortStatus(remotePortField,
+						remoteConfiguredPort, false,
+						remoteSelected);
 			}
 		});
 	}
 
-	private void createTokenButtons(Composite parent,
-			Text tokenField) {
+	private void createPortReplaceButton(Composite parent,
+			Text portField, boolean isLocal) {
+		Button replaceButton = new Button(parent, SWT.PUSH);
+		replaceButton.setText("Replace...");
+		replaceButton.addSelectionListener(new SelectionAdapter() {
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				int currentPort = isLocal
+						? localConfiguredPort : remoteConfiguredPort;
+				InputDialog portDialog = new InputDialog(
+						getShell(), "Replace Port",
+						isLocal
+								? "Enter port (0 = auto-assigned by OS):"
+								: "Enter port (1024\u201365535, required):",
+						String.valueOf(currentPort),
+						newValue -> validatePortInput(
+								newValue, isLocal));
+				if (portDialog.open() == Window.OK) {
+					int newPort = Integer.parseInt(
+							portDialog.getValue().trim());
+					if (isLocal) {
+						localConfiguredPort = newPort;
+					} else {
+						remoteConfiguredPort = newPort;
+					}
+					boolean enabled = isLocal
+							|| remoteEnabledCheckbox.getSelection();
+					updatePortStatus(portField, newPort, isLocal,
+							enabled);
+				}
+			}
+		});
+	}
+
+	private void createPortCheckButton(Composite parent,
+			Text portField, boolean isLocal) {
+		Button checkButton = new Button(parent, SWT.PUSH);
+		checkButton.setText("Check");
+		checkButton.addSelectionListener(new SelectionAdapter() {
+			@Override
+			public void widgetSelected(SelectionEvent e) {
+				int configuredPort = isLocal
+						? localConfiguredPort : remoteConfiguredPort;
+				boolean enabled = isLocal
+						|| remoteEnabledCheckbox.getSelection();
+				var pluginActivator =
+						io.github.kaluchi.jdtbridge.Activator
+								.getInstance();
+				if (pluginActivator == null) {
+					portField.setText(formatPortStatus(
+							configuredPort, -1, "not connected",
+							enabled));
+					return;
+				}
+				int actualPort = isLocal
+						? pluginActivator.getLocalPort()
+						: pluginActivator.getRemotePort();
+				if (actualPort <= 0) {
+					portField.setText(formatPortStatus(
+							configuredPort, 0, null, enabled));
+					return;
+				}
+				String bindHost = isLocal
+						? "127.0.0.1" : "0.0.0.0";
+				try (var socket = new java.net.Socket()) {
+					socket.connect(
+							new java.net.InetSocketAddress(
+									bindHost, actualPort), 2000);
+					var out = socket.getOutputStream();
+					out.write(("GET /status HTTP/1.1\r\nHost: "
+							+ bindHost + ":" + actualPort
+							+ "\r\n\r\n").getBytes());
+					out.flush();
+					byte[] buf = new byte[256];
+					socket.setSoTimeout(2000);
+					int bytesRead = socket.getInputStream().read(buf);
+					String response = new String(buf, 0,
+							Math.max(bytesRead, 0));
+					String status = response.contains("200")
+							? "listening" : response.split("\r?\n")[0];
+					portField.setText(formatPortStatus(
+							configuredPort, actualPort, status,
+							enabled));
+				} catch (Exception probeException) {
+					portField.setText(formatPortStatus(
+							configuredPort, actualPort,
+							probeException.getMessage(), enabled));
+				}
+			}
+		});
+	}
+
+	private void updatePortStatus(Text portField,
+			int configuredPort, boolean isLocal, boolean enabled) {
+		var pluginActivator =
+				io.github.kaluchi.jdtbridge.Activator.getInstance();
+		int actualPort = 0;
+		String status = null;
+		if (pluginActivator != null) {
+			actualPort = isLocal
+					? pluginActivator.getLocalPort()
+					: pluginActivator.getRemotePort();
+			if (actualPort > 0) status = "listening";
+		}
+		portField.setText(formatPortStatus(
+				configuredPort, actualPort, status, enabled));
+	}
+
+	private static String formatPortStatus(int configuredPort,
+			int actualPort, String status, boolean enabled) {
+		if (!enabled) {
+			return configuredPort == 0
+					? "auto, disabled"
+					: configuredPort + " disabled";
+		}
+		StringBuilder sb = new StringBuilder();
+		if (configuredPort == 0) {
+			sb.append("auto");
+			if (actualPort > 0) {
+				sb.append(" \u2192 :").append(actualPort);
+			}
+		} else {
+			sb.append(configuredPort).append(" pinned");
+		}
+		if (status != null) {
+			sb.append(", ").append(status);
+		}
+		return sb.toString();
+	}
+
+	private String validatePortInput(String portText, boolean isLocal) {
+		String trimmed = portText.trim();
+		if (trimmed.isEmpty()) return "Port cannot be empty.";
+		if (!trimmed.chars().allMatch(Character::isDigit))
+			return "Port must be a number.";
+		try {
+			int portNumber = Integer.parseInt(trimmed);
+			if (isLocal && portNumber == 0) return null;
+			if (!isLocal && portNumber == 0)
+				return "Remote port must be fixed (1024\u201365535).";
+			if (portNumber < 1024 || portNumber > 65535)
+				return "Port must be 0 (auto) or 1024\u201365535.";
+			// Cross-check: remote port != local port
+			Text otherField = isLocal ? remotePortField : localPortField;
+			if (otherField != null) {
+				String otherText = otherField.getText().trim();
+				try {
+					int otherPort = Integer.parseInt(otherText);
+					if (otherPort != 0 && portNumber == otherPort)
+						return "Must differ from the other socket's port.";
+				} catch (NumberFormatException nfe) { /* ignore */ }
+			}
+			return null;
+		} catch (NumberFormatException nfe) {
+			return "Port must be a number.";
+		}
+	}
+
+	private void createTokenButtons(Composite parent, Text tokenField) {
 		Button copyButton = new Button(parent, SWT.PUSH);
 		copyButton.setText("Copy");
 		copyButton.addSelectionListener(new SelectionAdapter() {
 			@Override
-			public void widgetSelected(SelectionEvent selectionEvent) {
+			public void widgetSelected(SelectionEvent e) {
 				String fullToken = (String) tokenField.getData(
 						"fullToken");
 				if (fullToken != null && !fullToken.isEmpty()) {
-					org.eclipse.swt.dnd.Clipboard clipboard =
-							new org.eclipse.swt.dnd.Clipboard(
-									getShell().getDisplay());
-					clipboard.setContents(
-							new Object[] { fullToken },
-							new org.eclipse.swt.dnd.Transfer[] {
-								org.eclipse.swt.dnd.TextTransfer
-										.getInstance() });
-					clipboard.dispose();
+					copyToClipboard(fullToken);
 				}
 			}
 		});
@@ -333,7 +450,7 @@ public class BridgePreferencePage extends PreferencePage
 		replaceButton.setText("Replace...");
 		replaceButton.addSelectionListener(new SelectionAdapter() {
 			@Override
-			public void widgetSelected(SelectionEvent selectionEvent) {
+			public void widgetSelected(SelectionEvent e) {
 				InputDialog replaceDialog = new InputDialog(
 						getShell(), "Replace Token",
 						"Enter token (leave empty to auto-generate):",
@@ -348,7 +465,6 @@ public class BridgePreferencePage extends PreferencePage
 				}
 			}
 		});
-
 	}
 
 	private void setRemoteContentEnabled(boolean enabled) {
@@ -371,8 +487,8 @@ public class BridgePreferencePage extends PreferencePage
 				store.getString(PreferenceConstants.TERMINAL_COMMAND));
 
 		// Local
-		int localPort = store.getInt(PreferenceConstants.LOCAL_PORT);
-		localPortField.setText(String.valueOf(localPort));
+		localConfiguredPort = store.getInt(
+				PreferenceConstants.LOCAL_PORT);
 		localRegenerateTokenCheckbox.setSelection(
 				store.getBoolean(
 						PreferenceConstants.LOCAL_REGENERATE_TOKEN));
@@ -380,8 +496,7 @@ public class BridgePreferencePage extends PreferencePage
 				PreferenceConstants.LOCAL_TOKEN);
 		if (localToken.isEmpty()) {
 			var pluginActivator =
-					io.github.kaluchi.jdtbridge.Activator
-							.getInstance();
+					io.github.kaluchi.jdtbridge.Activator.getInstance();
 			if (pluginActivator != null) {
 				localToken = pluginActivator.getLocalToken();
 				if (localToken == null) localToken = "";
@@ -390,15 +505,15 @@ public class BridgePreferencePage extends PreferencePage
 		localTokenField.setText(
 				localToken.isEmpty() ? "(auto)" : maskToken(localToken));
 		localTokenField.setData("fullToken", localToken);
+		updatePortStatus(localPortField, localConfiguredPort,
+				true, true);
 
 		// Remote
 		boolean remoteEnabled = store.getBoolean(
 				PreferenceConstants.REMOTE_ENABLED);
 		remoteEnabledCheckbox.setSelection(remoteEnabled);
-		remoteStatusLabel.setText(
-				remoteEnabled ? "(enabled)" : "(disabled)");
-		remotePortField.setText(String.valueOf(
-				store.getInt(PreferenceConstants.REMOTE_PORT)));
+		remoteConfiguredPort = store.getInt(
+				PreferenceConstants.REMOTE_PORT);
 		remoteRegenerateTokenCheckbox.setSelection(
 				store.getBoolean(
 						PreferenceConstants.REMOTE_REGENERATE_TOKEN));
@@ -406,8 +521,7 @@ public class BridgePreferencePage extends PreferencePage
 				PreferenceConstants.REMOTE_TOKEN);
 		if (remoteToken.isEmpty()) {
 			var pluginActivator =
-					io.github.kaluchi.jdtbridge.Activator
-							.getInstance();
+					io.github.kaluchi.jdtbridge.Activator.getInstance();
 			if (pluginActivator != null) {
 				String liveRemoteToken =
 						pluginActivator.getRemoteToken();
@@ -423,27 +537,20 @@ public class BridgePreferencePage extends PreferencePage
 		remoteTokenField.setData("fullToken", remoteToken);
 
 		setRemoteContentEnabled(remoteEnabled);
+		updatePortStatus(remotePortField, remoteConfiguredPort,
+				false, remoteEnabled);
 	}
 
 	@Override
 	public boolean performOk() {
-		if (!validatePort(localPortField, "Local port"))
-			return false;
 		if (remoteEnabledCheckbox.getSelection()) {
-			if (!validatePort(remotePortField, "Remote port"))
-				return false;
-			int remotePortValue = Integer.parseInt(
-					remotePortField.getText().trim());
-			if (remotePortValue == 0) {
+			if (remoteConfiguredPort == 0) {
 				setErrorMessage(
-						"Remote port must be fixed (1024\u201365535)."
-						+ " Auto-assign not supported for remote.");
+						"Remote port must be fixed (1024\u201365535).");
 				return false;
 			}
-			int localPortValue = Integer.parseInt(
-					localPortField.getText().trim());
-			if (localPortValue != 0
-					&& localPortValue == remotePortValue) {
+			if (localConfiguredPort != 0
+					&& localConfiguredPort == remoteConfiguredPort) {
 				setErrorMessage(
 						"Remote port must differ from local port.");
 				return false;
@@ -458,7 +565,7 @@ public class BridgePreferencePage extends PreferencePage
 
 		// Local
 		store.setValue(PreferenceConstants.LOCAL_PORT,
-				Integer.parseInt(localPortField.getText().trim()));
+				localConfiguredPort);
 		store.setValue(PreferenceConstants.LOCAL_REGENERATE_TOKEN,
 				localRegenerateTokenCheckbox.getSelection());
 		String localFullToken = (String) localTokenField.getData(
@@ -472,7 +579,7 @@ public class BridgePreferencePage extends PreferencePage
 		store.setValue(PreferenceConstants.REMOTE_ENABLED,
 				remoteEnabledCheckbox.getSelection());
 		store.setValue(PreferenceConstants.REMOTE_PORT,
-				Integer.parseInt(remotePortField.getText().trim()));
+				remoteConfiguredPort);
 		store.setValue(PreferenceConstants.REMOTE_REGENERATE_TOKEN,
 				remoteRegenerateTokenCheckbox.getSelection());
 		String remoteFullToken = (String) remoteTokenField.getData(
@@ -492,79 +599,21 @@ public class BridgePreferencePage extends PreferencePage
 				store.getDefaultString(
 						PreferenceConstants.TERMINAL_COMMAND));
 
-		localPortField.setText("0");
+		localConfiguredPort = 0;
 		localRegenerateTokenCheckbox.setSelection(true);
 		localTokenField.setText("(auto)");
 		localTokenField.setData("fullToken", "");
+		updatePortStatus(localPortField, 0, true, true);
 
 		remoteEnabledCheckbox.setSelection(false);
-		remotePortField.setText("0");
+		remoteConfiguredPort = 0;
 		remoteRegenerateTokenCheckbox.setSelection(false);
 		remoteTokenField.setText("(not set)");
 		remoteTokenField.setData("fullToken", "");
 		setRemoteContentEnabled(false);
-
-		localPortStatusLabel.setText("");
-		remotePortStatusLabel.setText("");
+		updatePortStatus(remotePortField, 0, false, false);
 
 		super.performDefaults();
-	}
-
-	private boolean validatePort(Text portTextField, String portLabel) {
-		String portText = portTextField.getText().trim();
-		try {
-			int portNumber = Integer.parseInt(portText);
-			if (portNumber == 0) return true;
-			if (portNumber < 1024 || portNumber > 65535) {
-				setErrorMessage(
-						portLabel
-						+ " must be 0 (auto) or 1024\u201365535.");
-				return false;
-			}
-			setErrorMessage(null);
-			return true;
-		} catch (NumberFormatException invalidPortNumber) {
-			setErrorMessage(portLabel + " must be a number.");
-			return false;
-		}
-	}
-
-	private void checkPortAvailability(Text portTextField,
-			Label statusLabel, InetAddress probeAddress) {
-		String portText = portTextField.getText().trim();
-		try {
-			int portNumber = Integer.parseInt(portText);
-			if (portNumber == 0) {
-				var pluginActivator =
-						io.github.kaluchi.jdtbridge.Activator
-								.getInstance();
-				if (pluginActivator != null) {
-					int currentPort = probeAddress.isLoopbackAddress()
-							? pluginActivator.getLocalPort()
-							: pluginActivator.getRemotePort();
-					statusLabel.setText(currentPort > 0
-							? "current: " + currentPort
-							: "not running");
-				} else {
-					statusLabel.setText("auto");
-				}
-				statusLabel.getParent().layout();
-				return;
-			}
-			if (portNumber < 1024 || portNumber > 65535) {
-				statusLabel.setText("invalid range");
-				return;
-			}
-			try (ServerSocket portProbe = new ServerSocket(
-					portNumber, 1, probeAddress)) {
-				statusLabel.setText("available");
-			} catch (Exception portBindException) {
-				statusLabel.setText("in use");
-			}
-		} catch (NumberFormatException invalidPortNumber) {
-			statusLabel.setText("invalid");
-		}
-		statusLabel.getParent().layout();
 	}
 
 	private void warnRunningAgents() {
@@ -605,16 +654,19 @@ public class BridgePreferencePage extends PreferencePage
 					: pluginActivator.getRemotePort();
 		}
 		if (actualPort > 0) {
-			org.eclipse.swt.dnd.Clipboard clipboard =
-					new org.eclipse.swt.dnd.Clipboard(
-							getShell().getDisplay());
-			clipboard.setContents(
-					new Object[] { String.valueOf(actualPort) },
-					new org.eclipse.swt.dnd.Transfer[] {
-						org.eclipse.swt.dnd.TextTransfer
-								.getInstance() });
-			clipboard.dispose();
+			copyToClipboard(String.valueOf(actualPort));
 		}
+	}
+
+	private void copyToClipboard(String text) {
+		org.eclipse.swt.dnd.Clipboard clipboard =
+				new org.eclipse.swt.dnd.Clipboard(
+						getShell().getDisplay());
+		clipboard.setContents(
+				new Object[] { text },
+				new org.eclipse.swt.dnd.Transfer[] {
+					org.eclipse.swt.dnd.TextTransfer.getInstance() });
+		clipboard.dispose();
 	}
 
 	private static String maskToken(String fullToken) {
