@@ -17,10 +17,19 @@ instance. Creates instance files in `~/.jdtbridge/instances/`.
    - Updated file → `Updated <path>:` + only changed fields
    - Changed fields show `(was: <old value>)`
    - Fields where a default was applied explain why:
-     `(no --workspace, written from process working directory)`
      `(no --token, auto-generated and written)`
    - Explicitly provided fields show value only, no annotation
    - Never show unchanged fields in update mode
+
+3. **All paths are jdt-host absolute paths.** Agents work with
+   absolute paths on the machine where jdt CLI runs. Eclipse-side
+   paths (Windows drive letters, different mount points) must never
+   reach agent output. Every path returned by jdt commands is
+   translated to a jdt-host absolute path using project mappings.
+   This is why project mapping exists — to convert between Eclipse
+   filesystem and jdt-host filesystem. Without mapping, FQMN
+   commands work but file-path output shows untranslated Eclipse
+   paths which agents cannot use.
 
 ## Syntax
 
@@ -407,50 +416,108 @@ Keys match CLI flags. File `~/.jdtbridge/instances/remote-<hash>.json`:
 {
   "bridge-socket": "host.docker.internal:7777",
   "token": "abc123",
-  "workspace": "/mnt/workspace",
-  "repo": ["/mnt/myapp", "/mnt/infra"],
-  "map-project": {
-    "automation": "/mnt/automation",
-    "tools": "/mnt/tools"
-  }
+  "mount-points": ["/mnt/workspace", "/mnt/m8", "/mnt/automation"]
 }
 ```
-```
+
+`mount-points` — directories where CLI scans for `.project` files.
+Set via `--map-workspace`, `--map-repo`, or derived from
+`--map-project` parent directories.
 
 Existing local instance files (written by Eclipse plugin):
 ```json
 {
   "port": 7777,
   "token": "70a491b0730b087abbbbeb272e797af4",
+  "host": "127.0.0.1",
   "pid": 39488,
   "workspace": "D:\\eclipse-workspace-jdtbridge",
-  "version": "2.5.0.202604040656",
-  "location": "reference:file:plugins/io.github.kaluchi.jdtbridge_2.5.0.202604040656.jar"
+  "version": "2.5.0.202604050531",
+  "location": "reference:file:plugins/io.github.kaluchi.jdtbridge_2.5.0.202604050531.jar"
 }
 ```
 
-Both read by the same `discoverInstances()`. Remote files have
-`host` field (local files default to `127.0.0.1`). Remote files
-have `remote: true` flag. No `pid` (no local process).
+Both read by `discoverInstances()`. Remote files have `host`
+field with non-loopback address. No `pid` (no local process).
 
-## Path handling
+## Path resolution
 
-Most commands use FQMN — platform-independent, no path issues.
+### Problem
 
-Eclipse returns absolute paths in its filesystem format in
-responses. CLI translates for display via `toSandboxPath()`.
-
+Agents work with absolute paths on the jdt-host. Eclipse returns
+paths in its own filesystem format (`D:\git\myapp\src\Foo.java`).
 Commands that accept file paths (`jdt refresh`, `jdt format`)
-use project mappings to convert:
+receive jdt-host paths (`/mnt/m8/myapp-core/src/Foo.java`).
+Both directions need translation.
 
-When `jdt refresh /mnt/myapp/myapp-core/src/Foo.java` is called:
-1. CLI finds project `myapp-core` by matching localPath prefix
-2. Strips prefix: `src/Foo.java`
-3. Sends workspace-relative: `/myapp-core/src/Foo.java`
+### Project path cache
+
+File: `~/.jdtbridge/project-path-cache.json`
+
+```json
+{
+  "scannedAt": 1775367354940,
+  "mount-points": ["/mnt/workspace", "/mnt/m8"],
+  "projects": {
+    "myapp-core": "/mnt/m8/myapp-core",
+    "myapp-server": "/mnt/m8/myapp-server",
+    "inside": "/mnt/workspace/inside",
+    "automation": "/mnt/automation"
+  }
+}
+```
+
+Maps Eclipse project name → jdt-host absolute path.
+Built by scanning `mount-points` for `.project` files,
+reading `<name>` from each.
+
+### Cache lifecycle
+
+**Populate:** scan mount-points recursively (limited depth),
+find `.project` files, parse `<name>`, record directory path.
+Atomic write (temp file + rename) for concurrency safety.
+
+**Invalidate and rescan on:**
+- `--check` requested
+- mount-points in instance file changed
+- Cache miss (path doesn't match any cached project)
+- Cache file doesn't exist (first run)
+
+**No TTL.** Invalidation is event-driven only.
+
+### Resolution algorithm
+
+**Eclipse path → jdt-host path** (output translation):
+
+For each path in Eclipse response (refs, source, projects):
+1. Extract project name (first segment of workspace-relative path)
+2. Lookup in cache → replace Eclipse project root with local path
+3. Miss → rescan mount-points → retry
+4. Second miss → leave path untranslated
+
+**jdt-host path → workspace-relative path** (input translation):
+
+When `jdt refresh /mnt/m8/myapp-core/src/Foo.java`:
+1. Lookup cache by longest prefix match → project `myapp-core`
+   at `/mnt/m8/myapp-core`
+2. Strip prefix → `src/Foo.java`
+3. Send workspace-relative `/myapp-core/src/Foo.java` to server
 4. Server resolves via `IWorkspaceRoot.findMember()`
+5. Cache miss → rescan → retry → second miss → error
 
-Projects not mapped locally: FQMN commands work. File-path
-commands skip with warning.
+### Concurrency
+
+Multiple agents calling `jdt` commands in parallel:
+- Read cache: always consistent (atomic write guarantees)
+- Write cache: last writer wins, same data (same `.project` files)
+- Simultaneous rescan: redundant work, not incorrect
+
+### Performance
+
+Scan cost depends on mount point type:
+- Local SSD: ~60ms for 30 projects (measured)
+- Network mount / Docker bind over network: may be seconds
+- Cache eliminates repeated scans — one scan per new/changed project
 
 ## Relationship to other specs
 
