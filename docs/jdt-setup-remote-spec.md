@@ -570,8 +570,9 @@ $ jdt use
 1         /mnt/dev    online   pinned  host.docker.internal    7777   2.5.0
 2         /mnt/stage  online           192.168.1.100           8888   2.4.0
 
-WORKSPACE for remote instances = first mount-point from config.
-If no mount-points configured, shows bridge-socket as identifier.
+WORKSPACE for remote instances = mount-points from config,
+one per line (multiline cell). If no mount-points, shows
+bridge-socket.
 ```
 
 ## Token sources
