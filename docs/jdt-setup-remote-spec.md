@@ -69,9 +69,11 @@ jdt setup remote --bridge-socket host.docker.internal:7777 --token abc123 \
 ## Mount points
 
 `--add-mount-point <path>` — adds a directory to scan for
-`.project` files. Multiple allowed. Duplicates ignored.
+`.project` files. Multiple allowed. Idempotent — adding an
+already-present mount point rescans it without duplicating.
 
 `--remove-mount-point <path>` — removes a directory.
+Idempotent — removing an absent mount point is a no-op.
 Invalidates project path cache.
 
 On `--add-mount-point`: CLI immediately scans the directory,
