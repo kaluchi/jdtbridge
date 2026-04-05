@@ -19,9 +19,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Minimal HTTP server on a raw ServerSocket.
- * Handles GET requests, parses path + query params, dispatches to handlers.
- * Binds to loopback only — not reachable from the network.
+ * HTTP server on a raw ServerSocket.
+ * Handles GET and POST requests, dispatches to handlers.
+ * Supports configurable bind address and hot rebind.
  */
 public class HttpServer {
 

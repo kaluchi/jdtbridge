@@ -31,11 +31,11 @@ public class Activator implements BundleActivator {
     private HttpServer localServer;
     private HttpServer remoteServer;
     private Path localBridgeFile;
-    private Path remoteBridgeFile;
     private String localToken;
     private String remoteToken;
     private BundleContext bundleContext;
-    private volatile boolean rebindScheduled;
+    private final java.util.concurrent.atomic.AtomicBoolean
+            rebindScheduled = new java.util.concurrent.atomic.AtomicBoolean();
 
     @Override
     public void start(BundleContext context) throws Exception {
@@ -65,9 +65,6 @@ public class Activator implements BundleActivator {
         localServer = new HttpServer();
         localServer.setToken(localToken);
         localServer.start(InetAddress.getLoopbackAddress(), localPort);
-        localBridgeFile = writeBridgeFile(null,
-                localServer.getPort(), localToken, version, location,
-                "127.0.0.1");
         Log.info("Local server on 127.0.0.1:"
                 + localServer.getPort());
 
@@ -75,6 +72,8 @@ public class Activator implements BundleActivator {
         if (ServerPreferences.resolveRemoteEnabled()) {
             startRemoteServer(version, location);
         }
+
+        localBridgeFile = writeBridgeFile(version, location);
 
         registerPreferenceListener();
     }
@@ -87,9 +86,6 @@ public class Activator implements BundleActivator {
         remoteServer.setToken(remoteToken);
         remoteServer.start(InetAddress.getByName("0.0.0.0"),
                 remotePort);
-        remoteBridgeFile = writeBridgeFile("remote",
-                remoteServer.getPort(), remoteToken,
-                version, location, "0.0.0.0");
         Log.info("Remote server on 0.0.0.0:"
                 + remoteServer.getPort());
     }
@@ -98,14 +94,6 @@ public class Activator implements BundleActivator {
         if (remoteServer != null) {
             remoteServer.stop();
             remoteServer = null;
-        }
-        if (remoteBridgeFile != null) {
-            try { Files.deleteIfExists(remoteBridgeFile); }
-            catch (IOException deleteException) {
-                Log.warn("Failed to delete remote bridge file",
-                        deleteException);
-            }
-            remoteBridgeFile = null;
         }
     }
 
@@ -142,9 +130,8 @@ public class Activator implements BundleActivator {
         Log.info("HTTP server stopped");
     }
 
-    private Path writeBridgeFile(String socketType, int port,
-            String token, String version, String location,
-            String host) throws IOException {
+    private Path writeBridgeFile(String version, String location)
+            throws IOException {
         String workspace = ResourcesPlugin.getWorkspace().getRoot()
                 .getLocation().toOSString();
         long pid = ProcessHandle.current().pid();
@@ -154,15 +141,16 @@ public class Activator implements BundleActivator {
         Files.createDirectories(instancesDir);
 
         String hash = workspaceHash(workspace);
-        String filename = socketType != null
-                ? hash + "-" + socketType + ".json"
-                : hash + ".json";
-        Path bridgeFilePath = instancesDir.resolve(filename);
+        Path bridgeFilePath = instancesDir.resolve(hash + ".json");
 
         var obj = new JsonObject();
-        obj.addProperty("port", port);
-        obj.addProperty("token", token);
-        obj.addProperty("host", host);
+        obj.addProperty("port", localServer.getPort());
+        obj.addProperty("token", localToken);
+        obj.addProperty("host", "127.0.0.1");
+        if (remoteServer != null) {
+            obj.addProperty("remotePort", remoteServer.getPort());
+            obj.addProperty("remoteToken", remoteToken);
+        }
         obj.addProperty("pid", pid);
         obj.addProperty("workspace", workspace);
         obj.addProperty("version", version);
@@ -188,8 +176,7 @@ public class Activator implements BundleActivator {
     }
 
     private void scheduleRebind() {
-        if (rebindScheduled) return;
-        rebindScheduled = true;
+        if (!rebindScheduled.compareAndSet(false, true)) return;
         new Thread(() -> {
             try {
                 Thread.sleep(100);
@@ -197,7 +184,7 @@ public class Activator implements BundleActivator {
                 Thread.currentThread().interrupt();
                 return;
             }
-            rebindScheduled = false;
+            rebindScheduled.set(false);
             performRebind();
         }, "jdtbridge-rebind").start();
     }
@@ -210,12 +197,11 @@ public class Activator implements BundleActivator {
         // Local rebind
         if (localServer != null) {
             try {
+                localToken = resolveLocalToken();
                 int localPort = ServerPreferences.resolveLocalPort();
+                localServer.setToken(localToken);
                 localServer.rebind(
                         InetAddress.getLoopbackAddress(), localPort);
-                localBridgeFile = writeBridgeFile(null,
-                        localServer.getPort(), localToken,
-                        version, location, "127.0.0.1");
                 Log.info("Local server rebound to 127.0.0.1:"
                         + localServer.getPort());
             } catch (IOException localRebindException) {
@@ -239,20 +225,27 @@ public class Activator implements BundleActivator {
             Log.info("Remote server stopped");
         } else if (remoteEnabled && remoteServer != null) {
             try {
+                remoteToken = resolveRemoteToken();
                 int remotePort =
                         ServerPreferences.resolveRemotePort();
+                remoteServer.setToken(remoteToken);
                 remoteServer.rebind(
                         InetAddress.getByName("0.0.0.0"),
                         remotePort);
-                remoteBridgeFile = writeBridgeFile("remote",
-                        remoteServer.getPort(), remoteToken,
-                        version, location, "0.0.0.0");
                 Log.info("Remote server rebound to 0.0.0.0:"
                         + remoteServer.getPort());
             } catch (IOException remoteRebindException) {
                 Log.error("Failed to rebind remote server",
                         remoteRebindException);
             }
+        }
+
+        // Rewrite bridge file with current state (both sockets)
+        try {
+            localBridgeFile = writeBridgeFile(version, location);
+        } catch (IOException bridgeFileException) {
+            Log.error("Failed to write bridge file",
+                    bridgeFileException);
         }
     }
 

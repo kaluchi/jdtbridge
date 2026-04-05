@@ -289,7 +289,10 @@ Remove a remote instance:
 
 ## `--check` mode
 
-Read-only. Does not write instance files or cache.
+Verification phase. When combined with config flags (`--token`,
+`--add-mount-point`), config is written first, then check runs.
+Check itself is read-only — rescans mount points in memory,
+does not persist to cache.
 
 ### Algorithm
 
@@ -302,18 +305,16 @@ Read-only. Does not write instance files or cache.
 3. TCP probe — connect to bridge-socket.
    Failure → report, skip remaining steps for this remote.
 
-4. Auth — `GET /status` with `Authorization: Bearer <token>`.
+4. Auth + project list — `GET /projects` with `Authorization: Bearer <token>`.
    401 → report token rejected, skip project comparison.
+   200 → token accepted, response contains project list for step 6.
 
-5. Get Eclipse project list — from server response.
-   Build project set B (project name → Eclipse-side path).
-
-6. Compare sets:
+5. Compare sets (using project list from step 4):
    - `A ∩ B` — mapped and verified (project in both cache and Eclipse)
    - `B \ A` — in Eclipse but not mapped (server knows it, no local .project)
    - `A \ B` — cached but not in Eclipse (local .project exists, server doesn't list it)
 
-7. Report — per remote: check results, three project tables,
+6. Report — per remote: check results, three project tables,
    instance file path, actionable hints.
 
 ### Output
@@ -451,11 +452,9 @@ Eclipse comparison:
     },
     "token": "******54d2f",
     "mount-points": ["/home/user/projects"],
-    "mapped": [
+    "cached": [
       { "project": "webapp", "localPath": "/home/user/projects/webapp", "mountPoint": "/home/user/projects" }
-    ],
-    "unmapped": [],
-    "stale": []
+    ]
   }
 ]
 ```
@@ -465,7 +464,7 @@ same structure but single object (not array).
 
 ## Instance file format
 
-File `~/.jdtbridge/instances/remote-<hash>.json`:
+File `~/.jdtbridge/remote-instances/<hash>.json`:
 
 ```json
 {
@@ -479,10 +478,12 @@ Keys match CLI flags. Hash derived from bridge-socket value.
 
 ## Project path cache
 
-File: `~/.jdtbridge/project-path-cache.json`
+Per-remote cache file alongside instance file:
+`~/.jdtbridge/instances/~/.jdtbridge/remote-instances/<hash>.cache.json`
 
 ```json
 {
+  "bridge-socket": "host.docker.internal:7777",
   "scannedAt": 1775367354940,
   "mount-points": ["/mnt/workspace", "/mnt/m8"],
   "projects": {
@@ -493,6 +494,9 @@ File: `~/.jdtbridge/project-path-cache.json`
   }
 }
 ```
+
+Each remote instance has its own cache. No collision between
+remotes with different mount points.
 
 Maps Eclipse project name → jdt-host absolute path.
 Built by scanning `mount-points` for `.project` files,
