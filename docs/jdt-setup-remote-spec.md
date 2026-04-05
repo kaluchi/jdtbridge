@@ -28,8 +28,10 @@ instance. Creates instance files in `~/.jdtbridge/instances/`.
 jdt setup remote                                                              status / onboarding
 jdt setup remote --bridge-socket <host>:<port>                                configure (auto-token)
 jdt setup remote --bridge-socket <host>:<port> --token <token>                configure with token
-jdt setup remote --bridge-socket <host>:<port> --workspace <path>             set workspace root
-jdt setup remote --bridge-socket <host>:<port> --token <t> --workspace <p>    full one-shot
+jdt setup remote --bridge-socket <host>:<port> --workspace <path>             Eclipse workspace (.metadata)
+jdt setup remote --bridge-socket <host>:<port> --repo <path>                  repository (.project scan)
+jdt setup remote --bridge-socket <host>:<port> --map-project <eclipse-project-name>=<path>    map single project
+jdt setup remote --bridge-socket <host>:<port> --unmap-project <eclipse-project-name>         unmap project
 jdt setup remote --delete --bridge-socket <host>:<port>                       remove remote
 ```
 
@@ -53,30 +55,41 @@ validate project mappings.
 One-shot example:
 ```bash
 jdt setup remote --bridge-socket host.docker.internal:7777 --token abc123 \
-  --workspace /mnt/dev \
-  --map-root D:\\git\\myapp=/mnt/myapp \
-  --map infra=/mnt/infra \
+  --workspace /mnt/workspace \
+  --repo /mnt/extra-repo \
+  --map orphan-project=/mnt/orphan \
   --check
 ```
 
-Project mapping:
-```bash
-jdt setup remote --bridge-socket <host>:<port> --map <project>=<local-path>
-jdt setup remote --bridge-socket <host>:<port> --unmap <project>
-jdt setup remote --bridge-socket <host>:<port> --map-root <eclipse-root>=<local-root>
+Project mapping — three sources, each with its own key:
+
+**`--workspace <path>`** — Eclipse workspace with `.metadata`.
+CLI reads `.location` files to build project mapping.
+Embedded projects: local path = `<workspace>/<project-name>`.
+Linked projects: Eclipse-side path from `.location` URI — local
+path unknown, shown in `--check` table for user to `--map-project`.
+
+Error if `.metadata` not found:
+```
+✗ /mnt/dev is not an Eclipse workspace (no .metadata directory)
+
+If this is a repository with project sources, use --repo:
+  jdt setup remote --bridge-socket host:7777 --repo /mnt/dev
+
+If this is a single project, use --map-project:
+  jdt setup remote --bridge-socket host:7777 --map-project <name>=/mnt/dev
 ```
 
-`--map-root` maps all projects under an Eclipse-side root to a
-local mount point. Example: Eclipse has 20 projects under
-`D:\git\myapp\*`, all mounted to `/mnt/myapp`:
+**`--repo <path>`** — scans directory for `.project` files, reads
+`<name>`, matches against Eclipse project list. Multiple allowed.
 
-```bash
-jdt setup remote --bridge-socket host.docker.internal:7777 \
-  --map-root D:\\git\\myapp=/mnt/myapp
-```
+**`--map-project <eclipse-project-name>=<path>`** — map single project
+by its Eclipse project name. For linked projects outside workspace
+or projects without `.project`.
 
-Maps `myapp-core` → `/mnt/myapp/myapp-core`, etc.
-Project locations known from the probe response.
+**`--unmap-project <eclipse-project-name>`** — remove project mapping.
+
+All composable in one call. Not specified = not touched on update.
 
 ## Output: new instance
 
@@ -175,8 +188,7 @@ Output structure per remote:
    - PROJECT — Eclipse project name
    - ECLIPSE_PATH — path on Eclipse host (from server or .metadata)
    - LOCAL_PATH — mapped local path, or `—` if unmapped
-   - STATUS — ✓ mapped, ✗ unmapped, source (.metadata, .project,
-     map-root, map)
+   - STATUS — ✓ mapped, ✗ unmapped, source (.metadata, .project/repo, map)
 
 When remote is offline: check lines show failure, project table
 shows all known projects with STATUS ✗ offline.
@@ -231,7 +243,7 @@ host.docker.internal:7777
 Configure + check in one call:
 ```
 $ jdt setup remote --bridge-socket host.docker.internal:7777 --token abc123 \
-    --map-root D:\\git\\myapp=/mnt/myapp --check
+    --repo /mnt/myapp --check
 
 Wrote ~/.jdtbridge/instances/remote-a1b2c3.json:
   port:      7777
@@ -245,10 +257,14 @@ host.docker.internal:7777
   ✓ Plugin 2.5.0
 
   PROJECT          ECLIPSE_PATH                LOCAL_PATH                    STATUS
-  myapp-core       D:\git\myapp\myapp-core     /mnt/myapp/myapp-core        ✓ map-root
-  myapp-server     D:\git\myapp\myapp-server   /mnt/myapp/myapp-server      ✓ map-root
-  infra            D:\git\infra                —                            ✗
-  deploy-tools     D:\git\deploy-tools         —                            ✗
+  myapp-core       D:\git\myapp\myapp-core     /mnt/myapp/myapp-core        ✓ repo
+  myapp-server     D:\git\myapp\myapp-server   /mnt/myapp/myapp-server      ✓ repo
+  infra            D:\git\infra                —                            ✗ linked
+  deploy-tools     D:\git\deploy-tools         —                            ✗ linked
+
+  Map linked projects:
+    --map-project infra=<local-path-to-D:\git\infra>
+    --map-project deploy-tools=<local-path-to-D:\git\deploy-tools>
 ```
 
 With `--workspace` pointing to a mounted Eclipse workspace:
@@ -312,7 +328,7 @@ host.docker.internal:7777
 ## Algorithm
 
 1. **Parse** — extract `--bridge-socket`, `--token`, `--workspace`,
-   `--map`, `--map-root` from flags.
+   `--map`, `--map-project` from flags.
 
 2. **Check existing** — scan `~/.jdtbridge/instances/` for file
    matching this bridge-socket.
@@ -331,7 +347,7 @@ host.docker.internal:7777
    - **Auth** — `GET /status` with `Authorization: Bearer <token>`.
    - **Discover** — from response: plugin version, project list.
    - **Map projects** — match against `.metadata`, `.project` files,
-     `--map`, `--map-root`.
+     `--map`, `--map-project`.
    - **Report** — check lines + project table.
 
 ## Token sources
@@ -385,27 +401,20 @@ jdt setup remote --bridge-socket other-host:7777 --token xyz
 
 ## Instance file format
 
-Based on existing instance file structure. Remote adds `host`
-field and optional `projectMappings`:
+Keys match CLI flags. File `~/.jdtbridge/instances/remote-<hash>.json`:
 
 ```json
 {
-  "port": 7777,
+  "bridge-socket": "host.docker.internal:7777",
   "token": "abc123",
-  "host": "host.docker.internal",
-  "workspace": "/mnt/dev",
-  "remote": true,
-  "projectMappings": {
-    "myapp-core": {
-      "eclipsePath": "D:\\git\\myapp\\myapp-core",
-      "localPath": "/mnt/myapp/myapp-core"
-    },
-    "myapp-server": {
-      "eclipsePath": "D:\\git\\myapp\\myapp-server",
-      "localPath": "/mnt/myapp/myapp-server"
-    }
+  "workspace": "/mnt/workspace",
+  "repo": ["/mnt/myapp", "/mnt/infra"],
+  "map-project": {
+    "automation": "/mnt/automation",
+    "tools": "/mnt/tools"
   }
 }
+```
 ```
 
 Existing local instance files (written by Eclipse plugin):
