@@ -5,7 +5,7 @@ import { existsSync, readFileSync, writeFileSync, readdirSync, unlinkSync, renam
 import { join, basename, dirname } from "node:path";
 import { createHash, randomBytes } from "node:crypto";
 import { execSync } from "node:child_process";
-import { remoteInstancesDir } from "../home.mjs";
+import { remoteInstancesDir, remoteProjectPathsDir } from "../home.mjs";
 import { parseFlags, extractPositional } from "../args.mjs";
 import { bold, green, red, yellow, dim } from "../color.mjs";
 import { printJson } from "../json-output.mjs";
@@ -27,7 +27,7 @@ function instanceFilePath(bridgeSocket) {
 
 function cacheFilePath(bridgeSocket) {
   const hash = bridgeSocketHash(bridgeSocket);
-  return join(remoteInstancesDir(), hash + ".project-path-cache.json");
+  return join(remoteProjectPathsDir(), hash + ".json");
 }
 
 function readInstanceFile(filePath) {
@@ -317,26 +317,32 @@ async function handleConfigure(bridgeSocket, flags, addMountPoints,
 
   // Report what was written
   if (!jsonOutput) {
-    console.log(`${isUpdate ? "Updated" : "Wrote"} ${filePath}:`);
-    if (!isUpdate) {
-      console.log(`  bridge-socket: ${bridgeSocket}`);
+    const tokenChanged = isUpdate && flags.token
+        && existingInstance.token !== resolvedToken;
+    const hasChanges = !isUpdate || tokenChanged
+        || addMountPoints.length > 0 || removeMountPoints.length > 0;
+
+    if (hasChanges) {
+      console.log(`${isUpdate ? "Updated" : "Wrote"} ${filePath}:`);
+      if (!isUpdate) {
+        console.log(`  bridge-socket: ${bridgeSocket}`);
+      }
+      if (tokenChanged) {
+        console.log(`  token:         ${maskToken(resolvedToken)} (was: ${maskToken(existingInstance.token)})`);
+      } else if (!isUpdate) {
+        const tokenDisplay = tokenSource
+          ? `${resolvedToken} (${tokenSource})`
+          : maskToken(resolvedToken);
+        console.log(`  token:         ${tokenDisplay}`);
+      }
+      if (addMountPoints.length > 0) {
+        console.log(`  mount-points:  added ${addMountPoints.join(", ")}`);
+      }
+      if (removeMountPoints.length > 0) {
+        console.log(`  mount-points:  removed ${removeMountPoints.join(", ")}`);
+      }
+      console.log();
     }
-    if (isUpdate && flags.token
-        && existingInstance.token !== resolvedToken) {
-      console.log(`  token:         ${maskToken(resolvedToken)} (was: ${maskToken(existingInstance.token)})`);
-    } else if (!isUpdate) {
-      const tokenDisplay = tokenSource
-        ? `${resolvedToken} (${tokenSource})`
-        : maskToken(resolvedToken);
-      console.log(`  token:         ${tokenDisplay}`);
-    }
-    if (addMountPoints.length > 0) {
-      console.log(`  mount-points:  added ${addMountPoints.join(", ")}`);
-    }
-    if (removeMountPoints.length > 0) {
-      console.log(`  mount-points:  removed ${removeMountPoints.join(", ")}`);
-    }
-    console.log();
   }
 
   // Scan mount points
@@ -402,8 +408,9 @@ function printRemoteStatus(remoteInstance) {
       && Object.keys(cacheData.projects).length > 0) {
     const projectRows = Object.entries(cacheData.projects).map(
       ([projectName, localPath]) => {
+        const norm = p => p.replace(/\\/g, "/");
         const matchingMountPoint = mountPoints.find(
-          mountPoint => localPath.startsWith(mountPoint));
+          mountPoint => norm(localPath).startsWith(norm(mountPoint)));
         return [projectName, localPath, matchingMountPoint || ""];
       });
     console.log(formatTable(
@@ -419,20 +426,46 @@ function printRemoteStatus(remoteInstance) {
 function buildInstanceJson(remoteInstance) {
   const cachePath = cacheFilePath(remoteInstance["bridge-socket"]);
   const cacheData = readInstanceFile(cachePath);
+  const mountPoints = remoteInstance["mount-points"] || [];
+  const norm = p => p.replace(/\\/g, "/");
   return {
     "bridge-socket": remoteInstance["bridge-socket"],
     file: remoteInstance.file,
     token: maskToken(remoteInstance.token),
-    "mount-points": remoteInstance["mount-points"] || [],
+    "mount-points": mountPoints,
     projects: cacheData?.projects
       ? Object.entries(cacheData.projects).map(
-          ([projectName, localPath]) => ({
-            project: projectName,
-            localPath,
-          }))
+          ([projectName, localPath]) => {
+            const mountPoint = mountPoints.find(
+              mp => norm(localPath).startsWith(norm(mp)));
+            return { project: projectName, localPath,
+              mountPoint: mountPoint || null };
+          })
       : [],
   };
 }
+
+export const setupRemoteHelp = `Configure CLI to connect to a remote Eclipse instance.
+
+Usage:
+  jdt setup remote                                            status / onboarding
+  jdt setup remote --bridge-socket <host>:<port>              configure (auto-token)
+  jdt setup remote --bridge-socket <host>:<port> --token <t>  configure with token
+  jdt setup remote --bridge-socket <host>:<port> --check      verify connection
+  jdt setup remote --bridge-socket <host>:<port> --json       output as JSON
+  jdt setup remote --delete --bridge-socket <host>:<port>     remove remote
+
+Mount points (directories scanned for .project files):
+  --add-mount-point <path>       add directory to scan
+  --remove-mount-point <path>    remove directory from scan
+  Multiple allowed, applied in argument order.
+
+Examples:
+  jdt setup remote --bridge-socket host.docker.internal:7777 --token abc123
+  jdt setup remote --bridge-socket host.docker.internal:7777 --add-mount-point /workspace
+  jdt setup remote --check
+  jdt setup remote --json
+  jdt setup remote --delete --bridge-socket host.docker.internal:7777`;
 
 function generateToken() {
   return randomBytes(16).toString("hex");

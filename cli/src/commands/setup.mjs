@@ -451,9 +451,15 @@ Options:
 Eclipse must be stopped for install/update/remove operations.
 If Eclipse is running, you will be prompted to stop it.
 
+Subcommand:
+  jdt setup remote    configure remote Eclipse connection
+
 Examples:
   jdt setup
   jdt setup --check
   jdt setup --eclipse D:/eclipse
   jdt setup --skip-build
-  jdt setup --remove`;
+  jdt setup --remove
+  jdt setup remote --bridge-socket host.docker.internal:7777 --token <token>
+
+Use "jdt help setup remote" for remote connection details.`;

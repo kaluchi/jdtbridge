@@ -164,6 +164,18 @@ With multiple instances, `jdt use` pins the current terminal to a specific works
 
 Override the home directory with `JDTBRIDGE_HOME` environment variable.
 
+## Remote Eclipse connection
+
+```bash
+jdt setup remote                                              # status / onboarding
+jdt setup remote --bridge-socket <host>:<port> --token <tok>  # configure with token
+jdt setup remote --bridge-socket <host>:<port> --check        # verify connection
+jdt setup remote --bridge-socket <host>:<port> --add-mount-point <path>
+jdt setup remote --delete --bridge-socket <host>:<port>       # remove remote
+```
+
+See [docs/jdt-setup-remote-spec.md](../docs/jdt-setup-remote-spec.md).
+
 ## Color output
 
 Auto-detected from TTY. Override:

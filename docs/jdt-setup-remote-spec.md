@@ -492,8 +492,17 @@ workspace hash in `Activator.workspaceHash()`.
 
 ## Project path cache
 
-Per-remote cache file alongside instance file:
-`~/.jdtbridge/remote-instances/<hash>.project-path-cache.json`
+Eclipse returns workspace-relative paths (`/myapp-core/src/Foo.java`),
+but the jdt host sees projects at mount-point paths
+(`/mnt/m8/myapp-core/src/Foo.java`). The project path cache maps
+Eclipse project names to their jdt-host absolute paths so the CLI
+can translate between the two.
+
+Built by scanning `mount-points` directories for `.project` files
+and reading `<name>` from each. Stored in a dedicated subdirectory,
+one file per remote instance (same hash as the instance file):
+
+`~/.jdtbridge/remote-instances/project-paths/<hash>.json`
 
 ```json
 {
@@ -508,13 +517,6 @@ Per-remote cache file alongside instance file:
   }
 }
 ```
-
-Each remote instance has its own cache. No collision between
-remotes with different mount points.
-
-Maps Eclipse project name → jdt-host absolute path.
-Built by scanning `mount-points` for `.project` files,
-reading `<name>` from each.
 
 ### Cache lifecycle
 
@@ -575,8 +577,8 @@ $ jdt setup remote --bridge-socket 192.168.1.100:8888 --token bbb
 
 $ jdt use
 #  ALIAS  WORKSPACE   STATUS   PINNED  HOST                    PORT   PLUGIN
-1         /mnt/dev    online   pinned  host.docker.internal    7777   2.5.0
-2         /mnt/stage  online           192.168.1.100           8888   2.4.0
+1         /mnt/dev    remote   pinned  host.docker.internal    7777   2.5.0
+2         /mnt/stage  remote           192.168.1.100           8888   2.4.0
 
 WORKSPACE for remote instances = mount-points from config,
 one per line (multiline cell). If no mount-points, shows

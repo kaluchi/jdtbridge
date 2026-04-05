@@ -342,6 +342,7 @@ function printOverview() {
     "",
     "Setup:",
     h("  setup [--check|--remove]",                        "install/check/remove Eclipse plugin"),
+    h("  setup remote [--bridge-socket <host>:<port>]",     "configure remote Eclipse connection"),
     "",
     'Use "jdt help <command>" for detailed usage of any command.',
   ].join("\n"));
@@ -365,7 +366,11 @@ export async function run(argv) {
   if (command === "help") {
     const topic = rest[0];
     const resolved = topic ? resolve(topic) : null;
-    if (resolved === "launch" && rest[1] && launchSubcommands[rest[1]]) {
+    if (resolved === "setup" && rest[1] === "remote") {
+      const { setupRemoteHelp } = await import("./commands/setup-remote.mjs");
+      console.log(setupRemoteHelp);
+      return;
+    } else if (resolved === "launch" && rest[1] && launchSubcommands[rest[1]]) {
       console.log(launchSubcommands[rest[1]].help);
     } else if (resolved === "test" && rest[1] && testSubcommands[rest[1]]) {
       console.log(testSubcommands[rest[1]].help);

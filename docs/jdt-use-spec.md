@@ -78,6 +78,7 @@ Status values:
 |---|---|
 | `online` | Instance running, port reachable |
 | `offline` | In registry but no running instance |
+| `remote` | Remote instance (no probe, no PID check) |
 | `*new*` | First time seen, just added to registry |
 
 After display, `*new*` entries become regular (status will show as
@@ -103,6 +104,7 @@ Pinned to: D:\eclipse-workspace-webapp (web, port 59100)
 ```
 
 Fails if workspace is offline (no running instance to connect to).
+Remote instances always allow pinning (no liveness check).
 
 Numbers are stable across Eclipse restarts but shift when entries
 are deleted via `--delete`. Aliases and workspace paths never shift.
@@ -414,8 +416,9 @@ Case-insensitive, backslash-normalized. No symlink resolution.
 On every `jdt use` (list) invocation:
 
 1. Read `workspaces.json` (or create empty)
-2. Scan `~/.jdtbridge/instances/*.json` for running instances
-3. For each running instance: match `workspace` against registry
+2. Scan `~/.jdtbridge/instances/*.json` for local instances
+   and `~/.jdtbridge/remote-instances/*.json` for remote instances
+3. For each instance: match `workspace` against registry
 4. Unmatched instances → append to registry, mark `*new*`
 5. Registry entries without running instance → `offline`
 6. Save updated `workspaces.json`
@@ -495,10 +498,11 @@ CLI:
   resolve.mjs                — connection resolution (env → ppid pin → term pin → discovery)
   home.mjs                   — workspaces.json read/write, pins directory management
   bridge-env.mjs             — getPinnedBridge() (existing, unchanged)
-  discovery.mjs              — discoverInstances() (existing, unchanged)
+  discovery.mjs              — discoverInstances() (updated: reads local + remote-instances)
 
 Data:
   ~/.jdtbridge/use/workspaces.json         — workspace list with aliases
   ~/.jdtbridge/use/pins/term-<id>.json     — per terminal tab pin
   ~/.jdtbridge/use/pins/ppid-<pid>.json    — per process pin
-  ~/.jdtbridge/instances/                  — running instance files (existing)
+  ~/.jdtbridge/instances/                  — local instance files (existing)
+  ~/.jdtbridge/remote-instances/           — remote instance files

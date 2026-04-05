@@ -3,7 +3,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { request } from "node:http";
-import { instancesDir } from "./home.mjs";
+import { instancesDir, remoteInstancesDir } from "./home.mjs";
 import { proxyAwareOptions } from "./proxy.mjs";
 import { getPinnedBridge } from "./bridge-env.mjs";
 
@@ -17,6 +17,7 @@ import { getPinnedBridge } from "./bridge-env.mjs";
  * @property {string} [location]
  * @property {string} host - bridge host (default 127.0.0.1)
  * @property {string} file - path to the instance file
+ * @property {boolean} [remote] - true for remote instances
  */
 
 /**
@@ -46,6 +47,39 @@ export async function discoverInstances() {
     } catch {
       // corrupt file — skip
     }
+  }
+
+  // Remote instances (jdt setup remote)
+  const remoteDir = remoteInstancesDir();
+  try {
+    const remoteFiles = readdirSync(remoteDir).filter(
+      (f) => f.endsWith(".json"));
+    for (const file of remoteFiles) {
+      const filePath = join(remoteDir, file);
+      try {
+        const data = JSON.parse(readFileSync(filePath, "utf8"));
+        const bridgeSocket = data["bridge-socket"];
+        if (!bridgeSocket) continue;
+        const colonIdx = bridgeSocket.lastIndexOf(":");
+        if (colonIdx < 0) continue;
+        const host = bridgeSocket.substring(0, colonIdx);
+        const port = parseInt(bridgeSocket.substring(colonIdx + 1), 10);
+        if (!port) continue;
+        instances.push({
+          port,
+          token: data.token,
+          host,
+          pid: 0,
+          workspace: bridgeSocket,
+          file: filePath,
+          remote: true,
+        });
+      } catch {
+        // corrupt file — skip
+      }
+    }
+  } catch {
+    // dir not found
   }
 
   return instances;

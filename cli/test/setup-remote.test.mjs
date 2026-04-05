@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { resetHome } from "../src/home.mjs";
@@ -157,13 +157,13 @@ describe("jdt setup remote", () => {
         "--add-mount-point", mountDir,
       ]);
 
-      const remoteDir = join(testDir, "remote-instances");
-      const cacheFiles = require("fs").readdirSync(remoteDir)
-        .filter(f => f.endsWith(".project-path-cache.json"));
+      const cacheDir = join(testDir, "remote-instances", "project-paths");
+      const cacheFiles = require("fs").readdirSync(cacheDir)
+        .filter(f => f.endsWith(".json"));
       expect(cacheFiles.length).toBe(1);
 
       const cacheData = JSON.parse(
-        readFileSync(join(remoteDir, cacheFiles[0]), "utf8"));
+        readFileSync(join(cacheDir, cacheFiles[0]), "utf8"));
       expect(cacheData.projects["cached-project"]).toBeTruthy();
     });
   });
@@ -279,7 +279,8 @@ describe("jdt setup remote", () => {
       expect(io.logs.join("\n")).toContain("Removed");
 
       const remoteDir = join(testDir, "remote-instances");
-      const remainingFiles = require("fs").readdirSync(remoteDir);
+      const remainingFiles = require("fs").readdirSync(remoteDir)
+        .filter(f => f.endsWith(".json"));
       expect(remainingFiles.length).toBe(0);
     });
 
@@ -534,6 +535,156 @@ describe("jdt setup remote", () => {
         readFileSync(join(remoteDir, instanceFiles[0]), "utf8"));
 
       expect(instanceData["mount-points"]).toContain(mountDir);
+    });
+  });
+
+  // --- Edge cases ---
+
+  describe("path separator normalization", () => {
+    it("matches mount point with mixed slashes in status", async () => {
+      // Simulate Windows: cache has backslash paths, mount point has forward
+      const mountDir = join(testDir, "mount");
+      createProjectDir(mountDir, "proj-a");
+      createProjectDir(mountDir, "proj-b");
+
+      await runSetupRemote([
+        "--bridge-socket", "host:7777", "--token", "tok",
+        "--add-mount-point", mountDir,
+      ]);
+      io.logs.length = 0;
+
+      // Status should show MOUNT_POINT for all projects, not just first
+      await runSetupRemote([]);
+      const output = io.logs.join("\n");
+      const mountPointMatches = output.split("\n").filter(
+        line => line.includes("proj-") && line.includes(mountDir));
+      expect(mountPointMatches.length).toBe(2);
+    });
+
+    it("matches mount point when cache uses backslashes", async () => {
+      // Manually write cache with backslash paths to simulate Windows
+      const mountDir = join(testDir, "mount").replace(/\\/g, "/");
+      createProjectDir(join(testDir, "mount"), "my-proj");
+
+      await runSetupRemote([
+        "--bridge-socket", "host:7777", "--token", "tok",
+        "--add-mount-point", mountDir,
+      ]);
+
+      // Rewrite cache with backslash paths
+      const { readdirSync, readFileSync: readFS, writeFileSync: writeFS }
+        = await import("node:fs");
+      const cacheDir = join(testDir, "remote-instances", "project-paths");
+      const cacheFile = readdirSync(cacheDir)
+        .find(f => f.endsWith(".json"));
+      const cachePath = join(cacheDir, cacheFile);
+      const cache = JSON.parse(readFS(cachePath, "utf8"));
+      // Replace forward slashes with backslashes in project paths
+      for (const [k, v] of Object.entries(cache.projects)) {
+        cache.projects[k] = v.replace(/\//g, "\\");
+      }
+      writeFS(cachePath, JSON.stringify(cache));
+
+      io.logs.length = 0;
+      await runSetupRemote([]);
+      const output = io.logs.join("\n");
+      // MOUNT_POINT column should still be populated
+      const projLine = output.split("\n").find(l => l.includes("my-proj"));
+      expect(projLine).toBeTruthy();
+      expect(projLine).toContain(mountDir);
+    });
+  });
+
+  describe("no-op update suppression", () => {
+    it("does not print Updated header on --check without changes", async () => {
+      await runSetupRemote([
+        "--bridge-socket", "host:7777", "--token", "tok",
+      ]);
+      io.logs.length = 0;
+
+      await runSetupRemote([
+        "--bridge-socket", "host:7777", "--check",
+      ]);
+      const output = io.logs.join("\n");
+      expect(output).not.toContain("Updated");
+    });
+
+    it("does not print Updated when token unchanged", async () => {
+      await runSetupRemote([
+        "--bridge-socket", "host:7777", "--token", "same-tok",
+      ]);
+      io.logs.length = 0;
+
+      await runSetupRemote([
+        "--bridge-socket", "host:7777", "--token", "same-tok",
+      ]);
+      const output = io.logs.join("\n");
+      expect(output).not.toContain("Updated");
+      expect(output).not.toContain("was:");
+    });
+  });
+
+  describe("idempotent remove-mount-point", () => {
+    it("is no-op when removing non-existent mount point", async () => {
+      const mountDir = join(testDir, "mount");
+      createProjectDir(mountDir, "proj");
+
+      await runSetupRemote([
+        "--bridge-socket", "host:7777", "--token", "tok",
+        "--add-mount-point", mountDir,
+      ]);
+      io.logs.length = 0;
+
+      // Remove a mount point that was never added
+      await runSetupRemote([
+        "--bridge-socket", "host:7777",
+        "--remove-mount-point", "/nonexistent/path",
+      ]);
+
+      // Mount points should be unchanged
+      const remoteDir = join(testDir, "remote-instances");
+      const files = readdirSync(remoteDir)
+        .filter(f => f.endsWith(".json") && !f.includes("cache"));
+      const data = JSON.parse(readFileSync(
+        join(remoteDir, files[0]), "utf8"));
+      expect(data["mount-points"]).toContain(mountDir);
+      expect(data["mount-points"]).toHaveLength(1);
+    });
+  });
+
+  describe("instance with no mount points", () => {
+    it("shows status without project table", async () => {
+      await runSetupRemote([
+        "--bridge-socket", "host:7777", "--token", "my-secret-token",
+      ]);
+      io.logs.length = 0;
+
+      await runSetupRemote([]);
+      const output = io.logs.join("\n");
+      expect(output).toContain("host:7777");
+      expect(output).toContain("******token");
+      // No PROJECT table header since no mount points scanned
+      expect(output).not.toContain("PROJECT");
+    });
+  });
+
+  describe("json output completeness", () => {
+    it("includes mountPoint in project entries", async () => {
+      const mountDir = join(testDir, "mount");
+      createProjectDir(mountDir, "proj");
+
+      await runSetupRemote([
+        "--bridge-socket", "host:7777", "--token", "tok",
+        "--add-mount-point", mountDir,
+      ]);
+      io.logs.length = 0;
+
+      await runSetupRemote(["--json"]);
+      const jsonOutput = JSON.parse(io.logs.join(""));
+      const project = jsonOutput[0].projects[0];
+      expect(project.project).toBe("proj");
+      expect(project.localPath).toBeTruthy();
+      expect(project.mountPoint).toBe(mountDir);
     });
   });
 
