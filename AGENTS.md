@@ -210,7 +210,14 @@ gh pr edit 55 --body "new body text" 2>&1 | grep -v GraphQL
 
 # Merge + cleanup
 gh pr merge 55 --squash --delete-branch
+
+# Wait for CI checks (no sleep — use gh pr checks --watch)
+gh pr checks 55 --watch
 ```
+
+**Waiting for CI:** use `gh pr checks <N> --watch` — it blocks until
+all checks complete, then exits with 0 (all pass) or 1 (failures).
+Never use `sleep` loops to poll CI status.
 
 ### Important details
 
