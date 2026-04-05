@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { createHash, randomBytes } from "node:crypto";
 import { remoteInstancesDir, remoteProjectPathsDir } from "../home.mjs";
 import { parseFlags } from "../args.mjs";
-import { dim } from "../color.mjs";
+
 import { printJson } from "../json-output.mjs";
 import { formatTable } from "../format/table.mjs";
 
