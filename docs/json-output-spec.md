@@ -72,6 +72,8 @@ Adding `--json` is mechanical — early exit before `formatTable`.
 | `launch configs` | HTTP | `GET /launch/configs` → `[{name, type}]` |
 | `project-info` | HTTP | `GET /project-info` — complex adaptive rendering, JSON = raw server response |
 | `source` | HTTP | **Already done** — `jdt source --json` |
+| `setup remote` | local files + HTTP (--check) | Instance config, cached projects, check results. See [jdt-setup-remote-spec](jdt-setup-remote-spec.md) `--json` section |
+| `use` | local files + HTTP | Workspace list with host/port/status. **Already done** — `jdt use --json` |
 
 ### Out of scope
 
@@ -80,7 +82,7 @@ Adding `--json` is mechanical — early exit before `formatTable`.
 | `status` | Compositor of other commands — each section has its own `--json` |
 | `build` | Action, not query |
 | `refresh` | Action, not query |
-| `setup` | Action, not query |
+| `setup` | Action, not query (except `setup --check --json` and `setup remote --json`) |
 | `agent *` | Lifecycle, not query |
 | `maven update` | Action, not query |
 | `refactoring` | Action (rename, move, organize-imports, format) |

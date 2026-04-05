@@ -38,6 +38,9 @@ jdt setup remote --bridge-socket <host>:<port> --token <token>                co
 jdt setup remote --bridge-socket <host>:<port> --add-mount-point <path>       add scan directory
 jdt setup remote --bridge-socket <host>:<port> --remove-mount-point <path>    remove scan directory
 jdt setup remote --delete --bridge-socket <host>:<port>                       remove remote
+jdt setup remote --json                                                       all remotes as JSON
+jdt setup remote --bridge-socket <host>:<port> --json                         specific remote as JSON
+jdt setup remote --bridge-socket <host>:<port> --check --json                 check results as JSON
 ```
 
 Token resolution: `--token` flag → existing token in instance
@@ -151,7 +154,12 @@ $ jdt setup remote --bridge-socket host.docker.internal:7777 \
 Updated ~/.jdtbridge/instances/remote-a1b2c3.json:
   mount-points: removed /mnt/automation
 
-Cache invalidated. Total: 4 projects.
+Removed from cache:
+
+  PROJECT      LOCAL_PATH         MOUNT_POINT
+  automation   /mnt/automation    /mnt/automation
+
+1 project removed. Total: 4 projects.
 ```
 
 ## Output: update token
@@ -181,86 +189,279 @@ To connect to a remote Eclipse:
      - Set a fixed port
      - Copy the remote token
 
-  2. Here:
-     jdt setup remote --bridge-socket <host>:<port> --token <token>
-     jdt setup remote --bridge-socket <host>:<port> --add-mount-point <path>
+  2. Here, configure the connection and mount points where your
+     project sources are accessible:
+
+     jdt setup remote \
+       --bridge-socket <eclipse-host>:<eclipse-port> \
+       --token <paste-token-from-step-1> \
+       --add-mount-point <mounted-directory> \
+       --add-mount-point <another-mounted-directory>
+
+     <eclipse-host> — hostname or IP where Eclipse is running.
+       For Docker on the same machine: host.docker.internal
+       For SSH tunnel: localhost
+       For remote machine: IP or hostname
+
+     <eclipse-port> — the fixed port you set in Eclipse preferences.
+
+     <paste-token-from-step-1> — the remote token from Eclipse preferences.
+
+     <mounted-directory> — each directory on this machine that
+       contains Eclipse project sources (with .project files).
+       Add as many --add-mount-point flags as you have mount points.
+       These are scanned for .project files to build path mappings.
+
+     Examples:
+
+     Docker container, Eclipse on same machine, one project dir:
+       jdt setup remote \
+         --bridge-socket host.docker.internal:7777 \
+         --token e240be6743978f011bfd326c9d3c392d \
+         --add-mount-point /workspace
+
+     Docker container, multiple project directories:
+       jdt setup remote \
+         --bridge-socket host.docker.internal:7777 \
+         --token e240be6743978f011bfd326c9d3c392d \
+         --add-mount-point /mnt/workspace \
+         --add-mount-point /mnt/libs \
+         --add-mount-point /mnt/tools
+
+     Remote machine via SSH tunnel (tunnel set up separately):
+       jdt setup remote \
+         --bridge-socket localhost:7777 \
+         --token e240be6743978f011bfd326c9d3c392d \
+         --add-mount-point /home/user/projects
+
+     After configuring, verify everything works:
+       jdt setup remote --check
 ```
 
-Instance files exist:
+Instance files exist — full status per remote, project table,
+available operations:
+
 ```
 $ jdt setup remote
 
-2 remote instances configured.
-Run with --check to verify, or jdt use to switch.
+── host.docker.internal:7777 ──────────────────────────────────
 
+  SETTING        VALUE
+  token          ******c392d
+  mount-points   /mnt/workspace, /mnt/m8
+
+  PROJECT          LOCAL_PATH                   MOUNT_POINT
+  inside           /mnt/workspace/inside        /mnt/workspace
+  myapp-core       /mnt/m8/myapp-core           /mnt/m8
+  myapp-server     /mnt/m8/myapp-server         /mnt/m8
+  myapp-shared     /mnt/m8/myapp-shared         /mnt/m8
+
+  File: ~/.jdtbridge/instances/remote-a1b2c3.json
+
+── 192.168.1.100:8888 ─────────────────────────────────────────
+
+  SETTING        VALUE
+  token          ******54d2f
+  mount-points   /home/user/projects
+
+  PROJECT          LOCAL_PATH                        MOUNT_POINT
+  webapp           /home/user/projects/webapp        /home/user/projects
+
+  File: ~/.jdtbridge/instances/remote-d4e5f6.json
+
+────────────────────────────────────────────────────────────────
+
+Verify connection and project mapping against Eclipse:
   jdt setup remote --check
-  jdt setup remote --bridge-socket <host>:<port> --check
+
+Switch between remote instances:
   jdt use
+
+Update token:
+  jdt setup remote --bridge-socket <host>:<port> --token <new-token>
+
+Add projects from another directory:
+  jdt setup remote --bridge-socket <host>:<port> --add-mount-point <path>
+
+Remove a remote instance:
+  jdt setup remote --delete --bridge-socket <host>:<port>
 ```
 
 ## `--check` mode
 
-Connects to Eclipse, gets project list, compares with cached
-projects. Shows two categories:
-- In Eclipse but not cached (mount point missing or .project absent)
-- Cached but not in Eclipse (project removed or closed)
+Read-only. Does not write instance files or cache.
 
-Output per remote:
+### Algorithm
+
+1. Read instance file — bridge-socket, token, mount-points.
+
+2. Rescan mount-points — find `.project` files, parse `<name>`,
+   build fresh project set A (project name → local path).
+   This replaces stale cache with current state.
+
+3. TCP probe — connect to bridge-socket.
+   Failure → report, skip remaining steps for this remote.
+
+4. Auth — `GET /status` with `Authorization: Bearer <token>`.
+   401 → report token rejected, skip project comparison.
+
+5. Get Eclipse project list — from server response.
+   Build project set B (project name → Eclipse-side path).
+
+6. Compare sets:
+   - `A ∩ B` — mapped and verified (project in both cache and Eclipse)
+   - `B \ A` — in Eclipse but not mapped (server knows it, no local .project)
+   - `A \ B` — cached but not in Eclipse (local .project exists, server doesn't list it)
+
+7. Report — per remote: check results, three project tables,
+   instance file path, actionable hints.
+
+### Output
 
 ```
 $ jdt setup remote --check
 
-host.docker.internal:7777
-  ✓ TCP
-  ✓ Token ******a1b2c
-  ✓ Plugin 2.5.0
+── host.docker.internal:7777 ──────────────────────────────────
 
-  Mapped and verified:
-  PROJECT                     LOCAL_PATH                   STATUS
-  inside                      /mnt/workspace/inside        ✓
-  myapp-core                  /mnt/m8/myapp-core           ✓
-  myapp-server                /mnt/m8/myapp-server         ✓
-  automation                  /mnt/automation              ✓
+  CHECK          STATUS
+  TCP            ✓ connected
+  Token          ✓ ******c392d accepted
+  Plugin         ✓ 2.5.0
 
-  In Eclipse but not mapped:
-  PROJECT                     ECLIPSE_PATH
-  deploy-tools                D:\git\deploy-tools
-  infra                       D:\git\infra
+  SETTING        VALUE
+  token          ******c392d
+  mount-points   /mnt/workspace, /mnt/m8
 
-  Cached but not in Eclipse:
-  PROJECT                     LOCAL_PATH
-  old-project                 /mnt/workspace/old-project
-```
+  Mapped and verified against Eclipse:
+  PROJECT          LOCAL_PATH                   MOUNT_POINT      VERIFIED
+  inside           /mnt/workspace/inside        /mnt/workspace   ✓
+  myapp-core       /mnt/m8/myapp-core           /mnt/m8          ✓
+  myapp-server     /mnt/m8/myapp-server         /mnt/m8          ✓
+  myapp-shared     /mnt/m8/myapp-shared         /mnt/m8          ✓
 
-Check specific remote:
-```
-$ jdt setup remote --bridge-socket host.docker.internal:7777 --check
-
-host.docker.internal:7777
-  ✓ TCP
-  ✓ Token ******a1b2c
-  ✓ Plugin 2.5.0
-
-  Mapped and verified:
-  PROJECT          LOCAL_PATH                    STATUS
-  myapp-core       /mnt/m8/myapp-core           ✓
-  myapp-server     /mnt/m8/myapp-server         ✓
-
-  In Eclipse but not mapped:
+  In Eclipse but not mapped locally:
   PROJECT          ECLIPSE_PATH
+  deploy-tools     D:\git\deploy-tools
   infra            D:\git\infra
 
-  Add mount point:
-    jdt setup remote --bridge-socket host.docker.internal:7777 \
-      --add-mount-point <local-path-containing-infra>
+  Cached but no longer in Eclipse:
+  PROJECT          LOCAL_PATH
+  old-project      /mnt/workspace/old-project
+
+  File: ~/.jdtbridge/instances/remote-a1b2c3.json
+
+── 192.168.1.100:8888 ─────────────────────────────────────────
+
+  CHECK          STATUS
+  TCP            ✗ connection refused
+
+  SETTING        VALUE
+  token          ******54d2f
+  mount-points   /home/user/projects
+
+  Cannot verify projects (Eclipse offline).
+
+  PROJECT          LOCAL_PATH                        MOUNT_POINT
+  webapp           /home/user/projects/webapp        /home/user/projects
+
+  File: ~/.jdtbridge/instances/remote-d4e5f6.json
+
+────────────────────────────────────────────────────────────────
+
+Fix unmapped projects by adding their mount point:
+  jdt setup remote --bridge-socket host.docker.internal:7777 \
+    --add-mount-point <directory-containing-deploy-tools-and-infra>
+
+Remove stale cached projects by removing their mount point:
+  jdt setup remote --bridge-socket host.docker.internal:7777 \
+    --remove-mount-point <mount-point-of-old-project>
+
+Fix connection:
+  - Is Eclipse running on 192.168.1.100?
+  - Remote socket enabled in Eclipse preferences?
+  - Port open in firewall?
+  - For SSH tunnel: is the tunnel running?
 ```
 
-Offline remote:
+## `--json` mode
+
+All output as JSON. Composable with `--check` and no-args status.
+
+`jdt setup remote --json` — all remotes:
+```json
+[
+  {
+    "bridge-socket": "host.docker.internal:7777",
+    "file": "~/.jdtbridge/instances/remote-a1b2c3.json",
+    "token": "******c392d",
+    "mount-points": ["/mnt/workspace", "/mnt/m8"],
+    "projects": [
+      { "project": "inside", "localPath": "/mnt/workspace/inside", "mountPoint": "/mnt/workspace" },
+      { "project": "myapp-core", "localPath": "/mnt/m8/myapp-core", "mountPoint": "/mnt/m8" },
+      { "project": "myapp-server", "localPath": "/mnt/m8/myapp-server", "mountPoint": "/mnt/m8" },
+      { "project": "myapp-shared", "localPath": "/mnt/m8/myapp-shared", "mountPoint": "/mnt/m8" }
+    ]
+  },
+  {
+    "bridge-socket": "192.168.1.100:8888",
+    "file": "~/.jdtbridge/instances/remote-d4e5f6.json",
+    "token": "******54d2f",
+    "mount-points": ["/home/user/projects"],
+    "projects": [
+      { "project": "webapp", "localPath": "/home/user/projects/webapp", "mountPoint": "/home/user/projects" }
+    ]
+  }
+]
 ```
-192.168.1.100:8888
-  ✗ TCP — connection refused
-  (cannot verify projects)
+
+`jdt setup remote --check --json` — with connection checks and
+Eclipse comparison:
+```json
+[
+  {
+    "bridge-socket": "host.docker.internal:7777",
+    "file": "~/.jdtbridge/instances/remote-a1b2c3.json",
+    "check": {
+      "tcp": true,
+      "token": true,
+      "plugin": "2.5.0"
+    },
+    "token": "******c392d",
+    "mount-points": ["/mnt/workspace", "/mnt/m8"],
+    "mapped": [
+      { "project": "inside", "localPath": "/mnt/workspace/inside", "mountPoint": "/mnt/workspace" },
+      { "project": "myapp-core", "localPath": "/mnt/m8/myapp-core", "mountPoint": "/mnt/m8" },
+      { "project": "myapp-server", "localPath": "/mnt/m8/myapp-server", "mountPoint": "/mnt/m8" },
+      { "project": "myapp-shared", "localPath": "/mnt/m8/myapp-shared", "mountPoint": "/mnt/m8" }
+    ],
+    "unmapped": [
+      { "project": "deploy-tools", "eclipsePath": "D:\\git\\deploy-tools" },
+      { "project": "infra", "eclipsePath": "D:\\git\\infra" }
+    ],
+    "stale": [
+      { "project": "old-project", "localPath": "/mnt/workspace/old-project" }
+    ]
+  },
+  {
+    "bridge-socket": "192.168.1.100:8888",
+    "file": "~/.jdtbridge/instances/remote-d4e5f6.json",
+    "check": {
+      "tcp": false,
+      "tcpError": "connection refused"
+    },
+    "token": "******54d2f",
+    "mount-points": ["/home/user/projects"],
+    "mapped": [
+      { "project": "webapp", "localPath": "/home/user/projects/webapp", "mountPoint": "/home/user/projects" }
+    ],
+    "unmapped": [],
+    "stale": []
+  }
+]
 ```
+
+`jdt setup remote --bridge-socket host:port --json` — single remote,
+same structure but single object (not array).
 
 ## Instance file format
 
