@@ -127,6 +127,7 @@ public class Activator implements BundleActivator {
                         deleteException);
             }
         }
+        instance = null;
         Log.info("HTTP server stopped");
     }
 

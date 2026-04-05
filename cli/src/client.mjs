@@ -55,22 +55,21 @@ export function resetClient() {
   _instance = null;
 }
 
-function authHeaders() {
-  const inst = _instance;
+function authHeaders(inst) {
+  const target = inst || _instance;
   const headers = {};
-  if (inst && inst.token) {
-    headers.Authorization = `Bearer ${inst.token}`;
+  if (target && target.token) {
+    headers.Authorization = `Bearer ${target.token}`;
   }
-  const session = inst && inst.session;
-  if (session) {
-    headers["X-Bridge-Session"] = session;
+  if (target && target.session) {
+    headers["X-Bridge-Session"] = target.session;
   }
   return headers;
 }
 
 function requestOpts(inst, path, method, timeoutMs) {
   return proxyAwareOptions(
-    inst.host, inst.port, path, method, timeoutMs, authHeaders());
+    inst.host, inst.port, path, method, timeoutMs, authHeaders(inst));
 }
 
 /**
@@ -112,6 +111,14 @@ export async function get(path, timeoutMs = 10_000) {
     }
     throw e;
   }
+}
+
+/**
+ * Direct GET to a specific instance (no resolve, no reconnect).
+ * Used by --check to probe a known remote instance.
+ */
+export function directGet(inst, path, timeoutMs = 5000) {
+  return doGet(inst, path, timeoutMs);
 }
 
 function doGet(inst, path, timeoutMs) {

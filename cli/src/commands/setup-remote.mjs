@@ -7,8 +7,10 @@ import { createHash, randomBytes } from "node:crypto";
 import { remoteInstancesDir, remoteProjectPathsDir } from "../home.mjs";
 import { parseFlags } from "../args.mjs";
 import { normalizePath } from "../paths.mjs";
+import { directGet } from "../client.mjs";
 import { printJson } from "../json-output.mjs";
 import { formatTable } from "../format/table.mjs";
+import { green, red } from "../color.mjs";
 
 /**
  * Hash a bridge-socket string to a 12-char hex filename.
@@ -291,8 +293,103 @@ async function handleCheckAll(jsonOutput) {
     console.log("No remote instances configured.");
     return;
   }
-  // TODO: implement full --check with TCP probe + /projects
-  console.log("--check: not yet implemented");
+  const results = [];
+  for (const remoteInstance of remoteInstances) {
+    results.push(await checkRemote(remoteInstance));
+  }
+  if (jsonOutput) {
+    printJson(results);
+    return;
+  }
+  for (const result of results) {
+    printCheckResult(result);
+  }
+}
+
+async function checkRemote(remoteInstance) {
+  const bridgeSocket = remoteInstance["bridge-socket"];
+  const colonIdx = bridgeSocket.lastIndexOf(":");
+  const host = bridgeSocket.substring(0, colonIdx);
+  const port = parseInt(bridgeSocket.substring(colonIdx + 1), 10);
+  const inst = { host, port, token: remoteInstance.token };
+
+  const result = {
+    "bridge-socket": bridgeSocket,
+    tcp: false,
+    token: false,
+    plugin: null,
+    tcpError: null,
+    projects: null,
+    unmapped: [],
+  };
+
+  // TCP + auth probe via /projects
+  try {
+    const projects = await directGet(inst, "/projects", 5000);
+    result.tcp = true;
+    result.token = true;
+    result.projects = projects;
+    if (Array.isArray(projects)) {
+      // Compare against cached projects
+      const cacheData = readInstanceFile(cacheFilePath(bridgeSocket));
+      const cachedNames = cacheData?.projects
+        ? new Set(Object.keys(cacheData.projects)) : new Set();
+      result.unmapped = projects
+        .map(p => p.name || p)
+        .filter(name => !cachedNames.has(name));
+    }
+  } catch (checkError) {
+    const msg = checkError.message || String(checkError);
+    if (msg.includes("401") || msg.includes("403")) {
+      result.tcp = true;
+      result.token = false;
+    } else {
+      result.tcpError = msg;
+    }
+  }
+
+  // Plugin version via /status
+  if (result.tcp && result.token) {
+    try {
+      const status = await directGet(inst, "/status", 5000);
+      result.plugin = status?.version || null;
+    } catch { /* version unavailable */ }
+  }
+
+  return result;
+}
+
+function printCheckResult(result) {
+  const bridgeSocket = result["bridge-socket"];
+  console.log(`── ${bridgeSocket} ${"─".repeat(
+    Math.max(0, 55 - bridgeSocket.length))}`);
+  console.log();
+  const ok = (msg) => console.log(`  ${green("\u2713")} ${msg}`);
+  const fail = (msg) => console.log(`  ${red("\u2717")} ${msg}`);
+
+  (result.tcp ? ok : fail)(
+    `TCP ${result.tcp ? "connected" : result.tcpError || "failed"}`);
+  if (result.tcp) {
+    (result.token ? ok : fail)(
+      `Token ${result.token ? "accepted" : "rejected"}`);
+  }
+  if (result.plugin) {
+    ok(`Plugin ${result.plugin}`);
+  }
+  if (result.projects) {
+    ok(`${result.projects.length} projects`);
+    if (result.unmapped.length > 0) {
+      console.log();
+      console.log(`  ${result.unmapped.length} unmapped (no local path):`);
+      for (const name of result.unmapped) {
+        console.log(`    ${name}`);
+      }
+      console.log();
+      console.log("  Add mount points to map them:");
+      console.log(`    jdt setup remote --bridge-socket ${bridgeSocket} --add-mount-point <path>`);
+    }
+  }
+  console.log();
 }
 
 function handleDelete(bridgeSocket) {
@@ -462,8 +559,17 @@ async function handleConfigure(bridgeSocket, flags, addMountPoints,
   }
 
   if (checkMode) {
-    // TODO: implement --check (TCP probe + /projects comparison)
-    console.log("--check: not yet implemented");
+    const filePath = instanceFilePath(bridgeSocket);
+    const instanceData = readInstanceFile(filePath);
+    if (instanceData) {
+      const result = await checkRemote(
+        { ...instanceData, file: filePath });
+      if (jsonOutput) {
+        printJson(result);
+      } else {
+        printCheckResult(result);
+      }
+    }
   }
 }
 

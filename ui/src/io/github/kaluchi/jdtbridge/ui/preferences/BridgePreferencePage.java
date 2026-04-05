@@ -506,7 +506,6 @@ public class BridgePreferencePage extends PreferencePage
 
 		localPortStatusLabel.setText("");
 		remotePortStatusLabel.setText("");
-		remotePortStatusLabel.setText("");
 
 		super.performDefaults();
 	}
