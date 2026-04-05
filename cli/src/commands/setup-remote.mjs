@@ -2,12 +2,11 @@
 // See docs/jdt-setup-remote-spec.md for full design.
 
 import { existsSync, readFileSync, writeFileSync, readdirSync, unlinkSync, renameSync } from "node:fs";
-import { join, basename, dirname } from "node:path";
+import { join } from "node:path";
 import { createHash, randomBytes } from "node:crypto";
-import { execSync } from "node:child_process";
 import { remoteInstancesDir, remoteProjectPathsDir } from "../home.mjs";
-import { parseFlags, extractPositional } from "../args.mjs";
-import { bold, green, red, yellow, dim } from "../color.mjs";
+import { parseFlags } from "../args.mjs";
+import { dim } from "../color.mjs";
 import { printJson } from "../json-output.mjs";
 import { formatTable } from "../format/table.mjs";
 
@@ -42,7 +41,7 @@ function readAllRemoteInstances() {
   const remoteInstances = [];
   try {
     for (const fileName of readdirSync(dir)) {
-      if (fileName.endsWith(".json") && !fileName.endsWith(".project-path-cache.json")) {
+      if (fileName.endsWith(".json")) {
         const filePath = join(dir, fileName);
         const instanceData = readInstanceFile(filePath);
         if (instanceData && instanceData["bridge-socket"]) {

@@ -78,18 +78,17 @@ Activator.start()
   ├─ localServer = new HttpServer()
   │  token = resolveLocalToken()
   │  start(127.0.0.1, localPort)
-  │  write <hash>.json
   │
-  └─ if remoteEnabled:
-     remoteServer = new HttpServer()
-     token = resolveRemoteToken()
-     start(0.0.0.0, remotePort)
-     write <hash>-remote.json
+  ├─ if remoteEnabled:
+  │  remoteServer = new HttpServer()
+  │  token = resolveRemoteToken()
+  │  start(0.0.0.0, remotePort)
+  │
+  └─ writeBridgeFile() → <hash>.json (both sockets)
 ```
 
-Instance files:
-- `~/.jdtbridge/instances/<hash>.json` — local socket (always)
-- `~/.jdtbridge/instances/<hash>-remote.json` — remote socket (when enabled)
+Single instance file `~/.jdtbridge/instances/<hash>.json` with both sockets:
+`port`, `token`, `host` (local) + `remotePort`, `remoteToken` (when enabled).
 
 Token resolution per socket:
 1. Regenerate on restart = true → generate new
