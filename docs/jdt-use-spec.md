@@ -51,17 +51,26 @@ instances and auto-adds new ones to `workspaces.json`.
 
 ```
 $ jdt use
-#  ALIAS  WORKSPACE                           STATUS   PINNED  VERSION  PORT
-1  jdt    D:\eclipse-workspace-jdtbridge      online   pinned  2.4.0    58800
-2  web    D:\eclipse-workspace-webapp         online           2.4.0    59100
-3         C:\Users\John\Projects\legacy       offline
-4         D:\eclipse-workspace-experiment     *new*            2.4.0    58801
+#  ALIAS  WORKSPACE                        STATUS  PINNED  HOST       PORT   PLUGIN
+1  jdt    D:\eclipse-workspace-jdtbridge   online  pinned  127.0.0.1  7777   2.5.0
+2  web    D:\eclipse-workspace-webapp      online          127.0.0.1  59100  2.5.0
+3         C:\Users\John\Projects\legacy    offline
 
 Pin this terminal:  jdt use <N|alias|path>
 ```
 
-The `PINNED` column shows which workspace is pinned in the current
-terminal. Determined from ppid pin or terminal ID pin.
+Columns:
+
+| Column | Description |
+|---|---|
+| `#` | Registry number (position in `workspaces.json`) |
+| `ALIAS` | User-defined short name for quick switching |
+| `WORKSPACE` | Workspace path as seen by the CLI host |
+| `STATUS` | Connection status (see below) |
+| `PINNED` | Shows `pinned` for the active workspace in this terminal |
+| `HOST` | Server bind address |
+| `PORT` | Server port |
+| `PLUGIN` | Plugin version on the Eclipse instance |
 
 Status values:
 
@@ -132,6 +141,32 @@ TYPE      ID                    WORKSPACE                       STATUS  PINNED A
 ppid      42512                 D:\eclipse-workspace-jdtbridge  stale   2026-04-04T02:49:02Z
 terminal  0679187d-a3ea-4c9...  D:\eclipse-workspace-jdtbridge  active  2026-04-04T02:49:02Z
 ```
+
+### Remote instances
+
+When `jdt setup --remote` creates an instance file (e.g. inside
+a Docker container), `jdt use` shows it alongside local instances.
+See [jdt-setup-spec.md](jdt-setup-spec.md) for remote setup details.
+
+Example inside a Linux container connected to a remote Eclipse:
+
+```
+$ jdt use
+#  ALIAS  WORKSPACE   STATUS  PINNED  HOST                    PORT   PLUGIN
+1         /workspace  online  pinned  host.docker.internal    7777   2.5.0
+```
+
+Multiple remote Eclipse instances:
+
+```
+$ jdt use
+#  ALIAS  WORKSPACE        STATUS   PINNED  HOST                    PORT   PLUGIN
+1  dev    /mnt/dev         online   pinned  host.docker.internal    7777   2.5.0
+2  stage  /mnt/staging     online           192.168.1.100           8888   2.4.0
+3  prod   /mnt/production  offline          10.0.0.5                9999
+```
+
+Switching works the same as local: `jdt use 2` or `jdt use stage`.
 
 ### `jdt use --json`
 

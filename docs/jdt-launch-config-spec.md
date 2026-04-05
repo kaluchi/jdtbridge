@@ -126,7 +126,7 @@ list). Complex — deferred until concrete use cases emerge.
 - **[jdt-launch-spec](jdt-launch-spec.md)** — core launch commands.
   Import and delete are flags on `jdt launch config` (alongside
   `--xml` and `--json`).
-- **[ui-integration-spec](ui-integration-spec.md)** — Eclipse UI
+- **[bridge-ui-spec](bridge-ui-spec.md)** — Eclipse UI
   creates launch configs via Run Configurations dialog. Import
   is the CLI equivalent for headless workflows.
 
