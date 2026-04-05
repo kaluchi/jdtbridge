@@ -379,6 +379,12 @@ async function runRemove(config) {
 // ---- entry point ----
 
 export async function setup(args) {
+  // Subcommand: jdt setup remote
+  if (args[0] === "remote") {
+    const { setupRemote } = await import("./setup-remote.mjs");
+    return setupRemote(args.slice(1));
+  }
+
   const flags = parseFlags(args);
   const config = readConfig();
   if (flags.eclipse) config.eclipse = flags.eclipse;

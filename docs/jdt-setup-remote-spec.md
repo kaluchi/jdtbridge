@@ -79,6 +79,14 @@ already-present mount point rescans it without duplicating.
 Idempotent — removing an absent mount point is a no-op.
 Invalidates project path cache.
 
+Operations applied in argument order. Mixed add/remove in one call:
+```bash
+--add-mount-point /a --remove-mount-point /b --add-mount-point /c
+```
+Executes: add /a → remove /b → add /c.
+`--add-mount-point /x --remove-mount-point /x` = not present (remove wins).
+`--remove-mount-point /x --add-mount-point /x` = present (add wins).
+
 On `--add-mount-point`: CLI immediately scans the directory,
 finds `.project` files, reads `<name>`, populates project path
 cache, outputs result table.

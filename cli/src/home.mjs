@@ -23,6 +23,13 @@ export function instancesDir() {
   return dir;
 }
 
+/** Directory for remote instance configs (jdt setup remote). */
+export function remoteInstancesDir() {
+  const dir = join(getHome(), "remote-instances");
+  ensureDir(dir);
+  return dir;
+}
+
 /** Directory where agent session files are stored. */
 export function agentsDir() {
   const dir = join(getHome(), "agents");

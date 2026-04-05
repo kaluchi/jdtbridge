@@ -207,6 +207,7 @@ class LaunchHandler {
         }
     }
 
+    @SuppressWarnings("restriction")
     String handleImport(Map<String, String> params,
             String launchXmlContent) {
         String configId = params.get("configId");
