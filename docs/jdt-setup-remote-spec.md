@@ -80,6 +80,22 @@ On `--add-mount-point`: CLI immediately scans the directory,
 finds `.project` files, reads `<name>`, populates project path
 cache, outputs result table.
 
+## Token display
+
+Tokens are masked in output: `******b7173` (last 5 characters).
+
+Exception: when a token is auto-generated, it is shown in full
+exactly once so the user can copy it:
+
+```
+  token: e240be6743978f011bfd326c9d3c392d (auto-generated, shown once)
+```
+
+Subsequent calls show masked: `******c392d`.
+
+No clipboard API — Docker containers have no GUI.
+User copies from terminal output.
+
 ## Output: new instance
 
 ```
@@ -88,7 +104,7 @@ $ jdt setup remote --bridge-socket host.docker.internal:7777 --token abc123 \
 
 Wrote ~/.jdtbridge/instances/remote-a1b2c3.json:
   bridge-socket: host.docker.internal:7777
-  token:         ***c123
+  token:         ******bc123
 
 Scanning mount points...
 
@@ -106,7 +122,7 @@ $ jdt setup remote --bridge-socket host.docker.internal:7777
 
 Wrote ~/.jdtbridge/instances/remote-a1b2c3.json:
   bridge-socket: host.docker.internal:7777
-  token:         ***f4a8 (no --token, auto-generated and written)
+  token:         e240be6743978f011bfd326c9d3c392d (no --token, auto-generated, shown once)
 ```
 
 ## Output: add mount point to existing
@@ -146,7 +162,7 @@ Only changed fields:
 $ jdt setup remote --bridge-socket host.docker.internal:7777 --token new-token
 
 Updated ~/.jdtbridge/instances/remote-a1b2c3.json:
-  token: ***token (was: ***c123)
+  token: ******token (was: ******bc123)
 ```
 
 ## Output: no arguments (onboarding / status)
@@ -196,7 +212,7 @@ $ jdt setup remote --check
 
 host.docker.internal:7777
   ✓ TCP
-  ✓ Token ***a1b2
+  ✓ Token ******a1b2c
   ✓ Plugin 2.5.0
 
   Mapped and verified:
@@ -222,7 +238,7 @@ $ jdt setup remote --bridge-socket host.docker.internal:7777 --check
 
 host.docker.internal:7777
   ✓ TCP
-  ✓ Token ***a1b2
+  ✓ Token ******a1b2c
   ✓ Plugin 2.5.0
 
   Mapped and verified:
