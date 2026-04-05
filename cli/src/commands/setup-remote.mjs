@@ -281,7 +281,7 @@ async function handleConfigure(bridgeSocket, flags, addMountPoints,
   }
   if (!resolvedToken) {
     resolvedToken = generateToken();
-    tokenSource = "no --token, auto-generated and written";
+    tokenSource = "no --token, auto-generated, shown once";
   }
 
   // Build instance data
@@ -346,7 +346,7 @@ async function handleConfigure(bridgeSocket, flags, addMountPoints,
     }
   }
 
-  // Scan mount points
+  // Scan mount points (on new instance or any mount-point change)
   const mountPoints = instanceData["mount-points"] || [];
   if (mountPoints.length > 0 && (mountPointsChanged || !isUpdate)) {
     const scannedProjects = scanAllMountPoints(mountPoints);
@@ -356,7 +356,6 @@ async function handleConfigure(bridgeSocket, flags, addMountPoints,
       console.log("Scanning mount points for .project files...");
       console.log();
       if (scannedProjects.length > 0) {
-        // Print table
         const projectRows = scannedProjects.map(scannedProject => [
           scannedProject.projectName,
           scannedProject.localPath,
@@ -369,14 +368,10 @@ async function handleConfigure(bridgeSocket, flags, addMountPoints,
       }
       console.log(`${scannedProjects.length} projects cached.`);
     }
-  }
-
-  // Remove mount point — rescan remaining
-  if (removeMountPoints.length > 0) {
-    const remainingProjects = scanAllMountPoints(
-      instanceData["mount-points"] || []);
-    writeCacheFile(bridgeSocket, instanceData["mount-points"] || [],
-      remainingProjects);
+  } else if (removeMountPoints.length > 0 && !mountPointsChanged) {
+    // Remove-only with no net change (path wasn't in list) — rescan
+    const remainingProjects = scanAllMountPoints(mountPoints);
+    writeCacheFile(bridgeSocket, mountPoints, remainingProjects);
     if (!jsonOutput) {
       console.log(`${remainingProjects.length} projects in cache.`);
     }
