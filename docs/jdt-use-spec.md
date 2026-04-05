@@ -497,12 +497,12 @@ CLI:
   terminal-id.mjs            — resolveTerminalId()
   resolve.mjs                — connection resolution (env → ppid pin → term pin → discovery)
   home.mjs                   — workspaces.json read/write, pins directory management
-  bridge-env.mjs             — getPinnedBridge() (existing, unchanged)
-  discovery.mjs              — discoverInstances() (updated: reads local + remote-instances)
+  bridge-env.mjs             — getPinnedBridge()
+  discovery.mjs              — discoverInstances() reads local + remote-instances
 
 Data:
   ~/.jdtbridge/use/workspaces.json         — workspace list with aliases
   ~/.jdtbridge/use/pins/term-<id>.json     — per terminal tab pin
   ~/.jdtbridge/use/pins/ppid-<pid>.json    — per process pin
-  ~/.jdtbridge/instances/                  — local instance files (existing)
+  ~/.jdtbridge/instances/                  — local instance files
   ~/.jdtbridge/remote-instances/           — remote instance files

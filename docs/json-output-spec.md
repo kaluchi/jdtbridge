@@ -71,9 +71,9 @@ Adding `--json` is mechanical — early exit before `formatTable`.
 | `launch list` | HTTP | `GET /launch/list` → `[{name, type, mode, status, pid}]` |
 | `launch configs` | HTTP | `GET /launch/configs` → `[{name, type}]` |
 | `project-info` | HTTP | `GET /project-info` — complex adaptive rendering, JSON = raw server response |
-| `source` | HTTP | **Already done** — `jdt source --json` |
+| `source` | HTTP | `GET /source` → `{fqn, source, origin}` |
 | `setup remote` | local files + HTTP (--check) | Instance config, cached projects, check results. See [jdt-setup-remote-spec](jdt-setup-remote-spec.md) `--json` section |
-| `use` | local files + HTTP | Workspace list with host/port/status. **Already done** — `jdt use --json` |
+| `use` | local files + HTTP | Workspace list with host/port/status |
 
 ### Out of scope
 
@@ -105,7 +105,7 @@ export async function find(args) {
     return;
   }
 
-  // ... existing render logic unchanged
+  // ... render logic
 }
 ```
 
@@ -147,7 +147,7 @@ the global help just shows command signatures.
 ### CLI tests (vitest)
 
 For each command with `--json`:
-1. Mock HTTP response (existing pattern)
+1. Mock HTTP response
 2. Call command with `--json` flag
 3. Assert stdout is valid JSON (`JSON.parse(stdout)`)
 4. Assert key fields are present

@@ -236,7 +236,7 @@ is stable and tested, the old command becomes an alias, then is removed.
 │  jdt build --project my-server     compilation            │
 │  jdt launch run my-maven-build     Java app launches      │
 │                                                           │
-│  Existing commands. Unchanged.                            │
+│                                                           │
 └───────────────────────────────────────────────────────────┘
 ```
 
