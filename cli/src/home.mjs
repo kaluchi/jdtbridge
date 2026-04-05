@@ -149,3 +149,9 @@ function ensureDir(dir) {
     mkdirSync(dir, { recursive: true });
   }
 }
+
+/** Mask token for display — show last 5 chars only. */
+export function maskToken(token) {
+  if (!token || token.length < 5) return "******";
+  return "******" + token.substring(token.length - 5);
+}

@@ -165,7 +165,7 @@ Design decisions:
   not on the server — keeps the API clean and the rendering consistent
   between `configs` and `config`.
 
-### `jdt launch run <configId> [-f] [-q]`
+### `jdt launch run <configId> [-f] [-q] [-- extra-args...]`
 
 Launch a saved configuration in run mode (non-blocking).
 
@@ -180,9 +180,37 @@ Launched my-server (run) [Java Application]
   Command:    java -cp ... com.example.Main
 ```
 
-### `jdt launch debug <configId> [-f] [-q]`
+#### Extra arguments (`-- args...`)
 
-Same as `run` but attaches the Eclipse debugger.
+Everything after `--` is appended to the configuration's arguments
+for this launch only. The saved configuration is not modified.
+
+```bash
+jdt launch run npm-test -f -- test/paths.test.mjs
+jdt launch run my-server -- --port 8080 --debug
+jdt launch run jdtbridge-verify -- -DskipTests
+```
+
+Implementation: `config.getWorkingCopy()` → append to argument
+attribute → `workingCopy.launch()` without `save()`. The working
+copy is discarded after launch.
+
+Argument attribute per launch type:
+
+| Launch type | Attribute | Effect |
+|---|---|---|
+| External Tools (Program) | `ATTR_TOOL_ARGUMENTS` | Appended to program arguments |
+| Java Application | `ATTR_PROGRAM_ARGUMENTS` | Appended to program arguments |
+| Maven Build | `ATTR_TOOL_ARGUMENTS` | Appended to Maven goals/flags |
+| JUnit / PDE JUnit | `ATTR_VM_ARGUMENTS` | Appended to JVM arguments |
+| JDT Bridge Agent | `ATTR_AGENT_ARGS` | Appended to agent arguments |
+
+When no `--` is provided, behavior is unchanged — saved config
+launched as-is via `config.launch()`.
+
+### `jdt launch debug <configId> [-f] [-q] [-- extra-args...]`
+
+Same as `run` but attaches the Eclipse debugger. Supports `-- args`.
 
 ### `jdt launch logs <launchId> [-f] [--tail N] [--stdout] [--stderr]`
 
@@ -234,7 +262,12 @@ Attribute values preserve Eclipse types:
 - `Set<String>` -> JSON array
 - `Map<String, String>` -> JSON object
 
-### `GET /launch/run?configId=<configId>[&debug]`
+### `GET /launch/run?configId=<configId>[&debug][&args=<extra>]`
+
+`args` — extra arguments appended to the config's argument attribute
+(URL-encoded). When present, a WorkingCopy is created, modified, and
+launched without saving. When absent, the saved config is launched
+directly.
 
 Returns: `{ok, configId, launchId, mode, configType, pid, cmdline, workingDir}`
 

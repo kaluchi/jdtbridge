@@ -1,409 +1,39 @@
-# UI Integration & UX Specification: JDT Bridge
+# Bridge UI — Design Spec
 
-**Version:** 2.0.0
-**Date:** 2026-03-30
+## Vision
 
----
-
-## 1. Vision
-
-Transform JDT Bridge from a background utility into a visible, manageable,
-and trustworthy AI-orchestration hub within Eclipse. Focus on zero-config
-onboarding, deep visibility into AI agent activities, and unified agent
+Transform JDT Bridge from a background utility into a visible,
+manageable AI-orchestration hub within Eclipse. Zero-config
+onboarding, deep visibility into agent activities, unified agent
 lifecycle management through `jdt` CLI.
 
 ### Design decisions
 
-- **Separate UI plugin** (`io.github.kaluchi.jdtbridge.ui`) — the core
+- **Separate UI plugin** (`io.github.kaluchi.jdtbridge.ui`) — core
   plugin stays headless, UI is a new module.
-- **Built-in Eclipse Terminal — rejected.** Buggy TTY, poor interactive CLI
-  support, non-viable for real agent sessions. Always external system terminal.
-- **All agent launches go through `jdt` CLI** — every agent invocation is
-  mediated by `jdt agent run`. This is the integration point for environment
-  propagation, telemetry, instance pinning, and lifecycle tracking.
-- **No change review / diff UI.** The plugin does not review or visualize
-  agent-produced code changes. Workflow: agent works, agent opens PR,
-  developer reviews PR with standard tools (GitHub, GitLab, IDE git).
-  The plugin's role ends at launch, observe, stop.
-- **No agent interaction UI.** No chat window, no prompt input, no
-  conversation history. Interactive communication happens in the agent's
-  own terminal.
-- **No agent-specific configuration.** Model selection, API keys, system
-  prompts belong to the agent itself. The plugin configures bridge
-  integration (which projects, which instance), not agent behavior.
-- **`jdt agent` — new CLI namespace** for agent lifecycle (run, stop, list,
-  logs, providers). Provider-based: each provider (sandbox, local, ccs) is
-  a separate launch flow with its own setup. Eclipse plugin calls
-  `jdt agent run` to spawn agents.
-- **No `jdt admin` for now.** `jdt setup` covers current admin needs
-  (health check, hook installation, plugin management).
-
----
-
-## 2. User Stories
-
-* **Onboarding:** "As a new user, I want the IDE to tell me if I'm missing
-  Node.js or the CLI, and offer a one-click fix."
-* **Execution:** "As a developer, I want to launch an AI session for a
-  specific subset of projects without manually typing complex commands."
-* **Trust & Transparency:** "As a security-conscious dev, I want to see
-  exactly what JDT data the agent is requesting in real-time."
-* **Control:** "As a multi-tasker, I want to see all running AI sessions
-  and stop them instantly."
-* **Multi-profile:** "As a power user, I want to run multiple independent
-  agent sessions (different profiles, different project scopes) in parallel."
-
----
-
-## 3. Functional Areas
-
-### A. Environment Health (Onboarding)
-
-* Automatic detection of: Node.js, npm, `@kaluchi/jdtbridge` CLI,
-  Docker (for sandbox).
-* "Fix-it" actions: install CLI globally, run `jdt setup --claude` in a
-  specific project.
-* Status Bar indicator (bridge status, CLI version).
-
-### B. Launch Configurations
-
-* Each agent setup is a **distinct named launch configuration**, not a
-  parameterized variant of a generic type.
-* Examples: "claude-local", "claude-sandbox", "ccs-max" — each with its
-  own command, env, hooks.
-* Launch configs encode: provider, agent, working directory, environment
-  variables (including bridge pinning), project scope.
-* Plugin calls `jdt agent run <provider> <agent> --name <id>` to spawn.
-* Lifecycle management via `jdt agent stop/list/logs`.
-
-### C. Agent Activity Monitor (Telemetry)
-
-* A dedicated Eclipse View showing a live stream of JDT Bridge HTTP requests.
-* Visual distinction between Search, Read Source, Refactor, and Test Run.
-* Double-click a log entry to open the corresponding Java element.
-* CLI-side telemetry: track `jdt` operations that don't hit the bridge
-  socket (setup, discovery, env checks) via a dedicated telemetry endpoint.
-
----
-
-## 4. Out of Scope
-
-- **Code review / diff viewer.** We don't reinvent pull requests.
-- **Agent interaction UI (chat).** Happens in the agent's own terminal.
-- **Built-in terminal emulator.** Unreliable for interactive TTY sessions.
-- **Agent-specific configuration.** Model, API keys, prompts — agent's concern.
-
----
-
-## 5. CLI Stakeholders
-
-`jdt` CLI has four distinct consumers:
-
-| # | Stakeholder | Commands used | Examples |
-|---|-------------|--------------|---------|
-| 1 | **Agent process** | Working commands | `jdt refs`, `jdt find`, `jdt build`, `jdt test run` |
-| 2 | **User in terminal** | Same as agent | `jdt refs`, `jdt find`, `! jdt problems` |
-| 3 | **Eclipse plugin** | Service/admin | `jdt setup --check`, `jdt agent run/stop/list` |
-| 4 | **User launching agents** | Agent lifecycle | `jdt agent run`, `jdt agent stop` |
-
-Stakeholders 1+2 share the working command interface.
-Stakeholders 3+4 share the agent lifecycle interface (`jdt agent`).
-
-### Context detection
-
-`jdt` adjusts visible commands based on caller context:
-
-| Signal | Stakeholder | Behavior |
-|--------|-------------|----------|
-| `isTTY=true`, no `JDT_BRIDGE_SESSION` | User in terminal (2, 4) | Full help, all commands |
-| `isTTY=false`, `JDT_BRIDGE_SESSION` set | Agent process (1) | Working commands only |
-| Called by plugin with admin token | Eclipse plugin (3) | Admin/service commands |
-
-UX differentiation only, not a security boundary.
-
----
-
-## 6. `jdt agent` — Agent Lifecycle
-
-### 6.1. Commands
-
-```
-jdt agent run <provider> <agent> [options]    Launch agent session
-  --name <id>                                 Session ID (launcher-defined)
-                                              Default: <provider>-<agent>-<timestamp>
-
-jdt agent run sandbox claude --name my-fix    Launch with specific ID
-jdt agent list                                Running sessions
-jdt agent stop <name>                         Stop by session ID
-jdt agent logs <name> [-f]                    Stream output
-jdt agent providers                           Available providers
-```
-
-The entity that calls `jdt agent run` (Eclipse UI or user) defines the
-Session ID via `--name`. This ID is used for telemetry (`X-Bridge-Session`
-header), lifecycle management, and UI grouping.
-
-### 6.2. Providers
-
-Each provider is a completely separate launch flow. No shared logic —
-`sandbox` knows about Docker, `ccs` knows about profiles, `local` knows
-about terminal emulators.
-
-**Why providers, not flags:** Local Claude and sandbox Claude have different
-accounts, histories, hosts, environments. `ccs max` vs direct `claude` have
-different hooks, onboarding files, dependencies. Too diverse for a
-parameterized command.
-
-**Provider contract:**
-1. Deliver `JDT_BRIDGE_*` connection coordinates to the agent
-2. Return a handle for lifecycle management (PID, container name, etc.)
-3. Implement `stop(handle)` and `logs(handle)` for that handle type
-
-Everything else is the provider's internal concern: terminal selection,
-network setup, authentication.
-
-| Provider | Agent runs in | Handle type | Stop mechanism |
-|----------|--------------|-------------|----------------|
-| `local` | System terminal on host | PID | Process tree kill |
-| `sandbox` | Docker container | Container name | `docker sandbox stop` |
-| `ccs` | System terminal (via ccs) | PID | Process tree kill |
-
-### 6.3. Provider setup examples
-
-The `sandbox` provider (reference implementation — `jdt sandbox run`):
-
-```
-jdt agent run sandbox claude
-  1. Discover bridge on host (port, token)
-  2. Create Docker sandbox (if not exists)
-  3. Configure network proxy (allow localhost)
-  4. Install jdt CLI inside sandbox
-  5. Write instance file inside sandbox (host.docker.internal)
-  6. Spawn agent process
-```
-
-The `local` provider:
-
-```
-jdt agent run local claude
-  1. Discover bridge on host (port, token)
-  2. Inject JDT_BRIDGE_* env vars
-  3. Open system terminal with agent command
-  4. Register PID for lifecycle tracking
-```
-
-The `ccs` provider:
-
-```
-jdt agent run ccs max
-  1. Discover bridge on host (port, token)
-  2. Inject JDT_BRIDGE_* env vars
-  3. Call `ccs max` with enriched environment
-  4. Register PID for lifecycle tracking
-```
-
-Each provider is a separate module in `cli/src/commands/agent/`.
-
-### 6.4. `jdt sandbox run` migration
-
-`jdt sandbox run` stays as-is during transition. Once `jdt agent run sandbox`
-is stable and tested, the old command becomes an alias, then is removed.
-
----
-
-## 7. Two Layers of Launch
-
-```
-┌───────────────────────────────────────────────────────────┐
-│  Plugin + User (stakeholders 3+4)                         │
-│                                                           │
-│  Eclipse UI calls:  jdt agent run sandbox claude          │
-│  User calls:        jdt agent run local claude            │
-│                                                           │
-│  CLI does ALL setup: bridge discovery, env injection,     │
-│  Docker/terminal setup, PID registration                  │
-│                                                           │
-│  Plugin manages via: jdt agent list / stop / logs         │
-└───────────────────────────────────────────────────────────┘
-         ▲ spawn + manage agents
-   ══════╪══════════════════════════════════════════════════
-         ▼ working commands for agents
-┌───────────────────────────────────────────────────────────┐
-│  Agent + User in terminal (stakeholders 1+2)              │
-│                                                           │
-│  jdt refs com.example.Service      semantic search        │
-│  jdt test run com.example.MyTest   run tests              │
-│  jdt build --project my-server     compilation            │
-│  jdt launch run my-maven-build     Java app launches      │
-│                                                           │
-│                                                           │
-└───────────────────────────────────────────────────────────┘
-```
-
----
-
-## 8. Environment Variable Propagation
-
-When `jdt agent run` spawns an agent, each provider injects bridge
-connection env vars:
-
-```bash
-JDT_BRIDGE_PORT=63741          # pinned port
-JDT_BRIDGE_TOKEN=abc123...     # auth token
-JDT_BRIDGE_HOST=127.0.0.1     # or host.docker.internal for sandbox
-JDT_BRIDGE_WORKSPACE=/path    # workspace path
-JDT_BRIDGE_SESSION=sess-001   # session ID for telemetry
-```
-
-When `JDT_BRIDGE_PORT` + `JDT_BRIDGE_TOKEN` are set, `jdt` CLI skips
-discovery entirely and connects directly. This eliminates the
-multi-instance collision bug where a test Eclipse overwrites the instance
-file and the dev agent connects to the wrong instance.
-
-**Transitivity:** These env vars must survive the agent's tool chain.
-Claude Code passes env to child processes (Bash tool), so `jdt` commands
-invoked by the agent inherit the pinned instance. Needs verification for
-each agent type.
-
----
-
-## 9. Third-Party Profile Managers
-
-Tools like [ccs](https://github.com/kaitranntt/ccs),
-[claude-code-switch](https://github.com/foreveryh/claude-code-switch),
-[claude-code-router](https://github.com/musistudio/claude-code-router)
-manage multiple Claude Code profiles (API keys, settings, models).
-
-These become `jdt agent` **providers** — `jdt agent run ccs max` calls
-`ccs max` under the hood with bridge env vars injected. Same pattern as
-`sandbox` provider wrapping `docker sandbox run`.
-
----
-
-## 10. Eclipse Launch Integration
-
-### 10.1. Custom ILaunchConfigurationType
-
-| Aspect | Details |
-|--------|---------|
-| Extension points | `o.e.debug.core.launchConfigurationTypes`, `o.e.debug.ui.launchConfigurationTabGroups` |
-| Classes | `AgentLaunchDelegate`, tab group classes |
-| What you get | Run Configurations dialog, Debug view, Console view, Run toolbar, history |
-| Persistence | `.launch` files (shareable via VCS) |
-
-The launch delegate calls `jdt agent run <provider> <agent> --name <id>`.
-CLI does all setup. Plugin identifies the session by the `--name` ID it
-assigned, and manages lifecycle via `jdt agent stop/list/logs`.
-
-```java
-// AgentLaunchDelegate.launch()
-String provider = config.getAttribute(ATTR_PROVIDER, "local");
-String agent = config.getAttribute(ATTR_AGENT, "claude");
-String name = config.getName(); // Eclipse launch config name = session ID
-
-List<String> cmd = List.of("jdt", "agent", "run", provider, agent,
-    "--name", name);
-
-Process proc = new ProcessBuilder(cmd)
-    .directory(new File(workDir))
-    .start();
-```
-
-### 10.2. External Tools (alternative)
-
-External Tools works as a power-user escape hatch for custom/unsupported
-agents. Not suitable for onboarding — user must manually construct
-commands and add env vars.
-
-### 10.3. Menu
-
-See [bridge-ui-menu-spec.md](bridge-ui-menu-spec.md).
-Main menu and context menu structure, commands, dynamic contributions.
-
----
-
-## 11. Telemetry
-
-### Problem
-
-Many `jdt` CLI operations don't hit the bridge HTTP server: `jdt setup`,
-discovery, agent spawning, hook installation. These are invisible to the
-plugin's Activity Monitor.
-
-### Proposed: `POST /telemetry`
-
-```
-POST /telemetry
-Authorization: Bearer <token>
-
-{
-  "session": "sess-001",
-  "event": "setup.check",
-  "ts": 1743300000000,
-  "data": { "node": true, "cli": "1.8.0", "docker": true }
-}
-```
-
-**Event categories:**
-- `discovery.*` — instance probing, connection, fallback
-- `setup.*` — check, install hooks
-- `agent.*` — spawn, stop
-- `cli.*` — commands without their own endpoint
-
-Plugin-side `TelemetryHandler` stores events in a ring buffer. Activity
-Monitor view reads from this buffer + live HTTP request log.
-
-Fire-and-forget: CLI sends telemetry asynchronously, does not wait for ACK.
-Default-on (local-only, no data leaves the machine). Suppressible via
-`--quiet` or `JDT_BRIDGE_QUIET=true`.
-
----
-
-## 12. Project Scoping
-
-### MVP: Working directory + instructions injection
-
-- **Working directory:** Launch agent in project dir — agent defaults to
-  exploring its cwd tree.
-- **Instructions injection:** Generate CLAUDE.md / config with explicit
-  project list. Works with all agents that respect instructions.
-
-### Future: Server-side filtering
-
-Each session gets a `JDT_BRIDGE_SESSION` ID. Agent's `jdt` calls include
-`X-Bridge-Session` header. Bridge maintains a session registry:
-
-```
-sess-001 → { allowedProjects: ["my-server", "my-lib"] }
-```
-
-All handlers filter results by session. Only airtight solution, but
-requires session-aware request routing. Deferred.
-
----
-
-## 13. Feature Evaluation Matrix
-
-**Scale:** 1 (Poor/Hard) to 5 (Excellent/Easy).
-
-| Feature | Variant | UX | Complexity | Gemini | Claude | Notes |
-|:---|:---|:---|:---:|:---:|:---:|:---|
-| **Onboarding** | A: External Browser (current) | Low | 1 | 2 | 2 | Too detached |
-| | B: Eclipse Intro | High | 3 | 4 | 3 | Good first-run, one-shot |
-| | C: Dashboard View | High | 3 | 5 | 5 | Persistent, actionable |
-| **Terminal** | A: Built-in Eclipse | Low | 2 | 1 | 1 | Rejected |
-| | B: External System | High | 1 | 5 | 5 | Full TTY |
-| **Launch** | A: Simple Menu Button | Mid | 1 | 3 | 3 | Fine as shortcut |
-| | B: External Tools | Mid | 0 | 3 | 2 | Power-user only |
-| | C: Custom Launch Type | High | 4 | 5 | 5 | Native feel |
-| **Scoping** | A: Manual flags | Low | 1 | 2 | 2 | Error-prone |
-| | B: Launch Config picker | High | 3 | 5 | 5 | Intuitive |
-| **Telemetry** | A: Console log | Low | 1 | 2 | 2 | Messy |
-| | B: Custom Table View | High | 3 | 5 | 5 | Searchable, clickable |
-
----
-
-## 14. UI/UX Principles
+- **External system terminal, not built-in Eclipse Terminal.** Buggy
+  TTY, poor interactive CLI support, non-viable for agent sessions.
+- **All agent launches go through `jdt` CLI** — every invocation is
+  mediated by `jdt agent run`. Integration point for environment
+  propagation, telemetry, lifecycle tracking.
+- **No change review / diff UI.** Agent works → opens PR → developer
+  reviews with standard tools. Plugin's role: launch, observe, stop.
+- **No agent interaction UI.** No chat window, no prompt input.
+  Interactive communication happens in the agent's own terminal.
+- **No agent-specific configuration.** Model selection, API keys,
+  system prompts belong to the agent itself. The plugin configures
+  bridge integration (which projects, which instance), not agent
+  behavior.
+
+## Out of scope
+
+- Code review / diff viewer — don't reinvent pull requests.
+- Agent interaction UI (chat) — happens in the agent's terminal.
+- Built-in terminal emulator — unreliable for interactive TTY.
+- Agent-specific configuration — model, API keys, prompts are the
+  agent's concern.
+
+## UI/UX principles
 
 1. **Never block the UI.** All checks and launches are asynchronous.
 2. **Native over Fancy.** Standard Eclipse components (Launch Configs,
@@ -414,9 +44,7 @@ requires session-aware request routing. Deferred.
 5. **jdt-mediated.** Eclipse UI never spawns agents directly — always
    through `jdt agent run`.
 
----
-
-## 15. Module Structure
+## Module structure
 
 ```
 eclipse-jdt-search/
@@ -460,37 +88,29 @@ ui/
       PreferenceInitializer.java     Default values
 ```
 
----
+## Detailed specs
 
-## 16. HTTP Server Preferences
+| Area | Spec |
+|---|---|
+| Main menu, context menu | [bridge-ui-menu-spec](bridge-ui-menu-spec.md) |
+| Preferences (dual socket, tokens) | [bridge-ui-preferences-spec](bridge-ui-preferences-spec.md) |
+| Agent launch configuration (tabs, delegate) | [bridge-ui-launch-spec](bridge-ui-launch-spec.md) |
+| Agent lifecycle (providers, CLI commands) | [jdt-agent-spec](jdt-agent-spec.md) |
+| Session scope (project filtering) | [bridge-session-spec](bridge-session-spec.md) |
 
-See [bridge-ui-preferences-spec.md](bridge-ui-preferences-spec.md).
+## Future work
 
-Two sockets (local loopback + optional remote), per-socket token
-management, dual socket architecture, hot rebind.
+### Telemetry view
 
----
+Many `jdt` CLI operations don't hit the bridge HTTP server: `jdt setup`,
+discovery, agent spawning, hook installation. A dedicated Eclipse View
+showing live stream of bridge HTTP requests + CLI telemetry events.
 
-## 17. Phased Delivery
+`POST /telemetry` endpoint, ring buffer on plugin side, Activity
+Monitor view. Fire-and-forget, default-on, local-only.
 
-### Phase 1 — Foundation
-- Create `ui/` plugin module with build integration
-- Main menu + context menu (health check, open terminal)
-- Preference page (basic settings, terminal preference)
-- Migrate welcome from browser to native Eclipse wizard
+### Onboarding dashboard
 
-### Phase 2 — Agent Launch (`jdt agent`)
-- `jdt agent run/stop/list/logs/providers` CLI commands
-- Provider implementations: `local`, `sandbox` (migrated from `jdt sandbox run`)
-- Custom `ILaunchConfigurationType` — plugin calls `jdt agent run`
-- Shared config in `~/.jdtbridge/config.json` — Preference Page writes, CLI reads
-- `jdt sandbox run` kept as alias during transition
-
-### Phase 3 — Observability
-- `POST /telemetry` endpoint
-- Activity Monitor view
-- Dashboard view with health checks
-
-### Phase 4 — Advanced
-- Server-side project filtering (session-aware)
-- Shareable `.launch` configs via VCS
+Eclipse View with environment health checks: Node.js, npm, CLI
+version, Docker availability. Fix-it actions: install CLI globally,
+run `jdt setup --claude` in a specific project.

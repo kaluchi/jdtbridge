@@ -656,8 +656,8 @@ public class LaunchHandlerTest {
         @Test
         void parseQueryWithLaunchParams() {
             var params = HttpServer.parseQuery(
-                    "name=m8-server&tail=50&stream=stderr");
-            assertEquals("m8-server", params.get("name"));
+                    "name=my-server&tail=50&stream=stderr");
+            assertEquals("my-server", params.get("name"));
             assertEquals("50", params.get("tail"));
             assertEquals("stderr", params.get("stream"));
         }
@@ -667,6 +667,70 @@ public class LaunchHandlerTest {
             var params = HttpServer.parseQuery(
                     "name=My%20Test%20Config");
             assertEquals("My Test Config", params.get("name"));
+        }
+    }
+
+    @Nested
+    class ArgsAttribute {
+
+        @Test
+        void externalToolsType() {
+            assertEquals(
+                    "org.eclipse.ui.externaltools.ATTR_TOOL_ARGUMENTS",
+                    LaunchHandler.argsAttribute(
+                            "org.eclipse.ui.externaltools"
+                            + ".ProgramLaunchConfigurationType"));
+        }
+
+        @Test
+        void javaAppType() {
+            assertEquals(
+                    "org.eclipse.jdt.launching.PROGRAM_ARGUMENTS",
+                    LaunchHandler.argsAttribute(
+                            "org.eclipse.jdt.launching"
+                            + ".localJavaApplication"));
+        }
+
+        @Test
+        void mavenType() {
+            assertEquals(
+                    "org.eclipse.ui.externaltools.ATTR_TOOL_ARGUMENTS",
+                    LaunchHandler.argsAttribute(
+                            "org.eclipse.m2e"
+                            + ".Maven2LaunchConfigurationType"));
+        }
+
+        @Test
+        void junitType() {
+            assertEquals(
+                    "org.eclipse.jdt.launching.VM_ARGUMENTS",
+                    LaunchHandler.argsAttribute(
+                            "org.eclipse.jdt.junit.launchconfig"));
+        }
+
+        @Test
+        void pdeJunitType() {
+            assertEquals(
+                    "org.eclipse.jdt.launching.VM_ARGUMENTS",
+                    LaunchHandler.argsAttribute(
+                            "org.eclipse.pde.ui.JunitLaunchConfig"));
+        }
+
+        @Test
+        void agentType() {
+            assertEquals(
+                    "io.github.kaluchi.jdtbridge.ui.agentArgs",
+                    LaunchHandler.argsAttribute(
+                            "io.github.kaluchi.jdtbridge.ui"
+                            + ".agentLaunchType"));
+        }
+
+        @Test
+        void unknownTypeDefaultsToProgramArgs() {
+            assertEquals(
+                    "org.eclipse.jdt.launching.PROGRAM_ARGUMENTS",
+                    LaunchHandler.argsAttribute(
+                            "some.unknown.type"));
         }
     }
 }

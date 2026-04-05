@@ -180,27 +180,27 @@ describe("JSON_COMMANDS", () => {
 describe("reposFromServer", () => {
   it("groups projects by repo", () => {
     const projects = [
-      { name: "m8-server", repo: "D:\\git\\m8", branch: "master" },
-      { name: "m8-client", repo: "D:\\git\\m8", branch: "master" },
+      { name: "my-server", repo: "D:\\git\\my-app", branch: "master" },
+      { name: "my-client", repo: "D:\\git\\my-app", branch: "master" },
       { name: "jdtbridge", repo: "D:\\git\\eclipse-jdt-search", branch: "main" },
     ];
     const repos = reposFromServer(projects);
     expect(repos.length).toBe(2);
-    expect(repos[0].name).toBe("m8");
-    expect(repos[0].projects).toEqual(["m8-server", "m8-client"]);
+    expect(repos[0].name).toBe("my-app");
+    expect(repos[0].projects).toEqual(["my-server", "my-client"]);
     expect(repos[1].name).toBe("eclipse-jdt-search");
   });
 
   it("normalizes backslashes in repo path", () => {
     const repos = reposFromServer([
-      { name: "p", repo: "D:\\git\\m8", branch: "x" },
+      { name: "p", repo: "D:\\git\\my-app", branch: "x" },
     ]);
-    expect(repos[0].path).toBe("D:/git/m8");
+    expect(repos[0].path).toBe("D:/git/my-app");
   });
 
   it("preserves branch per repo", () => {
     const repos = reposFromServer([
-      { name: "p", repo: "D:\\git\\m8", branch: "feature/123" },
+      { name: "p", repo: "D:\\git\\my-app", branch: "feature/123" },
     ]);
     expect(repos[0].branch).toBe("feature/123");
   });
@@ -227,10 +227,10 @@ describe("reposFromServer", () => {
 
   it("handles forward slashes in repo", () => {
     const repos = reposFromServer([
-      { name: "p", repo: "D:/git/m8", branch: "x" },
+      { name: "p", repo: "D:/git/my-app", branch: "x" },
     ]);
-    expect(repos[0].path).toBe("D:/git/m8");
-    expect(repos[0].name).toBe("m8");
+    expect(repos[0].path).toBe("D:/git/my-app");
+    expect(repos[0].name).toBe("my-app");
   });
 });
 

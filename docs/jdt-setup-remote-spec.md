@@ -64,7 +64,7 @@ One-shot example:
 ```bash
 jdt setup remote --bridge-socket host.docker.internal:7777 --token abc123 \
   --add-mount-point /mnt/workspace \
-  --add-mount-point /mnt/m8 \
+  --add-mount-point /mnt/projects \
   --add-mount-point /mnt/automation \
   --check
 ```
@@ -111,7 +111,7 @@ User copies from terminal output.
 
 ```
 $ jdt setup remote --bridge-socket host.docker.internal:7777 --token abc123 \
-    --add-mount-point /mnt/workspace --add-mount-point /mnt/m8
+    --add-mount-point /mnt/workspace --add-mount-point /mnt/projects
 
 Wrote ~/.jdtbridge/remote-instances/a1b2c3.json:
   bridge-socket: host.docker.internal:7777
@@ -121,9 +121,9 @@ Scanning mount points for .project files...
 
   PROJECT          LOCAL_PATH                   MOUNT_POINT
   inside           /mnt/workspace/inside        /mnt/workspace
-  myapp-core       /mnt/m8/myapp-core           /mnt/m8
-  myapp-server     /mnt/m8/myapp-server         /mnt/m8
-  myapp-shared     /mnt/m8/myapp-shared         /mnt/m8
+  myapp-core       /mnt/projects/myapp-core           /mnt/projects
+  myapp-server     /mnt/projects/myapp-server         /mnt/projects
+  myapp-shared     /mnt/projects/myapp-shared         /mnt/projects
 
 4 projects cached.
 ```
@@ -256,13 +256,13 @@ $ jdt setup remote
 
   SETTING        VALUE
   token          ******c392d
-  mount-points   /mnt/workspace, /mnt/m8
+  mount-points   /mnt/workspace, /mnt/projects
 
   PROJECT          LOCAL_PATH                   MOUNT_POINT
   inside           /mnt/workspace/inside        /mnt/workspace
-  myapp-core       /mnt/m8/myapp-core           /mnt/m8
-  myapp-server     /mnt/m8/myapp-server         /mnt/m8
-  myapp-shared     /mnt/m8/myapp-shared         /mnt/m8
+  myapp-core       /mnt/projects/myapp-core           /mnt/projects
+  myapp-server     /mnt/projects/myapp-server         /mnt/projects
+  myapp-shared     /mnt/projects/myapp-shared         /mnt/projects
 
   File: ~/.jdtbridge/remote-instances/a1b2c3.json
 
@@ -338,14 +338,14 @@ $ jdt setup remote --check
 
   SETTING        VALUE
   token          ******c392d
-  mount-points   /mnt/workspace, /mnt/m8
+  mount-points   /mnt/workspace, /mnt/projects
 
   Mapped and verified against Eclipse:
   PROJECT          LOCAL_PATH                   MOUNT_POINT      VERIFIED
   inside           /mnt/workspace/inside        /mnt/workspace   ✓
-  myapp-core       /mnt/m8/myapp-core           /mnt/m8          ✓
-  myapp-server     /mnt/m8/myapp-server         /mnt/m8          ✓
-  myapp-shared     /mnt/m8/myapp-shared         /mnt/m8          ✓
+  myapp-core       /mnt/projects/myapp-core           /mnt/projects          ✓
+  myapp-server     /mnt/projects/myapp-server         /mnt/projects          ✓
+  myapp-shared     /mnt/projects/myapp-shared         /mnt/projects          ✓
 
   In Eclipse but not mapped locally:
   PROJECT          ECLIPSE_PATH
@@ -402,12 +402,12 @@ All output as JSON. Composable with `--check` and no-args status.
     "bridge-socket": "host.docker.internal:7777",
     "file": "~/.jdtbridge/remote-instances/a1b2c3.json",
     "token": "******c392d",
-    "mount-points": ["/mnt/workspace", "/mnt/m8"],
+    "mount-points": ["/mnt/workspace", "/mnt/projects"],
     "projects": [
       { "project": "inside", "localPath": "/mnt/workspace/inside", "mountPoint": "/mnt/workspace" },
-      { "project": "myapp-core", "localPath": "/mnt/m8/myapp-core", "mountPoint": "/mnt/m8" },
-      { "project": "myapp-server", "localPath": "/mnt/m8/myapp-server", "mountPoint": "/mnt/m8" },
-      { "project": "myapp-shared", "localPath": "/mnt/m8/myapp-shared", "mountPoint": "/mnt/m8" }
+      { "project": "myapp-core", "localPath": "/mnt/projects/myapp-core", "mountPoint": "/mnt/projects" },
+      { "project": "myapp-server", "localPath": "/mnt/projects/myapp-server", "mountPoint": "/mnt/projects" },
+      { "project": "myapp-shared", "localPath": "/mnt/projects/myapp-shared", "mountPoint": "/mnt/projects" }
     ]
   },
   {
@@ -435,12 +435,12 @@ Eclipse comparison:
       "plugin": "2.5.0"
     },
     "token": "******c392d",
-    "mount-points": ["/mnt/workspace", "/mnt/m8"],
+    "mount-points": ["/mnt/workspace", "/mnt/projects"],
     "mapped": [
       { "project": "inside", "localPath": "/mnt/workspace/inside", "mountPoint": "/mnt/workspace" },
-      { "project": "myapp-core", "localPath": "/mnt/m8/myapp-core", "mountPoint": "/mnt/m8" },
-      { "project": "myapp-server", "localPath": "/mnt/m8/myapp-server", "mountPoint": "/mnt/m8" },
-      { "project": "myapp-shared", "localPath": "/mnt/m8/myapp-shared", "mountPoint": "/mnt/m8" }
+      { "project": "myapp-core", "localPath": "/mnt/projects/myapp-core", "mountPoint": "/mnt/projects" },
+      { "project": "myapp-server", "localPath": "/mnt/projects/myapp-server", "mountPoint": "/mnt/projects" },
+      { "project": "myapp-shared", "localPath": "/mnt/projects/myapp-shared", "mountPoint": "/mnt/projects" }
     ],
     "unmapped": [
       { "project": "deploy-tools", "eclipsePath": "D:\\git\\deploy-tools" },
@@ -482,7 +482,7 @@ File `~/.jdtbridge/remote-instances/<hash>.json`:
 {
   "bridge-socket": "host.docker.internal:7777",
   "token": "abc123",
-  "mount-points": ["/mnt/workspace", "/mnt/m8", "/mnt/automation"]
+  "mount-points": ["/mnt/workspace", "/mnt/projects", "/mnt/automation"]
 }
 ```
 
@@ -494,7 +494,7 @@ workspace hash in `Activator.workspaceHash()`.
 
 Eclipse returns workspace-relative paths (`/myapp-core/src/Foo.java`),
 but the jdt host sees projects at mount-point paths
-(`/mnt/m8/myapp-core/src/Foo.java`). The project path cache maps
+(`/mnt/projects/myapp-core/src/Foo.java`). The project path cache maps
 Eclipse project names to their jdt-host absolute paths so the CLI
 can translate between the two.
 
@@ -508,10 +508,10 @@ one file per remote instance (same hash as the instance file):
 {
   "bridge-socket": "host.docker.internal:7777",
   "scannedAt": 1775367354940,
-  "mount-points": ["/mnt/workspace", "/mnt/m8"],
+  "mount-points": ["/mnt/workspace", "/mnt/projects"],
   "projects": {
-    "myapp-core": "/mnt/m8/myapp-core",
-    "myapp-server": "/mnt/m8/myapp-server",
+    "myapp-core": "/mnt/projects/myapp-core",
+    "myapp-server": "/mnt/projects/myapp-server",
     "inside": "/mnt/workspace/inside",
     "automation": "/mnt/automation"
   }
@@ -544,9 +544,9 @@ For each path in Eclipse response (refs, source, projects):
 
 **jdt-host path → workspace-relative path** (input translation):
 
-When `jdt refresh /mnt/m8/myapp-core/src/Foo.java`:
+When `jdt refresh /mnt/projects/myapp-core/src/Foo.java`:
 1. Lookup cache by longest prefix match → project `myapp-core`
-   at `/mnt/m8/myapp-core`
+   at `/mnt/projects/myapp-core`
 2. Strip prefix → `src/Foo.java`
 3. Send workspace-relative `/myapp-core/src/Foo.java` to server
 4. Server resolves via `IWorkspaceRoot.findMember()`

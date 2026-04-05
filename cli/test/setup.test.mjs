@@ -60,13 +60,27 @@ describe("setup command", () => {
       writeConfig: () => ({}),
       getHome: () => "/mock/home",
       instancesDir: () => "/mock/home/instances",
+      remoteInstancesDir: () => "/mock/home/remote-instances",
       resetHome: () => {},
+      readPin: () => null,
+      writePin: () => {},
+      deletePin: () => {},
+      listPins: () => [],
+      maskToken: (t) => t ? "******" + t.slice(-5) : "******",
       ...overrides.home,
     };
 
     vi.doMock("../src/eclipse.mjs", () => eclipse);
     vi.doMock("../src/discovery.mjs", () => discovery);
     vi.doMock("../src/home.mjs", () => home);
+    vi.doMock("../src/bridge-env.mjs", () => ({
+      getPinnedBridge: () => null,
+      ...overrides.bridgeEnv,
+    }));
+    vi.doMock("../src/terminal-id.mjs", () => ({
+      resolveTerminalId: () => null,
+      ...overrides.terminalId,
+    }));
 
     // Mock child_process for prereq checks and maven build
     vi.doMock("node:child_process", () => ({
@@ -150,7 +164,7 @@ describe("setup command", () => {
       const { setup } = await importSetup();
       await setup(["--check"]);
       expect(
-        io.logs.some((l) => l.includes("port 7891")),
+        io.logs.some((l) => l.includes("127.0.0.1:7891")),
       ).toBe(true);
     });
 

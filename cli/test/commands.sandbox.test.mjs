@@ -53,7 +53,7 @@ describe("sandbox paths and bulk assertions", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { fqn: "javax.swing.table.TableModel", file: "D:/m8/m8-client", binary: true, kind: "interface", origin: "rt.jar" },
+        { fqn: "javax.swing.table.TableModel", file: "D:/my-app/my-client", binary: true, kind: "interface", origin: "rt.jar" },
       ]));
     });
     mockSandboxPaths();
@@ -61,7 +61,7 @@ describe("sandbox paths and bulk assertions", () => {
     await find(["TableModel"]);
     const out = io.logs[0];
     expect(out).toContain("rt.jar");
-    expect(out).not.toContain("/d/m8");
+    expect(out).not.toContain("/d/my-app");
   });
 
   it("find keeps workspace-relative path unchanged in sandbox", async () => {
@@ -149,7 +149,7 @@ describe("sandbox paths and bulk assertions", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({
-        kind: "class", fqn: "javax.swing.JPanel", file: "D:/git/m8/m8-client",
+        kind: "class", fqn: "javax.swing.JPanel", file: "D:/git/my-app/my-client",
         superclass: "javax.swing.JComponent", interfaces: [],
         fields: [], methods: [],
       }));
@@ -157,7 +157,7 @@ describe("sandbox paths and bulk assertions", () => {
     mockSandboxPaths();
     const { typeInfo } = await import("../src/commands/type-info.mjs");
     await typeInfo(["javax.swing.JPanel"]);
-    expect(io.logs[0]).toContain("/d/git/m8/m8-client");
+    expect(io.logs[0]).toContain("/d/git/my-app/my-client");
   });
 
   it("references converts source path in sandbox", async () => {
@@ -180,7 +180,7 @@ describe("sandbox paths and bulk assertions", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { file: "D:/git/m8/m8-core/lib/dep.jar", line: -1, project: "m8-core", in: "com.Dep#use()" },
+        { file: "D:/git/my-app/my-core/lib/dep.jar", line: -1, project: "my-core", in: "com.Dep#use()" },
       ]));
     });
     mockSandboxPaths();
@@ -188,7 +188,7 @@ describe("sandbox paths and bulk assertions", () => {
     await references(["com.example.Foo"]);
     const out = io.logs[0];
     expect(out).toContain("#### `com.Dep#use()`");
-    expect(out).toContain("`m8-core (dep.jar)`");
+    expect(out).toContain("`my-core (dep.jar)`");
   });
 
   it("hierarchy converts file path in sandbox", async () => {
@@ -210,15 +210,15 @@ describe("sandbox paths and bulk assertions", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({
-        name: "m8-server", location: "D:/git/m8/m8-server",
+        name: "my-server", location: "D:/git/my-app/my-server",
         natures: [], dependencies: [], totalTypes: 10, sourceRoots: [],
       }));
     });
     mockSandboxPaths();
     const { projectInfo } = await import("../src/commands/project-info.mjs");
-    await projectInfo(["m8-server"]);
+    await projectInfo(["my-server"]);
     const out = io.logs.join("\n");
-    expect(out).toContain("/d/git/m8/m8-server");
+    expect(out).toContain("/d/git/my-app/my-server");
   });
 
   // ---- Empty states: consistent (no <entity>) format ----

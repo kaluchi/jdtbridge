@@ -69,5 +69,5 @@ Terminal command configurable in preferences (`PreferenceConstants.TERMINAL_COMM
 
 Menu items that launch agents create or reuse
 `ILaunchConfiguration` of type `agentLaunchType`.
-See [jdt-launch-spec.md](jdt-launch-spec.md) and
-[bridge-ui-spec.md](bridge-ui-spec.md) section 10.
+See [jdt-launch-spec](jdt-launch-spec.md) and
+[bridge-ui-launch-spec](bridge-ui-launch-spec.md).

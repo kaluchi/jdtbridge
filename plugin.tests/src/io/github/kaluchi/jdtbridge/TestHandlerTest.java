@@ -256,13 +256,13 @@ public class TestHandlerTest {
     public void prefixFromPackage() {
         assertEquals("com.example.service",
                 TestHandler.launchPrefix(
-                        null, "com.example.service", "m8-server"));
+                        null, "com.example.service", "my-server"));
     }
 
     @Test
     public void prefixFromProject() {
-        assertEquals("m8-server",
-                TestHandler.launchPrefix(null, null, "m8-server"));
+        assertEquals("my-server",
+                TestHandler.launchPrefix(null, null, "my-server"));
     }
 
     @Test
@@ -277,21 +277,21 @@ public class TestHandlerTest {
                 TestHandler.launchPrefix(
                         "com.example.MyTest",
                         "com.example",
-                        "m8-server"));
+                        "my-server"));
     }
 
     @Test
     public void prefixPackageOverProject() {
         assertEquals("com.example",
                 TestHandler.launchPrefix(
-                        null, "com.example", "m8-server"));
+                        null, "com.example", "my-server"));
     }
 
     @Test
     public void prefixBlankFqnFallsToPackage() {
         assertEquals("com.example",
                 TestHandler.launchPrefix(
-                        "  ", "com.example", "m8-server"));
+                        "  ", "com.example", "my-server"));
     }
 
     // ---- Helpers ----

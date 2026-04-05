@@ -83,7 +83,7 @@ after every Edit/Write — Eclipse stays in sync without manual intervention.
 
 ```bash
 jdt maven update                                       # (alias: up) update all Maven projects (Alt+F5)
-jdt maven update --project m8-server                   # update specific project
+jdt maven update --project my-server                   # update specific project
 jdt maven update -f                                    # wait for auto-build, show error count
 jdt maven update --force --offline                     # force snapshots, offline mode
 jdt maven update --no-config --no-clean --no-refresh   # skip config/clean/refresh steps

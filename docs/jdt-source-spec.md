@@ -1,4 +1,4 @@
-# `jdt source` output design
+# jdt source — Design Spec
 
 ## Core Principles
 
@@ -227,10 +227,8 @@ public interface IType extends IMember, IAnnotatable {
 
 ---
 
-# Open Questions
+# Future considerations
 
 1. **Package-level** — `jdt source "com.example.shared.model"` could show types in package + package-info.java javadoc.
 
 2. **Inner class navigation** — sibling inner classes: show "Also nested in Outer: [E] Color, [C] Builder"?
-
-3. **`--json` flag** — implemented in CLI for debugging. Consider making it permanent for programmatic consumers.

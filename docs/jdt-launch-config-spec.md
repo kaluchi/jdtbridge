@@ -96,8 +96,8 @@ ConfigId is validated: no path separators (`/`, `\`) or `..` allowed.
 jdt launch config --delete <configId>
 ```
 
-Deletes a saved launch configuration from the workspace.
-Already implemented in `LaunchHandler.handleConfigDelete()`.
+Deletes a launch configuration from
+`<workspace>/.metadata/.plugins/org.eclipse.debug.core/.launches/`.
 
 ## Duplicate (future)
 

@@ -95,13 +95,13 @@ export const organizeImportsHelp = `Organize imports in a Java file.
 
 Usage:  jdt organize-imports <file>
 
-Example:  jdt organize-imports m8-server/src/main/java/.../Foo.java`;
+Example:  jdt organize-imports my-server/src/main/java/.../Foo.java`;
 
 export const formatHelp = `Format a Java file using Eclipse project settings.
 
 Usage:  jdt format <file>
 
-Example:  jdt format m8-server/src/main/java/.../Foo.java`;
+Example:  jdt format my-server/src/main/java/.../Foo.java`;
 
 export const renameHelp = `Rename a type, method, or field (updates all references).
 

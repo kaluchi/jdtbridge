@@ -2,7 +2,7 @@
 
 /**
  * Strip leading slash from workspace-relative path.
- * Eclipse returns paths like /m8-server/src/... — we want m8-server/src/...
+ * Eclipse returns paths like /my-server/src/... — we want my-server/src/...
  */
 export function stripProject(wsPath) {
   return wsPath.startsWith("/") ? wsPath.slice(1) : wsPath;
@@ -10,7 +10,7 @@ export function stripProject(wsPath) {
 
 /**
  * Ensure path starts with / for workspace-relative API calls.
- * Accepts: m8-server/src/... or /m8-server/src/...
+ * Accepts: my-server/src/... or /my-server/src/...
  */
 export function toWsPath(p) {
   return p.startsWith("/") ? p : "/" + p;

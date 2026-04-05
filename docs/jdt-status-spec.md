@@ -211,5 +211,5 @@ refreshable.
 - **[jdt-launch-spec.md](jdt-launch-spec.md)** — `launch-configs` section
   shows the same data as `jdt launch configs`. TARGET column uses the
   FQMN synthesis described in the launch spec.
-- **[json-output-spec.md](json-output-spec.md)** — `--json` mode follows
-  the project-wide JSON output conventions.
+- **[jdt-spec](jdt-spec.md)** — `--json` output principles and
+  per-command JSON shapes.

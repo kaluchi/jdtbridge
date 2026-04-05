@@ -1,6 +1,7 @@
 package io.github.kaluchi.jdtbridge;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
@@ -155,6 +156,39 @@ public class LaunchImportTest {
             String responseJson = launchHandler.handleImport(
                     Map.of("configId", configId), MAVEN_LAUNCH_XML);
             assertTrue(responseJson.contains("already exists"));
+        }
+    }
+
+    @Nested
+    class Delete {
+        @Test
+        void deleteSucceedsForMetadataConfig() throws Exception {
+            String configId = "test-delete-ok-"
+                    + System.currentTimeMillis();
+
+            launchHandler.handleImport(
+                    Map.of("configId", configId), MAVEN_LAUNCH_XML);
+
+            String responseJson = launchHandler.handleConfigDelete(
+                    Map.of("configId", configId));
+            JsonObject response = JsonParser.parseString(responseJson)
+                    .getAsJsonObject();
+            assertTrue(response.get("ok").getAsBoolean());
+
+            // Verify config no longer exists
+            Path launchFile = DebugPlugin.getDefault()
+                    .getStateLocation().toPath()
+                    .resolve(".launches")
+                    .resolve(configId + ".launch");
+            assertFalse(Files.exists(launchFile),
+                    "Deleted .launch file should not exist on disk");
+        }
+
+        @Test
+        void deleteRejectsNotFound() {
+            String responseJson = launchHandler.handleConfigDelete(
+                    Map.of("configId", "nonexistent-config-xyz"));
+            assertTrue(responseJson.contains("not found"));
         }
     }
 }

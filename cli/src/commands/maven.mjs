@@ -90,6 +90,6 @@ Options for update:
 
 Examples:
   jdt maven update
-  jdt maven update --project m8-server
+  jdt maven update --project my-server
   jdt maven update --force
   jdt maven up -q`;

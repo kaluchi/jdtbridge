@@ -100,5 +100,5 @@ When Eclipse is not running, exits silently.
 
 Examples:
   jdt refresh /path/to/Foo.java
-  jdt refresh --project m8-server
+  jdt refresh --project my-server
   jdt refresh`;

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<launchConfiguration type="org.eclipse.ui.externaltools.ProgramLaunchConfigurationType">
+    <stringAttribute key="org.eclipse.ui.externaltools.ATTR_LOCATION" value="${system_path:node}"/>
+    <stringAttribute key="org.eclipse.ui.externaltools.ATTR_TOOL_ARGUMENTS" value="node_modules/vitest/vitest.mjs run"/>
+    <stringAttribute key="org.eclipse.ui.externaltools.ATTR_WORKING_DIRECTORY" value="${workspace_loc:/io.github.kaluchi.jdtbridge.parent}/cli"/>
+    <booleanAttribute key="org.eclipse.debug.core.ATTR_CAPTURE_OUTPUT" value="true"/>
+    <booleanAttribute key="org.eclipse.ui.externaltools.ATTR_SHOW_CONSOLE" value="true"/>
+</launchConfiguration>

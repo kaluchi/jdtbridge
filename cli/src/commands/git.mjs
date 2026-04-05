@@ -118,6 +118,6 @@ Flags:
 
 Examples:
   jdt git                all repos
-  jdt git m8             only repos matching "m8"
-  jdt git m8 --limit 0   m8 repos, all dirty files
+  jdt git my-app             only repos matching "my-app"
+  jdt git my-app --limit 0   my-app repos, all dirty files
   jdt git --json`;

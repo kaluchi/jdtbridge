@@ -225,7 +225,18 @@ gh pr merge 55 --squash --delete-branch
 
 ### Test infrastructure
 
-- **CLI tests:** `cd cli && npm test` (vitest)
+**Prefer Eclipse launch configurations over direct CLI commands.**
+The developer works in Eclipse — launch configs give them history,
+Console output, and a shared vocabulary between agent and IDE.
+Use `jdt launch run` and `jdt test run` instead of `cd cli && npm test`
+or `mvn verify`. When a launch config exists for the task, use it.
+
+If you must call `npm`/`mvn` directly (e.g. no matching launch config,
+CI context, or specific flags not expressible via launch), explain why.
+
+- **CLI tests:** `jdt launch run npm-test -f` (preferred) or
+  `cd cli && npm test` (fallback). Single file:
+  `jdt launch run npm-test -f -- test/paths.test.mjs`
 - **Plugin unit tests:** `jdt test run --project io.github.kaluchi.jdtbridge.tests -f`
 - **Integration tests:** full Tycho build only (`jdt launch run jdtbridge-verify`) — use `@EnabledIfSystemProperty(named = "jdtbridge.integration-tests", matches = "true")`
 - **Test fixture:** `TestFixture.java` creates a project with known classes —
@@ -236,7 +247,7 @@ gh pr merge 55 --squash --delete-branch
 ### Running plugin tests
 
 **Prefer running individual test classes or methods**, not the full suite.
-Full suite (615+ tests) takes ~4 minutes and runs in a separate Eclipse
+Full suite (677 tests) takes ~4 minutes and runs in a separate Eclipse
 runtime. Individual tests take 5-15 seconds.
 
 ```bash
@@ -263,18 +274,47 @@ Important:
   idempotent but must be created before `JdtUtils.findType()` calls.
   If a `@Nested` class has `@AfterAll` with `TestFixture.destroy()`,
   subsequent nested classes in the same file won't find fixture types.
-- **Check results:** `jdt test sessions` shows all runs with relative time.
-  `jdt test status <session> -f` for details on failures.
+- **Check results:** `jdt test runs` shows all runs with relative time.
+  `jdt test status <testRunId> -f` for details on failures.
 
 ### Running CLI tests
 
 ```bash
-cd cli && npm test                    # full suite (~13s, 515+ tests)
+cd cli && npm test                    # full suite (~13s, 676 tests)
 cd cli && npx vitest run test/paths.test.mjs   # single file
+jdt launch run npm-test -f            # same suite via Eclipse (output in Console)
 ```
 
 CLI tests mock the HTTP server — no Eclipse needed. They run on both
 Windows and Linux (CI). Path conversion tests mock `process.platform`.
+
+### Plugin changes → live testing
+
+Plugin tests run in a PDE test runtime (workspace bundles) — `jdt build`
+is enough. But live commands (`jdt find`, `jdt refs`, `jdt launch config
+--delete`) go through the **installed** plugin's HTTP server. After
+changing plugin code:
+
+```bash
+jdt build --project io.github.kaluchi.jdtbridge        # compile
+jdt launch run jdtbridge-package -f | tail -5           # Tycho build
+jdt setup --skip-build                                  # install + restart Eclipse
+```
+
+Only then will live commands use the new code.
+
+### Shared launch configurations
+
+`launches/` contains `.launch` files committed to the repo. Eclipse
+auto-discovers them from the project directory. They are NOT in
+workspace metadata — `jdt launch config --delete` does not touch them.
+`--delete` only removes configs from
+`<workspace>/.metadata/.plugins/org.eclipse.debug.core/.launches/`.
+
+To add a new shared launch config: create `.launch` XML in `launches/`,
+`jdt refresh` the project. Eclipse picks it up automatically.
+Use `${system_path:node}` and `${workspace_loc:...}` variables for
+cross-platform paths — no absolute paths in committed .launch files.
 
 ## Releasing
 

@@ -189,6 +189,56 @@ describe("launch commands", () => {
     await expect(launchRun([])).rejects.toThrow("exit(1)");
   });
 
+  it("launch run passes extra args after --", async () => {
+    let receivedUrl;
+    await setupMock((req, res) => {
+      receivedUrl = req.url;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true, configId: "npm-test", launchId: "npm-test:333", mode: "run", pid: "333" }));
+    });
+    const { launchRun } = await import("../src/commands/launch.mjs");
+    await launchRun(["npm-test", "-q", "--", "test/paths.test.mjs"]);
+    expect(receivedUrl).toContain("configId=npm-test");
+    expect(receivedUrl).toContain("args=test%2Fpaths.test.mjs");
+  });
+
+  it("launch run passes multiple extra args joined", async () => {
+    let receivedUrl;
+    await setupMock((req, res) => {
+      receivedUrl = req.url;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true, configId: "my-server", launchId: "my-server:444", mode: "run", pid: "444" }));
+    });
+    const { launchRun } = await import("../src/commands/launch.mjs");
+    await launchRun(["my-server", "-q", "--", "--port", "8080", "--debug"]);
+    expect(receivedUrl).toContain("args=--port%208080%20--debug");
+  });
+
+  it("launch run without -- sends no args param", async () => {
+    let receivedUrl;
+    await setupMock((req, res) => {
+      receivedUrl = req.url;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true, configId: "my-server", launchId: "my-server:555", mode: "run", pid: "555" }));
+    });
+    const { launchRun } = await import("../src/commands/launch.mjs");
+    await launchRun(["my-server", "-q"]);
+    expect(receivedUrl).not.toContain("args=");
+  });
+
+  it("launch debug passes extra args after --", async () => {
+    let receivedUrl;
+    await setupMock((req, res) => {
+      receivedUrl = req.url;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true, configId: "my-server", launchId: "my-server:666", mode: "debug", pid: "666" }));
+    });
+    const { launchDebug } = await import("../src/commands/launch.mjs");
+    await launchDebug(["my-server", "-q", "--", "-Xmx2g"]);
+    expect(receivedUrl).toContain("debug");
+    expect(receivedUrl).toContain("args=-Xmx2g");
+  });
+
   it("launch stop shows stopped", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });

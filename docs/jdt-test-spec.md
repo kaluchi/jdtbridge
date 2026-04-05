@@ -3,141 +3,228 @@
 ## Overview
 
 `jdt test` runs and monitors JUnit tests through Eclipse's built-in
-test infrastructure. It wraps Eclipse's `JUnitModel` and launch system
-into CLI commands that let agents and terminal users run tests, stream
-progress, and inspect results.
+test infrastructure. Non-blocking by default — launches return
+immediately with IDs for status polling and streaming. Server-side
+protocol: [bridge-test-spec](bridge-test-spec.md).
 
 ## Commands
 
-### `jdt test run <FQN>[#method] [--project <name>] [-f] [-q]`
-### `jdt test run --project <name> [--package <pkg>] [-f] [-q]`
+### `jdt test run <FQN>[#method] [--project <name>] [-f] [-q] [--json]`
+### `jdt test run --project <name> [--package <pkg>] [-f] [-q] [--json]`
 
 Launch tests by FQN — class, method, package, or project scope.
 Non-blocking by default. With `-f`, streams test progress until done.
 
+Flags:
+- `--project <name>` — override project for classpath resolution
+- `-f, --follow` — stream test status (only failures by default)
+- `-q, --quiet` — suppress onboarding guide
+- `--all` — include passed tests in output (with `-f`)
+- `--ignored` — show only ignored tests (with `-f`)
+- `--json` — JSONL when streaming, JSON snapshot otherwise
+
 Server response includes `reused: true/false` to indicate whether
 an existing launch configuration was reused or a new one was created.
 
-### `jdt test runs [--json]`
-
-List test runs (youngest first). Replaces `test sessions`.
-
-### `jdt test status <testRunId> [-f] [--all] [--ignored]`
+### `jdt test status <testRunId> [-f] [--all] [--ignored] [--json]`
 
 Show test run progress/results. Snapshot or live stream.
+Accepts exact `testRunId` or plain `configId` (resolves to most recent).
 
-## Config reuse
+### `jdt test runs [--json]`
 
-### Problem
+List test runs (youngest first).
 
-Previous implementation created a new launch configuration on every
-`jdt test run` with a timestamped name (`FooTest-1775081500555`).
-This polluted `jdt launch configs` with hundreds of stale entries.
+## CLI output — all scenarios
 
-### Eclipse's approach
+### `jdt test run FQN -q` — launch, quiet
 
-Eclipse GUI "Run As > JUnit Test" reuses configs via
-`JUnitLaunchShortcut#performLaunch`:
-
-1. Create a temporary WorkingCopy with desired attributes
-2. Search all existing configs of the same launch type
-3. Compare 4 key attributes: `PROJECT_NAME`, `TEST_CONTAINER`,
-   `MAIN_TYPE_NAME`, `TEST_NAME`
-4. If match found — launch existing config
-5. If no match — save WorkingCopy as new config, then launch
-
-Source: `org.eclipse.jdt.junit.launcher.JUnitLaunchShortcut`
-(public API since 3.3, `org.eclipse.jdt.junit` bundle).
-
-### Our implementation
-
-Port the 4-attribute search algorithm. No dependency on
-`org.eclipse.jdt.junit` UI bundle — avoids OSGi classloader issues
-with subclassing across bundles.
-
-```java
-private ILaunchConfiguration findExistingConfig(
-        ILaunchConfigurationWorkingCopy wc) throws CoreException {
-    String[] keys = {
-        ATTR_PROJECT_NAME, ATTR_TEST_CONTAINER,
-        ATTR_MAIN_TYPE_NAME, ATTR_TEST_NAME,
-    };
-    for (ILaunchConfiguration config
-            : launchManager().getLaunchConfigurations(wc.getType())) {
-        if (hasSameAttributes(config, wc, keys))
-            return config;
-    }
-    return null;
-}
+```
+#### Test: HttpServerBindTest
+TestRunId: `HttpServerBindTest:1775393835096`
+LaunchId:  `HttpServerBindTest:6408`
+ConfigId:  `HttpServerBindTest`
+Config:    reused
+Project:   `io.github.kaluchi.jdtbridge.tests`
+Runner:    JUnit 6
 ```
 
-Flow:
-1. Create WorkingCopy with stable name (no timestamp)
-2. `findExistingConfig(wc)` — search by 4 attributes
-3. Found → launch existing config (`reused: true`)
-4. Not found → `wc.doSave()`, launch new (`reused: false`)
+### `jdt test run FQN` — launch with guide
 
-### Config naming
+```
+#### Test: HttpServerBindTest
+TestRunId: `HttpServerBindTest:1775393835096`
+LaunchId:  `HttpServerBindTest:6408`
+ConfigId:  `HttpServerBindTest`
+Config:    reused
+Project:   `io.github.kaluchi.jdtbridge.tests`
+Runner:    JUnit 6
 
-Stable names without timestamp, matching Eclipse GUI convention:
+**Test status** (testRunId = HttpServerBindTest:1775393835096):
+  `jdt test status HttpServerBindTest:1775393835096`            failures only (default)
+  `jdt test status HttpServerBindTest:1775393835096 -f`         stream live until done
+  `jdt test status HttpServerBindTest:1775393835096 --all`      all tests including passed
+  `jdt test status HttpServerBindTest:1775393835096 --ignored`  only skipped/disabled tests
 
-| Scope | Config name |
+**Console output** (launchId = HttpServerBindTest:6408):
+  `jdt launch logs HttpServerBindTest:6408`
+  `jdt launch logs HttpServerBindTest:6408 --tail 50`
+
+**Manage:**
+  `jdt test runs`                          list test runs
+  `jdt launch stop HttpServerBindTest:6408`            abort
+  `jdt launch clear HttpServerBindTest:6408`           remove
+
+**Navigate** — FQMNs from status output are copy-pasteable:
+  `jdt source <FQMN>`                     view test source
+  `jdt test run <FQMN> -f`                re-run single test
+
+Add `-q` to suppress this guide.
+```
+
+### `jdt test run FQN -f` — stream, failures only (default)
+
+```
+#### Test: SerializerTest (11 tests)
+TestRunId: `SerializerTest:1774552295107`
+LaunchId:  `SerializerTest:29164`
+ConfigId:  `SerializerTest`
+Config:    reused
+Project:   `my-project`
+Runner:    JUnit 5
+
+FAIL [M] `com.example.util.SerializerTest#testValidation` (9.214s)
+  AssertionError: No setter found for: [com.example.model.OrderAction.getId]
+  at com.example.util.SerializerTest.testValidation(SerializerTest.java:254)
+
+11 tests, 10 passed, 1 failed, 9.6s
+```
+
+When all tests pass, only the summary line is shown (no individual
+test lines in failures-only mode).
+
+### `jdt test run FQN -f --all` — stream, all tests
+
+```
+#### Test: HttpServerBindTest (13 tests)
+TestRunId: `HttpServerBindTest:1775393835096`
+LaunchId:  `HttpServerBindTest:6408`
+ConfigId:  `HttpServerBindTest`
+Config:    reused
+Project:   `io.github.kaluchi.jdtbridge.tests`
+Runner:    JUnit 6
+
+PASS [M] `io.github.kaluchi.jdtbridge.HttpServerBindTest.BindAddressAccessor#returnsAddressAfterStart` (0.000s)
+PASS [M] `io.github.kaluchi.jdtbridge.HttpServerBindTest.BindAddressAccessor#returnsNullBeforeStart` (0.000s)
+PASS [M] `io.github.kaluchi.jdtbridge.HttpServerBindTest.StartWithFixedPort#autoPortWhenZero` (0.000s)
+...
+
+13 tests, 13 passed, 0.0s
+```
+
+### `jdt test status <testRunId>` — snapshot, failures only
+
+```
+#### HttpServerBindTest — 13/13, 13 tests, 13 passed, 0.0s
+```
+
+With failures:
+
+```
+#### my-project — 87/150 (running), 150 tests, 85 passed, 2 failed, 23.1s
+
+FAIL [M] `com.example.dao.UserDaoTest#testUpdateRequired` (0.3s)
+  Expected: 3
+  Actual: 2
+  at UserDaoTestCase.java:142
+
+FAIL [M] `com.example.web.OrderControllerTest#testUpdateOrder` (0.1s)
+  NullPointerException
+  at OrderRestControllerTest.java:89
+```
+
+### `jdt test status <testRunId> --all` — snapshot, all tests
+
+```
+#### my-project — 150/150, 150 tests, 145 passed, 3 failed, 1 error, 1 ignored, 45.2s
+
+PASS [M] `com.example.dao.UserDaoTest#testCreate` (0.005s)
+PASS [M] `com.example.dao.UserDaoTest#testRead` (0.004s)
+FAIL [M] `com.example.dao.UserDaoTest#testUpdateRequired` (0.3s)
+  Expected: 3
+  Actual: 2
+  at UserDaoTestCase.java:142
+...
+```
+
+### `jdt test status <testRunId> --ignored` — only skipped
+
+```
+#### my-project — 122/122, 122 tests, 115 passed, 7 ignored, 7.5s
+
+IGNORED [M] `com.example.websocket.StateMachineListenerTest#testTimeout`
+IGNORED [M] `com.example.websocket.StateMachineListenerTest#testCleanup`
+IGNORED [M] `com.example.websocket.StateMachineTimeoutsTest#testIdleTimeout`
+```
+
+### `jdt test runs` — list
+
+```
+TESTRUNID                         CONFIGID            TESTS  RESULT                  TIME  STATUS
+HttpServerBindTest:1775393835096  HttpServerBindTest  13     13 passed                     finished 2m ago
+SerializerTest:1774552295107      SerializerTest      11     10 passed, 1 failed     9.6s  finished 5m ago
+my-project:1774554000000          my-project          150    running (87/150)        23.1s  running, started 30s ago
+```
+
+## Eclipse JUnit View — what we replicate
+
+| Eclipse UI element | CLI equivalent |
 |---|---|
-| Class | `FooTest` (simple name) |
-| Class#method | `FooTest.methodName` |
-| Package | `com.example.service` |
-| Project | `my-server` |
+| Progress bar + `Runs: 3/11` | Summary line: `87/150 (running)` |
+| Test tree with pass/fail icons | Flat list: `PASS/FAIL [M]` + FQMN |
+| Failure Trace panel | Inline trace after FAIL/ERROR entry |
+| Console output | `jdt launch logs <launchId>` |
+| "Show Failures Only" toggle | Default mode (no flag) |
+| "Show Skipped Tests Only" toggle | `--ignored` flag |
+| History dropdown | `jdt test runs` |
+| Re-run / Re-run failures | `jdt test run <FQMN> -f` |
+| Timing per test | `(0.005s)` after each entry |
 
-## Data source: JUnitModel
+## Filtering
 
-### Problem with custom tracker
+Maps Eclipse JUnit View toolbar toggles:
 
-`TestSessionTracker` used a `ConcurrentHashMap` keyed by config name.
-Multiple runs of the same config overwrote each other — 3 runs of
-`my-project` showed as 1 entry. Eclipse JUnit view showed all 3.
+| Eclipse toggle | CLI flag | What's shown |
+|---|---|---|
+| (default view) | `--all` | All tests, flat list |
+| Show Failures Only | *(default)* | Only FAIL + ERROR tests |
+| Show Skipped Tests Only | `--ignored` | Only IGNORED tests |
 
-### Eclipse's data source
+Summary line always shown regardless of filter.
+Filters apply to both snapshot and `-f` stream modes.
 
-`JUnitCorePlugin.getModel().getTestRunSessions()` — `LinkedList`,
-youngest first. Each run is a separate entry. Same data as the
-Eclipse JUnit view dropdown.
+## FQMN format conventions
 
-Key `TestRunSession` API:
-- `getTestRunName()` — config name (= configId)
-- `getLaunch()` → `ILaunch` → PID, ATTR_LAUNCH_TIMESTAMP
-- `getLaunch().getAttribute(ATTR_LAUNCH_TIMESTAMP)` — source of testRunId
-- `isRunning()`, `isStarting()`
-- `getTotalCount()`, `getStartedCount()`
-- `getErrorCount()`, `getFailureCount()`, `getIgnoredCount()`
-- `getElapsedTimeInSeconds()`
-- `getTestResult()` — OK, ERROR, FAILURE
-- `getChildren()` — full test tree (suites → cases)
-- `addTestSessionListener(ITestSessionListener)` — live events
+Test output follows `jdt source` conventions
+(see [jdt-source-spec](jdt-source-spec.md)):
 
-Capacity controlled by `MAX_TEST_RUNS` preference (default 10).
+1. **Zero-Modification Navigation** — every FQMN is a valid argument
+   for `jdt source` and `jdt test run`
+2. **Badge-Link Separation** — `[M]` prefix is visual, not part of FQMN
+3. **Full Qualification** — never truncate packages
+4. **`#` separator** — `Class#method`
 
-### testRunId composition
+Example:
+```
+FAIL [M] `com.example.OrderServiceTest#testCalculateTotal` (0.3s)
+```
+- Copy FQMN → `jdt source com.example.OrderServiceTest#testCalculateTotal`
+- Copy FQMN → `jdt test run com.example.OrderServiceTest#testCalculateTotal -f`
 
-`testRunId = configId + ":" + ATTR_LAUNCH_TIMESTAMP`
-
-`ATTR_LAUNCH_TIMESTAMP` is set by Eclipse on `ILaunch` at the moment
-`config.launch()` is called — available immediately, no waiting.
-This is different from `TestRunSession.getStartTime()` which is set
-later when the JUnit remote runner connects.
-
-`TestSessionHandler.testRunId(session)` — single method that extracts
-testRunId from any `TestRunSession` via its `ILaunch`.
-
-### Implementation
-
-All test handlers read from `JUnitModel` directly:
-- `test runs` → `getTestRunSessions()` — list with counts, state, time
-- `test status` → `findSession(testRunId)` → snapshot from session tree
-- `test run -f` → `ITestSessionListener` on `TestRunSession` for live events
-- `test run` response waits for nothing — testRunId from launch timestamp
-
-No custom tracker. All data from Eclipse `JUnitModel` and
-`ITestSessionListener`.
+Nested test classes use `.` for class nesting, `#` for method:
+```
+PASS [M] `pkg.OuterTest.InnerSuite#testMethod` (0.001s)
+```
 
 ## Design decisions
 
@@ -145,44 +232,41 @@ No custom tracker. All data from Eclipse `JUnitModel` and
   (class name) and returns what the system needs (testRunId, launchId).
   The agent never manages configs directly.
 
-- **Config reuse by attributes, not name.** Two projects can have a
-  class with the same name. Eclipse compares project + class + method +
-  container — we do the same.
-
-- **`reused` flag in response.** Tells the agent if a new config was
-  created. Guide can show `launch config <configId>` only on first run.
-
-- **Read from JUnitModel, not custom tracker.** Single source of truth.
-  Same data as Eclipse JUnit view. No deduplication bugs.
-
 - **`test runs` not `test sessions`.** "Run" is what the user did.
   "Session" is an Eclipse internal term with no meaning to agents.
 
 - **configId as primary UX.** `test status` and `test runs` accept
   plain configId — resolves to the most recent run, silently. Exact
-  testRunId is for advanced disambiguation. No warnings on ambiguity,
-  no `--latest` flag. Humans type configId, machines use exact IDs.
+  testRunId is for advanced disambiguation.
 
-## Constraints
+- **Flat output, not tree.** Eclipse JUnit view shows a tree
+  (session → suite → class → method → parameterized instance, up to
+  4 levels). CLI flattens to `FQMN` per test case. The tree hierarchy
+  is encoded in the FQMN itself (`OuterClass.InnerClass#method`).
 
-- **JUnitModel is internal API.** `@SuppressWarnings("restriction")`.
-  Stable across Eclipse versions.
+- **Failures by default.** In test output, what matters is what broke.
+  `--all` is opt-in for verification. Same philosophy as Eclipse's
+  "Show Failures Only" being one of the most-used toolbar toggles.
 
-- **Run limit.** Eclipse caps at MAX_TEST_RUNS (default 10). Old runs
-  evicted automatically. `jdt test runs` shows only what Eclipse keeps.
-
-- **PDE JUnit Plug-in Tests.** Additional config attributes
-  (run_in_ui_thread, application, clearws, location). Config reuse
-  preserves them. `clearws=true` ensures clean workspace per run.
-
-- **Streaming.** Uses `ITestSessionListener` on `TestRunSession` for
-  live `testEnded` events. Replay from `getChildren()` for already
-  completed tests. Session found via `findSession(testRunId)` which
-  matches by `ATTR_LAUNCH_TIMESTAMP` on `ILaunch`.
+- **Trace truncation.** Stack traces capped at 10 lines with `...`.
+  Full traces available via `jdt launch logs <launchId>` (console
+  output includes complete stack traces from the test process).
 
 ## Relationship to other specs
 
-- **[jdt-launch-spec.md](jdt-launch-spec.md)** — test launches appear
+- **[bridge-test-spec](bridge-test-spec.md)** — server-side HTTP
+  endpoints, JSONL streaming protocol, Eclipse APIs, plugin classes.
+- **[jdt-launch-spec](jdt-launch-spec.md)** — test launches appear
   in `launch list`, console via `launch logs`.
-- **[jdt-status-spec.md](jdt-status-spec.md)** — `test runs` feeds
+- **[jdt-status-spec](jdt-status-spec.md)** — `test runs` feeds
   the tests section in `jdt status`.
+
+## Files
+
+CLI:
+  commands/test-run.mjs         — `jdt test run`: launch + header + guide/streaming
+  commands/test-status.mjs      — `jdt test status`: snapshot or stream
+  commands/test-sessions.mjs    — `jdt test runs`: list table
+  format/test-status.mjs        — formatters: header, events, guide, followTestStream
+  format/test-results.mjs       — summary + failure details
+  client.mjs: getStreamLines()  — shared JSONL streaming (line-by-line callback)

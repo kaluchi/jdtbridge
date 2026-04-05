@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, writeFileSync, readdirSync, unlinkSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { createHash, randomBytes } from "node:crypto";
-import { remoteInstancesDir, remoteProjectPathsDir } from "../home.mjs";
+import { remoteInstancesDir, remoteProjectPathsDir, maskToken } from "../home.mjs";
 import { parseFlags } from "../args.mjs";
 import { normalizePath } from "../paths.mjs";
 import { directGet } from "../client.mjs";
@@ -55,10 +55,6 @@ function readAllRemoteInstances() {
   return remoteInstances;
 }
 
-function maskToken(fullToken) {
-  if (!fullToken || fullToken.length < 5) return "******";
-  return "******" + fullToken.substring(fullToken.length - 5);
-}
 
 /**
  * Scan a directory for .project files, extract <name>.

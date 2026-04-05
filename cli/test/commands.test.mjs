@@ -97,8 +97,8 @@ describe("commands (integration)", () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { fqn: "javax.swing.JPanel", file: "D:/m8/m8-client", binary: true, origin: "rt.jar" },
-        { fqn: "javax.swing.JPanel", file: "D:/m8/m8-server", binary: true, origin: "rt.jar" },
+        { fqn: "javax.swing.JPanel", file: "D:/my-app/my-client", binary: true, origin: "rt.jar" },
+        { fqn: "javax.swing.JPanel", file: "D:/my-app/my-server", binary: true, origin: "rt.jar" },
       ]));
     });
     const { find } = await import("../src/commands/find.mjs");
@@ -113,7 +113,7 @@ describe("commands (integration)", () => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
         { fqn: "com.example.Foo", file: "D:/git/project/src/Foo.java", kind: "class" },
-        { fqn: "javax.swing.JPanel", file: "D:/m8/m8-client", kind: "class", binary: true, origin: "rt.jar" },
+        { fqn: "javax.swing.JPanel", file: "D:/my-app/my-client", kind: "class", binary: true, origin: "rt.jar" },
       ]));
     });
     const { find } = await import("../src/commands/find.mjs");

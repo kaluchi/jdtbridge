@@ -53,6 +53,15 @@ class LaunchHandler {
             "io.github.kaluchi.jdtbridge.ui.agent";
     private static final String AGENT_ARGS =
             "io.github.kaluchi.jdtbridge.ui.agentArgs";
+    private static final String EXTERNAL_TOOLS_TYPE =
+            "org.eclipse.ui.externaltools"
+            + ".ProgramLaunchConfigurationType";
+    private static final String ATTR_TOOL_ARGUMENTS =
+            "org.eclipse.ui.externaltools.ATTR_TOOL_ARGUMENTS";
+    private static final String ATTR_PROGRAM_ARGUMENTS =
+            "org.eclipse.jdt.launching.PROGRAM_ARGUMENTS";
+    private static final String ATTR_VM_ARGUMENTS =
+            "org.eclipse.jdt.launching.VM_ARGUMENTS";
 
     private final LaunchTracker tracker;
 
@@ -284,6 +293,11 @@ class LaunchHandler {
                     + configId);
         }
         try {
+            if (!config.isLocal()) {
+                return HttpServer.jsonError(
+                        "Not found in workspace metadata: "
+                        + configId);
+            }
             config.delete();
             var result = new JsonObject();
             result.addProperty("ok", true);
@@ -539,6 +553,40 @@ class LaunchHandler {
         return result.toString();
     }
 
+    /**
+     * Create a WorkingCopy with extra arguments appended to the
+     * appropriate attribute for the launch type. Not saved —
+     * one-time use for this launch only.
+     */
+    ILaunchConfiguration appendArgs(
+            ILaunchConfiguration config, String extraArgs)
+            throws CoreException {
+        var wc = config.getWorkingCopy();
+        String typeId = config.getType().getIdentifier();
+        String attrKey = argsAttribute(typeId);
+        String existing = wc.getAttribute(attrKey, "");
+        String combined = existing.isBlank()
+                ? extraArgs
+                : existing + " " + extraArgs;
+        wc.setAttribute(attrKey, combined);
+        return wc;
+    }
+
+    /**
+     * Map launch type to the attribute key for appending arguments.
+     */
+    static String argsAttribute(String typeId) {
+        return switch (typeId) {
+            case EXTERNAL_TOOLS_TYPE -> ATTR_TOOL_ARGUMENTS;
+            case JAVA_APP_LAUNCH_TYPE -> ATTR_PROGRAM_ARGUMENTS;
+            case MAVEN_LAUNCH_TYPE -> ATTR_TOOL_ARGUMENTS;
+            case JUNIT_LAUNCH_TYPE, PDE_JUNIT_LAUNCH_TYPE
+                    -> ATTR_VM_ARGUMENTS;
+            case AGENT_LAUNCH_TYPE -> AGENT_ARGS;
+            default -> ATTR_PROGRAM_ARGUMENTS;
+        };
+    }
+
     String handleRun(Map<String, String> params) {
         String name = params.get("configId");
         if (name == null || name.isBlank()) {
@@ -555,7 +603,12 @@ class LaunchHandler {
                         "Launch configuration not found: "
                         + name);
             }
-            ILaunch launch = config.launch(mode, null, true);
+            String extraArgs = params.get("args");
+            ILaunchConfiguration toRun = config;
+            if (extraArgs != null && !extraArgs.isBlank()) {
+                toRun = appendArgs(config, extraArgs);
+            }
+            ILaunch launch = toRun.launch(mode, null, true);
             var response = new JsonObject();
             response.addProperty("ok", true);
             String configId = launchName(launch);

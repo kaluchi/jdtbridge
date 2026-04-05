@@ -222,15 +222,23 @@ export async function launchDebug(args) {
 }
 
 async function launchWithMode(args, mode) {
-  const pos = extractPositional(args);
+  // Split on -- separator: args before are flags, after are extra args
+  const ddIdx = args.indexOf("--");
+  const cliArgs = ddIdx >= 0 ? args.slice(0, ddIdx) : args;
+  const extraArgs = ddIdx >= 0 ? args.slice(ddIdx + 1) : [];
+
+  const pos = extractPositional(cliArgs);
   const name = pos[0];
   if (!name) {
-    console.error(`Usage: launch ${mode} <config-name> [-f] [-q]`);
+    console.error(`Usage: launch ${mode} <config-name> [-f] [-q] [-- extra-args...]`);
     process.exit(1);
   }
 
   let url = `/launch/run?configId=${encodeURIComponent(name)}`;
   if (mode === "debug") url += "&debug";
+  if (extraArgs.length > 0) {
+    url += `&args=${encodeURIComponent(extraArgs.join(" "))}`;
+  }
   const result = await get(url, 30_000);
   if (result.error) {
     console.error(result.error);
@@ -455,26 +463,31 @@ Examples:
 
 export const launchRunHelp = `Launch a saved configuration (non-blocking).
 
-Usage:  jdt launch run <configId> [-f] [-q]
+Usage:  jdt launch run <configId> [-f] [-q] [-- extra-args...]
 
 Without -f, launches and prints a guide with the launchId for logs/stop.
 With -f, launches and streams console output until the process terminates.
+
+Everything after -- is appended to the configuration's arguments for this
+launch only. The saved configuration is not modified.
 
 Flags:
   -f, --follow   stream output (Ctrl+C to detach, process keeps running)
   -q, --quiet    suppress onboarding guide
 
 Examples:
-  jdt launch run my-server                run + show guide with launchId
-  jdt launch run my-server -q             run silently
-  jdt launch run jdtbridge-verify -f      run + stream all output
-  jdt launch run my-server -f | tail -20  run + wait + bounded output`;
+  jdt launch run my-server                     run + show guide
+  jdt launch run my-server -q                  run silently
+  jdt launch run jdtbridge-verify -f           run + stream output
+  jdt launch run my-server -f | tail -20       run + wait + bounded output
+  jdt launch run npm-test -f -- test/foo.mjs   run with extra args
+  jdt launch run my-server -- --port 8080      append program args`;
 
 export const launchDebugHelp = `Launch a configuration in debug mode.
 
-Usage:  jdt launch debug <configId> [-f] [-q]
+Usage:  jdt launch debug <configId> [-f] [-q] [-- extra-args...]
 
-Same as 'launch run' but attaches the debugger.
+Same as 'launch run' but attaches the debugger. Supports -- extra args.
 
 Examples:
   jdt launch debug my-server

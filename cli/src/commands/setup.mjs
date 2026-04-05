@@ -5,8 +5,9 @@ import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execSync } from "node:child_process";
 import { createInterface } from "node:readline";
-import { readConfig, writeConfig } from "../home.mjs";
+import { readConfig, writeConfig, maskToken } from "../home.mjs";
 import { discoverInstances, probe } from "../discovery.mjs";
+import { resolveInstance, workspacePathsMatch } from "../resolve.mjs";
 import { green, red, bold, dim } from "../color.mjs";
 import { parseFlags } from "../args.mjs";
 import { createRequire } from "node:module";
@@ -152,6 +153,7 @@ async function runCheck(config) {
   const candidates = await discoverInstances();
   const liveInstances = [];
   for (const inst of candidates) {
+    if (inst.remote) continue; // remote instances shown separately
     try {
       await probe(inst);
       liveInstances.push(inst);
@@ -160,12 +162,43 @@ async function runCheck(config) {
     }
   }
   if (liveInstances.length > 0) {
-    for (const inst of liveInstances) {
-      ok(`port ${inst.port}, PID ${inst.pid}, workspace ${inst.workspace}`);
-      if (inst.version) ok(`Plugin: ${inst.version}${inst.location ? dim(` — ${inst.location}`) : ""}`);
+    // Resolve which instance this terminal is connected to
+    const resolved = await resolveInstance();
+    const resolvedPort = resolved?.port;
+
+    for (let i = 0; i < liveInstances.length; i++) {
+      const inst = liveInstances[i];
+      if (i > 0) console.log();
+      const active = resolvedPort === inst.port;
+      const marker = active ? bold(" \u2190 active") : "";
+      ok(`${inst.workspace}${marker}`);
+      ok(`PID ${inst.pid}, plugin ${inst.version || "unknown"}`);
+      ok(`local  127.0.0.1:${inst.port}, token ${maskToken(inst.token)}`);
+      if (inst.remotePort) {
+        ok(`remote 0.0.0.0:${inst.remotePort}, token ${maskToken(inst.remoteToken)}`);
+      }
+    }
+    if (liveInstances.length > 1 && !resolvedPort) {
+      info(`${liveInstances.length} instances found. Use ${bold("jdt use")} to pin this terminal.`);
     }
   } else {
     fail("No live instances");
+  }
+
+  // Remote instances (jdt setup remote)
+  const remoteInstances = candidates.filter((i) => i.remote);
+  if (remoteInstances.length > 0) {
+    console.log();
+    console.log(bold("Remote"));
+    for (const inst of remoteInstances) {
+      const label = `${inst.host}:${inst.port}`;
+      try {
+        await probe(inst);
+        ok(`${label} \u2014 connected`);
+      } catch {
+        fail(`${label} \u2014 connection refused`);
+      }
+    }
   }
 
   console.log();
@@ -281,13 +314,17 @@ async function runInstall(config, flags) {
   }
   ok("Plugin built");
 
-  // Capture workspace BEFORE stopping Eclipse (instances are filtered by
-  // HTTP probe fails after stop, so they disappear from discoverInstances).
+  // Capture ALL workspaces BEFORE stopping Eclipse (instance files
+  // disappear after stop — probe fails, they look stale).
   const wasRunning = isEclipseRunning();
-  let workspace = null;
+  const workspaces = [];
   if (wasRunning) {
     const instances = await discoverInstances();
-    if (instances.length > 0) workspace = instances[0].workspace;
+    for (const inst of instances) {
+      if (inst.workspace && !inst.remote) {
+        workspaces.push(inst.workspace);
+      }
+    }
   }
 
   // Install
@@ -315,11 +352,14 @@ async function runInstall(config, flags) {
   const newVersion = getInstalledVersion(eclipsePath, BUNDLE_ID);
   if (newVersion) ok(`Version: ${newVersion}`);
 
-  // Start Eclipse
+  // Start Eclipse — restore all workspaces that were running
   console.log();
   const launcherPath = join(eclipsePath, eclipseExe("eclipse"));
-  if (existsSync(launcherPath)) {
-    const pid = startEclipse(eclipsePath, workspace);
+  if (!existsSync(launcherPath)) {
+    info("Plugin installed. Run your Eclipse product to complete setup and activate the bridge.");
+  } else if (workspaces.length === 0) {
+    // No workspaces captured — start without -data
+    const pid = startEclipse(eclipsePath, null);
     info(`Eclipse started (PID ${pid})`);
     info("Waiting for bridge...");
     try {
@@ -329,7 +369,22 @@ async function runInstall(config, flags) {
       fail("Bridge did not start (Eclipse may still be loading)");
     }
   } else {
-    info("Plugin installed. Run your Eclipse product to complete setup and activate the bridge.");
+    // Restart all workspaces that were running before
+    const pids = [];
+    for (const ws of workspaces) {
+      const pid = startEclipse(eclipsePath, ws);
+      pids.push({ pid, workspace: ws });
+      info(`Eclipse started (PID ${pid}), workspace ${ws}`);
+    }
+    info("Waiting for bridge...");
+    for (const { pid, workspace } of pids) {
+      try {
+        const { port, projects } = await waitForBridge(discoverInstances, pid);
+        ok(`${workspace} — port ${port} (${projects.length} projects)`);
+      } catch {
+        fail(`${workspace} — bridge did not start`);
+      }
+    }
   }
 
   console.log();
@@ -360,6 +415,18 @@ async function runRemove(config) {
   }
   info(`Installed: ${installed}`);
 
+  // Capture workspaces before stopping
+  const wasRunning = isEclipseRunning();
+  const workspaces = [];
+  if (wasRunning) {
+    const instances = await discoverInstances();
+    for (const inst of instances) {
+      if (inst.workspace && !inst.remote) {
+        workspaces.push(inst.workspace);
+      }
+    }
+  }
+
   if (!(await ensureStopped())) return;
 
   try {
@@ -368,6 +435,17 @@ async function runRemove(config) {
   } catch (e) {
     console.error(`  ${e.message}`);
     process.exit(1);
+  }
+
+  // Restart Eclipse if it was running
+  if (workspaces.length > 0) {
+    const launcherPath = join(eclipsePath, eclipseExe("eclipse"));
+    if (existsSync(launcherPath)) {
+      for (const ws of workspaces) {
+        const pid = startEclipse(eclipsePath, ws);
+        info(`Eclipse restarted (PID ${pid}), workspace ${ws}`);
+      }
+    }
   }
   console.log();
 }
