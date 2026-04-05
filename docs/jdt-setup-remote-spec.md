@@ -474,7 +474,9 @@ File `~/.jdtbridge/remote-instances/<hash>.json`:
 }
 ```
 
-Keys match CLI flags. Hash derived from bridge-socket value.
+Keys match CLI flags. Hash = SHA-256 of bridge-socket string,
+first 6 bytes as hex (12 chars). Same algorithm as plugin's
+workspace hash in `Activator.workspaceHash()`.
 
 ## Project path cache
 
