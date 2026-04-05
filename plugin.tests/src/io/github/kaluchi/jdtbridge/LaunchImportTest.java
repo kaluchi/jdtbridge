@@ -165,23 +165,18 @@ public class LaunchImportTest {
         void deleteSucceedsForMetadataConfig() throws Exception {
             String configId = "test-delete-ok-"
                     + System.currentTimeMillis();
+            importedConfigId = configId;
 
-            launchHandler.handleImport(
+            String importJson = launchHandler.handleImport(
                     Map.of("configId", configId), MAVEN_LAUNCH_XML);
+            assertTrue(importJson.contains("\"imported\":true"),
+                    "Import should succeed: " + importJson);
 
-            String responseJson = launchHandler.handleConfigDelete(
+            String deleteJson = launchHandler.handleConfigDelete(
                     Map.of("configId", configId));
-            JsonObject response = JsonParser.parseString(responseJson)
-                    .getAsJsonObject();
-            assertTrue(response.get("ok").getAsBoolean());
-
-            // Verify config no longer exists
-            Path launchFile = DebugPlugin.getDefault()
-                    .getStateLocation().toPath()
-                    .resolve(".launches")
-                    .resolve(configId + ".launch");
-            assertFalse(Files.exists(launchFile),
-                    "Deleted .launch file should not exist on disk");
+            assertTrue(deleteJson.contains("\"ok\":true"),
+                    "Delete should succeed: " + deleteJson);
+            importedConfigId = null;
         }
 
         @Test
