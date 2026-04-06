@@ -198,25 +198,6 @@ describe("--json output", () => {
     expect(data).toEqual([]);
   });
 
-  it("type-info --json outputs valid JSON", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({
-        kind: "class", fqn: "com.example.Foo", file: "/my-server/src/Foo.java",
-        superclass: "java.lang.Object", interfaces: ["com.example.HasId"],
-        fields: [{ modifiers: "private", type: "String", name: "id", line: 5 }],
-        methods: [{ signature: "String getId()", line: 7 }],
-      }));
-    });
-    const { typeInfo } = await import("../src/commands/type-info.mjs");
-    await typeInfo(["com.example.Foo", "--json"]);
-    const data = parseJsonOutput(io.logs);
-    expect(data.fqn).toBe("com.example.Foo");
-    expect(data.kind).toBe("class");
-    expect(data.fields).toBeInstanceOf(Array);
-    expect(data.methods).toBeInstanceOf(Array);
-    expect(data.interfaces).toContain("com.example.HasId");
-  });
 
   it("errors --json outputs valid JSON", async () => {
     await setupMock((req, res) => {

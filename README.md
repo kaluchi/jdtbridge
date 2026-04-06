@@ -32,7 +32,7 @@ jdt impl "com.example.core.Repository#save(Order)"
 
 # Understand a 600-line class without reading it. Fields, method signatures,
 # supertypes, line numbers — structured overview, not raw source.
-jdt ti com.example.web.OrderController
+jdt outline com.example.web.OrderController
 
 # Run tests with real-time progress streaming.
 # Failures shown immediately — no waiting for full suite to finish.
@@ -80,7 +80,7 @@ MCP is the natural first thought for connecting an IDE to an AI agent. But JDT B
 ```bash
 # 26-method class — only the handler entry points.
 # MCP: all 26 methods enter context. CLI: just the 8 that matter.
-jdt ti io.github.kaluchi.jdtbridge.SearchHandler | grep handle
+jdt outline io.github.kaluchi.jdtbridge.SearchHandler -q | grep handle
 
 # "How many callers?" — a number, not 51 lines of references.
 jdt refs io.github.kaluchi.jdtbridge.JdtUtils#findMethod | wc -l

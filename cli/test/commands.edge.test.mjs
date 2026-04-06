@@ -116,21 +116,6 @@ describe("command edge cases", () => {
     expect(out).toContain("---");
   });
 
-  it("type-info shows interface without fields", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({
-        kind: "interface", fqn: "app.HasId", file: "/my-app/src/HasId.java",
-        superclass: null, interfaces: [],
-        fields: [], methods: [{ signature: "String getId()", line: 3 }],
-      }));
-    });
-    const { typeInfo } = await import("../src/commands/type-info.mjs");
-    await typeInfo(["app.HasId"]);
-    expect(io.logs[0]).toContain("interface app.HasId");
-    expect(io.logs.some((l) => l.includes("extends"))).toBe(false);
-  });
-
   it("errors with --warnings flag", async () => {
     await setupMock((req, res) => {
       expect(req.url).toContain("warnings");

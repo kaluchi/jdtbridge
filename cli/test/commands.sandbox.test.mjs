@@ -130,36 +130,6 @@ describe("sandbox paths and bulk assertions", () => {
     expect(io.logs[0]).toContain("/d/git/project/src/FooImpl.java:15-28");
   });
 
-  it("type-info converts path in sandbox", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({
-        kind: "class", fqn: "com.example.Foo", file: "D:/git/project/src/Foo.java",
-        superclass: "java.lang.Object", interfaces: [],
-        fields: [], methods: [],
-      }));
-    });
-    mockSandboxPaths();
-    const { typeInfo } = await import("../src/commands/type-info.mjs");
-    await typeInfo(["com.example.Foo"]);
-    expect(io.logs[0]).toContain("/d/git/project/src/Foo.java");
-  });
-
-  it("type-info converts JAR path in sandbox", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({
-        kind: "class", fqn: "javax.swing.JPanel", file: "D:/git/my-app/my-client",
-        superclass: "javax.swing.JComponent", interfaces: [],
-        fields: [], methods: [],
-      }));
-    });
-    mockSandboxPaths();
-    const { typeInfo } = await import("../src/commands/type-info.mjs");
-    await typeInfo(["javax.swing.JPanel"]);
-    expect(io.logs[0]).toContain("/d/git/my-app/my-client");
-  });
-
   it("references converts source path in sandbox", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
@@ -259,7 +229,6 @@ describe("sandbox paths and bulk assertions", () => {
       { mod: "../src/commands/implementors.mjs", fn: "implementors", args: ["X"] },
       { mod: "../src/commands/references.mjs", fn: "references", args: ["X"] },
       { mod: "../src/commands/problems.mjs", fn: "problems", args: [] },
-      { mod: "../src/commands/type-info.mjs", fn: "typeInfo", args: ["X"] },
       { mod: "../src/commands/hierarchy.mjs", fn: "hierarchy", args: ["X"] },
       { mod: "../src/commands/projects.mjs", fn: "projects", args: [] },
     ];
@@ -283,7 +252,6 @@ describe("sandbox paths and bulk assertions", () => {
     const cases = [
       { mod: "../src/commands/find.mjs", fn: "find", args: [] },
       { mod: "../src/commands/implementors.mjs", fn: "implementors", args: [] },
-      { mod: "../src/commands/type-info.mjs", fn: "typeInfo", args: [] },
       { mod: "../src/commands/hierarchy.mjs", fn: "hierarchy", args: [] },
       { mod: "../src/commands/references.mjs", fn: "references", args: [] },
     ];

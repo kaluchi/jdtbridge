@@ -107,7 +107,7 @@ Generics are stripped: `List<String>` matches `List`.
 ### Pipe composability
 
 ```bash
-jdt ti io.github.kaluchi.jdtbridge.SearchHandler | grep handle   # 26 methods → 8 handlers
+jdt outline io.github.kaluchi.jdtbridge.SearchHandler -q | grep handle   # find members by name
 jdt refs io.github.kaluchi.jdtbridge.JdtUtils#findMethod | wc -l # count, not 51 lines
 jdt problems --project my-server | head -5                       # one problem at a time
 jdt src org.springframework.jdbc.core.JdbcTemplate#query | grep -n throw  # throws in library code

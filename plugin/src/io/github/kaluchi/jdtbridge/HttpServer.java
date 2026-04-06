@@ -468,6 +468,8 @@ public class HttpServer {
                         maven.handleUpdate(params));
                 case "/type-info" -> Response.json(
                         search.handleTypeInfo(params));
+                case "/outline" -> Response.json(
+                        search.handleOutline(params));
                 case "/source" -> search.handleSource(params,
                         scope);
                 case "/organize-imports" -> Response.json(

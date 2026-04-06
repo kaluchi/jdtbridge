@@ -44,7 +44,7 @@ jdt find <Name|*Pattern*|pkg> [--source-only]          # find types by name, wil
 jdt references <FQMN> [--field <name>]                 # (alias: refs) references to type/method/field
 jdt implementors <FQN>[#method]                        # (alias: impl) type or method implementors
 jdt hierarchy <FQN>                                    # (alias: hier) supers + interfaces + subtypes
-jdt type-info <FQN>                                    # (alias: ti) class overview (fields, methods)
+jdt outline <FQN>                                      # Eclipse Outline View (fields, methods, types)
 jdt source <FQMN> [<FQMN> ...]                         # (alias: src) source code (project + libraries)
 ```
 

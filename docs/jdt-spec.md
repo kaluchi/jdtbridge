@@ -117,7 +117,7 @@ Default stays human-readable; agents opt in per invocation.
 | `references` | `[{file, line, in, content}]` |
 | `implementors` | `[{fqn, fqmn?, file, project, startLine, endLine}]` |
 | `hierarchy` | `{type, supertypes[], interfaces[], subtypes[]}` |
-| `type-info` | `{fqn, kind, fields[], methods[], supertypes[]}` |
+| `outline` | `{fqn, file, kind, children: [{kind, name, ...}]}` |
 | `source` | raw server JSON (source + refs) |
 | `problems` | `[{file, line, col, severity, message}]` |
 | `projects` | `[{name, location, repo}]` |
