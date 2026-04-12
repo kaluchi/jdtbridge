@@ -57,12 +57,6 @@ describe("command validation", () => {
     await expect(hierarchy([])).rejects.toThrow("exit(1)");
   });
 
-  it("type-info exits on missing args", async () => {
-    await setupMock((req, res) => res.end());
-    const { typeInfo } = await import("../src/commands/type-info.mjs");
-    await expect(typeInfo([])).rejects.toThrow("exit(1)");
-  });
-
   it("source exits on missing args", async () => {
     await setupMock((req, res) => res.end());
     const { source } = await import("../src/commands/source.mjs");
@@ -133,13 +127,6 @@ describe("command validation", () => {
     await setupMock(errorServer());
     const { implementors } = await import("../src/commands/implementors.mjs");
     await implementors(["app.Foo", "m"]);
-    expect(io.errors[0]).toContain("Something went wrong");
-  });
-
-  it("type-info exits on server error", async () => {
-    await setupMock(errorServer());
-    const { typeInfo } = await import("../src/commands/type-info.mjs");
-    await typeInfo(["app.Foo"]);
     expect(io.errors[0]).toContain("Something went wrong");
   });
 

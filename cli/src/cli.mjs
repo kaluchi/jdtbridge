@@ -7,7 +7,7 @@ import { find, help as findHelp } from "./commands/find.mjs";
 import { references, help as referencesHelp } from "./commands/references.mjs";
 import { hierarchy, help as hierarchyHelp } from "./commands/hierarchy.mjs";
 import { implementors, help as implementorsHelp } from "./commands/implementors.mjs";
-import { typeInfo, help as typeInfoHelp } from "./commands/type-info.mjs";
+import { outline, help as outlineHelp } from "./commands/outline.mjs";
 import { source, help as sourceHelp } from "./commands/source.mjs";
 import { build, help as buildHelp } from "./commands/build.mjs";
 import { testRun, help as testRunHelp } from "./commands/test-run.mjs";
@@ -193,7 +193,7 @@ const commands = {
   references: { fn: references, help: referencesHelp },
   implementors: { fn: implementors, help: implementorsHelp },
   hierarchy: { fn: hierarchy, help: hierarchyHelp },
-  "type-info": { fn: typeInfo, help: typeInfoHelp },
+  outline: { fn: outline, help: outlineHelp },
   source: { fn: source, help: sourceHelp },
   build: { fn: build, help: buildHelp },
   test: { fn: testDispatch, help: testHelp },
@@ -220,7 +220,6 @@ const aliases = {
   impl: "implementors",
   hier: "hierarchy",
   pi: "project-info",
-  ti: "type-info",
   oi: "organize-imports",
   ed: "editors",
   src: "source",
@@ -288,7 +287,7 @@ function printOverview() {
     h(`  references${fmtAliases("references")} <FQMN> [--field <name>]`, "markdown: call sites as code snippets"),
     h(`  implementors${fmtAliases("implementors")} <FQN>[#method]`,    "list: type or method implementors"),
     h(`  hierarchy${fmtAliases("hierarchy")} <FQN>`,                "markdown: supers + interfaces + subtypes"),
-    h(`  type-info${fmtAliases("type-info")} <FQN>`,                "text: class overview (fields, methods, lines)"),
+    h(`  outline <FQN>`,                                             "tree: Eclipse Outline View (fields, methods, types)"),
     h(`  source${fmtAliases("source")} <FQMN>`,                     "markdown: source + resolved references"),
     "",
     "Testing & building:",

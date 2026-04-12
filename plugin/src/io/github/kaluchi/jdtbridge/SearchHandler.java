@@ -16,8 +16,10 @@ import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IJavaProject;
+import org.eclipse.jdt.core.IInitializer;
 import org.eclipse.jdt.core.IMember;
 import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.IParent;
 import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.ISourceRange;
@@ -348,6 +350,7 @@ class SearchHandler {
         return result.toString();
     }
 
+    /** @deprecated Use handleOutline instead. Kept for backwards compat. */
     String handleTypeInfo(Map<String, String> params) throws Exception {
         String fqn = params.get("class");
         if (fqn == null || fqn.isBlank()) {
@@ -411,6 +414,142 @@ class SearchHandler {
         result.add("methods", methods);
 
         return result.toString();
+    }
+
+    // ---- /outline?class=FQN ----
+
+    String handleOutline(Map<String, String> params)
+            throws Exception {
+        String fqn = params.get("class");
+        if (fqn == null || fqn.isBlank()) {
+            return HttpServer.jsonError(
+                    "Missing 'class' parameter");
+        }
+
+        IType type = JdtUtils.findType(fqn);
+        if (type == null) {
+            return HttpServer.jsonError(
+                    "Type not found: " + fqn);
+        }
+
+        var result = new JsonObject();
+        result.addProperty("fqn",
+                type.getFullyQualifiedName());
+        result.addProperty("file", filePath(type));
+        result.addProperty("kind", JdtUtils.typeKind(type));
+        if (type.isBinary())
+            result.addProperty("binary", true);
+
+        var children = new JsonArray();
+        serializeChildren(type, children);
+        result.add("children", children);
+
+        return result.toString();
+    }
+
+    private void serializeChildren(IParent parent,
+            JsonArray out) throws JavaModelException {
+        for (IJavaElement child : parent.getChildren()) {
+            JsonObject node = serializeElement(child);
+            if (node != null) out.add(node);
+        }
+    }
+
+    private JsonObject serializeElement(IJavaElement element)
+            throws JavaModelException {
+        var node = new JsonObject();
+
+        switch (element.getElementType()) {
+        case IJavaElement.FIELD -> {
+            IField f = (IField) element;
+            node.addProperty("kind", "field");
+            node.addProperty("name", f.getElementName());
+            node.addProperty("type",
+                    Signature.toString(f.getTypeSignature()));
+            addModifiers(node, f.getFlags());
+            if (Flags.isStatic(f.getFlags())
+                    && Flags.isFinal(f.getFlags())) {
+                node.addProperty("constant", true);
+            }
+            addLines(node, f);
+        }
+        case IJavaElement.METHOD -> {
+            IMethod m = (IMethod) element;
+            node.addProperty("kind", "method");
+            node.addProperty("name", m.getElementName());
+            if (m.isConstructor()) {
+                node.addProperty("isConstructor", true);
+            } else {
+                node.addProperty("returnType",
+                        Signature.toString(m.getReturnType()));
+            }
+            node.addProperty("signature",
+                    formatSignature(m));
+            addModifiers(node, m.getFlags());
+            addLines(node, m);
+        }
+        case IJavaElement.TYPE -> {
+            IType t = (IType) element;
+            node.addProperty("kind", "type");
+            node.addProperty("name", t.getElementName());
+            node.addProperty("typeKind",
+                    JdtUtils.typeKind(t));
+            node.addProperty("fqn",
+                    t.getFullyQualifiedName());
+            addModifiers(node, t.getFlags());
+            addLines(node, t);
+            var children = new JsonArray();
+            serializeChildren(t, children);
+            if (children.size() > 0)
+                node.add("children", children);
+        }
+        case IJavaElement.INITIALIZER -> {
+            IInitializer init = (IInitializer) element;
+            node.addProperty("kind", "initializer");
+            addModifiers(node, init.getFlags());
+            addLines(node, init);
+        }
+        default -> {
+            return null;
+        }
+        }
+
+        return node;
+    }
+
+    private String formatSignature(IMethod m)
+            throws JavaModelException {
+        StringBuilder sb = new StringBuilder();
+        sb.append(m.getElementName()).append("(");
+        String[] paramTypes = m.getParameterTypes();
+        for (int i = 0; i < paramTypes.length; i++) {
+            if (i > 0) sb.append(", ");
+            sb.append(Signature.toString(paramTypes[i]));
+        }
+        sb.append(")");
+        return sb.toString();
+    }
+
+    private void addModifiers(JsonObject node, int flags) {
+        var mods = new JsonArray();
+        if (Flags.isPublic(flags)) mods.add("public");
+        if (Flags.isProtected(flags)) mods.add("protected");
+        if (Flags.isPrivate(flags)) mods.add("private");
+        if (Flags.isStatic(flags)) mods.add("static");
+        if (Flags.isFinal(flags)) mods.add("final");
+        if (Flags.isAbstract(flags)) mods.add("abstract");
+        if (Flags.isDefaultMethod(flags)) mods.add("default");
+        if (Flags.isSynchronized(flags)) mods.add("synchronized");
+        if (Flags.isNative(flags)) mods.add("native");
+        if (mods.size() > 0) node.add("modifiers", mods);
+    }
+
+    private void addLines(JsonObject node, IMember member) {
+        int[] lines = getLinesOfMember(member);
+        if (lines[0] > 0) node.addProperty("startLine",
+                lines[0]);
+        if (lines[1] > 0 && lines[1] != lines[0])
+            node.addProperty("endLine", lines[1]);
     }
 
     // ---- /source?class=FQN[&method=name] ----

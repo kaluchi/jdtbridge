@@ -408,24 +408,6 @@ describe("commands (integration)", () => {
     expect(out).toContain("/d/project/src/Foo.java:5-15");
   });
 
-  it("type-info shows class details", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({
-        kind: "class", fqn: "com.example.Foo", file: "/my-server/src/Foo.java",
-        superclass: "java.lang.Object", interfaces: ["com.example.HasId"],
-        fields: [{ modifiers: "private", type: "String", name: "id", line: 5 }],
-        methods: [{ signature: "String getId()", line: 7 }],
-      }));
-    });
-    const { typeInfo } = await import("../src/commands/type-info.mjs");
-    await typeInfo(["com.example.Foo"]);
-    expect(io.logs[0]).toContain("class com.example.Foo");
-    expect(io.logs.some((l) => l.includes("extends java.lang.Object"))).toBe(true);
-    expect(io.logs.some((l) => l.includes("implements com.example.HasId"))).toBe(true);
-    expect(io.logs.some((l) => l.includes("String id"))).toBe(true);
-    expect(io.logs.some((l) => l.includes("String getId()"))).toBe(true);
-  });
 
   it("project-info shows formatted output", async () => {
     await setupMock((req, res) => {

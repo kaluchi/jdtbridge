@@ -138,7 +138,7 @@ Endpoint            Filtering method
 
 ## Unfiltered endpoints (explicit params)
 
-/build, /refresh, /maven/update, /type-info, /project-info,
+/build, /refresh, /maven/update, /type-info, /outline, /project-info,
 /test/run, /test/status, /organize-imports, /format, /rename,
 /move, /open, /launch/config, /launch/run, /launch/stop
 

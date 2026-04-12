@@ -26,7 +26,7 @@
 
 12. **Flat Calls**: No chain-call nesting. Chains are visible through source order — consecutive calls = likely chain.
 
-13. **Each Command Has One Job**: `jdt source` = source code + references. `jdt type-info` = compact structural overview. Don't mix them.
+13. **Each Command Has One Job**: `jdt source` = source code + references. `jdt outline` = structural overview. Don't mix them.
 
 14. **Same-Domain Implementation Display**: Server resolves ALL implementations (exhaustive). CLI filters by domain: when `viewScope` is `"project"`, dependency interface implementations are hidden. This prevents library noise (e.g. 5 SLF4J Logger impls) while keeping the data available for alternative views.
 
