@@ -1,0 +1,271 @@
+package io.github.kaluchi.jdtbridge;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Unit tests for {@link GraphHandler} — point-lookup endpoints
+ * against {@link TestFixture}. Each test asserts on the parsed JSON
+ * response, treating the wire shape as the contract the CLI side
+ * will read.
+ */
+public class GraphHandlerTest {
+
+    private GraphHandler handler;
+
+    @BeforeAll
+    static void setUp() throws Exception {
+        TestFixture.create();
+    }
+
+    @BeforeEach
+    void newHandler() {
+        handler = new GraphHandler();
+    }
+
+    private static Map<String, String> params(String key, String value) {
+        var m = new HashMap<String, String>();
+        m.put(key, value);
+        return m;
+    }
+
+    private static JsonObject parse(String json) {
+        return JsonParser.parseString(json).getAsJsonObject();
+    }
+
+    private static boolean isError(JsonObject obj) {
+        return obj.has("_error");
+    }
+
+    private static JsonObject errorOf(JsonObject obj) {
+        return obj.getAsJsonObject("_error");
+    }
+
+    // ── /type ───────────────────────────────────────────────────────
+
+    @Test
+    void typeReturnsDetailForExistingFqn() {
+        JsonObject result = parse(
+                handler.handleType(params("of", "test.model.Dog")));
+        assertEquals("test.model.Dog",
+                result.get("fqn").getAsString());
+        assertEquals("type", result.get("kind").getAsString());
+        assertEquals("class", result.get("typeKind").getAsString());
+        assertEquals(1, result.getAsJsonArray("interfaces").size());
+        assertEquals("test.model.Animal",
+                result.getAsJsonArray("interfaces").get(0).getAsString());
+    }
+
+    @Test
+    void typeReturnsErrorForUnknownFqn() {
+        JsonObject result = parse(
+                handler.handleType(params("of", "no.such.Class")));
+        assertTrue(isError(result));
+        assertEquals("type-not-found",
+                errorOf(result).get("kind").getAsString());
+        assertEquals("TypeNotFound",
+                errorOf(result).get("thrown").getAsString());
+        assertEquals("no.such.Class",
+                errorOf(result).getAsJsonObject("context")
+                .get("fqn").getAsString());
+    }
+
+    @Test
+    void typeReturnsErrorWhenOfMissing() {
+        JsonObject result = parse(handler.handleType(Map.of()));
+        assertTrue(isError(result));
+        assertEquals("missing-parameter",
+                errorOf(result).get("kind").getAsString());
+        assertEquals("of",
+                errorOf(result).getAsJsonObject("context")
+                .get("parameter").getAsString());
+    }
+
+    @Test
+    void typeForInnerClassUsesDottedFqn() {
+        JsonObject result = parse(handler.handleType(
+                params("of", "test.edge.Outer.Inner")));
+        assertEquals("test.edge.Outer.Inner",
+                result.get("fqn").getAsString());
+        assertEquals("test.edge.Outer",
+                result.get("containingType").getAsString());
+    }
+
+    // ── /method ─────────────────────────────────────────────────────
+
+    @Test
+    void methodReturnsDetailForFqmnWithSignature() {
+        JsonObject result = parse(handler.handleMethod(
+                params("of", "test.edge.Calculator#add(int,int)")));
+        assertEquals("test.edge.Calculator#add(int,int)",
+                result.get("fqn").getAsString());
+        assertEquals("method", result.get("kind").getAsString());
+        assertEquals("add", result.get("name").getAsString());
+        assertEquals(2, result.getAsJsonArray("parameters").size());
+        assertEquals("int", result.get("returnType").getAsString());
+    }
+
+    @Test
+    void methodResolvesParamTypesFromInlineParens() {
+        JsonObject result = parse(handler.handleMethod(
+                params("of", "test.edge.Calculator#add(int,int,int)")));
+        assertEquals("add(int,int,int)",
+                result.get("signature").getAsString());
+    }
+
+    @Test
+    void methodFailsAmbiguousWithoutSignature() {
+        JsonObject result = parse(handler.handleMethod(
+                params("of", "test.edge.Calculator#add")));
+        assertTrue(isError(result));
+        assertEquals("ambiguous-match",
+                errorOf(result).get("kind").getAsString());
+        assertEquals(3,
+                errorOf(result).getAsJsonObject("context")
+                .get("matchCount").getAsInt());
+    }
+
+    @Test
+    void methodReturnsErrorForMissingMethod() {
+        JsonObject result = parse(handler.handleMethod(
+                params("of", "test.model.Dog#noSuchMethod()")));
+        assertTrue(isError(result));
+        assertEquals("method-not-found",
+                errorOf(result).get("kind").getAsString());
+    }
+
+    @Test
+    void methodRejectsMissingHash() {
+        JsonObject result = parse(handler.handleMethod(
+                params("of", "test.model.Dog")));
+        assertTrue(isError(result));
+        assertEquals("invalid-fqmn",
+                errorOf(result).get("kind").getAsString());
+    }
+
+    @Test
+    void methodErrorTypeNotFoundCarriesBothFqnAndFqmn() {
+        JsonObject result = parse(handler.handleMethod(
+                params("of", "no.such.Class#foo()")));
+        assertTrue(isError(result));
+        assertEquals("type-not-found",
+                errorOf(result).get("kind").getAsString());
+        var ctx = errorOf(result).getAsJsonObject("context");
+        assertEquals("no.such.Class", ctx.get("fqn").getAsString());
+        assertEquals("no.such.Class#foo()",
+                ctx.get("fqmn").getAsString());
+    }
+
+    // ── /field ──────────────────────────────────────────────────────
+
+    @Test
+    void fieldReturnsDetailForExistingField() {
+        JsonObject result = parse(handler.handleField(
+                params("of", "test.model.Dog#age")));
+        assertEquals("test.model.Dog#age",
+                result.get("fqn").getAsString());
+        assertEquals("field", result.get("kind").getAsString());
+        assertEquals("age", result.get("name").getAsString());
+        assertEquals("int", result.get("type").getAsString());
+    }
+
+    @Test
+    void fieldRejectsParensInName() {
+        JsonObject result = parse(handler.handleField(
+                params("of", "test.model.Dog#age()")));
+        assertTrue(isError(result));
+        assertEquals("invalid-fqmn",
+                errorOf(result).get("kind").getAsString());
+    }
+
+    @Test
+    void fieldErrorForUnknownField() {
+        JsonObject result = parse(handler.handleField(
+                params("of", "test.model.Dog#noSuchField")));
+        assertTrue(isError(result));
+        assertEquals("field-not-found",
+                errorOf(result).get("kind").getAsString());
+    }
+
+    @Test
+    void fieldDetailForStaticFinalCarriesIsConstant() {
+        JsonObject result = parse(handler.handleField(
+                params("of", "test.edge.Outer.StaticNested#VALUE")));
+        assertNotNull(result.get("isConstant"),
+                "static final field must carry :isConstant");
+        assertTrue(result.get("isConstant").getAsBoolean());
+    }
+
+    // ── /detail (polymorphic) ───────────────────────────────────────
+
+    @Test
+    void detailRoutesToTypeForPlainFqn() {
+        JsonObject result = parse(handler.handleDetail(
+                params("of", "test.model.Dog")));
+        assertEquals("type", result.get("kind").getAsString());
+    }
+
+    @Test
+    void detailRoutesToMethodForFqmnWithParens() {
+        JsonObject result = parse(handler.handleDetail(
+                params("of", "test.model.Dog#bark()")));
+        assertEquals("method", result.get("kind").getAsString());
+        assertEquals("bark", result.get("name").getAsString());
+    }
+
+    @Test
+    void detailRoutesToFieldForFqmnWithoutParens() {
+        JsonObject result = parse(handler.handleDetail(
+                params("of", "test.model.Dog#age")));
+        assertEquals("field", result.get("kind").getAsString());
+        assertEquals("age", result.get("name").getAsString());
+    }
+
+    @Test
+    void detailRoutesToMethodFallbackForBareFqmnWhenFieldAbsent() {
+        // bark is a method; no field 'bark' exists
+        JsonObject result = parse(handler.handleDetail(
+                params("of", "test.model.Dog#bark")));
+        assertEquals("method", result.get("kind").getAsString());
+    }
+
+    // ── Cross-cutting: every error carries origin :jdt/plugin ───────
+
+    @Test
+    void everyErrorPathsCarryOriginJdtPlugin() {
+        JsonElement[] errors = {
+            JsonParser.parseString(
+                handler.handleType(Map.of())),
+            JsonParser.parseString(
+                handler.handleType(params("of", "no.such"))),
+            JsonParser.parseString(
+                handler.handleMethod(Map.of())),
+            JsonParser.parseString(
+                handler.handleMethod(params("of", "no#hash()"))),
+            JsonParser.parseString(
+                handler.handleField(Map.of())),
+            JsonParser.parseString(
+                handler.handleField(params("of", "no.such#x"))),
+            JsonParser.parseString(
+                handler.handleDetail(Map.of())),
+        };
+        for (var je : errors) {
+            JsonObject obj = je.getAsJsonObject();
+            assertTrue(isError(obj), "expected error: " + obj);
+            assertEquals("jdt/plugin",
+                    errorOf(obj).get("origin").getAsString());
+        }
+    }
+}

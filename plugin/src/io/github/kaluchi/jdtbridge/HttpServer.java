@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 public class HttpServer {
 
     private final SearchHandler search = new SearchHandler();
+    private final GraphHandler graph = new GraphHandler();
     private final DiagnosticsHandler diagnostics =
             new DiagnosticsHandler();
     private final MavenHandler maven = new MavenHandler();
@@ -446,6 +447,14 @@ public class HttpServer {
             ProjectScope scope) {
         try {
             return switch (path) {
+                case "/type" -> Response.json(
+                        graph.handleType(params));
+                case "/method" -> Response.json(
+                        graph.handleMethod(params));
+                case "/field" -> Response.json(
+                        graph.handleField(params));
+                case "/detail" -> Response.json(
+                        graph.handleDetail(params));
                 case "/projects" -> Response.json(
                         search.handleProjects(scope));
                 case "/project-info" -> Response.json(
