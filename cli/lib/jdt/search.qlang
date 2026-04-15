@@ -1,0 +1,61 @@
+{:@find {:qlang/kind :builtin
+        :qlang/impl null
+        :category :jdt-search
+        :subject :string
+        :modifiers [:keyword]
+        :returns :vec
+        :docs ["Searches Eclipse workspace for Java type declarations."
+               "Subject is a name or wildcard pattern (e.g. \"*Controller*\")."
+               "Optional modifier :source-only excludes binary/library types."]
+        :examples []
+        :throws [:FindSubjectNotString]}
+ :@callers {:qlang/kind :builtin
+            :qlang/impl null
+            :category :jdt-search
+            :subject :string
+            :modifiers []
+            :returns :vec
+            :docs ["Finds all call sites of a fully qualified method name."
+                   "Subject is an FQMN string (e.g. \"com.example.Foo#bar\")."
+                   "Returns a Vec of reference Maps with :file, :line, :snippet."]
+            :examples []
+            :throws [:CallersSubjectNotString]}
+ :@members {:qlang/kind :builtin
+            :qlang/impl null
+            :category :jdt-search
+            :subject :string
+            :modifiers []
+            :returns :vec
+            :docs ["Returns the members of a Java type — fields, methods, constructors, inner types."
+                   "Subject is a fully qualified type name (e.g. \"com.example.Foo\")."
+                   "Each element is a Map with :kind, :name, :signature, :startLine, :endLine,"
+                   "and — depending on the kind — :returnType, :type, :modifiers, :children."]
+            :examples []
+            :throws [:MembersSubjectNotString]}
+ :@source  {:qlang/kind :builtin
+            :qlang/impl null
+            :category :jdt-search
+            :subject :string
+            :modifiers []
+            :returns :map
+            :docs ["Returns the full source composite for a Java type or method."
+                   "Subject is an FQMN string; specific overloads are honoured."
+                   "The Map carries :fqmn, :file, :startLine, :endLine, :source (Java text),"
+                   ":viewScope, :refs (outgoing + incoming references as one Vec),"
+                   "and — depending on the target — :implementations, :supertypes, :subtypes,"
+                   ":enclosingType, :overrideTarget."
+                   "Use the @outgoing / @incoming conduits to split :refs by direction."]
+            :examples []
+            :throws [:SourceSubjectNotString]}}
+| use
+
+|~~ Outgoing references from a @source composite — the things this
+    target calls or depends on. Applied to a @source Map; returns a
+    Vec of ref records (Maps with :fqmn :kind :typeKind :scope :file
+    :line :doc and — for methods — :type :returnTypeFqn :static). ~~|
+let(:@outgoing, /refs | filter(/direction | eq("outgoing")))
+
+|~~ Incoming references from a @source composite — the call sites
+    pointing at this target. Applied to a @source Map; returns a Vec
+    of ref records with the same shape as @outgoing entries. ~~|
+let(:@incoming, /refs | filter(/direction | eq("incoming")))

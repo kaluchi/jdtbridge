@@ -68,6 +68,7 @@ import {
 } from "./commands/launch.mjs";
 import { setup, help as setupHelp } from "./commands/setup.mjs";
 import { use, help as useHelp } from "./commands/use.mjs";
+import { query, help as queryHelp } from "./commands/query.mjs";
 import { isConnectionError } from "./client.mjs";
 import { bold, red, dim } from "./color.mjs";
 import { installTelemetry } from "./telemetry.mjs";
@@ -212,6 +213,7 @@ const commands = {
   agent: { fn: agentDispatch, help: agentHelp },
   setup: { fn: setup, help: setupHelp },
   use: { fn: use, help: useHelp },
+  query: { fn: query, help: queryHelp },
 };
 
 /** Short aliases for frequently used commands. */
@@ -227,6 +229,7 @@ const aliases = {
   err: "problems",
   r: "refresh",
   fmt: "format",
+  q: "query",
 };
 
 // Reverse map: command name → list of its aliases (for display).
