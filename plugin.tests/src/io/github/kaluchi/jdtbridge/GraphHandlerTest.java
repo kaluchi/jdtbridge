@@ -241,6 +241,136 @@ public class GraphHandlerTest {
         assertEquals("method", result.get("kind").getAsString());
     }
 
+    // ── /members /methods /fields /innerTypes ───────────────────────
+
+    @Test
+    void membersReturnsMethodsFieldsInnerTypesOfDog() {
+        var arr = JsonParser.parseString(handler.handleMembers(
+                params("of", "test.model.Dog")))
+                .getAsJsonArray();
+        // Dog: bark(), name(), age — 2 methods + 1 field + 0 inner
+        long methodCount = arr.asList().stream()
+                .filter(e -> "method".equals(e.getAsJsonObject()
+                        .get("kind").getAsString()))
+                .count();
+        long fieldCount = arr.asList().stream()
+                .filter(e -> "field".equals(e.getAsJsonObject()
+                        .get("kind").getAsString()))
+                .count();
+        assertEquals(2, methodCount, "Dog has bark() + name()");
+        assertEquals(1, fieldCount, "Dog has :age");
+    }
+
+    @Test
+    void membersIncludesInnerTypesForOuter() {
+        var arr = JsonParser.parseString(handler.handleMembers(
+                params("of", "test.edge.Outer")))
+                .getAsJsonArray();
+        long innerCount = arr.asList().stream()
+                .filter(e -> "type".equals(e.getAsJsonObject()
+                        .get("kind").getAsString()))
+                .count();
+        assertEquals(2, innerCount,
+                "Outer has Inner + StaticNested");
+    }
+
+    @Test
+    void methodsReturnsOnlyMethods() {
+        var arr = JsonParser.parseString(handler.handleMethods(
+                params("of", "test.model.Dog")))
+                .getAsJsonArray();
+        assertEquals(2, arr.size());
+        for (var entry : arr) {
+            assertEquals("method", entry.getAsJsonObject()
+                    .get("kind").getAsString());
+        }
+    }
+
+    @Test
+    void fieldsReturnsOnlyFields() {
+        var arr = JsonParser.parseString(handler.handleFields(
+                params("of", "test.model.Dog")))
+                .getAsJsonArray();
+        assertEquals(1, arr.size());
+        assertEquals("field", arr.get(0).getAsJsonObject()
+                .get("kind").getAsString());
+        assertEquals("test.model.Dog#age",
+                arr.get(0).getAsJsonObject().get("fqn").getAsString());
+    }
+
+    @Test
+    void innerTypesReturnsNestedTypes() {
+        var arr = JsonParser.parseString(handler.handleInnerTypes(
+                params("of", "test.edge.Outer")))
+                .getAsJsonArray();
+        assertEquals(2, arr.size());
+        for (var entry : arr) {
+            assertEquals("type", entry.getAsJsonObject()
+                    .get("kind").getAsString());
+        }
+    }
+
+    @Test
+    void membersErrorForUnknownType() {
+        JsonObject result = parse(handler.handleMembers(
+                params("of", "no.such.X")));
+        assertTrue(isError(result));
+        assertEquals("type-not-found",
+                errorOf(result).get("kind").getAsString());
+    }
+
+    // ── /supers /subtypes ───────────────────────────────────────────
+
+    @Test
+    void supersReturnsSuperclassAndInterfaces() {
+        var arr = JsonParser.parseString(handler.handleSupers(
+                params("of", "test.model.Dog")))
+                .getAsJsonArray();
+        // Dog: extends Object implements Animal — Object filtered? No — supers includes both
+        var fqns = new java.util.HashSet<String>();
+        for (var entry : arr) {
+            fqns.add(entry.getAsJsonObject().get("fqn").getAsString());
+        }
+        assertTrue(fqns.contains("test.model.Animal"),
+                "supers should include Animal interface, got: " + fqns);
+        assertTrue(fqns.contains("java.lang.Object"),
+                "supers should include Object superclass, got: " + fqns);
+    }
+
+    @Test
+    void supersForParrotIncludesAbstractPet() {
+        var arr = JsonParser.parseString(handler.handleSupers(
+                params("of", "test.edge.Parrot")))
+                .getAsJsonArray();
+        var fqns = new java.util.HashSet<String>();
+        for (var entry : arr) {
+            fqns.add(entry.getAsJsonObject().get("fqn").getAsString());
+        }
+        assertTrue(fqns.contains("test.edge.AbstractPet"));
+    }
+
+    @Test
+    void subtypesOfAnimalIncludesDogAndCat() {
+        var arr = JsonParser.parseString(handler.handleSubtypes(
+                params("of", "test.model.Animal")))
+                .getAsJsonArray();
+        var fqns = new java.util.HashSet<String>();
+        for (var entry : arr) {
+            fqns.add(entry.getAsJsonObject().get("fqn").getAsString());
+        }
+        assertTrue(fqns.contains("test.model.Dog"),
+                "subtypes of Animal should include Dog, got: " + fqns);
+        assertTrue(fqns.contains("test.model.Cat"));
+    }
+
+    @Test
+    void subtypesEmptyForLeafType() {
+        var arr = JsonParser.parseString(handler.handleSubtypes(
+                params("of", "test.model.Cat")))
+                .getAsJsonArray();
+        assertEquals(0, arr.size());
+    }
+
     // ── Cross-cutting: every error carries origin :jdt/plugin ───────
 
     @Test

@@ -2,9 +2,12 @@ package io.github.kaluchi.jdtbridge;
 
 import java.util.Map;
 
+import com.google.gson.JsonArray;
+
 import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.core.ITypeHierarchy;
 
 /**
  * Handlers for the new graph-axis endpoints. Each endpoint answers
@@ -130,6 +133,112 @@ class GraphHandler {
             Log.warn("/field failed for " + fqmn, e);
             return ErrorDescriptor.jdtInternalError(
                     "Failed to resolve field: " + fqmn, e).toJsonString();
+        }
+    }
+
+    // ── Down-navigation: direct contents of a type ──────────────────
+
+    /** All direct members of a type — methods + fields + inner types. */
+    String handleMembers(Map<String, String> params) {
+        return listForType(params, "/members", type -> {
+            var arr = new JsonArray();
+            for (IMethod m : type.getMethods()) {
+                arr.add(NodeBuilder.methodSkeleton(m));
+            }
+            for (IField f : type.getFields()) {
+                arr.add(NodeBuilder.fieldSkeleton(f));
+            }
+            for (IType inner : type.getTypes()) {
+                arr.add(NodeBuilder.typeSkeleton(inner));
+            }
+            return arr;
+        });
+    }
+
+    String handleMethods(Map<String, String> params) {
+        return listForType(params, "/methods", type -> {
+            var arr = new JsonArray();
+            for (IMethod m : type.getMethods()) {
+                arr.add(NodeBuilder.methodSkeleton(m));
+            }
+            return arr;
+        });
+    }
+
+    String handleFields(Map<String, String> params) {
+        return listForType(params, "/fields", type -> {
+            var arr = new JsonArray();
+            for (IField f : type.getFields()) {
+                arr.add(NodeBuilder.fieldSkeleton(f));
+            }
+            return arr;
+        });
+    }
+
+    String handleInnerTypes(Map<String, String> params) {
+        return listForType(params, "/innerTypes", type -> {
+            var arr = new JsonArray();
+            for (IType inner : type.getTypes()) {
+                arr.add(NodeBuilder.typeSkeleton(inner));
+            }
+            return arr;
+        });
+    }
+
+    // ── Hierarchy: direct supers and subtypes ───────────────────────
+
+    /** Direct supertypes — superclass plus directly-declared interfaces. */
+    String handleSupers(Map<String, String> params) {
+        return listForType(params, "/supers", type -> {
+            ITypeHierarchy hier = type.newSupertypeHierarchy(null);
+            var arr = new JsonArray();
+            IType superClass = hier.getSuperclass(type);
+            if (superClass != null) {
+                arr.add(NodeBuilder.typeSkeleton(superClass));
+            }
+            for (IType iface : hier.getSuperInterfaces(type)) {
+                arr.add(NodeBuilder.typeSkeleton(iface));
+            }
+            return arr;
+        });
+    }
+
+    /** Direct subtypes only — transitive descent is a qlang conduit. */
+    String handleSubtypes(Map<String, String> params) {
+        return listForType(params, "/subtypes", type -> {
+            ITypeHierarchy hier = type.newTypeHierarchy(null);
+            var arr = new JsonArray();
+            for (IType sub : hier.getSubtypes(type)) {
+                arr.add(NodeBuilder.typeSkeleton(sub));
+            }
+            return arr;
+        });
+    }
+
+    // ── Common helper: validate :of param, resolve type, build Vec ──
+
+    @FunctionalInterface
+    private interface TypeListBuilder {
+        JsonArray build(IType type) throws Exception;
+    }
+
+    private String listForType(Map<String, String> params,
+            String endpointName, TypeListBuilder builder) {
+        String fqn = params.get("of");
+        if (fqn == null || fqn.isBlank()) {
+            return ErrorDescriptor.missingParameter("of").toJsonString();
+        }
+        try {
+            IType type = JdtUtils.findType(fqn);
+            if (type == null) {
+                return ErrorDescriptor.typeNotFound(fqn).toJsonString();
+            }
+            return builder.build(type).toString();
+        } catch (Exception e) {
+            Log.warn(endpointName + " failed for " + fqn, e);
+            return ErrorDescriptor.jdtInternalError(
+                    "Failed " + endpointName + " on " + fqn, e)
+                    .toJsonString();
         }
     }
 

@@ -455,6 +455,18 @@ public class HttpServer {
                         graph.handleField(params));
                 case "/detail" -> Response.json(
                         graph.handleDetail(params));
+                case "/members" -> Response.json(
+                        graph.handleMembers(params));
+                case "/methods" -> Response.json(
+                        graph.handleMethods(params));
+                case "/fields" -> Response.json(
+                        graph.handleFields(params));
+                case "/innerTypes" -> Response.json(
+                        graph.handleInnerTypes(params));
+                case "/supers" -> Response.json(
+                        graph.handleSupers(params));
+                case "/subtypes" -> Response.json(
+                        graph.handleSubtypes(params));
                 case "/projects" -> Response.json(
                         search.handleProjects(scope));
                 case "/project-info" -> Response.json(
