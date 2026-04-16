@@ -1,6 +1,7 @@
 package io.github.kaluchi.jdtbridge;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -553,6 +554,73 @@ public class GraphHandlerTest {
             m.put(pairs[i], pairs[i + 1]);
         }
         return m;
+    }
+
+    // ── /types (bulk pattern search) ────────────────────────────────
+
+    @Test
+    void typesExactMatchReturnsSingleSkeleton() {
+        var arr = JsonParser.parseString(handler.handleTypes(
+                params("pattern", "Dog"),
+                ProjectScope.ALL)).getAsJsonArray();
+        // exact "Dog" — one match in fixture
+        assertEquals(1, arr.size());
+        assertEquals("test.model.Dog",
+                arr.get(0).getAsJsonObject().get("fqn").getAsString());
+        assertEquals("type",
+                arr.get(0).getAsJsonObject().get("kind").getAsString());
+    }
+
+    @Test
+    void typesWildcardMatchesMultiple() {
+        var arr = JsonParser.parseString(handler.handleTypes(
+                params("pattern", "*Service"),
+                ProjectScope.ALL)).getAsJsonArray();
+        assertTrue(arr.size() >= 2,
+                "*Service should match multiple, got " + arr.size());
+        for (var entry : arr) {
+            String fqn = entry.getAsJsonObject().get("fqn").getAsString();
+            assertTrue(fqn.endsWith("Service"),
+                    "non-Service FQN matched: " + fqn);
+        }
+    }
+
+    @Test
+    void typesSourceOnlyExcludesBinary() {
+        var arrAll = JsonParser.parseString(handler.handleTypes(
+                params("pattern", "Object"),
+                ProjectScope.ALL)).getAsJsonArray();
+        var arrSrc = JsonParser.parseString(handler.handleTypes(
+                paramsMulti("pattern", "Object", "sourceOnly", ""),
+                ProjectScope.ALL)).getAsJsonArray();
+        // java.lang.Object is binary — present in arrAll, absent in arrSrc
+        boolean hasObjectAll = arrAll.asList().stream()
+                .anyMatch(e -> "java.lang.Object".equals(
+                        e.getAsJsonObject().get("fqn").getAsString()));
+        boolean hasObjectSrc = arrSrc.asList().stream()
+                .anyMatch(e -> "java.lang.Object".equals(
+                        e.getAsJsonObject().get("fqn").getAsString()));
+        assertTrue(hasObjectAll,
+                "java.lang.Object must appear in unrestricted search");
+        assertFalse(hasObjectSrc,
+                "java.lang.Object must NOT appear with sourceOnly");
+    }
+
+    @Test
+    void typesMissingPatternReturnsError() {
+        JsonObject result = parse(handler.handleTypes(
+                Map.of(), ProjectScope.ALL));
+        assertTrue(isError(result));
+        assertEquals("missing-parameter",
+                errorOf(result).get("kind").getAsString());
+    }
+
+    @Test
+    void typesEmptyResultForUnknownPattern() {
+        var arr = JsonParser.parseString(handler.handleTypes(
+                params("pattern", "DefinitelyNonExistentTypeNameXYZ"),
+                ProjectScope.ALL)).getAsJsonArray();
+        assertEquals(0, arr.size());
     }
 
     // ── Cross-cutting: every error carries origin :jdt/plugin ───────

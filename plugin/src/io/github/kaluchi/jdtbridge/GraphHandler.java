@@ -353,6 +353,75 @@ class GraphHandler {
         });
     }
 
+    // ── Bulk search ─────────────────────────────────────────────────
+
+    /**
+     * Type pattern search — replaces the legacy /find. Returns a Vec
+     * of {@code :type} skeletons matching the wildcard pattern.
+     * Optional {@code &sourceOnly} flag excludes binary types.
+     * Binary types are deduped by FQN (they may appear once per
+     * project that has them on the classpath).
+     */
+    String handleTypes(Map<String, String> params, ProjectScope scope) {
+        String pattern = params.get("pattern");
+        if (pattern == null || pattern.isBlank()) {
+            return ErrorDescriptor.missingParameter("pattern")
+                    .toJsonString();
+        }
+        boolean sourceOnly = params.containsKey("sourceOnly");
+
+        int matchRule = (pattern.contains("*") || pattern.contains("?"))
+                ? SearchPattern.R_PATTERN_MATCH
+                        | SearchPattern.R_CASE_SENSITIVE
+                : SearchPattern.R_EXACT_MATCH
+                        | SearchPattern.R_CASE_SENSITIVE;
+
+        SearchPattern searchPattern = SearchPattern.createPattern(
+                pattern, IJavaSearchConstants.TYPE,
+                IJavaSearchConstants.DECLARATIONS, matchRule);
+        if (searchPattern == null) {
+            return ErrorDescriptor.invalidFqn(pattern)
+                    .with("reason",
+                            "Invalid type-pattern syntax")
+                    .toJsonString();
+        }
+
+        var arr = new JsonArray();
+        var seen = new java.util.HashSet<String>();
+        try {
+            new SearchEngine().search(searchPattern,
+                    new SearchParticipant[] {
+                        SearchEngine.getDefaultSearchParticipant() },
+                    scope.searchScope(),
+                    new SearchRequestor() {
+                        @Override
+                        public void acceptSearchMatch(SearchMatch match) {
+                            if (!(match.getElement() instanceof IType type)) {
+                                return;
+                            }
+                            try {
+                                if (sourceOnly && type.isBinary()) return;
+                                if (type.isBinary()
+                                        && !seen.add(type
+                                                .getFullyQualifiedName('.'))) {
+                                    return;
+                                }
+                                arr.add(NodeBuilder.typeSkeleton(type));
+                            } catch (Exception e) {
+                                Log.warn("typeSkeleton failed in /types",
+                                        e);
+                            }
+                        }
+                    }, null);
+            return arr.toString();
+        } catch (Exception e) {
+            Log.warn("/types failed for " + pattern, e);
+            return ErrorDescriptor.jdtInternalError(
+                    "/types search failed for " + pattern, e)
+                    .toJsonString();
+        }
+    }
+
     // ── References ──────────────────────────────────────────────────
 
     /**

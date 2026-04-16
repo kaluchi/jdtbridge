@@ -475,6 +475,8 @@ public class HttpServer {
                         graph.handleOverloads(params));
                 case "/refs" -> Response.json(
                         graph.handleRefsTo(params, scope));
+                case "/types" -> Response.json(
+                        graph.handleTypes(params, scope));
                 case "/projects" -> Response.json(
                         search.handleProjects(scope));
                 case "/project-info" -> Response.json(
