@@ -1,11 +1,9 @@
 /**
  * Git repos overview — shows repos, branches, dirty state.
  *
- * Fetches project skeletons via /projects, then enriches each with
- * /project?of=<fqn> to read the :repo and :branch fields (which
- * live in detail, not skeleton — the canonical project shape stays
- * git-agnostic). Local `git status --short` fills in dirty file
- * counts.
+ * Reads /projects skeletons (which carry :repo and :branch when
+ * EGit-managed) directly. Local `git status --short` per repo
+ * fills in dirty file counts.
  */
 
 import { execSync } from "node:child_process";
@@ -34,17 +32,13 @@ async function gitList(args = []) {
     : (flags.limit !== undefined ? Number(flags.limit) : 10);
   const filter = extractPositional(args);
 
-  const skeletons = await get("/projects");
-  if (!Array.isArray(skeletons)) {
-    output(args, skeletons, { text() {} });
+  const projects = await get("/projects");
+  if (!Array.isArray(projects)) {
+    output(args, projects, { text() {} });
     return;
   }
 
-  // Enrich each project with detail to read :repo / :branch
-  const details = await Promise.all(skeletons.map((p) =>
-    get(`/project?of=${encodeURIComponent(p.fqn)}`)));
-
-  let repos = reposFromDetails(details);
+  let repos = reposFromProjects(projects);
   if (filter.length > 0) {
     repos = repos.filter((r) =>
       filter.some((f) => r.name === f || r.name.includes(f)));
@@ -93,9 +87,9 @@ async function gitList(args = []) {
   });
 }
 
-function reposFromDetails(details) {
+function reposFromProjects(projects) {
   const seen = new Map();
-  for (const p of details) {
+  for (const p of projects) {
     const repoPath = normalizePath(p && p.repo || "");
     if (!repoPath) continue;
     if (!seen.has(repoPath)) {
@@ -124,9 +118,8 @@ function gitCmd(repoPath, cmd) {
 
 export const help = `Show git repos, branches, and modified files.
 
-Reads project list via /projects, then /project?of=<name> per
-project for :repo and :branch fields (EGit metadata lives in
-detail, not skeleton). Local git status fills in dirty counts.
+Reads /projects skeletons (which include :repo and :branch when
+EGit-managed). Local git status fills in dirty file counts.
 
 Usage:  jdt git [repo...] [--limit N] [--json]
 

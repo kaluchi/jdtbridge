@@ -281,8 +281,13 @@ class NodeBuilder {
         if (loc != null) obj.add("location", loc);
         obj.addProperty("containingProject",
                 type.getJavaProject().getElementName());
+        String packageName = type.getPackageFragment().getElementName();
+        if (!packageName.isEmpty()) {
+            obj.addProperty("containingPackage", packageName);
+        }
         try {
             obj.addProperty("typeKind", typeKindOf(type));
+            obj.add("modifiers", modifiers(type.getFlags()));
         } catch (JavaModelException ignored) { /* skip */ }
         return obj;
     }
@@ -349,6 +354,14 @@ class NodeBuilder {
         obj.addProperty("name", method.getElementName());
         obj.addProperty("signature", compactSignature(method));
         obj.add("modifiers", modifiers(method.getFlags()));
+        IType declaring = method.getDeclaringType();
+        if (declaring != null) {
+            obj.addProperty("containingType", fqnOf(declaring));
+        }
+        if (!method.isConstructor()) {
+            obj.addProperty("returnType",
+                    resolveTypeName(method.getReturnType(), declaring));
+        }
         return obj;
     }
 
@@ -429,8 +442,14 @@ class NodeBuilder {
         obj.addProperty("containingProject",
                 field.getJavaProject().getElementName());
         obj.addProperty("name", field.getElementName());
+        IType declaring = field.getDeclaringType();
+        if (declaring != null) {
+            obj.addProperty("containingType", fqnOf(declaring));
+        }
         try {
             obj.add("modifiers", modifiers(field.getFlags()));
+            obj.addProperty("type",
+                    resolveTypeName(field.getTypeSignature(), declaring));
         } catch (JavaModelException ignored) { /* skip */ }
         return obj;
     }
@@ -452,6 +471,21 @@ class NodeBuilder {
         if (project.getLocation() != null) {
             obj.addProperty("rootPath",
                     project.getLocation().toOSString());
+        }
+        // Git context — workspace projects overwhelmingly live in
+        // git repos and the membership is fundamental enough that
+        // bulk listings (jdt q '@projects') must show it without an
+        // @detail roundtrip per project.
+        var mapping = org.eclipse.egit.core.project
+                .RepositoryMapping.getMapping(project);
+        if (mapping != null && mapping.getRepository() != null) {
+            var repo = mapping.getRepository();
+            obj.addProperty("repo",
+                    repo.getWorkTree().getAbsolutePath());
+            try {
+                String branch = repo.getBranch();
+                if (branch != null) obj.addProperty("branch", branch);
+            } catch (Exception ignored) { /* git read failure */ }
         }
         return obj;
     }
@@ -503,16 +537,7 @@ class NodeBuilder {
             }
         }
 
-        var mapping = org.eclipse.egit.core.project
-                .RepositoryMapping.getMapping(project);
-        if (mapping != null) {
-            var repo = mapping.getRepository();
-            obj.addProperty("repo",
-                    repo.getWorkTree().getAbsolutePath());
-            try {
-                obj.addProperty("branch", repo.getBranch());
-            } catch (Exception ignored) { /* skip */ }
-        }
+        // :repo / :branch already in skeleton.
         return obj;
     }
 
@@ -531,6 +556,13 @@ class NodeBuilder {
         var obj = baseHeader(name, "package", origin);
         obj.addProperty("containingProject",
                 pkg.getJavaProject().getElementName());
+        try {
+            int typeCount = 0;
+            for (ICompilationUnit cu : pkg.getCompilationUnits()) {
+                typeCount += cu.getTypes().length;
+            }
+            obj.addProperty("typeCount", typeCount);
+        } catch (JavaModelException ignored) { /* skip */ }
         return obj;
     }
 
@@ -593,9 +625,14 @@ class NodeBuilder {
                 : file.getFullPath().toOSString();
         String origin = file.getName().endsWith(".class")
                 ? "binary" : "source";
+        String name = file.getName();
+        String language = name.endsWith(".java")
+                ? "java"
+                : name.endsWith(".class") ? "class" : "other";
         var obj = baseHeader(fqn, "file", origin);
         obj.addProperty("containingProject",
                 file.getProject().getName());
+        obj.addProperty("language", language);
         return obj;
     }
 
