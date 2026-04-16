@@ -311,3 +311,33 @@
             :examples []
             :throws [:FieldNotFound]}}
 | use
+
+|~ ── Stdlib conduits ─────────────────────────────────────────── ~|
+|~ Recursive and composed graph navigations built from the
+   primitive operands above. Each conduit carries :docs for
+   reify/manifest self-documentation. ~|
+
+|~~ Transitive supertypes, distinct. Walks @supers recursively
+    until the supertype chain terminates (Object or top interface). ~~|
+let(:@ancestors, @supers | as(:direct)
+    | [direct, direct * @ancestors] | flat
+    | filter(empty | not) | distinct)
+
+|~~ Transitive subtypes, distinct. Walks @subtypes recursively
+    until no further subtypes exist. ~~|
+let(:@descendants, @subtypes | as(:direct)
+    | [direct, direct * @descendants] | flat
+    | filter(empty | not) | distinct)
+
+|~~ Public methods of a type with zero incoming callers.
+    Deletion candidates — methods no code references. ~~|
+let(:@publicOrphans, @methods
+    | filter(/modifiers | any(eq("public")))
+    | filter(@callers | empty))
+
+|~~ Filter nodes to those from workspace source, not binary deps. ~~|
+let(:@sourceOnly, filter(/origin | eq("source")))
+
+|~~ Filter nodes to those belonging to the named project. ~~|
+let(:@inProject, [:projName],
+    filter(/containingProject | eq(projName)))
