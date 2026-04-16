@@ -3,10 +3,8 @@ import { createServer } from "node:http";
 import { setColorEnabled } from "../src/color.mjs";
 import { toSandboxPath } from "../src/paths.mjs";
 
-// Behavior tests for surviving non-graph CLI commands. Graph
-// queries (find/refs/impl/hier/outline/source/projects/project-info/
-// problems) were folded into `jdt q` — see GraphHandlerTest in
-// plugin.tests for the underlying endpoint coverage.
+// Behavior tests for non-graph CLI commands. Graph-axis endpoint
+// coverage lives in GraphHandlerTest (plugin.tests).
 
 function startServer(handler) {
   return new Promise((resolve) => {

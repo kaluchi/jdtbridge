@@ -157,9 +157,10 @@ The agent specifies the target directly.
 - No caching: scope resolved fresh every request. Session file is
   tiny, path comparison is cheap. New projects visible immediately.
 
-- Zero CLI changes: the X-Bridge-Session header was already sent
-  for telemetry. Session file was already written by AgentLaunchDelegate.
-  Scope piggybacks on existing infrastructure.
+- Scope piggybacks on existing transport: the X-Bridge-Session
+  header rides every CLI request, the session file is written by
+  AgentLaunchDelegate. Scope reads them; it does not require CLI
+  changes.
 
 - Explicit params bypass scope: endpoints that accept explicit
   project/file/class don't need scope. The agent already knows

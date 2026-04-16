@@ -14,9 +14,8 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Replaces the core plugin's browser-based welcome with a native dialog.
- * Checks whether the JDT Bridge CLI is installed and shows a setup prompt
- * if not.
+ * On Eclipse startup, checks whether the JDT Bridge CLI is installed
+ * and shows a native setup prompt dialog if not.
  */
 public class WelcomeStartupHandler implements IStartup {
 

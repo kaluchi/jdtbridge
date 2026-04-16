@@ -21,9 +21,7 @@ import java.util.Map;
  * <p>
  * The leading-underscore key on the outer object is the discriminator
  * the CLI-side qlang impl scans for; lifting into a qlang Error value
- * happens on the JS side and rides the fail-track. Replaces the legacy
- * {@code {"error": "<string>"}} shape — a stringly-typed message with
- * no kind, no class, no context.
+ * happens on the JS side and rides the fail-track.
  * <p>
  * Each error site uses a dedicated factory method that fixes the
  * {@code kind} / {@code thrown} pair; context fields are seeded from

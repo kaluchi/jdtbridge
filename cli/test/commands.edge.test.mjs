@@ -1,9 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { startServer, stopServer, captureConsole, disableColor } from "./helpers/mock-server.mjs";
 
-// Edge cases for surviving non-graph commands. Graph-query edge
-// cases (find/refs/impl/hier/outline/source/projects/problems)
-// migrated into GraphHandlerTest in plugin.tests.
+// Edge cases for non-graph commands. Graph-axis edge cases live in
+// GraphHandlerTest (plugin.tests).
 
 describe("command edge cases", () => {
   let server, port, io;

@@ -106,7 +106,7 @@ describe("guideSection", () => {
     expect(typeof g.body).toBe("string");
   });
 
-  it("body contains build/test/refactor refs for surviving commands", () => {
+  it("body contains build/test/refactor command references", () => {
     const g = guideSection();
     expect(g.body).toContain("jdt q '@problems'");
     expect(g.body).toContain("jdt test run FQN");

@@ -5,10 +5,6 @@
    see the ABI doc) or a fqn/fqmn String, and returns either a
    single node, a Vec of nodes, or — on failure — an Error value
    riding the fail-track with the server's structured descriptor.
-
-   Replaces the legacy :jdt/search MVP. Older operands (@find /
-   @callers / @members / @source) survive there until the
-   deletion sweep; new code uses :jdt/graph names verbatim.
    ───────────────────────────────────────────────────────────────── ~|
 
 |~ ── Root queries ─────────────────────────────────────────────── ~|

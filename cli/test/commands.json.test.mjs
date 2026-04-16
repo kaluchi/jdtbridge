@@ -3,11 +3,9 @@ import {
   startServer, stopServer, captureConsole, errorServer, parseJsonOutput, disableColor,
 } from "./helpers/mock-server.mjs";
 
-// --json output coverage for surviving non-graph commands.
-// Graph queries (find/refs/impl/hier/outline/source/projects/
-// project-info/problems/editors) were folded into `jdt q` —
-// their JSON contracts now live in the qlang :jdt/graph module
-// and the GraphHandler plugin tests, not here.
+// --json output coverage for non-graph commands.
+// Graph axes are tested through the qlang :jdt/graph module and the
+// GraphHandler plugin tests.
 
 describe("--json output", () => {
   let server, port, io;

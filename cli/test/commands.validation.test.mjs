@@ -3,11 +3,9 @@ import {
   startServer, stopServer, captureConsole, errorServer, disableColor,
 } from "./helpers/mock-server.mjs";
 
-// Validation tests for surviving non-graph CLI commands. Graph
-// queries (find/refs/impl/hier/outline/source/projects/project-info/
-// problems) moved into `jdt q`; their input validation lives in
-// the qlang :jdt/graph operand impls (subject-polymorphism +
-// missing-fqn errors via fail-track).
+// Validation tests for non-graph CLI commands. Graph-axis input
+// validation lives in the qlang :jdt/graph operand impls (subject-
+// polymorphism + missing-fqn errors via fail-track).
 
 describe("command validation", () => {
   let server, port, io;

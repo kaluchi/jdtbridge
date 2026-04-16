@@ -1,10 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { startServer, stopServer, captureConsole, disableColor } from "./helpers/mock-server.mjs";
 
-// Sandbox path conversion across surviving non-graph commands.
-// Graph queries (find/refs/impl/hier/source/problems/projects/
-// project-info/editors-listing) moved to `jdt q`; their path-
-// conversion behavior is exercised by GraphHandlerTest's
+// Sandbox path conversion across non-graph commands. Graph-axis
+// path-conversion behavior is exercised by GraphHandlerTest's
 // :location :file assertions plus the printValue path on the
 // CLI side, both of which return raw OS paths to the user.
 

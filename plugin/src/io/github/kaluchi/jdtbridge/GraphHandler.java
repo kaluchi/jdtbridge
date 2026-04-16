@@ -31,14 +31,13 @@ import org.eclipse.jdt.core.search.SearchPattern;
 import org.eclipse.jdt.core.search.SearchRequestor;
 
 /**
- * Handlers for the new graph-axis endpoints. Each endpoint answers
- * one primitive question against the JDT model and returns a node
- * (or Vec of nodes) in the canonical shape produced by
+ * Handlers for the graph-axis endpoints. Each endpoint answers one
+ * primitive question against the JDT model and returns a node (or
+ * Vec of nodes) in the canonical shape produced by
  * {@link NodeBuilder}. Errors come back as
- * {@link ErrorDescriptor} JSON, never as the legacy stringly-typed
- * {@code {"error": "..."}} form.
+ * {@link ErrorDescriptor} JSON.
  * <p>
- * Endpoint surface in this batch (point lookups + polymorphic detail):
+ * Endpoint surface (point lookups + polymorphic detail):
  * <ul>
  *   <li>{@code /type?of=<fqn>}     — single :type detail</li>
  *   <li>{@code /method?of=<fqmn>}  — single :method detail; supports
@@ -750,11 +749,11 @@ class GraphHandler {
     // ── Bulk search ─────────────────────────────────────────────────
 
     /**
-     * Type pattern search — replaces the legacy /find. Returns a Vec
-     * of {@code :type} skeletons matching the wildcard pattern.
-     * Optional {@code &sourceOnly} flag excludes binary types.
-     * Binary types are deduped by FQN (they may appear once per
-     * project that has them on the classpath).
+     * Type pattern search. Returns a Vec of {@code :type} skeletons
+     * matching the wildcard pattern. Optional {@code &sourceOnly}
+     * flag excludes binary types. Binary types are deduped by FQN
+     * (they may appear once per project that has them on the
+     * classpath).
      */
     String handleTypes(Map<String, String> params, ProjectScope scope) {
         String pattern = params.get("pattern");

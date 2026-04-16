@@ -350,7 +350,6 @@ class SearchHandler {
         return result.toString();
     }
 
-    /** @deprecated Use handleOutline instead. Kept for backwards compat. */
     String handleTypeInfo(Map<String, String> params) throws Exception {
         String fqn = params.get("class");
         if (fqn == null || fqn.isBlank()) {

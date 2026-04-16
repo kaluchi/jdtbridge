@@ -40,9 +40,8 @@ jdt status [sections...] [-q]                          # workspace overview (sta
 ### Graph query
 
 `jdt q '<qlang-pipeline>'` (alias: `q`) evaluates a qlang pipeline
-against the Eclipse JDT graph. Replaces the legacy find/references/
-implementors/hierarchy/outline/source/projects/project-info/problems
-commands — every navigation composes through axis operands.
+against the Eclipse JDT graph. Every navigation composes through
+axis operands.
 
 Pipelines start with a SEED (literal string or nullary operand) and
 chain operands that read their subject from pipeValue. Identifiers

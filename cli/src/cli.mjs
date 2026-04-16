@@ -261,7 +261,7 @@ function printOverview() {
     "Dashboard:",
     h("  status [sections...] [-q]",                       "CLI screenshot of Eclipse (start here)"),
     "",
-    "Graph query (replaces find/refs/impl/hier/outline/source/projects/problems):",
+    "Graph query:",
     h(`  q${fmtAliases("query")} '<qlang-pipeline>'`,     "pipeline query over the JDT graph"),
     "",
     "Testing & building:",
