@@ -630,6 +630,131 @@ class GraphHandler {
         return null;
     }
 
+    // ── Source text ───────────────────────────────────────────────
+
+    /**
+     * Raw source text of a type or member — byte-exact from disk
+     * (preserving indentation). Returns {@code {:node <detail> :text <source>}}.
+     * No enriched refs, no hierarchy — those are separate axes.
+     */
+    String handleSource(Map<String, String> params) {
+        String identifier = params.get("of");
+        if (identifier == null || identifier.isBlank()) {
+            return ErrorDescriptor.missingParameter("of").toJsonString();
+        }
+        try {
+            ResolvedTarget target = resolveTarget(identifier, params);
+            if (target.errorJson != null) return target.errorJson;
+
+            if (!(target.element instanceof org.eclipse.jdt.core.IMember member)) {
+                return ErrorDescriptor.wrongSubjectKind("/source", "member",
+                        elementKindOf(target.element)).toJsonString();
+            }
+
+            JsonObject detail;
+            if (member instanceof IType t) detail = NodeBuilder.typeDetail(t);
+            else if (member instanceof IMethod m) detail = NodeBuilder.methodDetail(m);
+            else if (member instanceof IField f) detail = NodeBuilder.fieldDetail(f);
+            else return ErrorDescriptor.wrongSubjectKind("/source", "type|method|field",
+                    elementKindOf(member)).toJsonString();
+
+            String text = NodeBuilder.sourceTextOf(member);
+            if (text == null) {
+                return ErrorDescriptor.ioError("Source not available for " + identifier)
+                        .toJsonString();
+            }
+
+            var result = new JsonObject();
+            result.add("node", detail);
+            result.addProperty("text", text);
+            return result.toString();
+        } catch (Exception e) {
+            Log.warn("/source failed for " + identifier, e);
+            return ErrorDescriptor.jdtInternalError(
+                    "Failed /source " + identifier, e).toJsonString();
+        }
+    }
+
+    // ── Problems ────────────────────────────────────────────────────
+
+    /**
+     * Compilation problems in canonical :problem shape.
+     * Scope: {@code &file=}, {@code &project=}, or workspace (default).
+     */
+    String handleProblems(Map<String, String> params, ProjectScope scope) {
+        try {
+            var root = org.eclipse.core.resources.ResourcesPlugin
+                    .getWorkspace().getRoot();
+            String filePath = params.get("file");
+            String projectName = params.get("project");
+
+            org.eclipse.core.resources.IResource resource;
+            if (filePath != null && !filePath.isBlank()) {
+                resource = root.findMember(filePath);
+                if (resource == null) {
+                    return ErrorDescriptor.fileNotFound(filePath).toJsonString();
+                }
+            } else if (projectName != null && !projectName.isBlank()) {
+                var project = root.getProject(projectName);
+                if (!project.exists()) {
+                    return ErrorDescriptor.projectNotFound(projectName).toJsonString();
+                }
+                resource = project;
+            } else {
+                resource = root;
+            }
+
+            int depth = (resource instanceof org.eclipse.core.resources.IFile)
+                    ? org.eclipse.core.resources.IResource.DEPTH_ZERO
+                    : org.eclipse.core.resources.IResource.DEPTH_INFINITE;
+            resource.refreshLocal(depth, null);
+            JdtUtils.joinAutoBuild();
+
+            var markers = resource.findMarkers(
+                    JdtUtils.JDT_PROBLEM_MARKER, true,
+                    org.eclipse.core.resources.IResource.DEPTH_INFINITE);
+
+            var arr = new JsonArray();
+            for (var marker : markers) {
+                int severity = marker.getAttribute(
+                        org.eclipse.core.resources.IMarker.SEVERITY, -1);
+                if (severity < org.eclipse.core.resources.IMarker.SEVERITY_ERROR) continue;
+                if (!scope.containsProject(
+                        marker.getResource().getProject().getName())) continue;
+
+                var node = new JsonObject();
+                node.addProperty("kind", "problem");
+                node.addProperty("origin", "source");
+                var loc = marker.getResource().getLocation();
+                if (loc != null) {
+                    var locObj = new JsonObject();
+                    locObj.addProperty("file", loc.toOSString());
+                    locObj.addProperty("startLine",
+                            marker.getAttribute(
+                                    org.eclipse.core.resources.IMarker.LINE_NUMBER, -1));
+                    locObj.addProperty("endLine",
+                            marker.getAttribute(
+                                    org.eclipse.core.resources.IMarker.LINE_NUMBER, -1));
+                    node.add("location", locObj);
+                }
+                node.addProperty("containingProject",
+                        marker.getResource().getProject().getName());
+                String sevStr = severity == org.eclipse.core.resources.IMarker.SEVERITY_ERROR
+                        ? "error" : "warning";
+                node.addProperty("severity", sevStr);
+                node.addProperty("message",
+                        marker.getAttribute(
+                                org.eclipse.core.resources.IMarker.MESSAGE, ""));
+                node.addProperty("markerType", "jdt");
+                arr.add(node);
+            }
+            return arr.toString();
+        } catch (Exception e) {
+            Log.warn("/problems2 failed", e);
+            return ErrorDescriptor.jdtInternalError("Failed /problems2", e).toJsonString();
+        }
+    }
+
     // ── Bulk search ─────────────────────────────────────────────────
 
     /**

@@ -729,6 +729,59 @@ public class GraphHandlerTest {
         assertTrue(names.contains("test.refactor"));
     }
 
+    // ── /source2 ─────────────────────────────────────────────────────
+
+    @Test
+    void sourceReturnsNodeAndText() {
+        JsonObject result = parse(handler.handleSource(
+                params("of", "test.model.Dog")));
+        assertNotNull(result.get("node"),
+                "/source must carry :node detail");
+        assertNotNull(result.get("text"),
+                "/source must carry :text");
+        assertEquals("type",
+                result.getAsJsonObject("node").get("kind").getAsString());
+        assertTrue(result.get("text").getAsString()
+                .contains("class Dog"),
+                "source text must contain 'class Dog'");
+    }
+
+    @Test
+    void sourceForMethodReturnsMethodBody() {
+        JsonObject result = parse(handler.handleSource(
+                params("of", "test.model.Dog#bark()")));
+        assertNotNull(result.get("text"));
+        assertTrue(result.get("text").getAsString()
+                .contains("bark"),
+                "method source must contain 'bark'");
+        assertEquals("method",
+                result.getAsJsonObject("node").get("kind").getAsString());
+    }
+
+    @Test
+    void sourceErrorForUnknownMember() {
+        JsonObject result = parse(handler.handleSource(
+                params("of", "no.such.Type")));
+        assertTrue(isError(result));
+    }
+
+    // ── /problems2 ──────────────────────────────────────────────────
+
+    @Test
+    void problemsReturnsCompilationErrors() {
+        // test.broken.BrokenClass has an intentional compile error
+        var arr = JsonParser.parseString(handler.handleProblems(
+                params("project", "jdtbridge-test"),
+                ProjectScope.ALL)).getAsJsonArray();
+        assertTrue(arr.size() >= 1,
+                "fixture has BrokenClass with compile error");
+        var first = arr.get(0).getAsJsonObject();
+        assertEquals("problem", first.get("kind").getAsString());
+        assertEquals("error", first.get("severity").getAsString());
+        assertNotNull(first.get("message"));
+        assertNotNull(first.get("location"));
+    }
+
     // ── Cross-cutting: every error carries origin :jdt/plugin ───────
 
     @Test

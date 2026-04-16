@@ -280,6 +280,29 @@ const refsImpl = overloadedOp('@refs', 2, {
 
 const classpathImpl = navOp('@classpath', '/classpath');
 
+// ── Source text ─────────────────────────────────────────────────
+
+const sourceImpl = navOp('@source', '/source2');
+
+// ── Problems ────────────────────────────────────────────────────
+
+const problemsImpl = overloadedOp('@problems', 1, {
+    0: async () => getEndpoint('/problems2'),
+    1: async (pipeValue, scopeLambda) => {
+        const scopeVal = await scopeLambda(pipeValue);
+        if (typeof scopeVal === 'string') {
+            if (scopeVal.includes('/') || scopeVal.includes('\\')) {
+                return getEndpoint(`/problems2?file=${enc(scopeVal)}`);
+            }
+            return getEndpoint(`/problems2?project=${enc(scopeVal)}`);
+        }
+        if (scopeVal && scopeVal.name) {
+            return getEndpoint(`/problems2?${enc(scopeVal.name)}`);
+        }
+        return getEndpoint('/problems2');
+    }
+});
+
 // ── Sugar: callers / readers / writers ──────────────────────────
 // Each is a two-form operand: `subject | @callers` (pipeValue)
 // AND `@callers(subject)` (captured). Returns the :from skeleton
@@ -347,6 +370,8 @@ export function createImpls() {
         '@overloads':   overloadsImpl,
         '@refs':        refsImpl,
         '@classpath':   classpathImpl,
+        '@source':      sourceImpl,
+        '@problems':    problemsImpl,
         '@callers':     callersImpl,
         '@readers':     readersImpl,
         '@writers':     writersImpl

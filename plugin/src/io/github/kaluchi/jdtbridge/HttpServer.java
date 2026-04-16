@@ -477,6 +477,10 @@ public class HttpServer {
                         graph.handleRefsTo(params, scope));
                 case "/types" -> Response.json(
                         graph.handleTypes(params, scope));
+                case "/source2" -> Response.json(
+                        graph.handleSource(params));
+                case "/problems2" -> Response.json(
+                        graph.handleProblems(params, scope));
                 case "/projects2" -> Response.json(
                         graph.handleProjects(scope));
                 case "/project" -> Response.json(

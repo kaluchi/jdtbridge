@@ -654,6 +654,53 @@ class NodeBuilder {
         return obj;
     }
 
+    // ── Source text extraction ─────────────────────────────────────
+
+    /**
+     * Byte-exact source text for a member. Top-level types include
+     * the full compilation unit (package + imports + type body).
+     * Methods, fields, and inner types return their declaration range
+     * read from disk to preserve indentation.
+     */
+    static String sourceTextOf(IMember member) {
+        try {
+            boolean isTopLevelType = member instanceof IType t
+                    && t.getDeclaringType() == null;
+            if (isTopLevelType) {
+                ICompilationUnit cu = member.getCompilationUnit();
+                if (cu != null) return cu.getSource();
+                IClassFile cf = member.getClassFile();
+                return cf != null ? cf.getSource() : null;
+            }
+            ISourceRange range = member.getSourceRange();
+            if (range == null || range.getOffset() < 0) {
+                return member.getSource();
+            }
+            String absPath = filePathOf(member);
+            String fullSource = sourceOf(member);
+            if (absPath != null && fullSource != null) {
+                int startLine = offsetToLine(fullSource,
+                        range.getOffset());
+                int endLine = offsetToLine(fullSource,
+                        range.getOffset() + range.getLength());
+                try {
+                    var path = java.nio.file.Path.of(absPath);
+                    if (java.nio.file.Files.exists(path)) {
+                        var lines = java.nio.file.Files.readAllLines(path);
+                        int from = Math.max(0, startLine - 1);
+                        int to = Math.min(lines.size(), endLine);
+                        return String.join("\n",
+                                lines.subList(from, to)) + "\n";
+                    }
+                } catch (Exception ignored) { /* fall through */ }
+            }
+            return member.getSource();
+        } catch (JavaModelException e) {
+            Log.warn("sourceTextOf failed", e);
+            return null;
+        }
+    }
+
     // ── :reference ──────────────────────────────────────────────────
 
     /**

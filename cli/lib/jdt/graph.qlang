@@ -278,6 +278,30 @@
               :examples []
               :throws [:ProjectNotFound]}
 
+ |~ ── Source / diagnostics ────────────────────────────────────── ~|
+
+ :@source {:qlang/kind :builtin
+           :qlang/impl null
+           :category :jdt/graph
+           :subject [:map :string]
+           :modifiers []
+           :returns :map
+           :docs ["Source text of a type or member. Returns {:node <detail> :text <source>}."
+                  "Top-level types include the full compilation unit."]
+           :examples []
+           :throws [:TypeNotFound :MethodNotFound :FieldNotFound]}
+
+ :@problems {:qlang/kind :builtin
+             :qlang/impl null
+             :category :jdt/graph
+             :subject :any
+             :modifiers [:keyword]
+             :returns :vec
+             :docs ["Compilation problems in the given scope."
+                    "Optional modifier: :file, :project, or :workspace."]
+             :examples []
+             :throws [:FileNotFound :ProjectNotFound]}
+
  |~ ── Sugar builtins: callers / readers / writers ────────────── ~|
 
  :@callers {:qlang/kind :builtin
