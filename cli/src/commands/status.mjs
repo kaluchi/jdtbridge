@@ -177,19 +177,38 @@ function introSection() {
     title: "Intro",
     cmd: "jdt status intro",
     body: `Eclipse IDE is running and connected to this terminal via jdt CLI.
-jdt is a bridge that exposes the IDE's functions as terminal commands.
-Commands cover Java search, compilation, testing, and refactoring.
-Everything the developer sees and does in Eclipse GUI
-the AI assistant can access through jdt CLI against the same
-running instance. Same IDE, different interface.
+jdt exposes the IDE's semantic Java graph as a pipeline query surface.
+grep sees text. jdt q sees structure — types, methods, call sites,
+hierarchies, annotations, classpaths — and composes them.
 
-The sections below are live output from that instance.
-Each section is produced by a command shown in its header:
-  ## Git     -> jdt status git
-  ## Problems -> jdt status problems
-That command can be run standalone for a fresh snapshot.
-Several commands can be combined: jdt status git editors projects
+Query the graph with jdt q '<qlang-pipeline>'. Examples:
 
+  jdt q '@types("*Service", :sourceOnly) * @methods
+        >> filter(/modifiers | any(eq("public")))
+        | filter(@callers | empty) * /fqn'
+  -- public methods with no callers (deletion candidates)
+
+  jdt q '@subtypes("com.example.Repository") * /fqn'
+  -- all implementations of an interface
+
+  jdt q '@callers("com.example.Foo#bar()") * /fqn'
+  -- who calls this method
+
+  jdt q '@ancestors("com.example.MyService") * /fqn'
+  -- full supertype chain
+
+  jdt q '@type("com.example.Foo") | @detail'
+  -- full type descriptor (modifiers, interfaces, javadoc)
+
+  jdt q 'manifest | filter(/category | eq(:jdt/graph)) * /name'
+  -- list all graph operands
+
+Any operand without args shows its descriptor:
+  jdt q '@subtypes'
+  -- :docs, :examples, :throws for this operand
+
+The sections below are live output from the running Eclipse instance.
+Each section is produced by a command shown in its header.
 -q suppresses intro, help, guide, and section descriptions.`,
   };
 }
@@ -206,18 +225,28 @@ function guideSection() {
   return {
     title: "Guide",
     cmd: "jdt status guide",
-    body: `After editing code:
+    body: `Graph query — jdt q:
+
+  jdt q '<qlang-pipeline>'   evaluate against the JDT graph
+  jdt q '@operand'           bare-name reify = descriptor
+  jdt q 'manifest'           full operand catalog
+
+  as(:name) snapshots any value — reuse without re-fetching:
+    jdt q '@types("*") | as(:all) | all | count'
+
+  !| catches errors on the fail-track:
+    jdt q '@type("no.such") !| /thrown'
+
+After editing code:
 
   jdt problems                check compilation after edit
-  jdt problems --project X    check one project only (faster)
   jdt test run FQN -f -q      run one test, stream result
   jdt build --project X       trigger build if auto-build is off
 
-Refreshing the dashboard:
+Dashboard:
 
   jdt status -q               all sections, no intro/help/guide
-  jdt status editors problems   combine specific sections
-  jdt help <command>          detailed usage for any command`,
+  jdt status editors problems   selective refresh`,
   };
 }
 
