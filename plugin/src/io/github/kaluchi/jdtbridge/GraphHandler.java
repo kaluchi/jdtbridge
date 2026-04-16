@@ -239,7 +239,7 @@ class GraphHandler {
                 IType declaring = method.getDeclaringType();
                 if (declaring == null) return "null";
                 String name = method.getElementName();
-                String paramSig = ReferenceCollector.paramSig(method);
+                String resolvedSig = NodeBuilder.erasedParams(method);
                 ITypeHierarchy hier =
                         declaring.newSupertypeHierarchy(null);
 
@@ -248,7 +248,7 @@ class GraphHandler {
                     IType superClass = hier.getSuperclass(current);
                     if (superClass == null) break;
                     IMethod found = matchingMethod(
-                            superClass, name, paramSig);
+                            superClass, name, resolvedSig);
                     if (found != null) {
                         return NodeBuilder.methodSkeleton(found)
                                 .toString();
@@ -258,7 +258,7 @@ class GraphHandler {
                 for (IType iface
                         : hier.getAllSuperInterfaces(declaring)) {
                     IMethod found = matchingMethod(
-                            iface, name, paramSig);
+                            iface, name, resolvedSig);
                     if (found != null) {
                         return NodeBuilder.methodSkeleton(found)
                                 .toString();
@@ -272,11 +272,17 @@ class GraphHandler {
         });
     }
 
+    /**
+     * Match by resolved FQN-erased param signature so source-side
+     * methods compare correctly against binary super methods (the
+     * {@code Q}-vs-{@code L} signature divergence that defeats
+     * {@code ReferenceCollector.paramSig}).
+     */
     private static IMethod matchingMethod(IType type, String name,
-            String paramSig) throws JavaModelException {
+            String resolvedSig) throws JavaModelException {
         for (IMethod m : type.getMethods()) {
             if (m.getElementName().equals(name)
-                    && ReferenceCollector.paramSig(m).equals(paramSig)) {
+                    && NodeBuilder.erasedParams(m).equals(resolvedSig)) {
                 return m;
             }
         }

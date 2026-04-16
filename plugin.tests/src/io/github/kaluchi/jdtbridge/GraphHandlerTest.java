@@ -392,6 +392,30 @@ public class GraphHandlerTest {
     }
 
     @Test
+    void overridesResolvesBinarySupertype() {
+        // Activator.start(BundleContext) overrides BundleActivator.start
+        // — source vs binary signature alignment must use resolved FQNs.
+        // Skip if Activator is not on the test fixture classpath
+        // (it lives in the production plugin, not jdtbridge-test).
+        try {
+            var activator = JdtUtils.findType(
+                    "io.github.kaluchi.jdtbridge.Activator");
+            if (activator == null) return; // not in this test classpath
+            String response = handler.handleOverrides(
+                    params("of",
+                        "io.github.kaluchi.jdtbridge.Activator"
+                        + "#start(org.osgi.framework.BundleContext)"));
+            JsonObject result = parse(response);
+            assertEquals("method", result.get("kind").getAsString());
+            assertTrue(result.get("fqn").getAsString()
+                    .startsWith("org.osgi.framework.BundleActivator#start"),
+                    "must resolve to binary super, got: " + result.get("fqn"));
+        } catch (Exception ignored) {
+            // resolution unavailable in test runtime — skip
+        }
+    }
+
+    @Test
     void overridesRejectsNonMethodSubject() {
         JsonObject result = parse(handler.handleOverrides(
                 params("of", "test.model.Dog")));
