@@ -3,6 +3,7 @@ package io.github.kaluchi.jdtbridge;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
+import org.eclipse.core.resources.IFile;
 import org.eclipse.jdt.core.Flags;
 import org.eclipse.jdt.core.IClassFile;
 import org.eclipse.jdt.core.ICompilationUnit;
@@ -14,8 +15,10 @@ import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.ISourceRange;
 import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.ITypeParameter;
+import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.Signature;
+import org.eclipse.jdt.core.search.SearchMatch;
 
 /**
  * Single source of truth for the canonical graph node JSON shape.
@@ -424,6 +427,122 @@ class NodeBuilder {
                 originOf(field),
                 location(field),
                 containingProjectOf(field));
+    }
+
+    // ── :reference ──────────────────────────────────────────────────
+
+    /**
+     * Polymorphic skeleton dispatcher. Resolves the right per-kind
+     * builder based on the element's runtime type. Falls back to the
+     * containing member when given an initializer or anonymous type
+     * — those have no FQN-addressable identity but their host does.
+     */
+    static JsonObject memberSkeleton(IJavaElement element)
+            throws JavaModelException {
+        if (element == null) return null;
+        if (element instanceof IType type) {
+            if (type.isAnonymous()) {
+                IJavaElement parent = type.getParent();
+                if (parent != null) return memberSkeleton(parent);
+                return null;
+            }
+            return typeSkeleton(type);
+        }
+        if (element instanceof IMethod method) {
+            return methodSkeleton(method);
+        }
+        if (element instanceof IField field) {
+            return fieldSkeleton(field);
+        }
+        // Initializers and other element kinds without their own
+        // skeleton fall back to the enclosing type — references from
+        // a static block attribute to the type that declared the block.
+        IType enclosing = (IType) element.getAncestor(IJavaElement.TYPE);
+        return enclosing != null ? typeSkeleton(enclosing) : null;
+    }
+
+    /**
+     * Build a {@code :reference} node from a {@link SearchMatch} that
+     * pinned the {@code from}-side and a pre-built {@code to}-side
+     * skeleton (the query target).
+     * <p>
+     * References are terminal nodes — no FQN, identified by the
+     * {@code (from, to, location, refKind)} tuple. The
+     * {@code :containingProject} mirrors the from-side's project,
+     * which is where the reference physically lives.
+     */
+    static JsonObject referenceFromMatch(JsonObject toSkeleton,
+            SearchMatch match, String refKind) throws JavaModelException {
+        var obj = new JsonObject();
+        obj.addProperty("kind", "reference");
+        obj.addProperty("origin", originOfMatch(match));
+
+        JsonObject loc = matchLocation(match);
+        if (loc != null) {
+            obj.add("location", loc);
+        } else {
+            obj.add("location", com.google.gson.JsonNull.INSTANCE);
+        }
+
+        JsonObject fromSkeleton = match.getElement() instanceof IJavaElement el
+                ? memberSkeleton(el) : null;
+        if (fromSkeleton != null) {
+            obj.add("from", fromSkeleton);
+            obj.add("containingProject",
+                    fromSkeleton.get("containingProject"));
+        } else {
+            obj.add("from", com.google.gson.JsonNull.INSTANCE);
+            obj.add("containingProject",
+                    com.google.gson.JsonNull.INSTANCE);
+        }
+
+        obj.add("to", toSkeleton);
+        obj.addProperty("refKind", refKind);
+
+        if (match.isInsideDocComment()) {
+            obj.addProperty("inJavadoc", true);
+        }
+        return obj;
+    }
+
+    private static String originOfMatch(SearchMatch match) {
+        if (match.getElement() instanceof IMember member) {
+            try {
+                if (member.isBinary()) return "binary";
+            } catch (Exception ignored) { /* fall through */ }
+        }
+        return "source";
+    }
+
+    /** Convert a SearchMatch's offset/length into the canonical location shape. */
+    static JsonObject matchLocation(SearchMatch match) {
+        if (!(match.getResource() instanceof IFile file)
+                || file.getLocation() == null) {
+            return null;
+        }
+        try {
+            ICompilationUnit cu =
+                    JavaCore.createCompilationUnitFrom(file);
+            if (cu == null) return null;
+            String source = cu.getSource();
+            if (source == null) return null;
+
+            int startOffset = match.getOffset();
+            int endOffset = startOffset + match.getLength();
+            int startLine = offsetToLine(source, startOffset);
+            int endLine = offsetToLine(source, endOffset);
+
+            var loc = new JsonObject();
+            loc.addProperty("file", file.getLocation().toOSString());
+            loc.addProperty("startLine", startLine);
+            loc.addProperty("endLine", endLine);
+            loc.addProperty("nameStart", startOffset);
+            loc.addProperty("nameEnd", endOffset);
+            return loc;
+        } catch (JavaModelException e) {
+            Log.warn("matchLocation failed", e);
+            return null;
+        }
     }
 
     static JsonObject fieldDetail(IField field) throws JavaModelException {

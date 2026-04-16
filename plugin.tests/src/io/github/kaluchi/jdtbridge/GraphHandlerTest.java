@@ -371,6 +371,166 @@ public class GraphHandlerTest {
         assertEquals(0, arr.size());
     }
 
+    // ── /overrides ──────────────────────────────────────────────────
+
+    @Test
+    void overridesReturnsAnimalNameForDogName() {
+        String response = handler.handleOverrides(
+                params("of", "test.model.Dog#name()"));
+        JsonObject result = parse(response);
+        assertEquals("method", result.get("kind").getAsString());
+        assertEquals("test.model.Animal#name()",
+                result.get("fqn").getAsString());
+    }
+
+    @Test
+    void overridesReturnsJsonNullWhenNoOverride() {
+        String response = handler.handleOverrides(
+                params("of", "test.model.Dog#bark()"));
+        assertEquals("null", response,
+                "bark() does not override anything");
+    }
+
+    @Test
+    void overridesRejectsNonMethodSubject() {
+        JsonObject result = parse(handler.handleOverrides(
+                params("of", "test.model.Dog")));
+        assertTrue(isError(result));
+        assertEquals("wrong-subject-kind",
+                errorOf(result).get("kind").getAsString());
+        assertEquals("method",
+                errorOf(result).getAsJsonObject("context")
+                .get("expected").getAsString());
+    }
+
+    // ── /overloads ──────────────────────────────────────────────────
+
+    @Test
+    void overloadsReturnsAllAddSiblings() {
+        var arr = JsonParser.parseString(handler.handleOverloads(
+                params("of", "test.edge.Calculator#add(int,int)")))
+                .getAsJsonArray();
+        assertEquals(3, arr.size(), "Calculator has 3 add overloads");
+        for (var entry : arr) {
+            assertEquals("method", entry.getAsJsonObject()
+                    .get("kind").getAsString());
+            assertEquals("test.edge.Calculator",
+                    entry.getAsJsonObject().get("fqn").getAsString()
+                            .substring(0, "test.edge.Calculator".length()));
+        }
+    }
+
+    @Test
+    void overloadsSingleEntryForUniqueMethodName() {
+        var arr = JsonParser.parseString(handler.handleOverloads(
+                params("of", "test.model.Dog#bark()")))
+                .getAsJsonArray();
+        assertEquals(1, arr.size());
+        assertEquals("test.model.Dog#bark()",
+                arr.get(0).getAsJsonObject().get("fqn").getAsString());
+    }
+
+    // ── /implementors2 ──────────────────────────────────────────────
+
+    @Test
+    void implementorsTypeModeReturnsAllSubtypes() {
+        var arr = JsonParser.parseString(handler.handleImplementors(
+                params("of", "test.model.Animal")))
+                .getAsJsonArray();
+        var fqns = new java.util.HashSet<String>();
+        for (var entry : arr) {
+            fqns.add(entry.getAsJsonObject().get("fqn").getAsString());
+        }
+        assertTrue(fqns.contains("test.model.Dog"),
+                "Animal subtypes should include Dog, got: " + fqns);
+        assertTrue(fqns.contains("test.model.Cat"));
+        assertTrue(fqns.contains("test.edge.AbstractPet"),
+                "transitive: AbstractPet implements Animal");
+        assertTrue(fqns.contains("test.edge.Parrot"),
+                "transitive: Parrot extends AbstractPet implements Animal");
+    }
+
+    @Test
+    void implementorsMethodModeReturnsOverridingMethods() {
+        var arr = JsonParser.parseString(handler.handleImplementors(
+                params("of", "test.model.Animal#name()")))
+                .getAsJsonArray();
+        var fqmns = new java.util.HashSet<String>();
+        for (var entry : arr) {
+            fqmns.add(entry.getAsJsonObject().get("fqn").getAsString());
+            assertEquals("method",
+                    entry.getAsJsonObject().get("kind").getAsString());
+        }
+        assertTrue(fqmns.contains("test.model.Dog#name()"));
+        assertTrue(fqmns.contains("test.model.Cat#name()"));
+        assertTrue(fqmns.contains("test.edge.AbstractPet#name()"));
+    }
+
+    // ── /refs?to= ───────────────────────────────────────────────────
+
+    @Test
+    void refsToFindsIncomingMethodCalls() {
+        var arr = JsonParser.parseString(handler.handleRefsTo(
+                params("of", "test.model.Dog#bark()"),
+                ProjectScope.ALL)).getAsJsonArray();
+        // bark() is called by AnimalService.createDog and CallerService.callCreateDog (transitively, but only direct here)
+        assertTrue(arr.size() >= 1, "bark() has at least one caller");
+        var first = arr.get(0).getAsJsonObject();
+        assertEquals("reference", first.get("kind").getAsString());
+        assertEquals("call", first.get("refKind").getAsString());
+        assertEquals("test.model.Dog#bark()",
+                first.getAsJsonObject("to").get("fqn").getAsString());
+        assertNotNull(first.get("from"),
+                "every ref must carry a :from skeleton");
+        assertNotNull(first.get("location"),
+                "every ref must carry a :location");
+    }
+
+    @Test
+    void refsToOnTypeReturnsTypeUseRefs() {
+        var arr = JsonParser.parseString(handler.handleRefsTo(
+                params("of", "test.model.Animal"),
+                ProjectScope.ALL)).getAsJsonArray();
+        assertTrue(arr.size() >= 1);
+        for (var entry : arr) {
+            JsonObject e = entry.getAsJsonObject();
+            assertEquals("typeUse",
+                    e.get("refKind").getAsString());
+            assertEquals("test.model.Animal",
+                    e.getAsJsonObject("to").get("fqn").getAsString());
+        }
+    }
+
+    @Test
+    void refsToReadsOnFieldUsesReadAccessesPattern() {
+        var arr = JsonParser.parseString(handler.handleRefsTo(
+                paramsMulti("of",
+                        "test.edge.Outer.StaticNested#VALUE",
+                        "refKind", "read"),
+                ProjectScope.ALL)).getAsJsonArray();
+        assertTrue(arr.size() >= 1,
+                "VALUE is read in EnrichedRefService.getStaticValue");
+        assertEquals("read",
+                arr.get(0).getAsJsonObject().get("refKind").getAsString());
+    }
+
+    @Test
+    void refsToErrorOnUnknownTarget() {
+        JsonObject result = parse(handler.handleRefsTo(
+                params("of", "no.such.Type"), ProjectScope.ALL));
+        assertTrue(isError(result));
+        assertEquals("type-not-found",
+                errorOf(result).get("kind").getAsString());
+    }
+
+    private static Map<String, String> paramsMulti(String... pairs) {
+        var m = new HashMap<String, String>();
+        for (int i = 0; i < pairs.length; i += 2) {
+            m.put(pairs[i], pairs[i + 1]);
+        }
+        return m;
+    }
+
     // ── Cross-cutting: every error carries origin :jdt/plugin ───────
 
     @Test

@@ -467,6 +467,14 @@ public class HttpServer {
                         graph.handleSupers(params));
                 case "/subtypes" -> Response.json(
                         graph.handleSubtypes(params));
+                case "/implementors2" -> Response.json(
+                        graph.handleImplementors(params));
+                case "/overrides" -> Response.json(
+                        graph.handleOverrides(params));
+                case "/overloads" -> Response.json(
+                        graph.handleOverloads(params));
+                case "/refs" -> Response.json(
+                        graph.handleRefsTo(params, scope));
                 case "/projects" -> Response.json(
                         search.handleProjects(scope));
                 case "/project-info" -> Response.json(
