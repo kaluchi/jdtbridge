@@ -6,11 +6,22 @@ import java.util.Map;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
+import org.eclipse.core.resources.IFile;
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IWorkspaceRoot;
+import org.eclipse.core.resources.ResourcesPlugin;
+import org.eclipse.core.runtime.Path;
+import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IJavaElement;
+import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.IModuleDescription;
+import org.eclipse.jdt.core.IPackageFragment;
+import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.ITypeHierarchy;
+import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.search.IJavaSearchConstants;
 import org.eclipse.jdt.core.search.SearchEngine;
@@ -351,6 +362,272 @@ class GraphHandler {
             }
             return arr;
         });
+    }
+
+    // ── Workspace navigation ────────────────────────────────────────
+
+    /** All open workspace projects in scope. */
+    String handleProjects(ProjectScope scope) {
+        var arr = new JsonArray();
+        scope.openProjects().forEach(p ->
+                arr.add(NodeBuilder.projectSkeleton(p)));
+        return arr.toString();
+    }
+
+    /** Single project detail by name. */
+    String handleProject(Map<String, String> params) {
+        String name = params.get("of");
+        if (name == null || name.isBlank()) {
+            return ErrorDescriptor.missingParameter("of").toJsonString();
+        }
+        try {
+            IProject project = ResourcesPlugin.getWorkspace()
+                    .getRoot().getProject(name);
+            if (!project.exists()) {
+                return ErrorDescriptor.projectNotFound(name)
+                        .toJsonString();
+            }
+            return NodeBuilder.projectDetail(project).toString();
+        } catch (Exception e) {
+            Log.warn("/project failed for " + name, e);
+            return ErrorDescriptor.jdtInternalError(
+                    "Failed /project " + name, e).toJsonString();
+        }
+    }
+
+    /** Classpath entries of a project. */
+    String handleClasspath(Map<String, String> params) {
+        String name = params.get("of");
+        if (name == null || name.isBlank()) {
+            return ErrorDescriptor.missingParameter("of").toJsonString();
+        }
+        try {
+            IProject project = ResourcesPlugin.getWorkspace()
+                    .getRoot().getProject(name);
+            if (!project.exists()) {
+                return ErrorDescriptor.projectNotFound(name)
+                        .toJsonString();
+            }
+            IJavaProject jp = JavaCore.create(project);
+            if (jp == null || !jp.exists()) {
+                return ErrorDescriptor.projectNotFound(name)
+                        .with("reason", "not a Java project")
+                        .toJsonString();
+            }
+            var arr = new JsonArray();
+            for (var entry : jp.getRawClasspath()) {
+                arr.add(NodeBuilder.classpathEntrySkeleton(
+                        entry, project));
+            }
+            return arr.toString();
+        } catch (Exception e) {
+            Log.warn("/classpath failed for " + name, e);
+            return ErrorDescriptor.jdtInternalError(
+                    "Failed /classpath " + name, e).toJsonString();
+        }
+    }
+
+    String handlePackage(Map<String, String> params) {
+        String fqn = params.get("of");
+        if (fqn == null || fqn.isBlank()) {
+            return ErrorDescriptor.missingParameter("of").toJsonString();
+        }
+        try {
+            IPackageFragment pkg = findPackage(fqn);
+            if (pkg == null) {
+                return ErrorDescriptor.packageNotFound(fqn)
+                        .toJsonString();
+            }
+            return NodeBuilder.packageDetail(pkg).toString();
+        } catch (Exception e) {
+            Log.warn("/package failed for " + fqn, e);
+            return ErrorDescriptor.jdtInternalError(
+                    "Failed /package " + fqn, e).toJsonString();
+        }
+    }
+
+    String handleFile(Map<String, String> params) {
+        String path = params.get("of");
+        if (path == null || path.isBlank()) {
+            return ErrorDescriptor.missingParameter("of").toJsonString();
+        }
+        IFile file = findFile(path);
+        if (file == null) {
+            return ErrorDescriptor.fileNotFound(path).toJsonString();
+        }
+        return NodeBuilder.fileDetail(file).toString();
+    }
+
+    String handleModule(Map<String, String> params) {
+        String name = params.get("of");
+        if (name == null || name.isBlank()) {
+            return ErrorDescriptor.missingParameter("of").toJsonString();
+        }
+        try {
+            IModuleDescription module = findModule(name);
+            if (module == null) {
+                return ErrorDescriptor.moduleNotFound(name)
+                        .toJsonString();
+            }
+            return NodeBuilder.moduleDetail(module).toString();
+        } catch (Exception e) {
+            Log.warn("/module failed for " + name, e);
+            return ErrorDescriptor.jdtInternalError(
+                    "Failed /module " + name, e).toJsonString();
+        }
+    }
+
+    String handleTypesInPackage(Map<String, String> params) {
+        String fqn = params.get("of");
+        if (fqn == null || fqn.isBlank()) {
+            return ErrorDescriptor.missingParameter("of").toJsonString();
+        }
+        try {
+            var arr = new JsonArray();
+            // Aggregate across all package fragments matching the name
+            // — same package name may appear in multiple source roots
+            // (Tycho test fragments etc.). Dedupe by type FQN.
+            var seen = new java.util.HashSet<String>();
+            for (IJavaProject jp : allJavaProjects()) {
+                for (IPackageFragmentRoot root
+                        : jp.getPackageFragmentRoots()) {
+                    IPackageFragment pkg =
+                            root.getPackageFragment(fqn);
+                    if (!pkg.exists()) continue;
+                    for (ICompilationUnit cu
+                            : pkg.getCompilationUnits()) {
+                        for (IType type : cu.getTypes()) {
+                            if (seen.add(type
+                                    .getFullyQualifiedName('.'))) {
+                                arr.add(NodeBuilder.typeSkeleton(
+                                        type));
+                            }
+                        }
+                    }
+                }
+            }
+            return arr.toString();
+        } catch (Exception e) {
+            Log.warn("/typesInPackage failed for " + fqn, e);
+            return ErrorDescriptor.jdtInternalError(
+                    "Failed /typesInPackage " + fqn, e)
+                    .toJsonString();
+        }
+    }
+
+    String handleTypesInFile(Map<String, String> params) {
+        String path = params.get("of");
+        if (path == null || path.isBlank()) {
+            return ErrorDescriptor.missingParameter("of").toJsonString();
+        }
+        IFile file = findFile(path);
+        if (file == null) {
+            return ErrorDescriptor.fileNotFound(path).toJsonString();
+        }
+        try {
+            ICompilationUnit cu =
+                    JavaCore.createCompilationUnitFrom(file);
+            if (cu == null || !cu.exists()) {
+                return ErrorDescriptor.fileNotFound(path)
+                        .with("reason", "not a Java compilation unit")
+                        .toJsonString();
+            }
+            var arr = new JsonArray();
+            for (IType type : cu.getTypes()) {
+                arr.add(NodeBuilder.typeSkeleton(type));
+            }
+            return arr.toString();
+        } catch (Exception e) {
+            Log.warn("/typesInFile failed for " + path, e);
+            return ErrorDescriptor.jdtInternalError(
+                    "Failed /typesInFile " + path, e).toJsonString();
+        }
+    }
+
+    String handlePackagesInProject(Map<String, String> params) {
+        String name = params.get("of");
+        if (name == null || name.isBlank()) {
+            return ErrorDescriptor.missingParameter("of").toJsonString();
+        }
+        try {
+            IProject project = ResourcesPlugin.getWorkspace()
+                    .getRoot().getProject(name);
+            if (!project.exists()) {
+                return ErrorDescriptor.projectNotFound(name)
+                        .toJsonString();
+            }
+            IJavaProject jp = JavaCore.create(project);
+            if (jp == null || !jp.exists()) {
+                return ErrorDescriptor.projectNotFound(name)
+                        .with("reason", "not a Java project")
+                        .toJsonString();
+            }
+            var arr = new JsonArray();
+            var seen = new java.util.HashSet<String>();
+            for (IPackageFragmentRoot root
+                    : jp.getPackageFragmentRoots()) {
+                if (root.getKind()
+                        != IPackageFragmentRoot.K_SOURCE) continue;
+                for (IJavaElement child : root.getChildren()) {
+                    if (child instanceof IPackageFragment pkg
+                            && pkg.hasChildren()
+                            && seen.add(pkg.getElementName())) {
+                        arr.add(NodeBuilder.packageSkeleton(pkg));
+                    }
+                }
+            }
+            return arr.toString();
+        } catch (Exception e) {
+            Log.warn("/packagesInProject failed for " + name, e);
+            return ErrorDescriptor.jdtInternalError(
+                    "Failed /packagesInProject " + name, e)
+                    .toJsonString();
+        }
+    }
+
+    // ── Workspace lookup helpers ────────────────────────────────────
+
+    private static IJavaProject[] allJavaProjects()
+            throws JavaModelException {
+        IWorkspaceRoot root =
+                ResourcesPlugin.getWorkspace().getRoot();
+        return JavaCore.create(root).getJavaProjects();
+    }
+
+    private static IPackageFragment findPackage(String name)
+            throws JavaModelException {
+        for (IJavaProject jp : allJavaProjects()) {
+            for (IPackageFragmentRoot root
+                    : jp.getPackageFragmentRoots()) {
+                IPackageFragment pkg = root.getPackageFragment(name);
+                if (pkg.exists()) return pkg;
+            }
+        }
+        return null;
+    }
+
+    private static IFile findFile(String absPath) {
+        IWorkspaceRoot root =
+                ResourcesPlugin.getWorkspace().getRoot();
+        // Try as workspace-relative first
+        var resource = root.findMember(absPath);
+        if (resource instanceof IFile f) return f;
+        // Try as filesystem path
+        IFile[] matches = root.findFilesForLocationURI(
+                Path.fromOSString(absPath).toFile().toURI());
+        return matches.length > 0 ? matches[0] : null;
+    }
+
+    private static IModuleDescription findModule(String name)
+            throws JavaModelException {
+        for (IJavaProject jp : allJavaProjects()) {
+            IModuleDescription module = jp.getModuleDescription();
+            if (module != null
+                    && name.equals(module.getElementName())) {
+                return module;
+            }
+        }
+        return null;
     }
 
     // ── Bulk search ─────────────────────────────────────────────────

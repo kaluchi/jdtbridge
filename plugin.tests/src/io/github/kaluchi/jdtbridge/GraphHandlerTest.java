@@ -623,6 +623,112 @@ public class GraphHandlerTest {
         assertEquals(0, arr.size());
     }
 
+    // ── Workspace navigation ────────────────────────────────────────
+
+    @Test
+    void projectsListsFixtureProject() {
+        var arr = JsonParser.parseString(handler.handleProjects(
+                ProjectScope.ALL)).getAsJsonArray();
+        boolean found = arr.asList().stream().anyMatch(e ->
+                "jdtbridge-test".equals(e.getAsJsonObject()
+                        .get("fqn").getAsString()));
+        assertTrue(found, "fixture project must be in /projects");
+    }
+
+    @Test
+    void projectDetailCarriesNaturesAndDependencies() {
+        JsonObject result = parse(handler.handleProject(
+                params("of", "jdtbridge-test")));
+        assertEquals("jdtbridge-test",
+                result.get("fqn").getAsString());
+        assertEquals("project", result.get("kind").getAsString());
+        assertNotNull(result.get("rootPath"),
+                "project detail carries :rootPath");
+        assertNotNull(result.getAsJsonArray("natures"));
+        assertNotNull(result.getAsJsonArray("classpathEntries"));
+        assertNotNull(result.getAsJsonArray("dependencies"));
+        assertNotNull(result.getAsJsonArray("sourceRoots"));
+    }
+
+    @Test
+    void projectErrorForUnknownName() {
+        JsonObject result = parse(handler.handleProject(
+                params("of", "no-such-project")));
+        assertTrue(isError(result));
+        assertEquals("project-not-found",
+                errorOf(result).get("kind").getAsString());
+    }
+
+    @Test
+    void classpathReturnsAllEntries() {
+        var arr = JsonParser.parseString(handler.handleClasspath(
+                params("of", "jdtbridge-test"))).getAsJsonArray();
+        assertTrue(arr.size() >= 3,
+                "fixture project has at least src + JRE + JUnit");
+        for (var entry : arr) {
+            JsonObject e = entry.getAsJsonObject();
+            assertEquals("classpathEntry", e.get("kind").getAsString());
+            assertNotNull(e.get("entryKind"));
+            assertNotNull(e.get("path"));
+        }
+    }
+
+    @Test
+    void packageReturnsDetailWithTypeCount() {
+        JsonObject result = parse(handler.handlePackage(
+                params("of", "test.model")));
+        assertEquals("test.model", result.get("fqn").getAsString());
+        assertEquals("package", result.get("kind").getAsString());
+        assertEquals(3, result.get("typeCount").getAsInt(),
+                "test.model has Animal + Dog + Cat");
+    }
+
+    @Test
+    void packageErrorForUnknownName() {
+        JsonObject result = parse(handler.handlePackage(
+                params("of", "no.such.pkg")));
+        assertTrue(isError(result));
+        assertEquals("package-not-found",
+                errorOf(result).get("kind").getAsString());
+    }
+
+    @Test
+    void typesInPackageListsAllTypesInTestModel() {
+        var arr = JsonParser.parseString(handler.handleTypesInPackage(
+                params("of", "test.model"))).getAsJsonArray();
+        var fqns = new java.util.HashSet<String>();
+        for (var entry : arr) {
+            fqns.add(entry.getAsJsonObject().get("fqn").getAsString());
+        }
+        assertEquals(3, arr.size());
+        assertTrue(fqns.contains("test.model.Animal"));
+        assertTrue(fqns.contains("test.model.Dog"));
+        assertTrue(fqns.contains("test.model.Cat"));
+    }
+
+    @Test
+    void typesInPackageEmptyForUnknownPackage() {
+        var arr = JsonParser.parseString(handler.handleTypesInPackage(
+                params("of", "no.such.pkg"))).getAsJsonArray();
+        assertEquals(0, arr.size());
+    }
+
+    @Test
+    void packagesInProjectListsAllPackages() {
+        var arr = JsonParser.parseString(
+                handler.handlePackagesInProject(
+                        params("of", "jdtbridge-test")))
+                .getAsJsonArray();
+        var names = new java.util.HashSet<String>();
+        for (var entry : arr) {
+            names.add(entry.getAsJsonObject().get("fqn").getAsString());
+        }
+        assertTrue(names.contains("test.model"));
+        assertTrue(names.contains("test.service"));
+        assertTrue(names.contains("test.edge"));
+        assertTrue(names.contains("test.refactor"));
+    }
+
     // ── Cross-cutting: every error carries origin :jdt/plugin ───────
 
     @Test

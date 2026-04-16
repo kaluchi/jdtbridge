@@ -4,13 +4,18 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
 import org.eclipse.core.resources.IFile;
+import org.eclipse.core.resources.IProject;
 import org.eclipse.jdt.core.Flags;
 import org.eclipse.jdt.core.IClassFile;
+import org.eclipse.jdt.core.IClasspathEntry;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IJavaElement;
+import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IMember;
 import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.IModuleDescription;
+import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.ISourceRange;
 import org.eclipse.jdt.core.IType;
@@ -427,6 +432,213 @@ class NodeBuilder {
                 originOf(field),
                 location(field),
                 containingProjectOf(field));
+    }
+
+    // ── :project ────────────────────────────────────────────────────
+
+    /**
+     * {@code :project} skeleton. {@code :location} is intentionally
+     * null — projects are containers, not code positions. Filesystem
+     * root path lives in detail under {@code :rootPath} so the
+     * canonical {@code :location} stays a code-coordinate sub-Map.
+     */
+    static JsonObject projectSkeleton(IProject project) {
+        return baseSkeleton(
+                project.getName(), "project",
+                "source", null, null);
+    }
+
+    static JsonObject projectDetail(IProject project) throws Exception {
+        var obj = projectSkeleton(project);
+        if (project.getLocation() != null) {
+            obj.addProperty("rootPath",
+                    project.getLocation().toOSString());
+        }
+
+        var natures = new JsonArray();
+        for (String id : project.getDescription().getNatureIds()) {
+            natures.add(ProjectHandler.shortNature(id));
+        }
+        obj.add("natures", natures);
+
+        IJavaProject jp = JavaCore.create(project);
+        if (jp != null && jp.exists()) {
+            var classpath = new JsonArray();
+            for (IClasspathEntry entry : jp.getRawClasspath()) {
+                classpath.add(classpathEntrySkeleton(entry, project));
+            }
+            obj.add("classpathEntries", classpath);
+
+            var deps = new JsonArray();
+            for (String dep : jp.getRequiredProjectNames()) {
+                deps.add(dep);
+            }
+            obj.add("dependencies", deps);
+
+            var sourceRoots = new JsonArray();
+            for (IPackageFragmentRoot root
+                    : jp.getPackageFragmentRoots()) {
+                if (root.getKind()
+                        == IPackageFragmentRoot.K_SOURCE) {
+                    sourceRoots.add(root.getResource()
+                            .getProjectRelativePath().toString());
+                }
+            }
+            obj.add("sourceRoots", sourceRoots);
+
+            String outputLoc = jp.getOutputLocation() != null
+                    ? jp.getOutputLocation().toString() : null;
+            if (outputLoc != null) {
+                obj.addProperty("outputLocation", outputLoc);
+            }
+
+            String compliance =
+                    jp.getOption(JavaCore.COMPILER_COMPLIANCE, true);
+            if (compliance != null) {
+                obj.addProperty("javaVersion", compliance);
+            }
+        }
+
+        var mapping = org.eclipse.egit.core.project
+                .RepositoryMapping.getMapping(project);
+        if (mapping != null) {
+            var repo = mapping.getRepository();
+            obj.addProperty("repo",
+                    repo.getWorkTree().getAbsolutePath());
+            try {
+                obj.addProperty("branch", repo.getBranch());
+            } catch (Exception ignored) { /* skip */ }
+        }
+        return obj;
+    }
+
+    // ── :package ────────────────────────────────────────────────────
+
+    static JsonObject packageSkeleton(IPackageFragment pkg) {
+        String name = pkg.getElementName();
+        if (name.isEmpty()) name = "(default)";
+        String origin;
+        try {
+            origin = pkg.getKind() == IPackageFragmentRoot.K_BINARY
+                    ? "binary" : "source";
+        } catch (JavaModelException e) {
+            origin = "source";
+        }
+        String containingProj = pkg.getJavaProject() != null
+                ? pkg.getJavaProject().getElementName() : null;
+        return baseSkeleton(name, "package", origin, null,
+                containingProj);
+    }
+
+    static JsonObject packageDetail(IPackageFragment pkg)
+            throws JavaModelException {
+        var obj = packageSkeleton(pkg);
+
+        IPackageFragmentRoot root = (IPackageFragmentRoot)
+                pkg.getAncestor(IJavaElement.PACKAGE_FRAGMENT_ROOT);
+        if (root != null && root.getResource() != null) {
+            obj.addProperty("sourceRoot",
+                    root.getResource()
+                            .getProjectRelativePath().toString());
+        }
+
+        int typeCount = 0;
+        for (ICompilationUnit cu : pkg.getCompilationUnits()) {
+            typeCount += cu.getTypes().length;
+        }
+        obj.addProperty("typeCount", typeCount);
+        return obj;
+    }
+
+    // ── :module ─────────────────────────────────────────────────────
+
+    static JsonObject moduleSkeleton(IModuleDescription module)
+            throws JavaModelException {
+        String name = module.getElementName();
+        String origin = module.isBinary() ? "binary" : "source";
+        String containingProj = module.getJavaProject() != null
+                ? module.getJavaProject().getElementName() : null;
+        return baseSkeleton(name, "module", origin, null,
+                containingProj);
+    }
+
+    static JsonObject moduleDetail(IModuleDescription module)
+            throws JavaModelException {
+        var obj = moduleSkeleton(module);
+
+        var requires = new JsonArray();
+        for (String required : module.getRequiredModuleNames()) {
+            var r = new JsonObject();
+            r.addProperty("name", required);
+            requires.add(r);
+        }
+        obj.add("requires", requires);
+
+        // JPMS exports/opens/uses/provides — JDT API for these
+        // varies across Eclipse versions and may require AST-level
+        // inspection. Deferred — the bulk of consumers care about
+        // requires and module identity, which are stable.
+        return obj;
+    }
+
+    // ── :file ───────────────────────────────────────────────────────
+
+    static JsonObject fileSkeleton(IFile file) {
+        String fqn = file.getLocation() != null
+                ? file.getLocation().toOSString()
+                : file.getFullPath().toOSString();
+        String origin = file.getName().endsWith(".class")
+                ? "binary" : "source";
+        String containingProj = file.getProject() != null
+                ? file.getProject().getName() : null;
+        return baseSkeleton(fqn, "file", origin, null, containingProj);
+    }
+
+    static JsonObject fileDetail(IFile file) {
+        var obj = fileSkeleton(file);
+        String name = file.getName();
+        String language = name.endsWith(".java")
+                ? "java"
+                : name.endsWith(".class") ? "class" : "other";
+        obj.addProperty("language", language);
+        try {
+            String charset = file.getCharset();
+            if (charset != null) obj.addProperty("charset", charset);
+        } catch (Exception ignored) { /* skip */ }
+        long mtime = file.getModificationStamp();
+        if (mtime > 0) obj.addProperty("modificationTime", mtime);
+        return obj;
+    }
+
+    // ── :classpathEntry ─────────────────────────────────────────────
+
+    static JsonObject classpathEntrySkeleton(IClasspathEntry entry,
+            IProject project) {
+        String entryKind = switch (entry.getEntryKind()) {
+            case IClasspathEntry.CPE_SOURCE    -> "source";
+            case IClasspathEntry.CPE_LIBRARY   -> "library";
+            case IClasspathEntry.CPE_PROJECT   -> "project";
+            case IClasspathEntry.CPE_VARIABLE  -> "variable";
+            case IClasspathEntry.CPE_CONTAINER -> "container";
+            default -> "unknown";
+        };
+        String path = entry.getPath() != null
+                ? entry.getPath().toOSString() : "";
+        String projName = project != null ? project.getName() : null;
+        String fqn = (projName != null ? projName : "")
+                + "#" + entryKind + "#" + path;
+
+        var obj = baseSkeleton(fqn, "classpathEntry", "source",
+                null, projName);
+        obj.addProperty("entryKind", entryKind);
+        obj.addProperty("path", path);
+        if (entry.getOutputLocation() != null) {
+            obj.addProperty("outputLocation",
+                    entry.getOutputLocation().toOSString());
+        }
+        if (entry.isTest()) obj.addProperty("isTest", true);
+        if (entry.isExported()) obj.addProperty("isExported", true);
+        return obj;
     }
 
     // ── :reference ──────────────────────────────────────────────────
