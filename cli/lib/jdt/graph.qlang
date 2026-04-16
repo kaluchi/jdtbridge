@@ -16,7 +16,7 @@
 {:@types {:qlang/kind :builtin
           :qlang/impl null
           :category :jdt/graph
-          :subject :string
+          :subject [:map :string]
           :modifiers [:keyword]
           :returns :vec
           :docs ["Type pattern search across the workspace. Subject is a name or wildcard pattern (\"*Controller*\")."
@@ -28,7 +28,7 @@
  :@type {:qlang/kind :builtin
          :qlang/impl null
          :category :jdt/graph
-         :subject :string
+         :subject [:map :string]
          :modifiers []
          :returns :map
          :docs ["Single :type detail by fully qualified name."
@@ -39,7 +39,7 @@
  :@method {:qlang/kind :builtin
            :qlang/impl null
            :category :jdt/graph
-           :subject :string
+           :subject [:map :string]
            :modifiers []
            :returns :map
            :docs ["Single :method detail by FQMN. Supports both inline-paren signatures and the bare-name form (must be unambiguous)."]
@@ -49,7 +49,7 @@
  :@field {:qlang/kind :builtin
           :qlang/impl null
           :category :jdt/graph
-          :subject :string
+          :subject [:map :string]
           :modifiers []
           :returns :map
           :docs ["Single :field detail by FQMN (pkg.Type#fieldName)."]
@@ -59,7 +59,7 @@
  :@project {:qlang/kind :builtin
             :qlang/impl null
             :category :jdt/graph
-            :subject :string
+            :subject [:map :string]
             :modifiers []
             :returns :map
             :docs ["Single :project detail by name. Carries natures, classpathEntries, dependencies, sourceRoots, repo and branch when EGit-managed."]
@@ -79,7 +79,7 @@
  :@package {:qlang/kind :builtin
             :qlang/impl null
             :category :jdt/graph
-            :subject :string
+            :subject [:map :string]
             :modifiers []
             :returns :map
             :docs ["Single :package detail by FQN."]
@@ -89,7 +89,7 @@
  :@file {:qlang/kind :builtin
          :qlang/impl null
          :category :jdt/graph
-         :subject :string
+         :subject [:map :string]
          :modifiers []
          :returns :map
          :docs ["Single :file detail by absolute filesystem path."]
@@ -101,7 +101,7 @@
  :@members {:qlang/kind :builtin
             :qlang/impl null
             :category :jdt/graph
-            :subject :map
+            :subject [:map :string]
             :modifiers []
             :returns :vec
             :docs ["Direct children of a type — methods, fields, inner types. Vec of skeletons."]
@@ -111,7 +111,7 @@
  :@methods {:qlang/kind :builtin
             :qlang/impl null
             :category :jdt/graph
-            :subject :map
+            :subject [:map :string]
             :modifiers []
             :returns :vec
             :docs ["Methods declared directly in the type."]
@@ -121,7 +121,7 @@
  :@fields {:qlang/kind :builtin
            :qlang/impl null
            :category :jdt/graph
-           :subject :map
+           :subject [:map :string]
            :modifiers []
            :returns :vec
            :docs ["Fields declared directly in the type."]
@@ -131,7 +131,7 @@
  :@innerTypes {:qlang/kind :builtin
                :qlang/impl null
                :category :jdt/graph
-               :subject :map
+               :subject [:map :string]
                :modifiers []
                :returns :vec
                :docs ["Inner types declared in the given type."]
@@ -141,7 +141,7 @@
  :@typesInPackage {:qlang/kind :builtin
                    :qlang/impl null
                    :category :jdt/graph
-                   :subject :map
+                   :subject [:map :string]
                    :modifiers []
                    :returns :vec
                    :docs ["All top-level types in the given package, aggregated across source roots."]
@@ -151,7 +151,7 @@
  :@typesInFile {:qlang/kind :builtin
                 :qlang/impl null
                 :category :jdt/graph
-                :subject :map
+                :subject [:map :string]
                 :modifiers []
                 :returns :vec
                 :docs ["Top-level types declared in the given Java file."]
@@ -161,7 +161,7 @@
  :@packagesInProject {:qlang/kind :builtin
                       :qlang/impl null
                       :category :jdt/graph
-                      :subject :map
+                      :subject [:map :string]
                       :modifiers []
                       :returns :vec
                       :docs ["Non-empty source packages in the project, deduped per name."]
@@ -173,7 +173,7 @@
  :@supers {:qlang/kind :builtin
            :qlang/impl null
            :category :jdt/graph
-           :subject :map
+           :subject [:map :string]
            :modifiers []
            :returns :vec
            :docs ["Direct supertypes — superclass plus directly-declared interfaces. Transitive ascent via @ancestors conduit."]
@@ -183,7 +183,7 @@
  :@subtypes {:qlang/kind :builtin
              :qlang/impl null
              :category :jdt/graph
-             :subject :map
+             :subject [:map :string]
              :modifiers []
              :returns :vec
              :docs ["Direct subtypes only. Transitive descent via @descendants conduit."]
@@ -193,7 +193,7 @@
  :@implementors {:qlang/kind :builtin
                  :qlang/impl null
                  :category :jdt/graph
-                 :subject :map
+                 :subject [:map :string]
                  :modifiers []
                  :returns :vec
                  :docs ["Subtypes (for :type subject) or override-methods (for :method subject)."]
@@ -203,7 +203,7 @@
  :@overrides {:qlang/kind :builtin
               :qlang/impl null
               :category :jdt/graph
-              :subject :map
+              :subject [:map :string]
               :modifiers []
               :returns :map
               :docs ["The closest super-method this method overrides, or null when no override exists."]
@@ -213,7 +213,7 @@
  :@overloads {:qlang/kind :builtin
               :qlang/impl null
               :category :jdt/graph
-              :subject :map
+              :subject [:map :string]
               :modifiers []
               :returns :vec
               :docs ["Sibling methods of the same name in the containing type, including the queried method."]
@@ -225,7 +225,7 @@
  :@refs {:qlang/kind :builtin
          :qlang/impl null
          :category :jdt/graph
-         :subject :map
+         :subject [:map :string]
          :modifiers [:keyword]
          :returns :vec
          :docs ["Incoming references to the given node (subject) of the given kind."
@@ -237,7 +237,7 @@
  :@classpath {:qlang/kind :builtin
               :qlang/impl null
               :category :jdt/graph
-              :subject :map
+              :subject [:map :string]
               :modifiers []
               :returns :vec
               :docs ["Classpath entries of the given project."]
@@ -301,8 +301,9 @@ let(:@containingFile, @asNode | /location/file | unless(eq(null), @file))
 |~~ Enrich a skeleton-node into a detail-node. Routes by :kind to
     the appropriate point-lookup operand (@type / @method / @field /
     @project / @package / @file). Idempotent on detail-nodes —
-    re-fetches the same identity. ~~|
-let(:@detail, as(:n) | /kind
+    re-fetches the same identity. Accepts String FQN/FQMN subjects
+    via @asNode (syntactic dispatch) before the :kind routing. ~~|
+let(:@detail, @asNode | as(:n) | /kind
     | cond(eq("type"),    n | @type,
            eq("method"),  n | @method,
            eq("field"),   n | @field,
