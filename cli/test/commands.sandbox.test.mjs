@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { startServer, stopServer, captureConsole, errorServer, disableColor } from "./helpers/mock-server.mjs";
+import { startServer, stopServer, captureConsole, disableColor } from "./helpers/mock-server.mjs";
+
+// Sandbox path conversion across surviving non-graph commands.
+// Graph queries (find/refs/impl/hier/source/problems/projects/
+// project-info/editors-listing) moved to `jdt q`; their path-
+// conversion behavior is exercised by GraphHandlerTest's
+// :location :file assertions plus the printValue path on the
+// CLI side, both of which return raw OS paths to the user.
 
 describe("sandbox paths and bulk assertions", () => {
   let server, port, io;
@@ -16,9 +23,6 @@ describe("sandbox paths and bulk assertions", () => {
     vi.resetModules();
   });
 
-  // NOTE: setupMock and mockSandboxPaths use vi.doMock with relative paths —
-  // vitest resolves these relative to THIS file, so they must stay inline here.
-
   function mockSandboxPaths() {
     vi.doMock("../src/paths.mjs", async (importOriginal) => {
       const orig = await importOriginal();
@@ -33,233 +37,31 @@ describe("sandbox paths and bulk assertions", () => {
     }));
   }
 
-  // ---- Sandbox path conversion (Linux) ----
-
-  it("find converts source path in sandbox", async () => {
+  it("editors converts source path in sandbox", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { fqn: "com.example.Foo", file: "D:/git/project/src/Foo.java", kind: "class" },
+        { file: "D:/projects/src/Foo.java", fqn: "com.example.Foo", project: "my-server" },
       ]));
     });
     mockSandboxPaths();
-    const { find } = await import("../src/commands/find.mjs");
-    await find(["Foo"]);
+    const { editors } = await import("../src/commands/editor.mjs");
+    await editors();
     const out = io.logs[0];
-    expect(out).toContain("/d/git/project/src/Foo.java");
+    expect(out).toContain("/d/projects/src/Foo.java");
   });
 
-  it("find binary shows origin not path in sandbox", async () => {
+  it("editors keeps workspace-relative path unchanged in sandbox", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify([
-        { fqn: "javax.swing.table.TableModel", file: "D:/my-app/my-client", binary: true, kind: "interface", origin: "rt.jar" },
+        { file: "/my-server/src/Foo.java", fqn: "com.example.Foo", project: "my-server" },
       ]));
     });
     mockSandboxPaths();
-    const { find } = await import("../src/commands/find.mjs");
-    await find(["TableModel"]);
-    const out = io.logs[0];
-    expect(out).toContain("rt.jar");
-    expect(out).not.toContain("/d/my-app");
-  });
-
-  it("find keeps workspace-relative path unchanged in sandbox", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { fqn: "com.example.Foo", file: "/my-server/src/Foo.java", kind: "class" },
-      ]));
-    });
-    mockSandboxPaths();
-    const { find } = await import("../src/commands/find.mjs");
-    await find(["Foo"]);
+    const { editors } = await import("../src/commands/editor.mjs");
+    await editors();
     const out = io.logs[0];
     expect(out).toContain("my-server/src/Foo.java");
-  });
-
-  it("errors converts path in sandbox", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { file: "D:/git/project/src/Foo.java", line: 10, severity: "ERROR", message: "bad" },
-      ]));
-    });
-    mockSandboxPaths();
-    const { problems } = await import("../src/commands/problems.mjs");
-    await problems([]);
-    expect(io.logs[0]).toContain("/d/git/project/src/Foo.java:10");
-  });
-
-  it("errors keeps workspace-relative path in sandbox", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { file: "/my-server/src/Foo.java", line: 5, severity: "ERROR", message: "err" },
-      ]));
-    });
-    mockSandboxPaths();
-    const { problems } = await import("../src/commands/problems.mjs");
-    await problems([]);
-    expect(io.logs[0]).toContain("/my-server/src/Foo.java:5");
-  });
-
-  it("implementors converts path in sandbox (type mode)", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { fqn: "com.example.Dog", file: "D:/git/project/src/Dog.java", startLine: 3, endLine: 40 },
-      ]));
-    });
-    mockSandboxPaths();
-    const { implementors } = await import("../src/commands/implementors.mjs");
-    await implementors(["com.example.Animal"]);
-    expect(io.logs[0]).toContain("/d/git/project/src/Dog.java:3-40");
-  });
-
-  it("implementors converts path in sandbox (method mode)", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { fqn: "com.example.FooImpl", file: "D:/git/project/src/FooImpl.java", startLine: 15, endLine: 28 },
-      ]));
-    });
-    mockSandboxPaths();
-    const { implementors } = await import("../src/commands/implementors.mjs");
-    await implementors(["com.example.Foo#bar"]);
-    expect(io.logs[0]).toContain("/d/git/project/src/FooImpl.java:15-28");
-  });
-
-  it("references converts source path in sandbox", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { file: "D:/git/project/src/Caller.java", line: 42, in: "doStuff()", content: "foo.bar();" },
-      ]));
-    });
-    mockSandboxPaths();
-    const { references } = await import("../src/commands/references.mjs");
-    await references(["com.example.Foo"]);
-    const out = io.logs[0];
-    expect(out).toContain("`/d/git/project/src/Caller.java:42`");
-    expect(out).toContain("```java");
-    expect(out).toContain("foo.bar();");
-  });
-
-  it("references converts binary project path in sandbox", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { file: "D:/git/my-app/my-core/lib/dep.jar", line: -1, project: "my-core", in: "com.Dep#use()" },
-      ]));
-    });
-    mockSandboxPaths();
-    const { references } = await import("../src/commands/references.mjs");
-    await references(["com.example.Foo"]);
-    const out = io.logs[0];
-    expect(out).toContain("#### `com.Dep#use()`");
-    expect(out).toContain("`my-core (dep.jar)`");
-  });
-
-  it("hierarchy converts file path in sandbox", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({
-        supertypes: [{ fqn: "java.lang.Object", kind: "class" }],
-        subtypes: [{ fqn: "com.example.Dog", kind: "class", file: "D:/git/project/src/Dog.java", line: 5 }],
-      }));
-    });
-    mockSandboxPaths();
-    const { hierarchy } = await import("../src/commands/hierarchy.mjs");
-    await hierarchy(["com.example.Animal"]);
-    const out = io.logs.join("\n");
-    expect(out).toContain("/d/git/project/src/Dog.java");
-  });
-
-  it("project-info converts location in sandbox", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({
-        name: "my-server", location: "D:/git/my-app/my-server",
-        natures: [], dependencies: [], totalTypes: 10, sourceRoots: [],
-      }));
-    });
-    mockSandboxPaths();
-    const { projectInfo } = await import("../src/commands/project-info.mjs");
-    await projectInfo(["my-server"]);
-    const out = io.logs.join("\n");
-    expect(out).toContain("/d/git/my-app/my-server");
-  });
-
-  // ---- Empty states: consistent (no <entity>) format ----
-
-  it("all empty states use (no <entity>) format", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end("[]");
-    });
-
-    const cases = [
-      { mod: "../src/commands/find.mjs", fn: "find", args: ["X"], expected: "(no results)" },
-      { mod: "../src/commands/implementors.mjs", fn: "implementors", args: ["X"], expected: "(no implementors)" },
-      { mod: "../src/commands/implementors.mjs", fn: "implementors", args: ["X", "m"], expected: "(no implementors)" },
-      { mod: "../src/commands/references.mjs", fn: "references", args: ["X"], expected: "(no references)" },
-      { mod: "../src/commands/problems.mjs", fn: "problems", args: [], expected: "(no problems)" },
-    ];
-
-    for (const { mod, fn, args, expected } of cases) {
-      io.logs.length = 0;
-      vi.resetModules();
-      vi.doMock("../src/resolve.mjs", () => ({
-        resolveInstance: async () => ({ port, token: null, pid: process.pid, workspace: "/test", host: "127.0.0.1", file: "" }),
-      }));
-      const module = await import(mod);
-      await module[fn](args);
-      expect(io.logs[0]).toBe(expected);
-    }
-  });
-
-  // ---- Domain errors: exit 0, not exit 1 ----
-
-  it("domain errors do not call process.exit", async () => {
-    await setupMock(errorServer());
-
-    const cases = [
-      { mod: "../src/commands/find.mjs", fn: "find", args: ["X"] },
-      { mod: "../src/commands/implementors.mjs", fn: "implementors", args: ["X"] },
-      { mod: "../src/commands/references.mjs", fn: "references", args: ["X"] },
-      { mod: "../src/commands/problems.mjs", fn: "problems", args: [] },
-      { mod: "../src/commands/hierarchy.mjs", fn: "hierarchy", args: ["X"] },
-      { mod: "../src/commands/projects.mjs", fn: "projects", args: [] },
-    ];
-
-    for (const { mod, fn, args } of cases) {
-      io.errors.length = 0;
-      vi.resetModules();
-      vi.doMock("../src/resolve.mjs", () => ({
-        resolveInstance: async () => ({ port, token: null, pid: process.pid, workspace: "/test", host: "127.0.0.1", file: "" }),
-      }));
-      const module = await import(mod);
-      // Should NOT throw — returns normally (exit 0)
-      await module[fn](args);
-      expect(io.errors[0]).toContain("Something went wrong");
-    }
-  });
-
-  // ---- Missing args: still exit 1 ----
-
-  it("missing args still exit 1", async () => {
-    const cases = [
-      { mod: "../src/commands/find.mjs", fn: "find", args: [] },
-      { mod: "../src/commands/implementors.mjs", fn: "implementors", args: [] },
-      { mod: "../src/commands/hierarchy.mjs", fn: "hierarchy", args: [] },
-      { mod: "../src/commands/references.mjs", fn: "references", args: [] },
-    ];
-
-    for (const { mod, fn, args } of cases) {
-      vi.resetModules();
-      const module = await import(mod);
-      await expect(module[fn](args)).rejects.toThrow("exit(1)");
-    }
   });
 });

@@ -148,8 +148,8 @@ public class HttpIntegrationTest {
     }
 
     @Test
-    public void findEndpoint() throws Exception {
-        String body = authedGet("/find?name=Dog&source");
+    public void typesEndpoint() throws Exception {
+        String body = authedGet("/types?pattern=Dog&sourceOnly");
         assertTrue(body.contains("test.model.Dog"),
                 "Should find Dog: " + body);
     }
@@ -164,21 +164,21 @@ public class HttpIntegrationTest {
     @Test
     public void problemsEndpoint() throws Exception {
         String body = authedGet("/problems?project="
-                + TestFixture.PROJECT_NAME + "&no-refresh");
+                + TestFixture.PROJECT_NAME);
         assertTrue(body.contains("BrokenClass"),
                 "Should contain BrokenClass error: " + body);
     }
 
     @Test
-    public void typeInfoEndpoint() throws Exception {
-        String body = authedGet("/type-info?class=test.model.Animal");
-        assertTrue(body.contains("\"kind\":\"interface\""),
+    public void typeEndpoint() throws Exception {
+        String body = authedGet("/type?of=test.model.Animal");
+        assertTrue(body.contains("\"typeKind\":\"interface\""),
                 "Should be interface: " + body);
     }
 
     @Test
     public void sourceEndpoint() throws Exception {
-        String response = rawRequest("GET /source?class=test.model.Dog HTTP/1.1",
+        String response = rawRequest("GET /source?of=test.model.Dog HTTP/1.1",
                 "Host: localhost",
                 "Authorization: Bearer " + TOKEN);
         assertTrue(response.startsWith("HTTP/1.1 200"),
@@ -193,7 +193,7 @@ public class HttpIntegrationTest {
     public void queryParamEncoding() throws Exception {
         // URL-encoded class name
         String body = authedGet(
-                "/type-info?class=test.model.Dog");
+                "/type?of=test.model.Dog");
         assertTrue(body.contains("test.model.Dog"),
                 "Should work with dots: " + body);
     }

@@ -2,7 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   startServer, stopServer, captureConsole, errorServer, parseJsonOutput, disableColor,
 } from "./helpers/mock-server.mjs";
-import { toSandboxPath } from "../src/paths.mjs";
+
+// --json output coverage for surviving non-graph commands.
+// Graph queries (find/refs/impl/hier/outline/source/projects/
+// project-info/problems/editors) were folded into `jdt q` —
+// their JSON contracts now live in the qlang :jdt/graph module
+// and the GraphHandler plugin tests, not here.
 
 describe("--json output", () => {
   let server, port, io;
@@ -19,280 +24,12 @@ describe("--json output", () => {
     vi.resetModules();
   });
 
-  function mockSandboxPaths() {
-    vi.doMock("../src/paths.mjs", async (importOriginal) => {
-      const orig = await importOriginal();
-      return { ...orig, toSandboxPath: (p) => p && /^[A-Z]:[/\\]/.test(p) ? "/" + p[0].toLowerCase() + p.slice(2).replace(/\\/g, "/") : p };
-    });
-  }
-
   async function setupMock(handler) {
     ({ server, port } = await startServer(handler));
     vi.doMock("../src/resolve.mjs", () => ({
       resolveInstance: async () => ({ port, token: null, pid: process.pid, workspace: "/test", host: "127.0.0.1", file: "" }),
     }));
   }
-
-  it("find --json outputs valid JSON with key fields", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { fqn: "com.example.Foo", file: "/my-server/src/Foo.java", kind: "class" },
-      ]));
-    });
-    const { find } = await import("../src/commands/find.mjs");
-    await find(["Foo", "--json"]);
-    const data = parseJsonOutput(io.logs);
-    expect(data).toBeInstanceOf(Array);
-    expect(data).toHaveLength(1);
-    expect(data[0].fqn).toBe("com.example.Foo");
-    expect(data[0].kind).toBe("class");
-  });
-
-  it("find --json deduplicates binary types", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { fqn: "javax.swing.JPanel", binary: true, origin: "rt.jar" },
-        { fqn: "javax.swing.JPanel", binary: true, origin: "rt.jar" },
-      ]));
-    });
-    const { find } = await import("../src/commands/find.mjs");
-    await find(["JPanel", "--json"]);
-    const data = parseJsonOutput(io.logs);
-    expect(data).toHaveLength(1);
-  });
-
-  it("find --json returns [] for no results", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end("[]");
-    });
-    const { find } = await import("../src/commands/find.mjs");
-    await find(["NonExistent", "--json"]);
-    const data = parseJsonOutput(io.logs);
-    expect(data).toEqual([]);
-  });
-
-  it("find --json returns error object on server error", async () => {
-    await setupMock(errorServer());
-    const { find } = await import("../src/commands/find.mjs");
-    await find(["Foo", "--json"]);
-    const data = parseJsonOutput(io.logs);
-    expect(data.error).toBe("Something went wrong");
-  });
-
-  it("find --json remaps paths in sandbox", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { fqn: "com.example.Foo", file: "D:/project/src/Foo.java", kind: "class" },
-      ]));
-    });
-    mockSandboxPaths();
-    const { find } = await import("../src/commands/find.mjs");
-    await find(["Foo", "--json"]);
-    const data = parseJsonOutput(io.logs);
-    expect(data[0].file).toBe("/d/project/src/Foo.java");
-  });
-
-  it("references --json outputs valid JSON", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { file: "/my-server/src/Bar.java", line: 10, in: "Bar.init()", content: "new Foo();" },
-      ]));
-    });
-    const { references } = await import("../src/commands/references.mjs");
-    await references(["com.example.Foo", "--json"]);
-    const data = parseJsonOutput(io.logs);
-    expect(data).toBeInstanceOf(Array);
-    expect(data[0].file).toBe("/my-server/src/Bar.java");
-    expect(data[0].line).toBe(10);
-  });
-
-  it("references --json returns [] for no results", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end("[]");
-    });
-    const { references } = await import("../src/commands/references.mjs");
-    await references(["com.example.Foo", "--json"]);
-    const data = parseJsonOutput(io.logs);
-    expect(data).toEqual([]);
-  });
-
-  it("implementors --json outputs valid JSON", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { fqn: "com.example.FooImpl", file: "/my-server/src/FooImpl.java" },
-      ]));
-    });
-    const { implementors } = await import("../src/commands/implementors.mjs");
-    await implementors(["com.example.Foo", "--json"]);
-    const data = parseJsonOutput(io.logs);
-    expect(data).toBeInstanceOf(Array);
-    expect(data[0].fqn).toBe("com.example.FooImpl");
-  });
-
-  it("implementors --json returns [] for no results", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end("[]");
-    });
-    const { implementors } = await import("../src/commands/implementors.mjs");
-    await implementors(["com.example.Foo", "--json"]);
-    const data = parseJsonOutput(io.logs);
-    expect(data).toEqual([]);
-  });
-
-  it("hierarchy --json outputs valid JSON", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({
-        fqn: "com.example.Foo",
-        supertypes: [{ fqn: "com.example.Base", kind: "class", depth: 0 }],
-        subtypes: [{ fqn: "com.example.Bar", kind: "class", depth: 0 }],
-      }));
-    });
-    const { hierarchy } = await import("../src/commands/hierarchy.mjs");
-    await hierarchy(["com.example.Foo", "--json"]);
-    const data = parseJsonOutput(io.logs);
-    expect(data.fqn).toBe("com.example.Foo");
-    expect(data.supertypes).toBeInstanceOf(Array);
-    expect(data.subtypes).toBeInstanceOf(Array);
-  });
-
-  it("hierarchy --json returns error on server error", async () => {
-    await setupMock(errorServer());
-    const { hierarchy } = await import("../src/commands/hierarchy.mjs");
-    await hierarchy(["app.Foo", "--json"]);
-    const data = parseJsonOutput(io.logs);
-    expect(data.error).toBe("Something went wrong");
-  });
-
-  it("implementors --json outputs valid JSON", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { fqn: "com.example.FooImpl", file: "/my-server/src/FooImpl.java", line: 25 },
-      ]));
-    });
-    const { implementors } = await import("../src/commands/implementors.mjs");
-    await implementors(["com.example.Foo#doStuff", "--json"]);
-    const data = parseJsonOutput(io.logs);
-    expect(data).toBeInstanceOf(Array);
-    expect(data[0].fqn).toBe("com.example.FooImpl");
-    expect(data[0].line).toBe(25);
-  });
-
-  it("implementors --json returns [] for no results", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end("[]");
-    });
-    const { implementors } = await import("../src/commands/implementors.mjs");
-    await implementors(["com.example.Foo#doStuff", "--json"]);
-    const data = parseJsonOutput(io.logs);
-    expect(data).toEqual([]);
-  });
-
-
-  it("errors --json outputs valid JSON", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { severity: "ERROR", source: "JDT", file: "D:/projects/my-server/src/Foo.java", line: 10, message: "cannot resolve symbol" },
-      ]));
-    });
-    const { problems } = await import("../src/commands/problems.mjs");
-    await problems(["--json"]);
-    const data = parseJsonOutput(io.logs);
-    expect(data).toBeInstanceOf(Array);
-    expect(data[0].severity).toBe("ERROR");
-    expect(data[0].message).toBe("cannot resolve symbol");
-    expect(data[0].line).toBe(10);
-    expect(data[0].file).toBe(toSandboxPath("D:/projects/my-server/src/Foo.java"));
-  });
-
-  it("problems --json returns [] for no problems", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end("[]");
-    });
-    const { problems } = await import("../src/commands/problems.mjs");
-    await problems(["--json"]);
-    const data = parseJsonOutput(io.logs);
-    expect(data).toEqual([]);
-  });
-
-  it("projects --json outputs valid JSON", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { name: "my-server", location: "D:/projects/my-server", repo: "D:/projects" },
-      ]));
-    });
-    const { projects } = await import("../src/commands/projects.mjs");
-    await projects(["--json"]);
-    const data = parseJsonOutput(io.logs);
-    expect(data).toBeInstanceOf(Array);
-    expect(data[0].name).toBe("my-server");
-  });
-
-  it("projects --json returns [] for no projects", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end("[]");
-    });
-    const { projects } = await import("../src/commands/projects.mjs");
-    await projects(["--json"]);
-    const data = parseJsonOutput(io.logs);
-    expect(data).toEqual([]);
-  });
-
-  it("projects --json remaps paths in sandbox", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { name: "my-server", location: "D:/projects/my-server", repo: "D:/projects" },
-      ]));
-    });
-    mockSandboxPaths();
-    const { projects } = await import("../src/commands/projects.mjs");
-    await projects(["--json"]);
-    const data = parseJsonOutput(io.logs);
-    expect(data[0].location).toBe("/d/projects/my-server");
-  });
-
-  it("editors --json outputs valid JSON", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { file: "D:/projects/src/Foo.java", fqn: "com.example.Foo", project: "my-server", active: true },
-        { file: "D:/projects/src/Bar.java", fqn: "com.example.Bar", project: "my-server" },
-      ]));
-    });
-    const { editors } = await import("../src/commands/editor.mjs");
-    await editors(["--json"]);
-    const data = parseJsonOutput(io.logs);
-    expect(data).toBeInstanceOf(Array);
-    expect(data).toHaveLength(2);
-    expect(data[0].fqn).toBe("com.example.Foo");
-    expect(data[0].active).toBe(true);
-  });
-
-  it("editors --json returns [] for no editors", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end("[]");
-    });
-    const { editors } = await import("../src/commands/editor.mjs");
-    await editors(["--json"]);
-    const data = parseJsonOutput(io.logs);
-    expect(data).toEqual([]);
-  });
 
   it("test runs --json outputs valid JSON", async () => {
     await setupMock((req, res) => {
@@ -346,26 +83,6 @@ describe("--json output", () => {
     expect(data.error).toBe("Something went wrong");
   });
 
-  it("source --json outputs valid JSON", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({
-        fqmn: "com.example.Foo",
-        file: "D:/project/src/Foo.java",
-        startLine: 5, endLine: 15,
-        source: "public class Foo {}",
-        refs: [],
-      }));
-    });
-    const { source } = await import("../src/commands/source.mjs");
-    await source(["com.example.Foo", "--json"]);
-    const data = parseJsonOutput(io.logs);
-    expect(data.fqmn).toBe("com.example.Foo");
-    expect(data.source).toBe("public class Foo {}");
-  });
-
-  // ---- Tier 2 --json ----
-
   it("launch list --json outputs valid JSON", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
@@ -412,31 +129,6 @@ describe("--json output", () => {
     expect(data[2].runner).toBe("JUnit 5");
   });
 
-  it("project-info --json outputs raw server response", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({
-        name: "test-proj", location: "/ws/test-proj",
-        natures: ["org.eclipse.jdt.core.javanature"],
-        dependencies: ["my-core"], totalTypes: 2,
-      }));
-    });
-    const { projectInfo } = await import("../src/commands/project-info.mjs");
-    await projectInfo(["test-proj", "--json"]);
-    const data = parseJsonOutput(io.logs);
-    expect(data.name).toBe("test-proj");
-    expect(data.totalTypes).toBe(2);
-    expect(data.natures).toContain("org.eclipse.jdt.core.javanature");
-  });
-
-  it("project-info --json returns error on server error", async () => {
-    await setupMock(errorServer());
-    const { projectInfo } = await import("../src/commands/project-info.mjs");
-    await projectInfo(["proj", "--json"]);
-    const data = parseJsonOutput(io.logs);
-    expect(data.error).toBe("Something went wrong");
-  });
-
   it("git --json outputs structured repo data", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
@@ -469,36 +161,5 @@ describe("--json output", () => {
     await git(["--json"]);
     const data = parseJsonOutput(io.logs);
     expect(data.error).toBe("Something went wrong");
-  });
-
-  // ---- --json does not break normal output ----
-
-  it("find without --json still shows table", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { fqn: "com.example.Foo", file: "/my-server/src/Foo.java", kind: "class" },
-      ]));
-    });
-    const { find } = await import("../src/commands/find.mjs");
-    await find(["Foo"]);
-    const out = io.logs[0];
-    expect(out).toContain("KIND");
-    expect(out).toContain("[C]");
-    expect(() => JSON.parse(out)).toThrow(); // not JSON
-  });
-
-  it("errors without --json still shows colored output", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { severity: "ERROR", source: "JDT", file: "D:/projects/my-server/src/Foo.java", line: 10, message: "bad" },
-      ]));
-    });
-    const { problems } = await import("../src/commands/problems.mjs");
-    await problems([]);
-    expect(io.logs[0]).toContain("ERROR");
-    expect(io.logs[0]).toContain("bad");
-    expect(() => JSON.parse(io.logs.join("\n"))).toThrow(); // not JSON
   });
 });

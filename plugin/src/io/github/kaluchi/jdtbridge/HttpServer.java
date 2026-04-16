@@ -467,7 +467,7 @@ public class HttpServer {
                         graph.handleSupers(params));
                 case "/subtypes" -> Response.json(
                         graph.handleSubtypes(params));
-                case "/implementors2" -> Response.json(
+                case "/implementors" -> Response.json(
                         graph.handleImplementors(params));
                 case "/overrides" -> Response.json(
                         graph.handleOverrides(params));
@@ -477,11 +477,11 @@ public class HttpServer {
                         graph.handleRefsTo(params, scope));
                 case "/types" -> Response.json(
                         graph.handleTypes(params, scope));
-                case "/source2" -> Response.json(
+                case "/source" -> Response.json(
                         graph.handleSource(params));
-                case "/problems2" -> Response.json(
+                case "/problems" -> Response.json(
                         graph.handleProblems(params, scope));
-                case "/projects2" -> Response.json(
+                case "/projects" -> Response.json(
                         graph.handleProjects(scope));
                 case "/project" -> Response.json(
                         graph.handleProject(params));
@@ -499,32 +499,12 @@ public class HttpServer {
                         graph.handleTypesInFile(params));
                 case "/packagesInProject" -> Response.json(
                         graph.handlePackagesInProject(params));
-                case "/projects" -> Response.json(
-                        search.handleProjects(scope));
-                case "/project-info" -> Response.json(
-                        projectInfo.handleProjectInfo(params));
-                case "/find" -> Response.json(
-                        search.handleFind(params, scope));
-                case "/references" -> Response.json(
-                        search.handleReferences(params, scope));
-                case "/implementors" -> Response.json(
-                        search.handleImplementors(params, scope));
-                case "/hierarchy" -> Response.json(
-                        search.handleHierarchy(params, scope));
-                case "/problems" -> Response.json(
-                        diagnostics.handleProblems(params, scope));
                 case "/build" -> Response.json(
                         diagnostics.handleBuild(params));
                 case "/refresh" -> Response.json(
                         diagnostics.handleRefresh(params));
                 case "/maven/update" -> Response.json(
                         maven.handleUpdate(params));
-                case "/type-info" -> Response.json(
-                        search.handleTypeInfo(params));
-                case "/outline" -> Response.json(
-                        search.handleOutline(params));
-                case "/source" -> search.handleSource(params,
-                        scope);
                 case "/organize-imports" -> Response.json(
                         refactoring.handleOrganizeImports(params));
                 case "/format" -> Response.json(

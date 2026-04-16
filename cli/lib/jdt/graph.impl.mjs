@@ -164,7 +164,7 @@ const packageImpl = navOp('@package', '/package');
 const fileImpl    = navOp('@file',    '/file');
 
 const projectsImpl = overloadedOp('@projects', 0, {
-    0: async () => getEndpoint('/projects2')
+    0: async () => getEndpoint('/projects')
 });
 
 // ── Detail enrichment ───────────────────────────────────────────
@@ -232,7 +232,7 @@ const packagesInProjectImpl = navOp('@packagesInProject',
 
 const supersImpl       = navOp('@supers',       '/supers');
 const subtypesImpl     = navOp('@subtypes',     '/subtypes');
-const implementorsImpl = navOp('@implementors', '/implementors2');
+const implementorsImpl = navOp('@implementors', '/implementors');
 const overridesImpl    = navOp('@overrides',    '/overrides');
 const overloadsImpl    = navOp('@overloads',    '/overloads');
 
@@ -282,24 +282,24 @@ const classpathImpl = navOp('@classpath', '/classpath');
 
 // ── Source text ─────────────────────────────────────────────────
 
-const sourceImpl = navOp('@source', '/source2');
+const sourceImpl = navOp('@source', '/source');
 
 // ── Problems ────────────────────────────────────────────────────
 
 const problemsImpl = overloadedOp('@problems', 1, {
-    0: async () => getEndpoint('/problems2'),
+    0: async () => getEndpoint('/problems'),
     1: async (pipeValue, scopeLambda) => {
         const scopeVal = await scopeLambda(pipeValue);
         if (typeof scopeVal === 'string') {
             if (scopeVal.includes('/') || scopeVal.includes('\\')) {
-                return getEndpoint(`/problems2?file=${enc(scopeVal)}`);
+                return getEndpoint(`/problems?file=${enc(scopeVal)}`);
             }
-            return getEndpoint(`/problems2?project=${enc(scopeVal)}`);
+            return getEndpoint(`/problems?project=${enc(scopeVal)}`);
         }
         if (scopeVal && scopeVal.name) {
-            return getEndpoint(`/problems2?${enc(scopeVal.name)}`);
+            return getEndpoint(`/problems?${enc(scopeVal.name)}`);
         }
-        return getEndpoint('/problems2');
+        return getEndpoint('/problems');
     }
 });
 

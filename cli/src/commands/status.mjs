@@ -239,7 +239,7 @@ function guideSection() {
 
 After editing code:
 
-  jdt problems                check compilation after edit
+  jdt q '@problems'           check compilation after edit
   jdt test run FQN -f -q      run one test, stream result
   jdt build --project X       trigger build if auto-build is off
 

@@ -106,17 +106,18 @@ describe("guideSection", () => {
     expect(typeof g.body).toBe("string");
   });
 
-  it("body contains specialized refresh", () => {
+  it("body contains build/test/refactor refs for surviving commands", () => {
     const g = guideSection();
-    expect(g.body).toContain("jdt problems --project X");
+    expect(g.body).toContain("jdt q '@problems'");
     expect(g.body).toContain("jdt test run FQN");
     expect(g.body).toContain("jdt build --project X");
   });
 
-  it("body contains dashboard refresh hints", () => {
+  it("body contains dashboard refresh hints and graph-query patterns", () => {
     const g = guideSection();
     expect(g.body).toContain("jdt status -q");
-    expect(g.body).toContain("jdt help <command>");
+    expect(g.body).toContain("jdt q");
+    expect(g.body).toContain("manifest");
   });
 });
 

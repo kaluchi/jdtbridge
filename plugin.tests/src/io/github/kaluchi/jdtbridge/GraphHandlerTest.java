@@ -455,7 +455,7 @@ public class GraphHandlerTest {
                 arr.get(0).getAsJsonObject().get("fqn").getAsString());
     }
 
-    // ── /implementors2 ──────────────────────────────────────────────
+    // ── /implementors ───────────────────────────────────────────────
 
     @Test
     void implementorsTypeModeReturnsAllSubtypes() {
@@ -729,7 +729,7 @@ public class GraphHandlerTest {
         assertTrue(names.contains("test.refactor"));
     }
 
-    // ── /source2 ─────────────────────────────────────────────────────
+    // ── /source ──────────────────────────────────────────────────────
 
     @Test
     void sourceReturnsNodeAndText() {
@@ -765,7 +765,7 @@ public class GraphHandlerTest {
         assertTrue(isError(result));
     }
 
-    // ── /problems2 ──────────────────────────────────────────────────
+    // ── /problems ───────────────────────────────────────────────────
 
     @Test
     void problemsReturnsCompilationErrors() {
