@@ -269,20 +269,34 @@
              :throws [:FileNotFound :ProjectNotFound]}}
 | use
 
-|~~ Type that contains a member. Pure projection + point-lookup —
-    member skeletons carry :containingType FQN directly. Returns
-    null for top-level types whose subject lacks the field. ~~|
-let(:@containingType, /containingType | @type)
+|~~ Polymorphic seed lift. For Map subjects (skeleton/detail) — pass
+    through. For String subjects, infer node kind from FQN syntax and
+    point-lookup via @method (has '#' and '('), @field (has '#', no
+    '('), or @type (no '#'). The @containing* axes use @asNode so
+    callers may write either `node | @containingType` or
+    `"X#m()" | @containingType` without explicit lift. ~~|
+let(:@asNode, as(:subj)
+    | reify | /type | as(:subjType)
+    | subj
+    | when(subjType | eq(:string),
+           cond(contains("#"),
+                cond(contains("("), @method, @field),
+                @type)))
+
+|~~ Type that contains a member. Member skeletons carry :containingType
+    FQN directly; the result is point-looked-up to a detail node.
+    Returns null for top-level types whose subject lacks the field. ~~|
+let(:@containingType, @asNode | /containingType | unless(eq(null), @type))
 
 |~~ Package that contains a type. ~~|
-let(:@containingPackage, /containingPackage | @package)
+let(:@containingPackage, @asNode | /containingPackage | unless(eq(null), @package))
 
 |~~ Project that contains the given workspace node. ~~|
-let(:@containingProject, /containingProject | @project)
+let(:@containingProject, @asNode | /containingProject | unless(eq(null), @project))
 
 |~~ File that contains a type/method/field. Reads :location/:file
     from the node's location sub-Map. ~~|
-let(:@containingFile, /location/file | @file)
+let(:@containingFile, @asNode | /location/file | unless(eq(null), @file))
 
 |~~ Enrich a skeleton-node into a detail-node. Routes by :kind to
     the appropriate point-lookup operand (@type / @method / @field /
