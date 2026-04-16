@@ -121,10 +121,6 @@ const projectImpl = axisOp('@project', '/project');
 const packageImpl = axisOp('@package', '/package');
 const fileImpl    = axisOp('@file',    '/file');
 
-// ── Detail enrichment ───────────────────────────────────────────
-
-const detailImpl = axisOp('@detail', '/detail');
-
 // ── Containment ─────────────────────────────────────────────────
 
 const containingTypeImpl = nullaryOp('@containingType',
@@ -192,7 +188,6 @@ export function createImpls() {
         '@project':     projectImpl,
         '@package':     packageImpl,
         '@file':        fileImpl,
-        '@detail':      detailImpl,
         '@members':     membersImpl,
         '@supers':      supersImpl,
         '@subtypes':    subtypesImpl,

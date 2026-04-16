@@ -634,8 +634,9 @@ class GraphHandler {
 
     /**
      * Raw source text of a type or member — byte-exact from disk
-     * (preserving indentation). Returns {@code {:node <detail> :text <source>}}.
-     * No enriched refs, no hierarchy — those are separate axes.
+     * (preserving indentation). Returns the text as a JSON string.
+     * The node itself is already in the caller's hand from prior
+     * navigation — no need to bundle it back.
      */
     String handleSource(Map<String, String> params) {
         String identifier = params.get("of");
@@ -647,27 +648,18 @@ class GraphHandler {
             if (target.errorJson != null) return target.errorJson;
 
             if (!(target.element instanceof org.eclipse.jdt.core.IMember member)) {
-                return ErrorDescriptor.wrongSubjectKind("/source", "member",
+                return ErrorDescriptor.wrongSubjectKind("/source",
+                        "type|method|field",
                         elementKindOf(target.element)).toJsonString();
             }
 
-            JsonObject detail;
-            if (member instanceof IType t) detail = NodeBuilder.typeDetail(t);
-            else if (member instanceof IMethod m) detail = NodeBuilder.methodDetail(m);
-            else if (member instanceof IField f) detail = NodeBuilder.fieldDetail(f);
-            else return ErrorDescriptor.wrongSubjectKind("/source", "type|method|field",
-                    elementKindOf(member)).toJsonString();
-
             String text = NodeBuilder.sourceTextOf(member);
             if (text == null) {
-                return ErrorDescriptor.ioError("Source not available for " + identifier)
+                return ErrorDescriptor.ioError(
+                        "Source not available for " + identifier)
                         .toJsonString();
             }
-
-            var result = new JsonObject();
-            result.add("node", detail);
-            result.addProperty("text", text);
-            return result.toString();
+            return new com.google.gson.Gson().toJson(text);
         } catch (Exception e) {
             Log.warn("/source failed for " + identifier, e);
             return ErrorDescriptor.jdtInternalError(

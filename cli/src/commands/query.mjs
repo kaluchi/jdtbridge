@@ -6,6 +6,9 @@ import { fileURLToPath } from 'node:url';
 import { createSession } from '@kaluchi/qlang-core/session';
 import { printValue } from '@kaluchi/qlang-core';
 import { keyword, isErrorValue } from '@kaluchi/qlang-core';
+import { bindIoOperands } from '@kaluchi/qlang-cli/io-operands';
+import { bindFormatOperands } from '@kaluchi/qlang-cli/format-operands';
+import { bindParseOperands } from '@kaluchi/qlang-cli/parse-operands';
 import { createImpls as createGraphImpls } from '../../lib/jdt/graph.impl.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -39,6 +42,20 @@ export async function query(args) {
     process.exit(1);
   }
   const session = await createSession({ locator: createLocator() });
+  // Bind qlang-cli's standard host operands so jdt q has the same
+  // composable I/O + format toolkit as plain `qlang`:
+  //   @in / @out / @err / @tap     stdio
+  //   pretty / tjson / template    value → string formatters
+  //   parseJson / parseTjson       string → value parsers
+  let didExplicitStdoutEffect = false;
+  bindIoOperands(session, {
+    stdinReader: () => Promise.resolve(''),
+    stdoutWrite: (text) => process.stdout.write(text),
+    stderrWrite: (text) => process.stderr.write(text),
+    recordStdoutEffect: () => { didExplicitStdoutEffect = true; },
+  });
+  bindFormatOperands(session);
+  bindParseOperands(session);
   const cellEntry = await session.evalCell(`use(:jdt/graph) | ${querySource}`);
 
   if (cellEntry.error) {
@@ -56,6 +73,14 @@ export async function query(args) {
     const msg = desc.get(keyword('message'));
     console.error(`Error: ${thrown?.name ?? 'unknown'} — ${msg ?? ''}`);
     process.exit(1);
+  } else if (didExplicitStdoutEffect) {
+    // The pipeline already pushed bytes to stdout via @out — stay
+    // silent on the auto-print to avoid double-output.
+  } else if (typeof queryResult === 'string') {
+    // Strings print raw (no quotes/escapes) — `@source` returns the
+    // file's source text, which should land on stdout exactly as it
+    // appears on disk for `jdt q '"X" | @source' > X.java` workflows.
+    console.log(queryResult);
   } else {
     console.log(printValue(queryResult));
   }

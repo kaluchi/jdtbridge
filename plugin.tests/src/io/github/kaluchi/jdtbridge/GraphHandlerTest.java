@@ -732,30 +732,22 @@ public class GraphHandlerTest {
     // ── /source ──────────────────────────────────────────────────────
 
     @Test
-    void sourceReturnsNodeAndText() {
-        JsonObject result = parse(handler.handleSource(
-                params("of", "test.model.Dog")));
-        assertNotNull(result.get("node"),
-                "/source must carry :node detail");
-        assertNotNull(result.get("text"),
-                "/source must carry :text");
-        assertEquals("type",
-                result.getAsJsonObject("node").get("kind").getAsString());
-        assertTrue(result.get("text").getAsString()
-                .contains("class Dog"),
+    void sourceReturnsRawTextString() {
+        String response = handler.handleSource(
+                params("of", "test.model.Dog"));
+        // Response is a JSON-quoted string, not an object
+        String text = JsonParser.parseString(response).getAsString();
+        assertTrue(text.contains("class Dog"),
                 "source text must contain 'class Dog'");
     }
 
     @Test
     void sourceForMethodReturnsMethodBody() {
-        JsonObject result = parse(handler.handleSource(
-                params("of", "test.model.Dog#bark()")));
-        assertNotNull(result.get("text"));
-        assertTrue(result.get("text").getAsString()
-                .contains("bark"),
+        String response = handler.handleSource(
+                params("of", "test.model.Dog#bark()"));
+        String text = JsonParser.parseString(response).getAsString();
+        assertTrue(text.contains("bark"),
                 "method source must contain 'bark'");
-        assertEquals("method",
-                result.getAsJsonObject("node").get("kind").getAsString());
     }
 
     @Test

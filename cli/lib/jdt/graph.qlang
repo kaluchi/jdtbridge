@@ -98,16 +98,6 @@
 
  |~ ── Detail enrichment ─────────────────────────────────────── ~~|
 
- :@detail {:qlang/kind :builtin
-           :qlang/impl null
-           :category :jdt/graph
-           :subject :map
-           :modifiers []
-           :returns :map
-           :docs ["Enrich a skeleton-node into a detail-node. Polymorphic by :kind. Idempotent on detail-nodes."]
-           :examples []
-           :throws [:TypeNotFound :MethodNotFound :FieldNotFound]}
-
  |~ ── Containment up ────────────────────────────────────────── ~~|
 
  :@containingType {:qlang/kind :builtin
@@ -302,6 +292,19 @@
              :examples []
              :throws [:FileNotFound :ProjectNotFound]}}
 | use
+
+|~~ Enrich a skeleton-node into a detail-node. Routes by :kind to
+    the appropriate point-lookup operand (@type / @method / @field /
+    @project / @package / @file). Idempotent on detail-nodes —
+    re-fetches the same identity. ~~|
+let(:@detail, as(:n) | /kind
+    | cond(eq("type"),    n | @type,
+           eq("method"),  n | @method,
+           eq("field"),   n | @field,
+           eq("project"), n | @project,
+           eq("package"), n | @package,
+           eq("file"),    n | @file,
+           n))
 
 |~~ Incoming call sites of a method — :from skeleton nodes
     from each :call reference. ~~|
