@@ -1,6 +1,7 @@
 package io.github.kaluchi.jdtbridge;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 import org.eclipse.core.resources.IFile;
@@ -260,39 +261,26 @@ class NodeBuilder {
 
     // ── Skeleton header builder ─────────────────────────────────────
 
-    private static JsonObject baseSkeleton(String fqn, String kind,
-            String origin, JsonObject location, String containingProject) {
+    /** The three always-present skeleton fields. Per-kind builders
+     *  explicitly add :location and :containingProject when the
+     *  node has them — null arguments are not part of the API. */
+    private static JsonObject baseHeader(String fqn, String kind,
+            String origin) {
         var obj = new JsonObject();
         obj.addProperty("fqn", fqn);
         obj.addProperty("kind", kind);
         obj.addProperty("origin", origin);
-        if (location != null) {
-            obj.add("location", location);
-        } else {
-            obj.add("location", com.google.gson.JsonNull.INSTANCE);
-        }
-        if (containingProject != null) {
-            obj.addProperty("containingProject", containingProject);
-        } else {
-            obj.add("containingProject",
-                    com.google.gson.JsonNull.INSTANCE);
-        }
         return obj;
-    }
-
-    private static String containingProjectOf(IJavaElement element) {
-        if (element.getJavaProject() == null) return null;
-        return element.getJavaProject().getElementName();
     }
 
     // ── :type ───────────────────────────────────────────────────────
 
     static JsonObject typeSkeleton(IType type) {
-        var obj = baseSkeleton(
-                fqnOf(type), "type",
-                originOf(type),
-                location(type),
-                containingProjectOf(type));
+        var obj = baseHeader(fqnOf(type), "type", originOf(type));
+        JsonObject loc = location(type);
+        if (loc != null) obj.add("location", loc);
+        obj.addProperty("containingProject",
+                type.getJavaProject().getElementName());
         try {
             obj.addProperty("typeKind", typeKindOf(type));
         } catch (JavaModelException ignored) { /* skip */ }
@@ -353,11 +341,11 @@ class NodeBuilder {
     // ── :method ─────────────────────────────────────────────────────
 
     static JsonObject methodSkeleton(IMethod method) throws JavaModelException {
-        var obj = baseSkeleton(
-                fqmnOf(method), "method",
-                originOf(method),
-                location(method),
-                containingProjectOf(method));
+        var obj = baseHeader(fqmnOf(method), "method", originOf(method));
+        JsonObject loc = location(method);
+        if (loc != null) obj.add("location", loc);
+        obj.addProperty("containingProject",
+                method.getJavaProject().getElementName());
         obj.addProperty("name", method.getElementName());
         obj.addProperty("signature", compactSignature(method));
         obj.add("modifiers", modifiers(method.getFlags()));
@@ -435,11 +423,11 @@ class NodeBuilder {
     // ── :field ──────────────────────────────────────────────────────
 
     static JsonObject fieldSkeleton(IField field) {
-        var obj = baseSkeleton(
-                fqmnOf(field), "field",
-                originOf(field),
-                location(field),
-                containingProjectOf(field));
+        var obj = baseHeader(fqmnOf(field), "field", originOf(field));
+        JsonObject loc = location(field);
+        if (loc != null) obj.add("location", loc);
+        obj.addProperty("containingProject",
+                field.getJavaProject().getElementName());
         obj.addProperty("name", field.getElementName());
         try {
             obj.add("modifiers", modifiers(field.getFlags()));
@@ -456,17 +444,20 @@ class NodeBuilder {
      * canonical {@code :location} stays a code-coordinate sub-Map.
      */
     static JsonObject projectSkeleton(IProject project) {
-        return baseSkeleton(
-                project.getName(), "project",
-                "source", null, null);
-    }
-
-    static JsonObject projectDetail(IProject project) throws Exception {
-        var obj = projectSkeleton(project);
+        var obj = baseHeader(
+                project.getName(), "project", "source");
+        // Projects have a filesystem root, but no code-position
+        // :location sub-Map (no line/column). Root path lives at
+        // top-level under :rootPath.
         if (project.getLocation() != null) {
             obj.addProperty("rootPath",
                     project.getLocation().toOSString());
         }
+        return obj;
+    }
+
+    static JsonObject projectDetail(IProject project) throws Exception {
+        var obj = projectSkeleton(project);
 
         var natures = new JsonArray();
         for (String id : project.getDescription().getNatureIds()) {
@@ -537,10 +528,10 @@ class NodeBuilder {
         } catch (JavaModelException e) {
             origin = "source";
         }
-        String containingProj = pkg.getJavaProject() != null
-                ? pkg.getJavaProject().getElementName() : null;
-        return baseSkeleton(name, "package", origin, null,
-                containingProj);
+        var obj = baseHeader(name, "package", origin);
+        obj.addProperty("containingProject",
+                pkg.getJavaProject().getElementName());
+        return obj;
     }
 
     static JsonObject packageDetail(IPackageFragment pkg)
@@ -569,10 +560,10 @@ class NodeBuilder {
             throws JavaModelException {
         String name = module.getElementName();
         String origin = module.isBinary() ? "binary" : "source";
-        String containingProj = module.getJavaProject() != null
-                ? module.getJavaProject().getElementName() : null;
-        return baseSkeleton(name, "module", origin, null,
-                containingProj);
+        var obj = baseHeader(name, "module", origin);
+        obj.addProperty("containingProject",
+                module.getJavaProject().getElementName());
+        return obj;
     }
 
     static JsonObject moduleDetail(IModuleDescription module)
@@ -602,9 +593,10 @@ class NodeBuilder {
                 : file.getFullPath().toOSString();
         String origin = file.getName().endsWith(".class")
                 ? "binary" : "source";
-        String containingProj = file.getProject() != null
-                ? file.getProject().getName() : null;
-        return baseSkeleton(fqn, "file", origin, null, containingProj);
+        var obj = baseHeader(fqn, "file", origin);
+        obj.addProperty("containingProject",
+                file.getProject().getName());
+        return obj;
     }
 
     static JsonObject fileDetail(IFile file) {
@@ -637,12 +629,11 @@ class NodeBuilder {
         };
         String path = entry.getPath() != null
                 ? entry.getPath().toOSString() : "";
-        String projName = project != null ? project.getName() : null;
-        String fqn = (projName != null ? projName : "")
-                + "#" + entryKind + "#" + path;
+        String projName = project.getName();
+        String fqn = projName + "#" + entryKind + "#" + path;
 
-        var obj = baseSkeleton(fqn, "classpathEntry", "source",
-                null, projName);
+        var obj = baseHeader(fqn, "classpathEntry", "source");
+        obj.addProperty("containingProject", projName);
         obj.addProperty("entryKind", entryKind);
         obj.addProperty("path", path);
         if (entry.getOutputLocation() != null) {
@@ -752,20 +743,17 @@ class NodeBuilder {
         JsonObject loc = matchLocation(match);
         if (loc != null) {
             obj.add("location", loc);
-        } else {
-            obj.add("location", com.google.gson.JsonNull.INSTANCE);
         }
 
         JsonObject fromSkeleton = match.getElement() instanceof IJavaElement el
                 ? memberSkeleton(el) : null;
         if (fromSkeleton != null) {
             obj.add("from", fromSkeleton);
-            obj.add("containingProject",
-                    fromSkeleton.get("containingProject"));
-        } else {
-            obj.add("from", com.google.gson.JsonNull.INSTANCE);
-            obj.add("containingProject",
-                    com.google.gson.JsonNull.INSTANCE);
+            JsonElement containingProj =
+                    fromSkeleton.get("containingProject");
+            if (containingProj != null && !containingProj.isJsonNull()) {
+                obj.add("containingProject", containingProj);
+            }
         }
 
         obj.add("to", toSkeleton);
