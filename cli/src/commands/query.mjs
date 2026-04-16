@@ -6,7 +6,6 @@ import { fileURLToPath } from 'node:url';
 import { createSession } from '@kaluchi/qlang-core/session';
 import { printValue } from '@kaluchi/qlang-core';
 import { keyword, isErrorValue } from '@kaluchi/qlang-core';
-import { createImpls } from '../../lib/jdt/search.impl.mjs';
 import { createImpls as createGraphImpls } from '../../lib/jdt/graph.impl.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -14,7 +13,6 @@ const MODULE_LIB = join(__dirname, '..', '..', 'lib');
 
 function createLocator() {
   const implFactories = {
-    'jdt/search': createImpls,
     'jdt/graph': createGraphImpls
   };
 

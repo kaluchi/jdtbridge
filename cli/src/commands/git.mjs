@@ -1,6 +1,11 @@
 /**
  * Git repos overview — shows repos, branches, dirty state.
- * Data from EGit via /projects endpoint (repo + branch per project).
+ *
+ * Fetches project skeletons via /projects, then enriches each with
+ * /project?of=<fqn> to read the :repo and :branch fields (which
+ * live in detail, not skeleton — the canonical project shape stays
+ * git-agnostic). Local `git status --short` fills in dirty file
+ * counts.
  */
 
 import { execSync } from "node:child_process";
@@ -25,28 +30,34 @@ export async function git(args = []) {
 async function gitList(args = []) {
   const flags = parseFlags(args);
   const noFiles = args.includes("--no-files");
-  const limit = noFiles ? -1 : (flags.limit !== undefined ? Number(flags.limit) : 10);
+  const limit = noFiles ? -1
+    : (flags.limit !== undefined ? Number(flags.limit) : 10);
   const filter = extractPositional(args);
-  const projects = await get("/projects");
-  if (projects.error) {
-    output(args, projects, { text() {} });
+
+  const skeletons = await get("/projects");
+  if (!Array.isArray(skeletons)) {
+    output(args, skeletons, { text() {} });
     return;
   }
 
-  let repos = reposFromProjects(projects);
+  // Enrich each project with detail to read :repo / :branch
+  const details = await Promise.all(skeletons.map((p) =>
+    get(`/project?of=${encodeURIComponent(p.fqn)}`)));
+
+  let repos = reposFromDetails(details);
   if (filter.length > 0) {
     repos = repos.filter((r) =>
       filter.some((f) => r.name === f || r.name.includes(f)));
   }
 
-  // Build repo data with raw git status lines
+  // Local git status per repo for dirty file count
   const repoData = repos.map((repo) => {
     const statusOut = gitCmd(repo.path, "git status --short");
     const dirtyLines = statusOut.split("\n").filter((l) => l.trim());
     return { repo, dirtyLines };
   });
 
-  // JSON gets clean data (no ANSI)
+  // JSON: clean structured data for programmatic consumption
   const data = repoData.map(({ repo, dirtyLines }) => ({
     name: repo.name,
     path: toSandboxPath(repo.path),
@@ -63,14 +74,17 @@ async function gitList(args = []) {
       for (const { repo, dirtyLines } of repoData) {
         const repoPath = toSandboxPath(repo.path);
         const status = dirtyLines.length > 0
-          ? yellow(`${dirtyLines.length} modified`) : green("clean");
+          ? yellow(`${dirtyLines.length} modified`)
+          : green("clean");
         rows.push([repo.name, status, repoPath, repo.branch]);
 
         if (dirtyLines.length > 0 && limit >= 0) {
-          const show = limit === 0 ? dirtyLines : dirtyLines.slice(0, limit);
+          const show = limit === 0
+            ? dirtyLines : dirtyLines.slice(0, limit);
           for (const l of show) rows.push([l.trim(), "", "", ""]);
           if (limit > 0 && dirtyLines.length > limit) {
-            rows.push([`...+${dirtyLines.length - limit} more`, "", "", ""]);
+            rows.push([`...+${dirtyLines.length - limit} more`,
+              "", "", ""]);
           }
         }
       }
@@ -79,13 +93,17 @@ async function gitList(args = []) {
   });
 }
 
-function reposFromProjects(projects) {
+function reposFromDetails(details) {
   const seen = new Map();
-  for (const p of projects) {
-    const repo = normalizePath(p.repo || "");
-    if (!repo) continue;
-    if (!seen.has(repo)) {
-      seen.set(repo, { path: repo, name: basename(repo), branch: p.branch || "" });
+  for (const p of details) {
+    const repoPath = normalizePath(p && p.repo || "");
+    if (!repoPath) continue;
+    if (!seen.has(repoPath)) {
+      seen.set(repoPath, {
+        path: repoPath,
+        name: basename(repoPath),
+        branch: p.branch || "",
+      });
     }
   }
   return [...seen.values()];
@@ -106,6 +124,10 @@ function gitCmd(repoPath, cmd) {
 
 export const help = `Show git repos, branches, and modified files.
 
+Reads project list via /projects, then /project?of=<name> per
+project for :repo and :branch fields (EGit metadata lives in
+detail, not skeleton). Local git status fills in dirty counts.
+
 Usage:  jdt git [repo...] [--limit N] [--json]
 
 Arguments:
@@ -118,6 +140,7 @@ Flags:
 
 Examples:
   jdt git                all repos
-  jdt git my-app             only repos matching "my-app"
+  jdt git my-app         only repos matching "my-app"
   jdt git my-app --limit 0   my-app repos, all dirty files
-  jdt git --json`;
+  jdt git --json
+`;

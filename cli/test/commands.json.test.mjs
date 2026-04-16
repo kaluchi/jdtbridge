@@ -130,11 +130,24 @@ describe("--json output", () => {
   });
 
   it("git --json outputs structured repo data", async () => {
+    // git.mjs hits /projects (skeletons) then /project?of=<fqn>
+    // (detail) per project to read :repo / :branch from detail.
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { name: "my-server", location: "D:/projects/my-server", repo: "D:/projects", branch: "main" },
-      ]));
+      if (req.url === "/projects") {
+        res.end(JSON.stringify([
+          { fqn: "my-server", kind: "project", origin: "source" },
+        ]));
+        return;
+      }
+      if (req.url.startsWith("/project?of=")) {
+        res.end(JSON.stringify({
+          fqn: "my-server", kind: "project", origin: "source",
+          repo: "D:/projects", branch: "main",
+        }));
+        return;
+      }
+      res.end("{}");
     });
     const { git } = await import("../src/commands/git.mjs");
     await git(["--json"]);
