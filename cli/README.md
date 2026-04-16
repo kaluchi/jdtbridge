@@ -39,21 +39,26 @@ jdt status [sections...] [-q]                          # workspace overview (sta
 
 ### Graph query
 
-`jdt q '<qlang-pipeline>'` (alias: `q`) evaluates a qlang pipeline against the
-Eclipse JDT graph. Replaces the legacy find/references/implementors/hierarchy/
-outline/source/projects/project-info/problems commands — every navigation now
-composes through axis operands.
+`jdt q '<qlang-pipeline>'` (alias: `q`) evaluates a qlang pipeline
+against the Eclipse JDT graph. Replaces the legacy find/references/
+implementors/hierarchy/outline/source/projects/project-info/problems
+commands — every navigation composes through axis operands.
+
+Pipelines start with a SEED (literal string or nullary operand) and
+chain operands that read their subject from pipeValue. Identifiers
+are never captured arguments — that's RPC. Filtering and composition
+uses core qlang (filter, *, >>, |, !|, as, let).
 
 ```bash
-jdt query '<qlang>'                                    # pattern search etc.
-jdt q '@types("*Service") * /fqn'                      # pattern search
-jdt q '@type("com.example.Foo") | @members'            # full type detail + members
-jdt q '@subtypes("com.example.Animal") * /fqn'         # direct subtypes
-jdt q '@ancestors("com.example.Foo") * /fqn'           # transitive supertypes
-jdt q '@callers("com.example.Foo#bar()") * /fqn'       # incoming call sites
-jdt q '@source("com.example.Foo") | /text'             # source text
+jdt query '<qlang>'                                    # eval qlang pipeline
+jdt q '"*Service" | @types * /fqn'                     # pattern search
+jdt q '"com.example.Foo" | @type | @members'           # type detail then members
+jdt q '"com.example.Animal" | @subtypes * /fqn'        # direct subtypes
+jdt q '"com.example.Foo" | @ancestors * /fqn'          # transitive supertypes
+jdt q '"com.example.Foo#bar()" | @callers * /fqn'      # incoming call sites
+jdt q '"com.example.Foo" | @source'                    # source text
 jdt q '@projects * /fqn'                               # workspace projects
-jdt q '@problems("my-server")'                         # compilation problems
+jdt q '@problems'                                      # compilation problems
 ```
 
 Bare-name reify shows operand descriptors:
@@ -83,8 +88,8 @@ All commands auto-refresh from disk. `build` is the only command that triggers e
 ### Diagnostics
 
 ```bash
-jdt q '@problems("my-server")'                         # compilation problems for one project
 jdt q '@problems'                                      # workspace-wide problems
+jdt q '@problems | filter(/containingProject | eq("p"))' # filter
 jdt refresh <file> [<file> ...] [-q]                   # (alias: r) notify Eclipse of file changes
 jdt refresh --project <name>                           # refresh entire project
 jdt refresh                                            # refresh entire workspace
@@ -145,7 +150,7 @@ jdt open <FQMN>                                        # open in Eclipse editor
 
 ```bash
 jdt q '@projects * /fqn'                               # workspace project FQNs
-jdt q '@project("my-server")'                          # full project detail (natures, classpath, deps)
+jdt q '"my-server" | @project'                         # full project detail (natures, classpath, deps)
 jdt editors                                            # (alias: ed) open editors (FQN, project, path)
 jdt git [list] [repo...] [--no-files] [--limit N]      # git repos, branches, dirty state
 ```

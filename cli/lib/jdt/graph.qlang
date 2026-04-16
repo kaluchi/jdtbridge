@@ -300,41 +300,18 @@
              :docs ["Compilation problems in the given scope."
                     "Optional modifier: :file, :project, or :workspace."]
              :examples []
-             :throws [:FileNotFound :ProjectNotFound]}
-
- |~ ── Sugar builtins: callers / readers / writers ────────────── ~|
-
- :@callers {:qlang/kind :builtin
-            :qlang/impl null
-            :category :jdt/graph
-            :subject [:map :string]
-            :modifiers []
-            :returns :vec
-            :docs ["Incoming call-sites. Returns Vec of :from skeleton nodes."
-                   "Sugar for @refs(:call) * /from. Subject from pipeValue or captured arg."]
-            :examples []
-            :throws [:TypeNotFound :MethodNotFound :FieldNotFound]}
-
- :@readers {:qlang/kind :builtin
-            :qlang/impl null
-            :category :jdt/graph
-            :subject [:map :string]
-            :modifiers []
-            :returns :vec
-            :docs ["Read-access call-sites on a field. Sugar for @refs(:read) * /from."]
-            :examples []
-            :throws [:FieldNotFound]}
-
- :@writers {:qlang/kind :builtin
-            :qlang/impl null
-            :category :jdt/graph
-            :subject [:map :string]
-            :modifiers []
-            :returns :vec
-            :docs ["Write-access call-sites on a field. Sugar for @refs(:write) * /from."]
-            :examples []
-            :throws [:FieldNotFound]}}
+             :throws [:FileNotFound :ProjectNotFound]}}
 | use
+
+|~~ Incoming call sites of a method — :from skeleton nodes
+    from each :call reference. ~~|
+let(:@callers, @refs | filter(/refKind | eq("call"))  * /from)
+
+|~~ Read-access call sites of a field. ~~|
+let(:@readers, @refs | filter(/refKind | eq("read"))  * /from)
+
+|~~ Write-access call sites of a field. ~~|
+let(:@writers, @refs | filter(/refKind | eq("write")) * /from)
 
 |~ ── Stdlib conduits ─────────────────────────────────────────── ~|
 |~ Recursive and composed graph navigations built from the

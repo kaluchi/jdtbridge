@@ -94,15 +94,18 @@ References:
 Detail:
   @detail(skeleton)  -> detail-node    @classpath(project)
 
-Examples:
-  jdt q '@types("*Service") * /fqn'
-  jdt q '@type("test.model.Dog") | @members | filter(/modifiers | has(:public))'
-  jdt q '@subtypes("test.model.Animal") * /fqn'
-  jdt q '@refs("test.model.Dog#bark()") * /from/fqn | distinct'
-  jdt q '@types("*") | as(:all) | all * @methods | filter(/modifiers | has(:public)) | filter(@callers | empty) * /fqn'
+Pipelines start with a SEED (literal string or nullary operand)
+and chain operands that read pipeValue. Operands never take FQN
+as captured args — that's RPC. Examples:
+
+  jdt q '"*Service" | @types * /fqn'
+  jdt q '"test.model.Dog" | @type | @members | filter(/modifiers | any(eq("public")))'
+  jdt q '"test.model.Animal" | @subtypes * /fqn'
+  jdt q '"test.model.Dog#bark()" | @refs * /from/fqn | distinct'
+  jdt q '@projects * @members * @methods | filter(/modifiers | any(eq("public"))) | filter(@callers | empty) * /fqn'
 
 All 69 qlang builtins are available (filter, sort, count, groupBy, * fan-out, !| fail-track).
-Bare-name reify on any operand without args = its descriptor:
+Bare-name reify on any operand = its descriptor:
   jdt q '@subtypes'   shows :docs/:examples/:throws for the operand.
   jdt q 'manifest | filter(/category | eq(:jdt/graph)) * /name'
   -- enumerate the full graph axis catalog.`;

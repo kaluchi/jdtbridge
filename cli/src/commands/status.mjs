@@ -181,23 +181,28 @@ jdt exposes the IDE's semantic Java graph as a pipeline query surface.
 grep sees text. jdt q sees structure — types, methods, call sites,
 hierarchies, annotations, classpaths — and composes them.
 
-Query the graph with jdt q '<qlang-pipeline>'. Examples:
+Query the graph with jdt q '<qlang-pipeline>'. Pipelines start
+with a SEED (literal string, nullary operand) and chain operands
+that take their subject from pipeValue. Operands never receive
+identifiers as captured arguments — that's RPC. Filtering and
+composition is done with core qlang (filter, *, >>, |, !|, as,
+let). Examples:
 
-  jdt q '@types("*Service", :sourceOnly) * @methods
-        >> filter(/modifiers | any(eq("public")))
+  jdt q '@projects * @members * @methods
+        | filter(/modifiers | any(eq("public")))
         | filter(@callers | empty) * /fqn'
   -- public methods with no callers (deletion candidates)
 
-  jdt q '@subtypes("com.example.Repository") * /fqn'
-  -- all implementations of an interface
+  jdt q '"com.example.Repository" | @subtypes * /fqn'
+  -- all subtypes of an interface
 
-  jdt q '@callers("com.example.Foo#bar()") * /fqn'
+  jdt q '"com.example.Foo#bar()" | @callers * /fqn'
   -- who calls this method
 
-  jdt q '@ancestors("com.example.MyService") * /fqn'
+  jdt q '"com.example.MyService" | @ancestors * /fqn'
   -- full supertype chain
 
-  jdt q '@type("com.example.Foo") | @detail'
+  jdt q '"com.example.Foo" | @type | @detail'
   -- full type descriptor (modifiers, interfaces, javadoc)
 
   jdt q 'manifest | filter(/category | eq(:jdt/graph)) * /name'
@@ -231,11 +236,14 @@ function guideSection() {
   jdt q '@operand'           bare-name reify = descriptor
   jdt q 'manifest'           full operand catalog
 
+  Pipelines start with a SEED (string literal, @projects, etc.).
+  Operands never take FQN/FQMN as captured args — that's RPC.
+
   as(:name) snapshots any value — reuse without re-fetching:
-    jdt q '@types("*") | as(:all) | all | count'
+    jdt q '"*" | @types | as(:all) | all | count'
 
   !| catches errors on the fail-track:
-    jdt q '@type("no.such") !| /thrown'
+    jdt q '"no.such" | @type !| /thrown'
 
 After editing code:
 
