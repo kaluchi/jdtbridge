@@ -121,38 +121,6 @@ const projectImpl = axisOp('@project', '/project');
 const packageImpl = axisOp('@package', '/package');
 const fileImpl    = axisOp('@file',    '/file');
 
-// ── Containment ─────────────────────────────────────────────────
-
-const containingTypeImpl = nullaryOp('@containingType',
-        async (subject) => {
-    const fqn = fqnOf(subject);
-    if (fqn === null) return missingSubject('@containingType', subject);
-    const hash = fqn.indexOf('#');
-    if (hash >= 0) {
-        return getEndpoint(`/type?of=${enc(fqn.substring(0, hash))}`);
-    }
-    // Subject is itself a type — read its :containingType field
-    const detail = await get(`/type?of=${enc(fqn)}`, 30_000);
-    if (detail && detail._error) {
-        return makeErrorValue(jsonToQlang(detail._error));
-    }
-    if (detail && detail.containingType) {
-        return getEndpoint(`/type?of=${enc(detail.containingType)}`);
-    }
-    return null;
-});
-
-const containingProjectImpl = nullaryOp('@containingProject',
-        async (subject) => {
-    if (subject instanceof Map) {
-        const proj = subject.get(keyword('containingProject'));
-        if (typeof proj === 'string') {
-            return getEndpoint(`/project?of=${enc(proj)}`);
-        }
-    }
-    return missingSubject('@containingProject', subject);
-});
-
 // ── Down-navigation ─────────────────────────────────────────────
 
 const membersImpl = axisOp('@members', '/members');
@@ -197,8 +165,6 @@ export function createImpls() {
         '@refs':        refsImpl,
         '@source':      sourceImpl,
         '@classpath':   classpathImpl,
-        '@containingType':    containingTypeImpl,
-        '@containingProject': containingProjectImpl,
         '@problems':    problemsImpl
     };
 }

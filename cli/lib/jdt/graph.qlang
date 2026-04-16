@@ -96,30 +96,6 @@
          :examples []
          :throws [:FileNotFound]}
 
- |~ ── Detail enrichment ─────────────────────────────────────── ~~|
-
- |~ ── Containment up ────────────────────────────────────────── ~~|
-
- :@containingType {:qlang/kind :builtin
-                   :qlang/impl null
-                   :category :jdt/graph
-                   :subject :map
-                   :modifiers []
-                   :returns :map
-                   :docs ["Type that contains the given member. Returns null for top-level types."]
-                   :examples []
-                   :throws []}
-
- :@containingProject {:qlang/kind :builtin
-                      :qlang/impl null
-                      :category :jdt/graph
-                      :subject :map
-                      :modifiers []
-                      :returns :map
-                      :docs ["Project containing the given workspace node."]
-                      :examples []
-                      :throws [:ProjectNotFound]}
-
  |~ ── Containment down ──────────────────────────────────────── ~~|
 
  :@members {:qlang/kind :builtin
@@ -292,6 +268,21 @@
              :examples []
              :throws [:FileNotFound :ProjectNotFound]}}
 | use
+
+|~~ Type that contains a member. Pure projection + point-lookup —
+    member skeletons carry :containingType FQN directly. Returns
+    null for top-level types whose subject lacks the field. ~~|
+let(:@containingType, /containingType | @type)
+
+|~~ Package that contains a type. ~~|
+let(:@containingPackage, /containingPackage | @package)
+
+|~~ Project that contains the given workspace node. ~~|
+let(:@containingProject, /containingProject | @project)
+
+|~~ File that contains a type/method/field. Reads :location/:file
+    from the node's location sub-Map. ~~|
+let(:@containingFile, /location/file | @file)
 
 |~~ Enrich a skeleton-node into a detail-node. Routes by :kind to
     the appropriate point-lookup operand (@type / @method / @field /
