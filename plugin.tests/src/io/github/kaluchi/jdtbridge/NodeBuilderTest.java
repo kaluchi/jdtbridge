@@ -150,11 +150,11 @@ public class NodeBuilderTest {
     // ── Skeleton invariants ─────────────────────────────────────────
 
     @Test
-    void typeSkeletonHasFiveHeaderFields() throws Exception {
+    void typeSkeletonHasHeaderPlusTypeKind() throws Exception {
         JsonObject skeleton = NodeBuilder.typeSkeleton(
                 type("test.model.Dog"));
-        assertEquals(5, skeleton.entrySet().size(),
-                "skeleton must have exactly 5 fields, got: "
+        assertEquals(6, skeleton.entrySet().size(),
+                "skeleton must have 5 header + typeKind, got: "
                 + skeleton);
         assertEquals("test.model.Dog",
                 skeleton.get("fqn").getAsString());
@@ -166,21 +166,25 @@ public class NodeBuilderTest {
     }
 
     @Test
-    void methodSkeletonHasFiveHeaderFields() throws Exception {
+    void methodSkeletonHasHeaderPlusFilterFields() throws Exception {
         IMethod barkMethod = method("test.model.Dog", "bark", null);
         JsonObject skeleton = NodeBuilder.methodSkeleton(barkMethod);
-        assertEquals(5, skeleton.entrySet().size());
+        assertEquals(8, skeleton.entrySet().size(),
+                "5 header + name + signature + modifiers, got: "
+                + skeleton);
         assertEquals("test.model.Dog#bark()",
                 skeleton.get("fqn").getAsString());
         assertEquals("method", skeleton.get("kind").getAsString());
     }
 
     @Test
-    void fieldSkeletonHasFiveHeaderFields() throws Exception {
+    void fieldSkeletonHasHeaderPlusFilterFields() throws Exception {
         IType dog = type("test.model.Dog");
         IField ageField = dog.getField("age");
         JsonObject skeleton = NodeBuilder.fieldSkeleton(ageField);
-        assertEquals(5, skeleton.entrySet().size());
+        assertEquals(7, skeleton.entrySet().size(),
+                "5 header + name + modifiers, got: "
+                + skeleton);
         assertEquals("test.model.Dog#age",
                 skeleton.get("fqn").getAsString());
         assertEquals("field", skeleton.get("kind").getAsString());
@@ -356,31 +360,45 @@ public class NodeBuilderTest {
     // ── No spurious fields in skeleton ──────────────────────────────
 
     @Test
-    void typeSkeletonOmitsTypeKindAndModifiers() throws Exception {
+    void typeSkeletonCarriesTypeKindButOmitsModifiers() throws Exception {
         JsonObject skeleton = NodeBuilder.typeSkeleton(
                 type("test.model.Dog"));
-        assertFalse(skeleton.has("typeKind"));
-        assertFalse(skeleton.has("modifiers"));
+        assertTrue(skeleton.has("typeKind"),
+                "skeleton must carry typeKind for filtering");
+        assertFalse(skeleton.has("modifiers"),
+                "modifiers is detail-only for types");
         assertFalse(skeleton.has("interfaces"));
     }
 
     @Test
-    void methodSkeletonOmitsParametersAndReturnType() throws Exception {
+    void methodSkeletonCarriesNameModifiersSignatureButOmitsParams() throws Exception {
         IMethod barkMethod = method("test.model.Dog", "bark", null);
         JsonObject skeleton = NodeBuilder.methodSkeleton(barkMethod);
-        assertFalse(skeleton.has("parameters"));
-        assertFalse(skeleton.has("returnType"));
-        assertFalse(skeleton.has("signature"));
+        assertTrue(skeleton.has("name"),
+                "skeleton must carry name for display");
+        assertTrue(skeleton.has("modifiers"),
+                "skeleton must carry modifiers for filtering");
+        assertTrue(skeleton.has("signature"),
+                "skeleton must carry signature for display");
+        assertFalse(skeleton.has("parameters"),
+                "parameters is detail-only");
+        assertFalse(skeleton.has("returnType"),
+                "returnType is detail-only");
     }
 
     @Test
-    void fieldSkeletonOmitsTypeAndContainingType() throws Exception {
+    void fieldSkeletonCarriesNameModifiersButOmitsTypeAndContaining() throws Exception {
         IType dog = type("test.model.Dog");
         IField ageField = dog.getField("age");
         JsonObject skeleton = NodeBuilder.fieldSkeleton(ageField);
-        assertFalse(skeleton.has("type"));
-        assertFalse(skeleton.has("containingType"));
-        assertFalse(skeleton.has("modifiers"));
+        assertTrue(skeleton.has("name"),
+                "skeleton must carry name for display");
+        assertTrue(skeleton.has("modifiers"),
+                "skeleton must carry modifiers for filtering");
+        assertFalse(skeleton.has("type"),
+                "type is detail-only for fields");
+        assertFalse(skeleton.has("containingType"),
+                "containingType is detail-only");
     }
 
     // ── Detail invariant: every field is queryable ──────────────────

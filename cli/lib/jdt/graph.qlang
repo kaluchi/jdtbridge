@@ -1,0 +1,313 @@
+|~ ───────────────────────────────────────────────────────────────────
+   :jdt/graph — canonical access surface for the Eclipse JDT graph.
+
+   Every operand consumes either a node-Map (skeleton or detail —
+   see the ABI doc) or a fqn/fqmn String, and returns either a
+   single node, a Vec of nodes, or — on failure — an Error value
+   riding the fail-track with the server's structured descriptor.
+
+   Replaces the legacy :jdt/search MVP. Older operands (@find /
+   @callers / @members / @source) survive there until the
+   deletion sweep; new code uses :jdt/graph names verbatim.
+   ───────────────────────────────────────────────────────────────── ~|
+
+|~ ── Root queries ─────────────────────────────────────────────── ~|
+
+{:@types {:qlang/kind :builtin
+          :qlang/impl null
+          :category :jdt/graph
+          :subject :string
+          :modifiers [:keyword]
+          :returns :vec
+          :docs ["Type pattern search across the workspace. Subject is a name or wildcard pattern (\"*Controller*\")."
+                 "Optional modifier :sourceOnly excludes binary types."
+                 "Returns Vec of :type skeletons."]
+          :examples []
+          :throws [:InvalidFqn]}
+
+ :@type {:qlang/kind :builtin
+         :qlang/impl null
+         :category :jdt/graph
+         :subject :string
+         :modifiers []
+         :returns :map
+         :docs ["Single :type detail by fully qualified name."
+                "Inner classes use dotted form: pkg.Outer.Inner."]
+         :examples []
+         :throws [:TypeNotFound]}
+
+ :@method {:qlang/kind :builtin
+           :qlang/impl null
+           :category :jdt/graph
+           :subject :string
+           :modifiers []
+           :returns :map
+           :docs ["Single :method detail by FQMN. Supports both inline-paren signatures and the bare-name form (must be unambiguous)."]
+           :examples []
+           :throws [:MethodNotFound :AmbiguousMatch :InvalidFqmn]}
+
+ :@field {:qlang/kind :builtin
+          :qlang/impl null
+          :category :jdt/graph
+          :subject :string
+          :modifiers []
+          :returns :map
+          :docs ["Single :field detail by FQMN (pkg.Type#fieldName)."]
+          :examples []
+          :throws [:FieldNotFound :InvalidFqmn]}
+
+ :@project {:qlang/kind :builtin
+            :qlang/impl null
+            :category :jdt/graph
+            :subject :string
+            :modifiers []
+            :returns :map
+            :docs ["Single :project detail by name. Carries natures, classpathEntries, dependencies, sourceRoots, repo and branch when EGit-managed."]
+            :examples []
+            :throws [:ProjectNotFound]}
+
+ :@projects {:qlang/kind :builtin
+             :qlang/impl null
+             :category :jdt/graph
+             :subject :any
+             :modifiers []
+             :returns :vec
+             :docs ["All open workspace projects in the current session scope. Vec of :project skeletons."]
+             :examples []
+             :throws []}
+
+ :@package {:qlang/kind :builtin
+            :qlang/impl null
+            :category :jdt/graph
+            :subject :string
+            :modifiers []
+            :returns :map
+            :docs ["Single :package detail by FQN."]
+            :examples []
+            :throws [:PackageNotFound]}
+
+ :@file {:qlang/kind :builtin
+         :qlang/impl null
+         :category :jdt/graph
+         :subject :string
+         :modifiers []
+         :returns :map
+         :docs ["Single :file detail by absolute filesystem path."]
+         :examples []
+         :throws [:FileNotFound]}
+
+ |~ ── Detail enrichment ─────────────────────────────────────── ~~|
+
+ :@detail {:qlang/kind :builtin
+           :qlang/impl null
+           :category :jdt/graph
+           :subject :map
+           :modifiers []
+           :returns :map
+           :docs ["Enrich a skeleton-node into a detail-node. Polymorphic by :kind. Idempotent on detail-nodes."]
+           :examples []
+           :throws [:TypeNotFound :MethodNotFound :FieldNotFound]}
+
+ |~ ── Containment up ────────────────────────────────────────── ~~|
+
+ :@containingType {:qlang/kind :builtin
+                   :qlang/impl null
+                   :category :jdt/graph
+                   :subject :map
+                   :modifiers []
+                   :returns :map
+                   :docs ["Type that contains the given member. Returns null for top-level types."]
+                   :examples []
+                   :throws []}
+
+ :@containingProject {:qlang/kind :builtin
+                      :qlang/impl null
+                      :category :jdt/graph
+                      :subject :map
+                      :modifiers []
+                      :returns :map
+                      :docs ["Project containing the given workspace node."]
+                      :examples []
+                      :throws [:ProjectNotFound]}
+
+ |~ ── Containment down ──────────────────────────────────────── ~~|
+
+ :@members {:qlang/kind :builtin
+            :qlang/impl null
+            :category :jdt/graph
+            :subject :map
+            :modifiers []
+            :returns :vec
+            :docs ["Direct children of a type — methods, fields, inner types. Vec of skeletons."]
+            :examples []
+            :throws [:TypeNotFound]}
+
+ :@methods {:qlang/kind :builtin
+            :qlang/impl null
+            :category :jdt/graph
+            :subject :map
+            :modifiers []
+            :returns :vec
+            :docs ["Methods declared directly in the type."]
+            :examples []
+            :throws [:TypeNotFound]}
+
+ :@fields {:qlang/kind :builtin
+           :qlang/impl null
+           :category :jdt/graph
+           :subject :map
+           :modifiers []
+           :returns :vec
+           :docs ["Fields declared directly in the type."]
+           :examples []
+           :throws [:TypeNotFound]}
+
+ :@innerTypes {:qlang/kind :builtin
+               :qlang/impl null
+               :category :jdt/graph
+               :subject :map
+               :modifiers []
+               :returns :vec
+               :docs ["Inner types declared in the given type."]
+               :examples []
+               :throws [:TypeNotFound]}
+
+ :@typesInPackage {:qlang/kind :builtin
+                   :qlang/impl null
+                   :category :jdt/graph
+                   :subject :map
+                   :modifiers []
+                   :returns :vec
+                   :docs ["All top-level types in the given package, aggregated across source roots."]
+                   :examples []
+                   :throws []}
+
+ :@typesInFile {:qlang/kind :builtin
+                :qlang/impl null
+                :category :jdt/graph
+                :subject :map
+                :modifiers []
+                :returns :vec
+                :docs ["Top-level types declared in the given Java file."]
+                :examples []
+                :throws [:FileNotFound]}
+
+ :@packagesInProject {:qlang/kind :builtin
+                      :qlang/impl null
+                      :category :jdt/graph
+                      :subject :map
+                      :modifiers []
+                      :returns :vec
+                      :docs ["Non-empty source packages in the project, deduped per name."]
+                      :examples []
+                      :throws [:ProjectNotFound]}
+
+ |~ ── Hierarchy ─────────────────────────────────────────────── ~~|
+
+ :@supers {:qlang/kind :builtin
+           :qlang/impl null
+           :category :jdt/graph
+           :subject :map
+           :modifiers []
+           :returns :vec
+           :docs ["Direct supertypes — superclass plus directly-declared interfaces. Transitive ascent via @ancestors conduit."]
+           :examples []
+           :throws [:TypeNotFound]}
+
+ :@subtypes {:qlang/kind :builtin
+             :qlang/impl null
+             :category :jdt/graph
+             :subject :map
+             :modifiers []
+             :returns :vec
+             :docs ["Direct subtypes only. Transitive descent via @descendants conduit."]
+             :examples []
+             :throws [:TypeNotFound]}
+
+ :@implementors {:qlang/kind :builtin
+                 :qlang/impl null
+                 :category :jdt/graph
+                 :subject :map
+                 :modifiers []
+                 :returns :vec
+                 :docs ["Subtypes (for :type subject) or override-methods (for :method subject)."]
+                 :examples []
+                 :throws [:TypeNotFound :MethodNotFound]}
+
+ :@overrides {:qlang/kind :builtin
+              :qlang/impl null
+              :category :jdt/graph
+              :subject :map
+              :modifiers []
+              :returns :map
+              :docs ["The closest super-method this method overrides, or null when no override exists."]
+              :examples []
+              :throws [:MethodNotFound :WrongSubjectKind]}
+
+ :@overloads {:qlang/kind :builtin
+              :qlang/impl null
+              :category :jdt/graph
+              :subject :map
+              :modifiers []
+              :returns :vec
+              :docs ["Sibling methods of the same name in the containing type, including the queried method."]
+              :examples []
+              :throws [:MethodNotFound :WrongSubjectKind]}
+
+ |~ ── References ────────────────────────────────────────────── ~~|
+
+ :@refs {:qlang/kind :builtin
+         :qlang/impl null
+         :category :jdt/graph
+         :subject :map
+         :modifiers [:keyword]
+         :returns :vec
+         :docs ["Incoming references to the given node (subject) of the given kind."
+                "Modifier is the refKind keyword: :call | :read | :write | :typeUse | :all."
+                "For methods, :call (default) returns invocations. For fields, :read/:write select access mode. For types, :typeUse covers extends/implements/typeUse."]
+          :examples []
+          :throws [:TypeNotFound :MethodNotFound :FieldNotFound]}
+
+ :@classpath {:qlang/kind :builtin
+              :qlang/impl null
+              :category :jdt/graph
+              :subject :map
+              :modifiers []
+              :returns :vec
+              :docs ["Classpath entries of the given project."]
+              :examples []
+              :throws [:ProjectNotFound]}
+
+ |~ ── Sugar builtins: callers / readers / writers ────────────── ~|
+
+ :@callers {:qlang/kind :builtin
+            :qlang/impl null
+            :category :jdt/graph
+            :subject [:map :string]
+            :modifiers []
+            :returns :vec
+            :docs ["Incoming call-sites. Returns Vec of :from skeleton nodes."
+                   "Sugar for @refs(:call) * /from. Subject from pipeValue or captured arg."]
+            :examples []
+            :throws [:TypeNotFound :MethodNotFound :FieldNotFound]}
+
+ :@readers {:qlang/kind :builtin
+            :qlang/impl null
+            :category :jdt/graph
+            :subject [:map :string]
+            :modifiers []
+            :returns :vec
+            :docs ["Read-access call-sites on a field. Sugar for @refs(:read) * /from."]
+            :examples []
+            :throws [:FieldNotFound]}
+
+ :@writers {:qlang/kind :builtin
+            :qlang/impl null
+            :category :jdt/graph
+            :subject [:map :string]
+            :modifiers []
+            :returns :vec
+            :docs ["Write-access call-sites on a field. Sugar for @refs(:write) * /from."]
+            :examples []
+            :throws [:FieldNotFound]}}
+| use

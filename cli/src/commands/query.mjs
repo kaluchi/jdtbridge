@@ -1,4 +1,4 @@
-// jdt q <qlang-query> — evaluate a qlang pipeline against the JDT search module.
+// jdt q <qlang-query> — evaluate a qlang pipeline against the :jdt/graph module.
 
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -7,13 +7,15 @@ import { createSession } from '@kaluchi/qlang-core/session';
 import { printValue } from '@kaluchi/qlang-core';
 import { keyword, isErrorValue } from '@kaluchi/qlang-core';
 import { createImpls } from '../../lib/jdt/search.impl.mjs';
+import { createImpls as createGraphImpls } from '../../lib/jdt/graph.impl.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MODULE_LIB = join(__dirname, '..', '..', 'lib');
 
 function createLocator() {
   const implFactories = {
-    'jdt/search': createImpls
+    'jdt/search': createImpls,
+    'jdt/graph': createGraphImpls
   };
 
   return (namespaceName) => {
@@ -39,7 +41,7 @@ export async function query(args) {
     process.exit(1);
   }
   const session = await createSession({ locator: createLocator() });
-  const cellEntry = await session.evalCell(`use(:jdt/search) | ${querySource}`);
+  const cellEntry = await session.evalCell(`use(:jdt/graph) | ${querySource}`);
 
   if (cellEntry.error) {
     console.error(cellEntry.error.message);
@@ -61,20 +63,46 @@ export async function query(args) {
   }
 }
 
-export const help = `Evaluate a qlang pipeline against the JDT search module.
+export const help = `Evaluate a qlang pipeline against the Eclipse JDT graph.
 
 Usage:  jdt q <qlang-query> [--json]
 
-The query runs with use(:jdt/search) pre-loaded. Available operands:
-  @find(<kind>)    search workspace for declarations (default: :type)
-  @callers         find all call sites of an FQMN
-  @orphans         shorthand: methods with no callers
+Runs with use(:jdt/graph) pre-loaded. The graph is navigated through
+operand axes that all consume node-Maps OR fqn/fqmn Strings (subject
+polymorphism); every operand returns canonical-shape nodes (skeletons
+or detail) with five-field headers (:fqn :kind :origin :location
+:containingProject) plus per-kind detail fields.
+
+Root queries:
+  @types("*Pat*") [:sourceOnly]    workspace pattern search
+  @type(fqn)  @method(fqmn)  @field(fqmn)
+  @project(name)  @projects  @package(fqn)  @file(absPath)
+
+Containment:
+  @containingType(node)  @containingProject(node)
+  @members @methods @fields @innerTypes (node)
+  @typesInPackage @typesInFile @packagesInProject (node)
+
+Hierarchy:
+  @supers @subtypes @implementors (node)
+  @overrides(method)  @overloads(method)
+
+References:
+  @refs(node) [:call|:read|:write|:typeUse|:all]
+  @callers(node) @readers(node) @writers(node)  -- sugar conduits
+
+Detail:
+  @detail(skeleton)  -> detail-node    @classpath(project)
 
 Examples:
-  jdt q '@find(:method, "process") | count'
-  jdt q '@find("*Controller*") * /fqn'
-  jdt q '@orphans("MyService") * /fqn'
-  jdt q '@callers("com.example.Foo#bar") | count'
+  jdt q '@types("*Service") * /fqn'
+  jdt q '@type("test.model.Dog") | @members | filter(/modifiers | has(:public))'
+  jdt q '@subtypes("test.model.Animal") * /fqn'
+  jdt q '@refs("test.model.Dog#bark()") * /from/fqn | distinct'
+  jdt q '@types("*") | as(:all) | all * @methods | filter(/modifiers | has(:public)) | filter(@callers | empty) * /fqn'
 
-All 69 qlang builtins are available (filter, sort, count, groupBy, etc.).
-Use "jdt q '@find(:type, \"Name\") | reify(:@find)'" to inspect descriptors.`;
+All 69 qlang builtins are available (filter, sort, count, groupBy, * fan-out, !| fail-track).
+Bare-name reify on any operand without args = its descriptor:
+  jdt q '@subtypes'   shows :docs/:examples/:throws for the operand.
+  jdt q 'manifest | filter(/category | eq(:jdt/graph)) * /name'
+  -- enumerate the full graph axis catalog.`;

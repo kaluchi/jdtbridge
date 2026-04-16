@@ -288,11 +288,15 @@ class NodeBuilder {
     // ── :type ───────────────────────────────────────────────────────
 
     static JsonObject typeSkeleton(IType type) {
-        return baseSkeleton(
+        var obj = baseSkeleton(
                 fqnOf(type), "type",
                 originOf(type),
                 location(type),
                 containingProjectOf(type));
+        try {
+            obj.addProperty("typeKind", typeKindOf(type));
+        } catch (JavaModelException ignored) { /* skip */ }
+        return obj;
     }
 
     static JsonObject typeDetail(IType type) throws JavaModelException {
@@ -349,11 +353,15 @@ class NodeBuilder {
     // ── :method ─────────────────────────────────────────────────────
 
     static JsonObject methodSkeleton(IMethod method) throws JavaModelException {
-        return baseSkeleton(
+        var obj = baseSkeleton(
                 fqmnOf(method), "method",
                 originOf(method),
                 location(method),
                 containingProjectOf(method));
+        obj.addProperty("name", method.getElementName());
+        obj.addProperty("signature", compactSignature(method));
+        obj.add("modifiers", modifiers(method.getFlags()));
+        return obj;
     }
 
     static JsonObject methodDetail(IMethod method) throws JavaModelException {
@@ -427,11 +435,16 @@ class NodeBuilder {
     // ── :field ──────────────────────────────────────────────────────
 
     static JsonObject fieldSkeleton(IField field) {
-        return baseSkeleton(
+        var obj = baseSkeleton(
                 fqmnOf(field), "field",
                 originOf(field),
                 location(field),
                 containingProjectOf(field));
+        obj.addProperty("name", field.getElementName());
+        try {
+            obj.add("modifiers", modifiers(field.getFlags()));
+        } catch (JavaModelException ignored) { /* skip */ }
+        return obj;
     }
 
     // ── :project ────────────────────────────────────────────────────
