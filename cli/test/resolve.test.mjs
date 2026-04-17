@@ -209,6 +209,28 @@ describe("resolve", () => {
       expect(stderrOutput).toContain("Multiple Eclipse instances");
       expect(stderrOutput).toContain("jdt use");
     });
+
+    it("no warning when only one live instance among stale files", async () => {
+      writeInstance("inst1", {
+        port: 58800, token: "a", pid: process.pid,
+        workspace: "/ws/one",
+      });
+      writeInstance("inst2", {
+        port: 58900, token: "b", pid: 999999999,
+        workspace: "/ws/two",
+      });
+
+      const origWrite = process.stderr.write;
+      let stderrOutput = "";
+      process.stderr.write = (msg) => { stderrOutput += msg; };
+
+      const { resolveInstance } = await import("../src/resolve.mjs");
+      const inst = await resolveInstance();
+
+      process.stderr.write = origWrite;
+      expect(inst.port).toBe(58800);
+      expect(stderrOutput).not.toContain("Multiple Eclipse instances");
+    });
   });
 
   // --- writePinFiles ---

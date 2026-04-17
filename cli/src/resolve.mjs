@@ -64,12 +64,17 @@ export async function resolveInstance() {
   if (instances.length === 0) return null;
   if (instances.length === 1) return instances[0];
 
-  // Multiple instances — warn
+  // Filter to live instances — remote instances have no PID to check
+  const live = instances.filter(i => i.remote || !i.pid || isPidAlive(i.pid));
+  if (live.length === 0) return null;
+  if (live.length === 1) return live[0];
+
+  // Multiple live instances — warn
   process.stderr.write(
     "\u26A0 Multiple Eclipse instances found. Using first.\n" +
     "  Run `jdt use` to see all and pin one.\n",
   );
-  return instances[0];
+  return live[0];
 }
 
 /**
