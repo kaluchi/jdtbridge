@@ -281,8 +281,43 @@ public class HttpServer {
             requestTracker.logRequest(sessionHeader, method, path,
                     200, durationMs);
         } catch (Exception e) {
-            Log.error("Request error", e);
+            if (isClientDisconnect(e)) {
+                // The CLI closed its socket before we finished
+                // writing — timeout, Ctrl+C, process exit. Not a
+                // server fault; logging at Error level swamps the
+                // Eclipse Error Log with noise that doesn't need
+                // attention.
+                Log.info("client disconnected: " + e.getMessage());
+            } else {
+                Log.error("Request error", e);
+            }
         }
+    }
+
+    /**
+     * Recognize the socket-level conditions that surface when the
+     * client bailed before the response finished writing — broken
+     * pipe on Unix, the Russian / German / localized "подключение
+     * разорвано" flavors on Windows, and the common message heads
+     * every JVM emits for a reset peer or closed connection.
+     */
+    private static boolean isClientDisconnect(Throwable t) {
+        for (Throwable cursor = t; cursor != null;
+                cursor = cursor.getCause()) {
+            if (cursor instanceof java.net.SocketException
+                    || cursor instanceof java.io.EOFException) {
+                return true;
+            }
+            String msg = cursor.getMessage();
+            if (msg != null && (
+                    msg.contains("Broken pipe")
+                    || msg.contains("Connection reset")
+                    || msg.contains("connection was aborted")
+                    || msg.contains("разорвала"))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
