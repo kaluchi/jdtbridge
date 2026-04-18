@@ -3,8 +3,7 @@
 ## Overview
 
 Operations on Eclipse launch configurations beyond listing and
-inspection: import from file, delete, and future operations
-(duplicate, edit).
+inspection: import from file and delete.
 
 See [jdt-launch-spec.md](jdt-launch-spec.md) for the core launch
 commands (`configs`, `config`, `run`, `debug`, `logs`, `stop`, `clear`).
@@ -98,28 +97,6 @@ jdt launch config --delete <configId>
 
 Deletes a launch configuration from
 `<workspace>/.metadata/.plugins/org.eclipse.debug.core/.launches/`.
-
-## Duplicate (future)
-
-```bash
-jdt launch config --duplicate <configId> --configid <newName>
-```
-
-Creates a copy of an existing configuration with a new name.
-Useful for creating variants (e.g., different Maven goals,
-different test classes). Requires `--configid` for the new name.
-Not implemented yet.
-
-## Edit (future)
-
-Key-value editing of launch configuration attributes:
-
-```bash
-jdt launch config <configId> --set <key>=<value>
-```
-
-Would require knowledge of attribute types (string, boolean, int,
-list). Complex — deferred until concrete use cases emerge.
 
 ## Relationship to other specs
 

@@ -225,10 +225,3 @@ public interface IType extends IMember, IAnnotatable {
 }
 ```
 
----
-
-# Future considerations
-
-1. **Package-level** — `jdt source "com.example.shared.model"` could show types in package + package-info.java javadoc.
-
-2. **Inner class navigation** — sibling inner classes: show "Also nested in Outer: [E] Color, [C] Builder"?

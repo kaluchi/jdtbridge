@@ -351,8 +351,7 @@ Lifecycle:
   unreachable, telemetry is lost.
 
 - **Loopback-only server.** The bridge binds to 127.0.0.1. Remote
-  access requires a proxy (sandbox provider handles this) or future
-  configurable bind address.
+  access requires a proxy (sandbox provider handles this).
 
 ## Relationship to other specs
 

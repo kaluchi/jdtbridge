@@ -1,16 +1,13 @@
 // jdt q <qlang-query> — evaluate a qlang pipeline against the :jdt/graph module.
 //
 // Read-only command: every outcome (parse error, CLI-argument error,
-// server fail-track, legitimate error-value result) exits 0 with the
-// error descriptor printed on stdout in the same shape qlang's `!{}`
-// literal produces. Non-zero exit would cancel sibling parallel tool
-// calls in Claude Code; errors travel as data, not as exit status.
+// server fail-track, error-value result) exits 0 with the error
+// descriptor printed on stdout as a qlang `!{}` value. Non-zero
+// exit would cancel sibling parallel tool calls in agent harnesses;
+// errors travel as data.
 //
-// Output is always qlang-literal via `printValue` — qlang-sourced data
-// stays in its native formalism, round-trips losslessly through
-// parse + evalQuery, and composes as `jdt X | jdt q '...'` without
-// jq bridging. No --json flag: tagged JSON was a process bridge that
-// erased keyword/Set/Error identity on the wire.
+// Output is qlang-literal via `printValue` — round-trips through
+// parse + evalQuery and composes as `jdt X | jdt q '...'`.
 
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
