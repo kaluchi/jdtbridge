@@ -137,13 +137,47 @@ function releaseSlot() {
     else inFlight--;
 }
 
-async function getEndpoint(path) {
+/**
+ * Per-process request cache. Keyed by the full endpoint path
+ * (including `?of=…` and `&refKind=…`). A qlang pipeline is a
+ * short-lived process — typing the same fqn twice costs two
+ * HTTP calls unless we dedupe.
+ *
+ * The cache also dedupes concurrent identical requests: two axes
+ * racing the same path get the same in-flight Promise instead of
+ * each holding its own semaphore slot. On a fan-out that revisits
+ * the same targets (e.g. `@methods * @containingType | distinct
+ * * @type` — same container type reached via multiple methods),
+ * this can collapse dozens of redundant round-trips into one.
+ *
+ * qlang values are immutable at the language level so sharing a
+ * single cached response across every caller is safe.
+ *
+ * Disable with JDT_GRAPH_CACHE=0 when you need to see fresh data
+ * mid-session (rare; the process restarts between queries so by
+ * default every `jdt q` invocation already has a cold cache).
+ */
+const GRAPH_CACHE_ENABLED =
+    process.env.JDT_GRAPH_CACHE !== '0';
+
+const requestCache = new Map();
+
+async function fetchUncached(path) {
     await acquireSlot();
     try {
         return liftServerResponse(await get(path, GRAPH_TIMEOUT_MS));
     } finally {
         releaseSlot();
     }
+}
+
+function getEndpoint(path) {
+    if (!GRAPH_CACHE_ENABLED) return fetchUncached(path);
+    const cached = requestCache.get(path);
+    if (cached) return cached;
+    const promise = fetchUncached(path);
+    requestCache.set(path, promise);
+    return promise;
 }
 
 /**
