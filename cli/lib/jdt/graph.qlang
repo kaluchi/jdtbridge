@@ -364,6 +364,39 @@ let(:@publicOrphans, @methods
     | filter(/modifiers | any(eq("public")))
     | filter(@callers | empty))
 
+|~ ── Type dependency conduits ──────────────────────────── ~|
+
+|~~ Types the subject depends on — direct supertypes plus every
+    type touched by the subject's body (signatures, casts,
+    instanceof, generic args). Returns distinct :type-kind
+    skeletons. ~~|
+let(:@dependsOn,
+    as(:self)
+    | [self | @supers,
+       self | @outgoingRefs | filter(/refKind | eq("typeUse")) * /to]
+    | flat | distinct)
+
+|~~ Types that depend on the subject — everything in the workspace
+    that references the subject as a typeUse, plus direct subtypes
+    (which implicitly depend on their super). Returns distinct
+    :type skeletons. ~~|
+let(:@usedBy,
+    as(:self)
+    | [self | @refs(:typeUse) * /from | filter(/kind | eq("type")),
+       self | @subtypes]
+    | flat | distinct)
+
+|~ ── Dead code conduits ────────────────────────────────── ~|
+
+|~~ Non-private methods with zero incoming callers — broader
+    deletion audit than @publicOrphans (includes protected and
+    package-private). May still include override targets (framework
+    callbacks invoked reflectively) — filter further with
+    `filter(@overrides | eq(null))` when ruling those out.  ~~|
+let(:@deadCode, @methods
+    | filter(/modifiers | any(eq("private")) | not)
+    | filter(@callers | empty))
+
 |~~ Filter nodes to those from workspace source, not binary deps. ~~|
 let(:@sourceOnly, filter(/origin | eq("source")))
 

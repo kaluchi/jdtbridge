@@ -81,8 +81,24 @@ function missingSubject(operandName, subject) {
 
 const enc = encodeURIComponent;
 
+/**
+ * Per-axis HTTP timeout. Graph operands are non-interactive —
+ * an LLM composes a pipeline and waits for the answer; a 10-30 s
+ * ceiling on expensive queries (@outgoingRefs on large compilation
+ * units, @refs with many hits, transitive walks) truncates
+ * legitimate work mid-flight. Default is 5 minutes; an agent or
+ * CI run can raise or lower via JDT_GRAPH_TIMEOUT_MS.
+ */
+const GRAPH_TIMEOUT_MS = (() => {
+    const override = Number.parseInt(
+        process.env.JDT_GRAPH_TIMEOUT_MS ?? '', 10);
+    return Number.isFinite(override) && override > 0
+        ? override
+        : 300_000;
+})();
+
 async function getEndpoint(path) {
-    return liftServerResponse(await get(path, 30_000));
+    return liftServerResponse(await get(path, GRAPH_TIMEOUT_MS));
 }
 
 /**

@@ -398,6 +398,12 @@ class NodeBuilder {
             loc.addProperty("file", filePath);
             loc.addProperty("startLine", startLine);
             loc.addProperty("endLine", endLine);
+            // :lineCount saves the repeated
+            //   add(m | /location/endLine | sub(m | /location/startLine), 1)
+            // idiom in sort/audit pipelines. Plain inclusive span,
+            // 1-based matching startLine / endLine.
+            loc.addProperty("lineCount",
+                    endLine - startLine + 1);
 
             ISourceRange nameRange = member.getNameRange();
             if (nameRange != null && nameRange.getOffset() >= 0) {
