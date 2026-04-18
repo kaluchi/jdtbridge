@@ -347,3 +347,53 @@ let(:@sourceOnly, filter(/origin | eq("source")))
 |~~ Filter nodes to those belonging to the named project. ~~|
 let(:@inProject, [:projName],
     filter(/containingProject | eq(projName)))
+
+|~ ── Test-scope conduits ────────────────────────────────────── ~|
+
+|~~ Subset of callers whose declaring type is test-scope. For
+    @callers of a method, @readers/@writers of a field — answers
+    "which tests exercise this element". ~~|
+let(:@testCallers, @callers | filter(/isTestScope))
+
+|~~ Callers outside test scope — production usage audit. ~~|
+let(:@productionCallers, @callers | filter(/isTestScope | not))
+
+|~~ Keep only elements whose @callers include no test-scope code.
+    Applied after @methods / @fields — yields un-exercised
+    declarations. ~~|
+let(:@untested,
+    filter(@callers | filter(/isTestScope) | empty))
+
+|~~ For a type node, every test-scope caller across the type
+    itself plus its declared methods and fields. Returns the Vec
+    of distinct test-scope :from skeletons — the "which tests
+    exercise this type" answer. Per-fqn @refs errors (unreachable
+    members, binary-origin extras) are swallowed via `!| []` so
+    a single bad fqn does not crater the audit. ~~|
+let(:@tests,
+    as(:self)
+    | [[self | /fqn], self | @methods * /fqn, self | @fields * /fqn]
+    | flat
+    * (@refs !| [])
+    | flat * /from
+    | filter(/isTestScope)
+    | distinct)
+
+|~ ── Annotation conduits ───────────────────────────────────── ~|
+
+|~~ Keep only elements declaring the given annotation FQN. The
+    argument is a String — the full qualified annotation type,
+    e.g. "org.junit.jupiter.api.Test", "java.lang.Deprecated",
+    "org.springframework.stereotype.Service". ~~|
+let(:@annotated, [:annotationFqn],
+    filter(/annotations | any(eq(annotationFqn))))
+
+|~~ Deprecated elements — shorthand for
+    @annotated("java.lang.Deprecated"). ~~|
+let(:@deprecated, @annotated("java.lang.Deprecated"))
+
+|~~ JUnit Jupiter `@Test` methods. Portable across JUnit 4 if the
+    caller wants that flavor, they pass the JUnit 4 FQN to
+    @annotated directly: @annotated("org.junit.Test"). ~~|
+let(:@testMethods,
+    @annotated("org.junit.jupiter.api.Test"))
