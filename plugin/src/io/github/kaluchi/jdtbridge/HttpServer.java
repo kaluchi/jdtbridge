@@ -41,8 +41,30 @@ public class HttpServer {
     private final TestHandler testHandler =
             new TestHandler();
     private final ProjectHandler projectInfo = new ProjectHandler();
+    private final LogHandler logHandler = new LogHandler();
     private final SessionScope sessionScope = new SessionScope();
     private final RequestTracker requestTracker = new RequestTracker();
+
+    /**
+     * Diagnostic: log every request handler that takes longer than
+     * this (in ms) to the Eclipse .log at INFO. Read from env var
+     * {@code JDT_LOG_SLOW_REQUESTS_MS}; absent / non-positive →
+     * {@link Long#MAX_VALUE} (nothing logged). Set to {@code 0} to
+     * log every request, set to {@code 5000} to see only stragglers.
+     * Undocumented knob — meant for diagnosing locks and queues.
+     */
+    private static final long SLOW_REQUEST_THRESHOLD_MS = resolveSlowThreshold();
+
+    private static long resolveSlowThreshold() {
+        String raw = System.getenv("JDT_LOG_SLOW_REQUESTS_MS");
+        if (raw == null) return Long.MAX_VALUE;
+        try {
+            long parsed = Long.parseLong(raw.trim());
+            return parsed >= 0 ? parsed : Long.MAX_VALUE;
+        } catch (NumberFormatException e) {
+            return Long.MAX_VALUE;
+        }
+    }
     private final ConfigService configService =
             new ConfigService(Activator.getHome());
     private final WelcomeHandler welcome =
@@ -280,6 +302,10 @@ public class HttpServer {
 
             requestTracker.logRequest(sessionHeader, method, path,
                     200, durationMs);
+            if (durationMs >= SLOW_REQUEST_THRESHOLD_MS) {
+                Log.info("slow " + method + " " + path + " "
+                        + durationMs + "ms");
+            }
         } catch (Exception e) {
             if (isClientDisconnect(e)) {
                 // The CLI closed its socket before we finished
@@ -536,6 +562,8 @@ public class HttpServer {
                         graph.handleTypesInFile(params));
                 case "/packagesInProject" -> Response.json(
                         graph.handlePackagesInProject(params));
+                case "/log" -> Response.json(
+                        logHandler.handleLog(params));
                 case "/build" -> Response.json(
                         diagnostics.handleBuild(params));
                 case "/refresh" -> Response.json(

@@ -97,8 +97,53 @@ const GRAPH_TIMEOUT_MS = (() => {
         : 300_000;
 })();
 
+/**
+ * Cap simultaneous in-flight HTTP calls into the plugin. qlang `*`
+ * runs its body through Promise.all over the entire subject Vec,
+ * so `@projects * @members * @methods` naturally fans out into
+ * hundreds of concurrent requests. Unbounded, that queues on
+ * Eclipse's workspace lock — a handful finish, the rest wait past
+ * the CLI timeout, and the Error Log fills with broken-pipe
+ * entries once the CLI bails.
+ *
+ * The limiter is a cooperative semaphore: each getEndpoint call
+ * waits until a slot frees, then holds it for the duration of the
+ * HTTP round-trip. Order is FIFO over the wait queue.
+ *
+ * Default concurrency: 8. JDT_GRAPH_CONCURRENCY tunes per-process.
+ */
+const GRAPH_CONCURRENCY = (() => {
+    const override = Number.parseInt(
+        process.env.JDT_GRAPH_CONCURRENCY ?? '', 10);
+    return Number.isFinite(override) && override > 0
+        ? override
+        : 8;
+})();
+
+let inFlight = 0;
+const waiters = [];
+
+function acquireSlot() {
+    if (inFlight < GRAPH_CONCURRENCY) {
+        inFlight++;
+        return Promise.resolve();
+    }
+    return new Promise((resolve) => waiters.push(resolve));
+}
+
+function releaseSlot() {
+    const next = waiters.shift();
+    if (next) next();
+    else inFlight--;
+}
+
 async function getEndpoint(path) {
-    return liftServerResponse(await get(path, GRAPH_TIMEOUT_MS));
+    await acquireSlot();
+    try {
+        return liftServerResponse(await get(path, GRAPH_TIMEOUT_MS));
+    } finally {
+        releaseSlot();
+    }
 }
 
 /**
