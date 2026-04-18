@@ -336,6 +336,137 @@ function kindHeader(kind) {
     }
 }
 
+// ── mdOutline: structural tree of a type ───────────────────────
+
+const K_NAME      = keyword('name');
+const K_SIGNATURE = keyword('signature');
+const K_TYPE      = keyword('type');
+
+/**
+ * Bundle shape for mdOutline:
+ *   :node    — :type detail node-Map (required)
+ *   :members — Vec of member skeletons (methods / fields /
+ *              innerTypes). Upstream fetches via @members.
+ *
+ * Renders the viewed type header, then three sub-sections in
+ * source convention order — fields, methods, inner types — each
+ * line a one-row signature with badge, modifiers, and line
+ * range. Inner types drop in as `[C] Name` without recursion;
+ * feed them separately for a nested outline.
+ */
+function formatMdOutline(bundle) {
+    ensureMap(bundle, 'mdOutline');
+    const node = mapGet(bundle, K_NODE);
+    if (!(node instanceof Map)) {
+        throw new TypeError(
+            'mdOutline: :node must be a :type detail node-Map');
+    }
+
+    const out = [];
+    out.push('#### ' + badgeOf(node) + ' '
+            + (mapGet(node, K_FQN) ?? '?'));
+    const loc = locationLine(node);
+    if (loc) out.push(loc);
+    out.push('');
+
+    const members = mapGet(bundle, K_MEMBERS);
+    if (!Array.isArray(members) || members.length === 0) {
+        return out.join('\n').replace(/\n+$/, '');
+    }
+
+    const fields = [];
+    const methods = [];
+    const innerTypes = [];
+    for (const m of members) {
+        if (!(m instanceof Map)) continue;
+        const kind = mapGet(m, K_KIND);
+        if (kind === 'field')       fields.push(m);
+        else if (kind === 'method') methods.push(m);
+        else if (kind === 'type')   innerTypes.push(m);
+    }
+
+    if (fields.length > 0) {
+        out.push('#### Fields:');
+        for (const f of fields) out.push(outlineFieldLine(f));
+        out.push('');
+    }
+    if (methods.length > 0) {
+        out.push('#### Methods:');
+        for (const m of methods) out.push(outlineMethodLine(m));
+        out.push('');
+    }
+    if (innerTypes.length > 0) {
+        out.push('#### Inner types:');
+        for (const t of innerTypes) out.push(outlineInnerTypeLine(t));
+    }
+
+    return out.join('\n').replace(/\n+$/, '');
+}
+
+function outlineFieldLine(field) {
+    const name = mapGet(field, K_NAME)
+            ?? fqnLocalName(mapGet(field, K_FQN));
+    const type = mapGet(field, K_TYPE);
+    let line = badgeOf(field) + ' ' + name;
+    if (typeof type === 'string') line += ' : ' + type;
+    const modSuffix = modifierSuffix(field);
+    if (modSuffix) line += ' ' + modSuffix;
+    const range = lineRangeSuffix(field);
+    if (range) line += '  ' + range;
+    return line;
+}
+
+function outlineMethodLine(method) {
+    const sig = mapGet(method, K_SIGNATURE)
+            ?? fqnLocalName(mapGet(method, K_FQN));
+    const returnType = mapGet(method, K_RETURN_TYPE);
+    let line = badgeOf(method) + ' ' + sig;
+    if (typeof returnType === 'string') line += ' : ' + returnType;
+    const modSuffix = modifierSuffix(method);
+    if (modSuffix) line += ' ' + modSuffix;
+    const range = lineRangeSuffix(method);
+    if (range) line += '  ' + range;
+    return line;
+}
+
+function outlineInnerTypeLine(type) {
+    const name = fqnLocalName(mapGet(type, K_FQN));
+    let line = badgeOf(type) + ' ' + (name ?? '?');
+    const modSuffix = modifierSuffix(type);
+    if (modSuffix) line += ' ' + modSuffix;
+    const range = lineRangeSuffix(type);
+    if (range) line += '  ' + range;
+    return line;
+}
+
+function fqnLocalName(fqn) {
+    if (typeof fqn !== 'string') return null;
+    const hash = fqn.indexOf('#');
+    if (hash >= 0) return fqn.slice(hash + 1);
+    const dot = fqn.lastIndexOf('.');
+    return dot >= 0 ? fqn.slice(dot + 1) : fqn;
+}
+
+function modifierSuffix(node) {
+    const mods = mapGet(node, K_MODIFIERS);
+    if (!Array.isArray(mods) || mods.length === 0) return '';
+    return '(' + mods.join(', ') + ')';
+}
+
+function lineRangeSuffix(node) {
+    const loc = mapGet(node, K_LOCATION);
+    if (!(loc instanceof Map)) return '';
+    const startLine = mapGet(loc, K_START_LINE);
+    const endLine = mapGet(loc, K_END_LINE);
+    if (typeof startLine !== 'number') return '';
+    if (typeof endLine !== 'number' || endLine === startLine) {
+        return String(startLine);
+    }
+    return startLine + '-' + endLine;
+}
+
+const K_MEMBERS = keyword('members');
+
 // ── Operand bindings ───────────────────────────────────────────
 
 export function bindJdtRenderOperands(session) {
@@ -343,6 +474,8 @@ export function bindJdtRenderOperands(session) {
             async (bundle) => formatMdSource(bundle)));
     session.bind('mdHierarchy', valueOp('mdHierarchy', 1,
             async (bundle) => formatMdHierarchy(bundle)));
+    session.bind('mdOutline', valueOp('mdOutline', 1,
+            async (bundle) => formatMdOutline(bundle)));
     session.bind('mdRefs', valueOp('mdRefs', 1,
             async (refs) => formatMdRefs(refs)));
 }

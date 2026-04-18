@@ -540,3 +540,12 @@ let(:@hierarchyCard,
        :supers   self | @supers
        :subtypes self | @subtypes}
     | mdHierarchy)
+
+|~~ Structural outline of a type — fields, methods, inner types
+    grouped by kind with modifiers and line ranges. One-shot
+    "what lives in this class" without reading the source. ~~|
+let(:@outlineCard,
+    @asNode | as(:self)
+    | {:node    self | @detail
+       :members self | @members}
+    | mdOutline)

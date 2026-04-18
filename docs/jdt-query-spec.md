@@ -132,8 +132,29 @@ conduit. More → accept, document the exact delta.
 markdown cards for the common read operations are provided as
 host-bound render operands installed into the session alongside
 the I/O / format / parse operand packs. Each render operand
-consumes a detail node-Map (or the result of `@source`) as its
-subject and returns a markdown String.
+consumes a bundle Map (or a Vec of reference records) from
+pipeValue and returns a markdown String.
+
+### Renderers
+
+| Operand | Bundle shape | Output |
+|---|---|---|
+| `mdSource` | `{:node :text :outgoing :incoming [:supers :subtypes]}` | header + location + code fence + Outgoing Calls + Incoming Calls (+ Hierarchy for types) |
+| `mdHierarchy` | `{:node :supers :subtypes}` | type header + ↑ Supertypes + ↓ Subtypes |
+| `mdOutline` | `{:node :members}` | type header + Fields + Methods + Inner types, each grouped with modifiers and line ranges |
+| `mdRefs` | Vec of `:reference` records | grouped by `:refKind` (Calls / Reads / Writes / Type uses) |
+
+### Conduit shortcuts
+
+Every renderer has a conduit in `:jdt/graph` that collects the
+bundle through existing axes and pipes it through the
+renderer — one-shot from an fqn or node subject:
+
+| Conduit | Expands to |
+|---|---|
+| `@sourceCard` | `{:node @detail :text @source :outgoing @outgoingRefs :incoming @refs(:all)} \| mdSource` |
+| `@hierarchyCard` | `{:node @detail :supers @supers :subtypes @subtypes} \| mdHierarchy` |
+| `@outlineCard` | `{:node @detail :members @members} \| mdOutline` |
 
 ### Rendering contract
 
