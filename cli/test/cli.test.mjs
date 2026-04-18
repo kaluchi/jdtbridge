@@ -38,8 +38,8 @@ describe("cli dispatcher", () => {
   });
 
   it("shows command help for known command", async () => {
-    await run(["help", "find"]);
-    expect(logs.some((l) => l.includes("find"))).toBe(true);
+    await run(["help", "build"]);
+    expect(logs.some((l) => l.includes("incremental"))).toBe(true);
   });
 
   it("exits with error for unknown command", async () => {
