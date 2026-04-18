@@ -328,6 +328,140 @@ Used by `jdt status` in both text and JSON modes.
    narrowing because `:workspace` is prohibitively expensive as
    a default.
 
+## JSON removal scope
+
+Exploratory inventory of the `--json` surface across the CLI. Goal:
+assess the cost of eliminating JSON as an output format entirely and
+adopting qlang-literal (via `printValue`) as the universal raw-data
+form for every command. Markdown stays the human-rendered form; text
+tables stay; JSON is the one that goes.
+
+### Why consider it
+
+- Three formalisms live in parallel today — qlang-literal (`jdt q`
+  default), tagged JSON (`jdt q --json`), plain JSON (everything
+  else via `output.mjs` / `printJson`). Consumers must know which
+  command emits which.
+- Tagged JSON is not a human format (`{"$keyword": "foo"}`,
+  `{"$map": [[…]]}`) — it exists only as a bridge between
+  processes; the human reads `printValue` output.
+- Plain JSON is lossy — keyword / Set / Error identity is erased;
+  `fromPlain(toPlain(v))` is identity only when `v` carries no
+  lossy shape.
+- qlang-literal round-trips losslessly (`parse + evalQuery`), is
+  LLM-readable as-is, and composes natively: `jdt editors | jdt q
+  'filter(/active)'` works without `jq` bridging.
+
+### Commands currently emitting JSON
+
+Read-only (candidates for JSON removal):
+
+| Command | JSON form | Shape |
+|---|---|---|
+| `jdt q` | tagged JSON | `toTaggedJSON(result)` — `{"$map": …}`, `{"$keyword": …}` |
+| `jdt status` | composite plain JSON | `{ git: [...], editors: [...], problems: [...], … }` (mixed sources; qlang sections post-processed via `fromTaggedJSON + toPlain`) |
+| `jdt git` | plain JSON via `output()` | `[{ name, path, branch, dirty, files }]` |
+| `jdt editors` | plain JSON via `output()` | `[{ fqn, project, path, active }]` |
+| `jdt launch list` | plain JSON via `output()` | `[{ launchId, configId, configType, mode, pid, terminated }]` |
+| `jdt launch configs` | plain JSON via `output()` | `[{ configId, configType, project?, class?, goals? }]` |
+| `jdt launch config <id>` | plain JSON via `output()` | `{ configId, type, file, attributes }` (+ `--xml` orthogonal) |
+| `jdt test runs` | plain JSON via `output()` | `[{ configId, testRunId, state, total, passed, failed }]` |
+| `jdt agent list` | plain JSON via `output()` | agent sessions |
+| `jdt use` | plain JSON via `printJson` | `[{ index, alias, workspace, status, pinned, port }]` |
+| `jdt use --pins` | plain JSON via `printJson` | pin-file listing |
+| `jdt setup remote` | plain JSON via `printJson` | instance config + cached projects |
+
+Streaming (special — JSONL, not static JSON; orthogonal concern):
+
+| Command | Shape |
+|---|---|
+| `jdt test run -f --json` | JSONL events (per-test-case start/end) |
+| `jdt test status -f --json` | JSONL events |
+
+### Common infrastructure
+
+| File | Role | After removal |
+|---|---|---|
+| `cli/src/output.mjs` | Strategy dispatcher with `json` as a built-in format + `text` per-command renderer | Simplify to text-only; drop `BUILT_IN.json` branch |
+| `cli/src/json-output.mjs` | `printJson` + `remapJsonPaths` (sandbox path remap) | Delete; sandbox-path remap either migrates to text renderers or is dropped for qlang-native paths (node-Map `/location/file` already absolute) |
+| `cli/src/commands/query.mjs` | `toTaggedJSON` branch | Delete; qlang-literal always |
+| `cli/src/commands/status.mjs` | `JSON_COMMANDS` + `fromTaggedJSON + toPlain` bridge | Delete; status becomes markdown-only dashboard |
+
+### Test surface
+
+`--json` occurrences across 8 test files (50 total):
+- `cli/test/commands.json.test.mjs` — 22 (centralized JSON assertions for every command)
+- `cli/test/setup-remote.test.mjs` — 8
+- `cli/test/use.test.mjs` — 4
+- `cli/test/test-commands.test.mjs` — 4
+- `cli/test/agent.test.mjs` — 4
+- `cli/test/status.test.mjs` — 4
+- `cli/test/commands.launch.test.mjs` — 2
+- `cli/test/query.test.mjs` — 2
+
+Most tests delete outright with the feature. A handful (that assert
+on table rendering when `--json` is absent) keep their default-mode
+branch; JSON-mode branches delete. `commands.json.test.mjs` — the
+whole file likely retires.
+
+### Doc surface
+
+`--json` mentions across 10 spec files (54 total):
+- `jdt-setup-remote-spec.md` — 10
+- `jdt-regression-inventory.md` — 12 (this doc — meta)
+- `jdt-spec.md` — 7 (including the top-level `Commands with --json` table)
+- `jdt-launch-spec.md` — 6
+- `jdt-status-spec.md` — 6
+- `jdt-test-spec.md` — 5
+- `jdt-query-spec.md` — 4
+- `jdt-use-spec.md` — 2
+- `jdt-launch-config-spec.md` — 1
+- `jdt-agent-spec.md` — 1
+
+Single pass updates the `Commands with --json` table in
+`jdt-spec.md` (deleted) and every per-command `--json` line in
+neighbouring specs (deleted).
+
+### Breakdown by decision
+
+**Clearly retires with qlang-as-output:**
+
+- `--json` flag and the whole `output.mjs` JSON strategy.
+- `json-output.mjs` — including `remapJsonPaths` unless a text
+  renderer needs the same path conversion.
+- `toTaggedJSON` usage in `query.mjs`.
+- `JSON_COMMANDS` in `status.mjs`.
+- `commands.json.test.mjs` and the JSON-branch of every other test.
+- `Commands with --json` table in `jdt-spec.md`.
+
+**Kept, separate concern:**
+
+- `jdt launch config --xml` — XML is a different formalism
+  (Eclipse native .launch XML dump), not part of the JSON triage.
+- JSONL **streaming** for `jdt test run -f` / `jdt test status -f` —
+  per-event real-time feed for agents. Likely migrates to
+  line-delimited qlang-literals (each event a Map printed on one
+  line via `printValue`); same byte-wire discipline, new payload
+  shape. Separate PR.
+- `toTaggedJSON` / `fromTaggedJSON` in `@kaluchi/qlang-core` itself
+  — still needed for session serialization, not a CLI concern.
+
+**Open question after grep:**
+
+- `jdt use --json` and `jdt setup remote --json` are read-only but
+  run outside the `jdt/graph` surface. Same treatment (kill `--json`,
+  emit qlang-literal), or special-case as connection-management
+  commands where a shell-friendly plain form stays? User input
+  needed.
+
+### Estimated scope
+
+A single PR covering only commands 1-7 from the table above (the
+core graph read-only path): roughly 12-15 files touched in `cli/src`,
+3-4 test files trimmed or deleted, 4-5 specs updated. Medium PR.
+Commands 8-12 (test / agent / use / setup-remote / launch-streaming)
+can follow in a second PR once the pattern is settled.
+
 ## Cross-cutting gaps
 
 1. **Markdown render operands.** Six distinct renderers were
