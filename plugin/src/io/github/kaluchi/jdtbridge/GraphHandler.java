@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 import org.eclipse.core.resources.IFile;
@@ -15,6 +16,7 @@ import org.eclipse.core.runtime.Path;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IJavaElement;
+import org.eclipse.jdt.core.IMember;
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IModuleDescription;
@@ -893,6 +895,84 @@ class GraphHandler {
         if (element instanceof IType)   return "typeUse";
         if (element instanceof IField)  return requested;
         return requested;
+    }
+
+    /**
+     * Outgoing references from a source member. Returns Vec of
+     * :reference nodes where the subject-as-`:from` calls / reads
+     * / touches the target carried under `:to`. AST-visitor based
+     * (ReferenceCollector) — resolves bindings to FQMN and kind.
+     *
+     * Member-scoped: calls on a type flatten into one record per
+     * distinct callee across every declared method body. Constants
+     * and fields referenced by a body are both emitted as :read
+     * for this MVP; write-detection would take an extra assignment
+     * visitor and is not exposed yet.
+     */
+    String handleOutgoingRefs(Map<String, String> params,
+            ProjectScope scope) {
+        String fqmn = params.get("of");
+        if (fqmn == null || fqmn.isBlank()) {
+            return ErrorDescriptor.missingParameter("of").toJsonString();
+        }
+        try {
+            ResolvedTarget target = resolveTarget(fqmn, params);
+            if (target.errorJson != null) return target.errorJson;
+            if (!(target.element instanceof IMember member)) {
+                return ErrorDescriptor.wrongSubjectKind(
+                        "@outgoingRefs", "member", "non-member")
+                        .toJsonString();
+            }
+
+            Map<String, ReferenceCollector.Ref> collected =
+                    ReferenceCollector.collect(member);
+
+            var arr = new JsonArray();
+            for (ReferenceCollector.Ref ref : collected.values()) {
+                IJavaElement targetElement = ref.element();
+                if (targetElement == null) continue;
+                JsonObject toSkeleton =
+                        NodeBuilder.memberSkeleton(targetElement);
+                if (toSkeleton == null) continue;
+                if (!scope.containsProject(
+                        projectNameOf(targetElement))) continue;
+
+                var node = new JsonObject();
+                node.addProperty("kind", "reference");
+                node.addProperty("origin",
+                        NodeBuilder.originOf(targetElement));
+                node.addProperty("refKind",
+                        outgoingRefKindLabel(ref.kind()));
+                node.add("from", target.skeleton);
+                JsonElement containingProj =
+                        target.skeleton.get("containingProject");
+                if (containingProj != null
+                        && !containingProj.isJsonNull()) {
+                    node.add("containingProject", containingProj);
+                }
+                node.add("to", toSkeleton);
+                arr.add(node);
+            }
+            return arr.toString();
+        } catch (Exception e) {
+            Log.warn("/outgoingRefs failed for " + fqmn, e);
+            return ErrorDescriptor.jdtInternalError(
+                    "Failed /outgoingRefs of=" + fqmn, e).toJsonString();
+        }
+    }
+
+    private static String outgoingRefKindLabel(
+            ReferenceCollector.RefKind kind) {
+        return switch (kind) {
+            case METHOD -> "call";
+            case FIELD, CONSTANT -> "read";
+            case TYPE -> "typeUse";
+        };
+    }
+
+    private static String projectNameOf(IJavaElement element) {
+        var jp = element.getJavaProject();
+        return jp != null ? jp.getElementName() : "";
     }
 
     // ── Common helpers ──────────────────────────────────────────────

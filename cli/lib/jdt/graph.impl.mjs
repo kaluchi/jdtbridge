@@ -178,6 +178,10 @@ const refsImpl = overloadedOp('@refs', 2, {
     }
 });
 
+// ── Outgoing references — subject-member calls / reads / type-uses ──
+
+const outgoingRefsImpl = axisOp('@outgoingRefs', '/outgoingRefs');
+
 // ── Resources ───────────────────────────────────────────────────
 
 const classpathImpl = axisOp('@classpath', '/classpath');
@@ -238,6 +242,7 @@ export function createImpls() {
         '@overrides':   overridesImpl,
         '@overloads':   overloadsImpl,
         '@refs':        refsImpl,
+        '@outgoingRefs': outgoingRefsImpl,
         '@source':      sourceImpl,
         '@classpath':   classpathImpl,
         '@problems':    problemsImpl

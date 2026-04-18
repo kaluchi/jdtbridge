@@ -475,6 +475,8 @@ public class HttpServer {
                         graph.handleOverloads(params));
                 case "/refs" -> Response.json(
                         graph.handleRefsTo(params, scope));
+                case "/outgoingRefs" -> Response.json(
+                        graph.handleOutgoingRefs(params, scope));
                 case "/types" -> Response.json(
                         graph.handleTypes(params, scope));
                 case "/source" -> Response.json(

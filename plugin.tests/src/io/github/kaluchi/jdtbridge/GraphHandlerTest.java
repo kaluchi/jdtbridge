@@ -659,6 +659,73 @@ public class GraphHandlerTest {
         assertTrue(found, "fixture project must be in /projects");
     }
 
+    // ── Outgoing references ────────────────────────────────────────
+
+    @Test
+    void outgoingRefsFromMethodLists_callsReadsAndTypeUses() {
+        var arr = JsonParser.parseString(handler.handleOutgoingRefs(
+                params("of",
+                    "test.service.EnrichedRefService#getAnimalName(test.model.Animal)"),
+                ProjectScope.ALL)).getAsJsonArray();
+
+        assertFalse(arr.isEmpty(),
+                "getAnimalName body calls at least one method, "
+                + "references the Animal type — @outgoingRefs must "
+                + "produce non-empty ref records");
+
+        var refKinds = arr.asList().stream()
+                .map(JsonElement::getAsJsonObject)
+                .map(n -> n.get("refKind").getAsString())
+                .distinct().toList();
+        assertTrue(refKinds.contains("call"),
+                "expected at least one :call ref in outgoing; got "
+                + refKinds);
+
+        var calleeFqns = arr.asList().stream()
+                .map(JsonElement::getAsJsonObject)
+                .filter(n -> "call".equals(n.get("refKind").getAsString()))
+                .map(n -> n.getAsJsonObject("to")
+                        .get("fqn").getAsString())
+                .toList();
+        assertTrue(calleeFqns.contains("test.model.Animal#name()"),
+                "Animal#name() is invoked inside the body; callee "
+                + "fqn should land in /to/fqn; got " + calleeFqns);
+    }
+
+    @Test
+    void outgoingRefsFromEveryNodeCarriesFromSubject() {
+        var arr = JsonParser.parseString(handler.handleOutgoingRefs(
+                params("of",
+                    "test.service.EnrichedRefService#getAnimalName(test.model.Animal)"),
+                ProjectScope.ALL)).getAsJsonArray();
+        for (var node : arr) {
+            var obj = node.getAsJsonObject();
+            assertEquals("reference",
+                    obj.get("kind").getAsString());
+            var from = obj.getAsJsonObject("from");
+            assertNotNull(from,
+                    "every outgoing ref carries :from pointing back "
+                    + "at the subject (the member whose body was "
+                    + "scanned)");
+            assertEquals(
+                    "test.service.EnrichedRefService#getAnimalName(test.model.Animal)",
+                    from.get("fqn").getAsString());
+            assertNotNull(obj.getAsJsonObject("to"),
+                    ":to carries the target skeleton — "
+                    + "symmetric with incoming /refs");
+        }
+    }
+
+    @Test
+    void outgoingRefsErrorsOnUnknownTarget() {
+        JsonObject result = parse(handler.handleOutgoingRefs(
+                params("of", "no.such.Type#method()"),
+                ProjectScope.ALL));
+        assertTrue(isError(result),
+                "unresolved target must surface as structured "
+                + "error on the fail-track; got " + result);
+    }
+
     // ── Annotations ─────────────────────────────────────────────────
 
     @Test

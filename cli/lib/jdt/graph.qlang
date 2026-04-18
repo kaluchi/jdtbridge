@@ -230,6 +230,19 @@
           :examples []
           :throws [:TypeNotFound :MethodNotFound :FieldNotFound]}
 
+ :@outgoingRefs {:qlang/kind :builtin
+                 :qlang/impl null
+                 :category :jdt/graph
+                 :subject [:map :string]
+                 :modifiers []
+                 :returns :vec
+                 :docs ["Outgoing references from a source member — the types / methods / fields referenced inside the subject's body."
+                        "Returns Vec of :reference nodes where :from is the subject skeleton and :to is the referenced target."
+                        "Subject must be a type / method / field with available source. Binary-origin subjects fail because the AST visitor needs a compilation unit."
+                        ":refKind labels: :call (method invocation), :read (field / constant access), :typeUse (type reference in signatures, casts, instanceof)."]
+                 :examples []
+                 :throws [:TypeNotFound :MethodNotFound :FieldNotFound :WrongSubjectKind]}
+
  :@classpath {:qlang/kind :builtin
               :qlang/impl null
               :category :jdt/graph
@@ -317,6 +330,16 @@ let(:@readers, @refs | filter(/refKind | eq("read"))  * /from)
 
 |~~ Write-access call sites of a field. ~~|
 let(:@writers, @refs | filter(/refKind | eq("write")) * /from)
+
+|~~ Methods the subject body invokes. Outgoing-side companion
+    to @callers. Returns distinct :to skeletons. ~~|
+let(:@calls, @outgoingRefs | filter(/refKind | eq("call")) * /to
+    | distinct)
+
+|~~ Types the subject body touches — signatures, casts, generics,
+    instanceof. Returns distinct :to skeletons. ~~|
+let(:@typeUses, @outgoingRefs | filter(/refKind | eq("typeUse")) * /to
+    | distinct)
 
 |~ ── Stdlib conduits ─────────────────────────────────────────── ~|
 |~ Recursive and composed graph navigations built from the
