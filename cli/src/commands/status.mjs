@@ -10,6 +10,7 @@
 
 import { execSync } from "node:child_process";
 import { basename } from "node:path";
+import { fromTaggedJSON, toPlain } from "@kaluchi/qlang-core";
 import { normalizePath } from "../paths.mjs";
 
 // ---- Public API ----
@@ -28,13 +29,9 @@ export async function status(args) {
     const dataSections = sections.filter((s) => !new Set(["intro", "guide", "help"]).has(s));
     const result = {};
     for (const name of dataSections) {
-      const cmd = JSON_COMMANDS[name];
-      if (!cmd) continue;
-      try {
-        result[name] = JSON.parse(cliCmd(cmd));
-      } catch {
-        result[name] = null;
-      }
+      const descriptor = JSON_COMMANDS[name];
+      if (!descriptor) continue;
+      result[name] = readJsonSection(descriptor);
     }
     console.log(JSON.stringify(result, null, 2));
     return;
@@ -79,16 +76,33 @@ function formatSection({ title, cmd, body, description }, { bare, quiet }) {
   return `## ${title}\n\n${desc}\`\`\`bash\n$ ${cmd}\n${body}\n\`\`\``;
 }
 
-/** JSON commands for --json composite output. */
+/**
+ * Per-section JSON source. Two flavors:
+ *  - { kind: "cli",  cmd }   — legacy CLI subcommand emitting plain JSON
+ *  - { kind: "qlang", cmd }   — `jdt q --json ...` emitting tagged JSON;
+ *                               status converts to plain via toPlain()
+ *                               so the composite --json output keeps one
+ *                               stable shape regardless of source.
+ */
 const JSON_COMMANDS = {
-  git: "jdt git --json",
-  editors: "jdt editors --json",
-  problems: "jdt problems --json",
-  "launch-configs": "jdt launch configs --json",
-  launches: "jdt launch list --json",
-  tests: "jdt test runs --json",
-  projects: "jdt projects --json",
+  git: { kind: "cli", cmd: "jdt git --json" },
+  editors: { kind: "cli", cmd: "jdt editors --json" },
+  problems: { kind: "qlang", cmd: `jdt q --json "@problems"` },
+  "launch-configs": { kind: "cli", cmd: "jdt launch configs --json" },
+  launches: { kind: "cli", cmd: "jdt launch list --json" },
+  tests: { kind: "cli", cmd: "jdt test runs --json" },
+  projects: { kind: "qlang", cmd: `jdt q --json "@projects * inter(#{:fqn :rootPath :repo :branch})"` },
 };
+
+function readJsonSection({ kind, cmd }) {
+  try {
+    const parsed = JSON.parse(cliCmd(cmd));
+    if (kind === "qlang") return toPlain(fromTaggedJSON(parsed));
+    return parsed;
+  } catch {
+    return null;
+  }
+}
 
 // ---- Renderers (return { title, cmd, body }) ----
 
@@ -123,12 +137,13 @@ async function renderEditors() {
 }
 
 async function renderProblems() {
+  const cmd = `jdt q "@problems | table"`;
   return {
-    title: "Problems", cmd: "jdt problems --json",
-    body: cliCmd("jdt problems --json"),
+    title: "Problems", cmd,
+    body: cliCmd(cmd),
     description:
       "Eclipse Problems view — IMarker.PROBLEM markers (errors, warnings).\n"
-      + "Updated on every build. [] = clean workspace.",
+      + "Updated on every build. (empty) = clean workspace.",
   };
 }
 
@@ -163,12 +178,13 @@ async function renderTests() {
 }
 
 async function renderProjects() {
+  const cmd = `jdt q "@projects * inter(#{:fqn :rootPath :repo :branch}) | table"`;
   return {
-    title: "Projects", cmd: "jdt projects",
-    body: cliCmd("jdt projects"),
+    title: "Projects", cmd,
+    body: cliCmd(cmd),
     description:
       "Eclipse Package Explorer / Project Explorer.\n"
-      + "LOCATION = filesystem path. REPO = git root if EGit-managed.",
+      + "rootPath = filesystem path. repo = git root if EGit-managed.",
   };
 }
 

@@ -159,7 +159,7 @@ describe("JSON_COMMANDS", () => {
   it("covers all data sections", () => {
     for (const name of dataSections) {
       expect(JSON_COMMANDS[name]).toBeDefined();
-      expect(JSON_COMMANDS[name]).toContain("--json");
+      expect(JSON_COMMANDS[name].cmd).toContain("--json");
     }
   });
 
@@ -169,9 +169,10 @@ describe("JSON_COMMANDS", () => {
     }
   });
 
-  it("each command starts with jdt", () => {
-    for (const cmd of Object.values(JSON_COMMANDS)) {
-      expect(cmd).toMatch(/^jdt /);
+  it("each descriptor carries a kind ∈ {cli, qlang} and a jdt cmd", () => {
+    for (const descriptor of Object.values(JSON_COMMANDS)) {
+      expect(["cli", "qlang"]).toContain(descriptor.kind);
+      expect(descriptor.cmd).toMatch(/^jdt /);
     }
   });
 });
