@@ -287,24 +287,24 @@ bash calls within the same tab.
 
 ppid covers parallel subagents. `ppid` here means the parent PID
 of the `jdt` CLI process — i.e. the bash process that runs the `&&`
-chain. Within `jdt use 1 && jdt find Foo`, both `jdt` invocations
+chain. Within `jdt use 1 && jdt q '@projects'`, both `jdt` invocations
 are children of the same bash (same ppid). Different `&&` chains
 (parallel subagents) have different bash PIDs → different ppid pins
 → no race.
 
 | Scenario | Terminal ID | ppid |
 |---|---|---|
-| Human: `jdt use 2` then `jdt find` | same ✓ | same ✓ |
-| Sequential agent: bash1 `jdt use 2`, bash2 `jdt find` | same ✓ | different (dead) |
-| Parallel: `jdt use 1 && jdt find` / `jdt use 2 && jdt refs` | same (race) | different ✓ |
+| Human: `jdt use 2` then `jdt q ...` | same ✓ | same ✓ |
+| Sequential agent: bash1 `jdt use 2`, bash2 `jdt q ...` | same ✓ | different (dead) |
+| Parallel: `jdt use 1 && jdt q '@projects'` / `jdt use 2 && jdt q '@problems'` | same (race) | different ✓ |
 
 ### Race analysis (parallel subagents)
 
 Two parallel subagents in the same terminal tab:
 
 ```
-Subagent A (bash PID 1234):  jdt use 1 && jdt find Foo
-Subagent B (bash PID 5678):  jdt use 2 && jdt refs Bar
+Subagent A (bash PID 1234):  jdt use 1 && jdt q '"Foo" | @callers'
+Subagent B (bash PID 5678):  jdt use 2 && jdt q '"Bar" | @refs'
 ```
 
 Both write `term-<WT_SESSION>.json` — last writer wins (race).
@@ -317,9 +317,9 @@ consulted (ppid pin has priority).
 If subagents do NOT call `jdt use` (main agent pinned earlier):
 
 ```
-Main agent bash1:  jdt use 1           → term pin = ws1
-Subagent A bash2:  jdt find Foo        → ppid pin not found → term pin = ws1 ✓
-Subagent B bash3:  jdt refs Bar        → ppid pin not found → term pin = ws1 ✓
+Main agent bash1:  jdt use 1                   → term pin = ws1
+Subagent A bash2:  jdt q '"Foo" | @callers'    → ppid pin not found → term pin = ws1 ✓
+Subagent B bash3:  jdt q '"Bar" | @refs'       → ppid pin not found → term pin = ws1 ✓
 ```
 
 All subagents inherit the main agent's choice via terminal pin.

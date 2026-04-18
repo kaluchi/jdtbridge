@@ -346,8 +346,9 @@ public class GenericErasureTest {
         @Test
         void implementationsMatchHandleImplementors()
                 throws Exception {
-            // Cross-check: impls from jdt source ==
-            // impls from handleImplementors (hierarchy).
+            // Cross-check: impls surfaced by source-level
+            // resolution (SourceReport) == impls from
+            // handleImplementors (type hierarchy).
             // handleImplementors skips anonymous, so
             // source impls >= hierarchy impls.
             var handler = new SearchHandler();

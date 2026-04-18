@@ -337,7 +337,7 @@ describe("agent commands", () => {
       writeFileSync(join(dir, ".claude", "settings.local.json"),
         JSON.stringify({
           hooks: {
-            PreToolUse: [{ hooks: [{ command: "jdt refs check" }] }],
+            PreToolUse: [{ hooks: [{ command: "jdt setup --check" }] }],
             PostToolUse: [{ hooks: [{ command: "jdt refresh" }] }],
           },
         }));

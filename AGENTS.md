@@ -10,9 +10,10 @@ Required tools (verified by `jdt setup --check`):
 
 ### Eclipse source bundles (recommended)
 
-`jdt source` needs source bundles to read Eclipse Platform/JDT API source
-and javadoc. Without them, `jdt source org.eclipse.core.runtime.CoreException`
-returns "Source not available". Install all Eclipse source bundles once
+The `@source` axis needs source bundles to read Eclipse Platform/JDT API
+source and javadoc. Without them,
+`jdt q '"org.eclipse.core.runtime.CoreException" | @source'` returns
+"Source not available". Install all Eclipse source bundles once
 (Eclipse must NOT be running):
 
 ```bash
@@ -78,24 +79,50 @@ string matches; `jdt` returns semantic results from Eclipse's compiler index.
 with the full command reference. `jdt help <command>` for detailed usage
 of any command.
 
-### `jdt source` — hypertext navigation
+### `jdt q` — graph query language
 
-`jdt source` returns markdown with source code and resolved references.
-Each reference is a ready FQMN for the next `jdt source` call.
+`jdt q '<qlang-pipeline>'` evaluates a qlang pipeline against the
+Eclipse semantic graph. The graph is navigated through operand axes
+that consume a node-Map (skeleton or detail) OR a fqn/fqmn string
+from `pipeValue`. Output is qlang-literal; fqn strings in the result
+are ready subjects for the next step.
 
-References are grouped by:
-- **Same-class members** — with javadoc (saves a hop)
-- **Project source** — with absolute paths and javadoc
-- **Dependencies** — bare FQMNs
+Axes (see `docs/jdt-query-spec.md` for the full catalog):
 
-All paths are absolute OS paths (converted via `toSandboxPath` in Docker sandbox).
+```
+@types("*Pattern")  @type(fqn)  @method(fqmn)  @field(fqmn)
+@project(name)  @projects  @package(fqn)  @file(absPath)
+@members  @methods  @fields  @innerTypes
+@typesInPackage  @typesInFile  @packagesInProject
+@supers  @subtypes  @ancestors  @descendants  @implementors
+@refs(:kind?)  @callers  @readers  @writers
+@outgoingRefs  @calls  @typeUses
+@overrides  @overloads
+@source  @detail  @classpath  @problems(:scope?)
+```
+
+Sugar conduits for common audits:
+
+```
+@publicOrphans           public methods with zero incoming callers
+@testCallers             @callers filtered by /isTestScope
+@productionCallers       @callers where /isTestScope is false
+@untested                filter(@callers | filter(/isTestScope) | empty)
+@tests                   test-scope callers across a type's members
+@annotated(fqn)          filter(/annotations | any(eq(fqn)))
+@deprecated              @annotated("java.lang.Deprecated")
+@testMethods             @annotated("org.junit.jupiter.api.Test")
+@sourceOnly              filter(/origin | eq("source"))
+@inProject(projName)     filter(/containingProject | eq(projName))
+@asNode                  lift fqn String → point-looked-up node
+```
 
 ### FQMN (Fully Qualified Method Name)
 
-Commands that accept methods support FQMN — class and method in one argument:
+Axes accept FQMN in one argument — class and method together:
 
 ```
-pkg.Class#method              any overload
+pkg.Class#method              any overload (disambiguate via AmbiguousMatch :candidates)
 pkg.Class#method()            zero-arg overload
 pkg.Class#method(String)      specific signature
 pkg.Class.method(String)      Eclipse Copy Qualified Name style
@@ -104,13 +131,17 @@ pkg.Class.method(String)      Eclipse Copy Qualified Name style
 Types can be simple (`String`) or FQN (`java.lang.String`).
 Generics are stripped: `List<String>` matches `List`.
 
-### Pipe composability
+### Pipeline composability
+
+All of the below return a single qlang-literal value — ready for
+pipe-chaining with standard shell tools or further `jdt q` calls.
 
 ```bash
-jdt outline io.github.kaluchi.jdtbridge.SearchHandler -q | grep handle   # find members by name
-jdt refs io.github.kaluchi.jdtbridge.JdtUtils#findMethod | wc -l # count, not 51 lines
-jdt problems --project my-server | head -5                       # one problem at a time
-jdt src org.springframework.jdbc.core.JdbcTemplate#query | grep -n throw  # throws in library code
+jdt q '"io.github.kaluchi.jdtbridge.SearchHandler" | @members * /name'
+jdt q '"io.github.kaluchi.jdtbridge.JdtUtils#findMethod" | @callers | count'
+jdt q '@problems(:project) | filter(/containingProject | eq("my-server"))'
+jdt q '"org.springframework.jdbc.core.JdbcTemplate#query" | @source' | grep -n throw
+jdt q '"io.github.kaluchi.jdtbridge.HttpServer" | @methods | @untested * /fqn'
 ```
 
 ### Subagents (Explore, Plan)
@@ -129,7 +160,7 @@ and auto-allow hooks — no setup needed.
 **When NOT to use subagents:**
 - Writing code, editing files — do it yourself, not subagents.
 - Simple `jdt` queries (one command) — call `jdt` directly, don't
-  spawn a subagent for `jdt refs Foo#bar`.
+  spawn a subagent for `jdt q '"Foo#bar" | @callers'`.
 - Non-Java exploration — subagents add jdt overhead, use plain
   Grep/Glob for config files, scripts, docs.
 
@@ -272,8 +303,9 @@ Important:
 - **Plugin tests run in a PDE test runtime** with workspace bundles
   (not the installed plugin). `jdt build` is enough — no `jdt setup`
   needed before running tests.
-- **But `jdt setup` IS needed** to test live behavior (e.g. `jdt find`,
-  `jdt hier`) because those go through the installed plugin's HTTP server.
+- **But `jdt setup` IS needed** to test live behavior (`jdt q` axes,
+  `jdt launch`, `jdt open`, etc.) because those go through the
+  installed plugin's HTTP server.
 - **Build before testing:** `jdt build --project io.github.kaluchi.jdtbridge.tests`
   — otherwise new test classes won't be found.
 - **TestFixture lifecycle:** each test class needs `@BeforeAll static void
@@ -298,9 +330,9 @@ Windows and Linux (CI). Path conversion tests mock `process.platform`.
 ### Plugin changes → live testing
 
 Plugin tests run in a PDE test runtime (workspace bundles) — `jdt build`
-is enough. But live commands (`jdt find`, `jdt refs`, `jdt launch config
---delete`) go through the **installed** plugin's HTTP server. After
-changing plugin code:
+is enough. But live commands (`jdt q`, `jdt launch config --delete`,
+`jdt refactor`, `jdt open`, `jdt test run`) go through the **installed**
+plugin's HTTP server. After changing plugin code:
 
 ```bash
 jdt build --project io.github.kaluchi.jdtbridge        # compile

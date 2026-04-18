@@ -250,9 +250,9 @@ describe("testRunGuide", () => {
     expect(guide).toContain("jdt launch stop FooTest:123");
   });
 
-  it("includes 'jdt source' hint", () => {
+  it("includes '@source' navigation hint", () => {
     const guide = testRunGuide("FooTest:1775000", "FooTest:123");
-    expect(guide).toContain("jdt source");
+    expect(guide).toContain("@source");
   });
 
   it("includes --all flag explanation", () => {

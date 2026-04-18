@@ -7,7 +7,7 @@ import {
 // ---- formatSection ----
 
 describe("formatSection", () => {
-  const s = { title: "Problems", cmd: "jdt problems --json", body: "[]" };
+  const s = { title: "Problems", cmd: `jdt q "@problems | table"`, body: "[]" };
 
   it("bare: body only, no header, no fence", () => {
     const out = formatSection(s, { bare: true, quiet: false });
@@ -23,7 +23,7 @@ describe("formatSection", () => {
     const out = formatSection(s, { bare: false, quiet: false });
     expect(out).toContain("## Problems");
     expect(out).toContain("```bash");
-    expect(out).toContain("$ jdt problems --json");
+    expect(out).toContain(`$ jdt q "@problems | table"`);
   });
 
   it("multi: code fence wraps body", () => {
@@ -56,7 +56,8 @@ describe("formatSection", () => {
 
   it("no description field: no extra blank lines", () => {
     const out = formatSection(s, { bare: false, quiet: false });
-    expect(out).toBe("## Problems\n\n```bash\n$ jdt problems --json\n[]\n```");
+    expect(out).toBe(
+      "## Problems\n\n```bash\n$ jdt q \"@problems | table\"\n[]\n```");
   });
 
   it("multiline body preserved", () => {

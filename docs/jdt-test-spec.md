@@ -76,7 +76,7 @@ Runner:    JUnit 6
   `jdt launch clear HttpServerBindTest:6408`           remove
 
 **Navigate** — FQMNs from status output are copy-pasteable:
-  `jdt source <FQMN>`                     view test source
+  `jdt q '"<FQMN>" | @source'`            view test source
   `jdt test run <FQMN> -f`                re-run single test
 
 Add `-q` to suppress this guide.
@@ -205,20 +205,21 @@ Filters apply to both snapshot and `-f` stream modes.
 
 ## FQMN format conventions
 
-Test output follows `jdt source` conventions
-(see [jdt-source-spec](jdt-source-spec.md)):
+Test output follows the repo-wide FQMN conventions
+(see [jdt-query-spec § Identity](jdt-query-spec.md#identity)):
 
-1. **Zero-Modification Navigation** — every FQMN is a valid argument
-   for `jdt source` and `jdt test run`
-2. **Badge-Link Separation** — `[M]` prefix is visual, not part of FQMN
-3. **Full Qualification** — never truncate packages
-4. **`#` separator** — `Class#method`
+1. **Zero-Modification Navigation** — every FQMN is a valid subject
+   for `jdt q` axes (`@method`, `@source`, `@callers`, …) and for
+   `jdt test run`.
+2. **Badge-Link Separation** — `[M]` prefix is visual, not part of FQMN.
+3. **Full Qualification** — never truncate packages.
+4. **`#` separator** — `Class#method`.
 
 Example:
 ```
 FAIL [M] `com.example.OrderServiceTest#testCalculateTotal` (0.3s)
 ```
-- Copy FQMN → `jdt source com.example.OrderServiceTest#testCalculateTotal`
+- Copy FQMN → `jdt q '"com.example.OrderServiceTest#testCalculateTotal" | @source'`
 - Copy FQMN → `jdt test run com.example.OrderServiceTest#testCalculateTotal -f`
 
 Nested test classes use `.` for class nesting, `#` for method:

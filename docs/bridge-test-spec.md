@@ -126,7 +126,7 @@ closes when the session ends. The CLI synthesizes the summary from
 accumulated counts.
 
 Case event fields:
-- `fqmn` — `Class#method`, copy-pasteable to `jdt source` / `jdt test run`
+- `fqmn` — `Class#method`, copy-pasteable to `jdt q` axes or `jdt test run`
 - `status` — `PASS`, `FAIL`, `ERROR`, `IGNORED`
 - `time` — elapsed seconds
 - `trace` — stack trace (FAIL/ERROR only)

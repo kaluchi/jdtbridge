@@ -25,9 +25,10 @@ import org.eclipse.jdt.core.dom.MethodInvocation;
 import org.eclipse.jdt.core.dom.SimpleName;
 
 /**
- * Collects resolved references from a Java source member using
- * Eclipse AST with binding resolution. Each reference maps to
- * an {@link IJavaElement} that can be navigated with jdt source.
+ * Collects resolved outgoing references from a Java source member
+ * using Eclipse AST with binding resolution. Each reference maps
+ * to an {@link IJavaElement} that downstream axes (@source,
+ * @callers, @members) can navigate through the :jdt/graph module.
  */
 class ReferenceCollector {
 

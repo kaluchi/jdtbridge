@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests for type-level jdt source output: hierarchy
+ * Tests for type-level SourceReport output: hierarchy
  * (supertypes, subtypes), enclosing type, no outgoing refs.
  */
 public class TypeLevelHierarchyTest {

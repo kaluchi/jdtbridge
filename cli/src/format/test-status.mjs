@@ -172,7 +172,7 @@ export function testRunGuide(testRunId, launchId) {
   \`jdt launch clear ${launchId}\`           remove
 
 **Navigate** — FQMNs from status output are copy-pasteable:
-  \`jdt source <FQMN>\`                     view test source
+  \`jdt q '"<FQMN>" | @source'\`            view test source
   \`jdt test run <FQMN> -f\`                re-run single test
 
 Add \`-q\` to suppress this guide.`;

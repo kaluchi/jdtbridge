@@ -17,11 +17,11 @@ into a single output with markdown headers.
 | `intro` | `jdt status intro` | Context paragraph for AI agents |
 | `git` | `jdt git list --no-files` | Repos, branches, dirty state |
 | `editors` | `jdt editors` | Open editor tabs (active first) |
-| `problems` | `jdt problems --json` | IMarker.PROBLEM markers (JSON for zero = `[]`) |
+| `problems` | `jdt q "@problems \| table"` | IMarker.PROBLEM markers |
 | `launch-configs` | `jdt launch configs` | Saved launch configurations (configId, type, project, target) |
 | `launches` | `jdt launch list` | Running/terminated launches |
 | `tests` | `jdt test runs` | Recent test runs with results |
-| `projects` | `jdt projects` | Workspace projects with repo mapping |
+| `projects` | `jdt q "@projects * inter(#{:fqn :rootPath :repo :branch}) \| table"` | Workspace projects with repo mapping |
 | `help` | `jdt help` | Full command reference (dynamic) |
 | `guide` | `jdt status guide` | Hints and patterns |
 
@@ -177,9 +177,9 @@ Users control which sections appear, not where they appear.
 
 Every data section is literally a standalone command run via
 `execSync`. No dashboard-only data, no special aggregation.
-`jdt status problems` shows exactly what `jdt problems --json` returns.
-This keeps the dashboard honest and makes sections independently
-refreshable.
+`jdt status problems` shows exactly what `jdt q '@problems | table'`
+returns. This keeps the dashboard honest and makes sections
+independently refreshable.
 
 ## Design decisions
 
