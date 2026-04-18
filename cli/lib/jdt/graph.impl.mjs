@@ -123,7 +123,13 @@ const fileImpl    = axisOp('@file',    '/file');
 
 // ── Down-navigation ─────────────────────────────────────────────
 
-const membersImpl = axisOp('@members', '/members');
+const membersImpl     = axisOp('@members',    '/members');
+const methodsImpl     = axisOp('@methods',    '/methods');
+const fieldsImpl      = axisOp('@fields',     '/fields');
+const innerTypesImpl      = axisOp('@innerTypes',      '/innerTypes');
+const typesInPackageImpl  = axisOp('@typesInPackage',  '/typesInPackage');
+const typesInFileImpl     = axisOp('@typesInFile',     '/typesInFile');
+const packagesInProjectImpl = axisOp('@packagesInProject', '/packagesInProject');
 const supersImpl       = axisOp('@supers',       '/supers');
 const subtypesImpl     = axisOp('@subtypes',     '/subtypes');
 const implementorsImpl = axisOp('@implementors', '/implementors');
@@ -157,6 +163,12 @@ export function createImpls() {
         '@package':     packageImpl,
         '@file':        fileImpl,
         '@members':     membersImpl,
+        '@methods':     methodsImpl,
+        '@fields':      fieldsImpl,
+        '@innerTypes':  innerTypesImpl,
+        '@typesInPackage':     typesInPackageImpl,
+        '@typesInFile':        typesInFileImpl,
+        '@packagesInProject':  packagesInProjectImpl,
         '@supers':      supersImpl,
         '@subtypes':    subtypesImpl,
         '@implementors': implementorsImpl,
