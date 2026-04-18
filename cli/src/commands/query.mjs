@@ -23,6 +23,7 @@ import { bindIoOperands } from '@kaluchi/qlang-cli/io-operands';
 import { bindFormatOperands } from '@kaluchi/qlang-cli/format-operands';
 import { bindParseOperands } from '@kaluchi/qlang-cli/parse-operands';
 import { createImpls as createGraphImpls } from '../../lib/jdt/graph.impl.mjs';
+import { bindJdtRenderOperands } from '../../lib/jdt/render.impl.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MODULE_LIB = join(__dirname, '..', '..', 'lib');
@@ -120,6 +121,7 @@ export async function query(args) {
   });
   bindFormatOperands(session);
   bindParseOperands(session);
+  bindJdtRenderOperands(session);
   const cellEntry = await session.evalCell(`use(:jdt/graph) | ${querySource}`);
 
   if (cellEntry.error) {

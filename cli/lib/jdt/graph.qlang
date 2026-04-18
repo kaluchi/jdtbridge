@@ -514,3 +514,29 @@ let(:@deprecated, @annotated("java.lang.Deprecated"))
     @annotated directly: @annotated("org.junit.Test"). ~~|
 let(:@testMethods,
     @annotated("org.junit.jupiter.api.Test"))
+
+|~ ── Markdown render shortcuts ────────────────────────────── ~|
+
+|~~ Collect a member's detail + source text + outgoing + incoming
+    refs into a single bundle and hand it to the host-bound
+    mdSource renderer. For a method / field: source body + call
+    sites both ways. For a type: source + its type-use refs on
+    each side.
+
+    Pipes the rendered String through as-is — `jdt q '…' >
+    Foo.md` writes markdown without quoting.  ~~|
+let(:@sourceCard,
+    @asNode | as(:self)
+    | {:node     self | @detail
+       :text     self | @source
+       :outgoing self | @outgoingRefs !| []
+       :incoming self | @refs(:all)   !| []}
+    | mdSource)
+
+|~~ Type hierarchy card — ↑ supers / ↓ subtypes flat markdown. ~~|
+let(:@hierarchyCard,
+    @asNode | as(:self)
+    | {:node     self | @detail
+       :supers   self | @supers
+       :subtypes self | @subtypes}
+    | mdHierarchy)
