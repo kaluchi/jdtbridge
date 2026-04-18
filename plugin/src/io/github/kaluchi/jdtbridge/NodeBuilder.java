@@ -10,6 +10,7 @@ import org.eclipse.jdt.core.Flags;
 import org.eclipse.jdt.core.IAnnotatable;
 import org.eclipse.jdt.core.IAnnotation;
 import org.eclipse.jdt.core.IClassFile;
+import org.eclipse.jdt.core.IClasspathAttribute;
 import org.eclipse.jdt.core.IClasspathEntry;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IField;
@@ -222,6 +223,149 @@ class NodeBuilder {
         return name;
     }
 
+    // ── Test-scope classification ───────────────────────────────────
+
+    /**
+     * Whether an element lives in a test-scoped source root or
+     * carries a test-annotation signature. Two signals combined:
+     *
+     *  1. Classpath-attribute — Maven/M2E promotes src/test/java /
+     *     src/test/resources to IClasspathEntry.isTest() = true.
+     *     Decisive when present: any type/method/field under such a
+     *     root is test-scope by construction.
+     *
+     *  2. Annotation fallback — PDE fragments and hand-rolled test
+     *     layouts may keep a single source root unflagged yet still
+     *     host test code. A type declaring any method annotated
+     *     with a JUnit/TestNG `@*Test*` qualifies the whole type
+     *     (and every member of it).
+     *
+     * Short-circuits on the first positive signal. Defaults to false
+     * — production-scope unless proven otherwise.
+     */
+    static boolean isTestScope(IJavaElement element) {
+        if (element == null) return false;
+        IPackageFragmentRoot root = (IPackageFragmentRoot)
+                element.getAncestor(IJavaElement.PACKAGE_FRAGMENT_ROOT);
+        if (root != null) {
+            try {
+                IClasspathEntry entry = root.getRawClasspathEntry();
+                if (entry != null) {
+                    for (IClasspathAttribute attr
+                            : entry.getExtraAttributes()) {
+                        if (IClasspathAttribute.TEST.equals(
+                                attr.getName())
+                                && "true".equals(attr.getValue())) {
+                            return true;
+                        }
+                    }
+                    if (entry.isTest()) return true;
+                }
+            } catch (JavaModelException ignored) { /* broken root */ }
+        }
+        IType type = (element instanceof IType t) ? t
+                : (IType) element.getAncestor(IJavaElement.TYPE);
+        if (type != null) {
+            try {
+                for (IMethod m : type.getMethods()) {
+                    if (hasTestAnnotation(m)) return true;
+                }
+            } catch (JavaModelException ignored) { /* unreadable */ }
+        }
+        return false;
+    }
+
+    /**
+     * Project-level test-scope: true only when the project hosts
+     * tests exclusively (no production source roots). A standard
+     * Maven module with both src/main/java and src/test/java is
+     * `false` — it is a production project that happens to ship
+     * tests, not a test-only module. A PDE fragment whose single
+     * source root contains only `@Test`-bearing types is `true`.
+     *
+     * Scanning rule:
+     *
+     *  1. If any source classpath entry is test AND any other is
+     *     production → false (mixed = production with tests).
+     *  2. If every source classpath entry is test → true.
+     *  3. If no source entry is test via classpath attribute →
+     *     annotation fallback: scan top-level types for any
+     *     `@Test`-family method. A hit against any type in any
+     *     root still returns true (PDE fragment pattern), but an
+     *     absence of hits returns false.
+     */
+    private static boolean projectIsTestScope(IProject project) {
+        IJavaProject jp = JavaCore.create(project);
+        if (jp == null || !jp.exists()) return false;
+        try {
+            int testRoots = 0;
+            int productionRoots = 0;
+            for (IClasspathEntry entry : jp.getRawClasspath()) {
+                if (entry.getEntryKind() != IClasspathEntry.CPE_SOURCE) {
+                    continue;
+                }
+                if (isTestEntry(entry)) testRoots++;
+                else productionRoots++;
+            }
+            if (productionRoots == 0 && testRoots > 0) return true;
+            if (productionRoots > 0 && testRoots > 0) return false;
+            // Zero test classpath markers — hand off to annotation
+            // fallback. Bounded: short-circuits on first @Test hit.
+            for (IPackageFragmentRoot root : jp.getPackageFragmentRoots()) {
+                if (root.getKind() != IPackageFragmentRoot.K_SOURCE) {
+                    continue;
+                }
+                for (IJavaElement pkg : root.getChildren()) {
+                    if (!(pkg instanceof IPackageFragment frag)) continue;
+                    for (ICompilationUnit cu
+                            : frag.getCompilationUnits()) {
+                        for (IType type : cu.getTypes()) {
+                            for (IMethod m : type.getMethods()) {
+                                if (hasTestAnnotation(m)) return true;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (JavaModelException ignored) { /* broken project */ }
+        return false;
+    }
+
+    private static boolean isTestEntry(IClasspathEntry entry) {
+        if (entry.isTest()) return true;
+        for (IClasspathAttribute attr : entry.getExtraAttributes()) {
+            if (IClasspathAttribute.TEST.equals(attr.getName())
+                    && "true".equals(attr.getValue())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasTestAnnotation(IMethod method)
+            throws JavaModelException {
+        for (IAnnotation ann : method.getAnnotations()) {
+            String name = ann.getElementName();
+            // Match by terminal segment — JUnit 4/5 (`org.junit.Test`,
+            // `org.junit.jupiter.api.Test`, `ParameterizedTest`,
+            // `RepeatedTest`, `TestFactory`, `TestTemplate`) and
+            // TestNG (`org.testng.annotations.Test`) all land on one
+            // of these terminal tokens. Purposefully does not
+            // resolve FQN — classpath-attribute check runs first for
+            // unambiguous cases; annotation-fallback is a
+            // best-effort conventional match.
+            String last = name.substring(name.lastIndexOf('.') + 1);
+            if (last.equals("Test")
+                    || last.equals("ParameterizedTest")
+                    || last.equals("RepeatedTest")
+                    || last.equals("TestFactory")
+                    || last.equals("TestTemplate")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // ── Location ────────────────────────────────────────────────────
 
     /**
@@ -334,6 +478,7 @@ class NodeBuilder {
             obj.add("modifiers", modifiers(type.getFlags()));
         } catch (JavaModelException ignored) { /* skip */ }
         obj.add("annotations", annotationsOf(type, type));
+        obj.addProperty("isTestScope", isTestScope(type));
         return obj;
     }
 
@@ -408,6 +553,7 @@ class NodeBuilder {
                     resolveTypeName(method.getReturnType(), declaring));
         }
         obj.add("annotations", annotationsOf(method, declaring));
+        obj.addProperty("isTestScope", isTestScope(method));
         return obj;
     }
 
@@ -498,6 +644,7 @@ class NodeBuilder {
                     resolveTypeName(field.getTypeSignature(), declaring));
         } catch (JavaModelException ignored) { /* skip */ }
         obj.add("annotations", annotationsOf(field, declaring));
+        obj.addProperty("isTestScope", isTestScope(field));
         return obj;
     }
 
@@ -533,6 +680,12 @@ class NodeBuilder {
             }
             obj.add("natures", natures);
         } catch (Exception ignored) { /* closed / deleted project */ }
+        // :isTestScope on the project carries true when any of its
+        // source roots is itself test-scoped (Maven src/test/java,
+        // PDE fragment with test annotations on any type). Lets
+        // `@projects | filter(/isTestScope)` gate workspace audits
+        // before any per-project axis.
+        obj.addProperty("isTestScope", projectIsTestScope(project));
         // Git context — workspace projects overwhelmingly live in
         // git repos and the membership is fundamental enough that
         // bulk listings (jdt q '@projects') must show it without an

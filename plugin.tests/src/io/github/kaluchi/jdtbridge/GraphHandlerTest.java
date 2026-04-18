@@ -689,6 +689,37 @@ public class GraphHandlerTest {
     }
 
     @Test
+    void typeCarryingTestAnnotatedMethodIsTestScope() {
+        JsonObject result = parse(handler.handleType(
+                params("of", "test.edge.SimpleTest")));
+        assertTrue(result.get("isTestScope").getAsBoolean(),
+                "SimpleTest hosts @Test-annotated methods; "
+                + "annotation fallback tags the enclosing type as "
+                + "test-scope even without an M2E src/test/java "
+                + "classpath attribute");
+    }
+
+    @Test
+    void productionTypeIsNotTestScope() {
+        JsonObject result = parse(handler.handleType(
+                params("of", "test.model.Dog")));
+        assertFalse(result.get("isTestScope").getAsBoolean(),
+                "Dog carries no test annotations on its methods "
+                + "and sits under a production source root");
+    }
+
+    @Test
+    void methodInheritsTestScopeFromDeclaringType() {
+        JsonObject result = parse(handler.handleMethod(
+                params("of", "test.edge.SimpleTest#onePlusOne()")));
+        assertTrue(result.get("isTestScope").getAsBoolean(),
+                "a method resolves :isTestScope via its declaring "
+                + "type so `filter(@containingType | /isTestScope)` "
+                + "is unnecessary — the field is on the method "
+                + "skeleton directly");
+    }
+
+    @Test
     void annotationsFieldIsEmptyArrayWhenNoDeclarations() {
         JsonObject result = parse(handler.handleMethod(
                 params("of", "test.model.Dog#bark()")));
