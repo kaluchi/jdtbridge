@@ -7,6 +7,8 @@ import com.google.gson.JsonObject;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.jdt.core.Flags;
+import org.eclipse.jdt.core.IAnnotatable;
+import org.eclipse.jdt.core.IAnnotation;
 import org.eclipse.jdt.core.IClassFile;
 import org.eclipse.jdt.core.IClasspathEntry;
 import org.eclipse.jdt.core.ICompilationUnit;
@@ -178,6 +180,48 @@ class NodeBuilder {
         return arr;
     }
 
+    // ── Annotations ─────────────────────────────────────────────────
+
+    /**
+     * Resolve annotations declared directly on an element into a Vec
+     * of fully qualified annotation type names. For source elements
+     * IAnnotation.getElementName() returns the name as written
+     * (simple, qualified, or aliased); IType.resolveType() promotes
+     * it to the canonical FQN using the enclosing compilation unit's
+     * imports. For binary elements IAnnotation already yields FQN.
+     *
+     * Always returns a JsonArray (possibly empty) so pipelines like
+     *     filter(/annotations | any(eq("org.junit.jupiter.api.Test")))
+     * run against every member without tripping on /annotations →
+     * null for the unannotated majority.
+     */
+    static JsonArray annotationsOf(IJavaElement element,
+            IType context) {
+        var arr = new JsonArray();
+        if (!(element instanceof IAnnotatable ann)) return arr;
+        try {
+            for (IAnnotation decl : ann.getAnnotations()) {
+                arr.add(resolveAnnotationName(decl, context));
+            }
+        } catch (JavaModelException ignored) { /* closed element */ }
+        return arr;
+    }
+
+    private static String resolveAnnotationName(IAnnotation ann,
+            IType context) throws JavaModelException {
+        String name = ann.getElementName();
+        // Binary elements and already-qualified source writers both
+        // embed a '.' — no resolution needed.
+        if (name.indexOf('.') >= 0) return name;
+        if (context == null) return name;
+        String[][] resolved = context.resolveType(name);
+        if (resolved != null && resolved.length > 0) {
+            String[] parts = resolved[0];
+            return parts[0].isEmpty() ? parts[1] : parts[0] + "." + parts[1];
+        }
+        return name;
+    }
+
     // ── Location ────────────────────────────────────────────────────
 
     /**
@@ -289,6 +333,7 @@ class NodeBuilder {
             obj.addProperty("typeKind", typeKindOf(type));
             obj.add("modifiers", modifiers(type.getFlags()));
         } catch (JavaModelException ignored) { /* skip */ }
+        obj.add("annotations", annotationsOf(type, type));
         return obj;
     }
 
@@ -362,6 +407,7 @@ class NodeBuilder {
             obj.addProperty("returnType",
                     resolveTypeName(method.getReturnType(), declaring));
         }
+        obj.add("annotations", annotationsOf(method, declaring));
         return obj;
     }
 
@@ -451,6 +497,7 @@ class NodeBuilder {
             obj.addProperty("type",
                     resolveTypeName(field.getTypeSignature(), declaring));
         } catch (JavaModelException ignored) { /* skip */ }
+        obj.add("annotations", annotationsOf(field, declaring));
         return obj;
     }
 

@@ -635,6 +635,72 @@ public class GraphHandlerTest {
         assertTrue(found, "fixture project must be in /projects");
     }
 
+    // ── Annotations ─────────────────────────────────────────────────
+
+    @Test
+    void typeSkeletonCarriesFqnAnnotations() {
+        JsonObject result = parse(handler.handleType(
+                params("of", "test.service.EnrichedRefService")));
+        var annotations = result.getAsJsonArray("annotations");
+        assertNotNull(annotations,
+                "type detail must carry :annotations resolved to FQN");
+        assertTrue(annotations.asList().stream()
+                .map(JsonElement::getAsString)
+                .anyMatch("test.edge.Marker"::equals),
+                "simple @Marker source reference promotes to "
+                + "FQN test.edge.Marker via enclosing imports; "
+                + "got " + annotations);
+    }
+
+    @Test
+    void methodSkeletonCarriesTestAnnotation() {
+        JsonObject result = parse(handler.handleMethod(
+                params("of", "test.edge.SimpleTest#onePlusOne()")));
+        var annotations = result.getAsJsonArray("annotations");
+        assertNotNull(annotations,
+                "method detail must carry :annotations");
+        assertTrue(annotations.asList().stream()
+                .map(JsonElement::getAsString)
+                .anyMatch(
+                    "org.junit.jupiter.api.Test"::equals),
+                "@Test on a JUnit 5 method resolves via the "
+                + "compilation unit's import to FQN "
+                + "org.junit.jupiter.api.Test; got " + annotations);
+    }
+
+    @Test
+    void methodsAxisCarriesAnnotationsOnSkeletons() {
+        var arr = JsonParser.parseString(handler.handleMethods(
+                params("of", "test.edge.SimpleTest"))).getAsJsonArray();
+        JsonObject testMethod = arr.asList().stream()
+                .map(JsonElement::getAsJsonObject)
+                .filter(m -> m.get("fqn").getAsString()
+                        .endsWith("#onePlusOne()"))
+                .findFirst().orElseThrow();
+        var annotations = testMethod.getAsJsonArray("annotations");
+        assertNotNull(annotations,
+                ":annotations must appear on the method skeleton "
+                + "returned by @methods so `@methods | filter("
+                + "/annotations | any(eq(\"org.junit.jupiter.api.Test\")))` "
+                + "runs without an @detail roundtrip per method");
+        assertTrue(annotations.asList().stream()
+                .map(JsonElement::getAsString)
+                .anyMatch("org.junit.jupiter.api.Test"::equals));
+    }
+
+    @Test
+    void annotationsFieldIsEmptyArrayWhenNoDeclarations() {
+        JsonObject result = parse(handler.handleMethod(
+                params("of", "test.model.Dog#bark()")));
+        var annotations = result.getAsJsonArray("annotations");
+        assertNotNull(annotations,
+                ":annotations is always present (empty array for "
+                + "un-annotated members) so filter predicates like "
+                + "`filter(/annotations | any(eq(...)))` run against "
+                + "every element without tripping on null");
+        assertEquals(0, annotations.size());
+    }
+
     @Test
     void projectSkeletonCarriesNatures() {
         var arr = JsonParser.parseString(handler.handleProjects(
