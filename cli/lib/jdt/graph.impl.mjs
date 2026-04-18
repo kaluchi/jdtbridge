@@ -17,8 +17,8 @@
 // {"_error": {…}}. liftServerResponse converts to qlang shape
 // and lifts errors via makeErrorValue (rides the fail-track).
 
-import { nullaryOp } from '@kaluchi/qlang-core/dispatch';
-import { keyword, makeErrorValue } from '@kaluchi/qlang-core';
+import { nullaryOp, overloadedOp } from '@kaluchi/qlang-core/dispatch';
+import { keyword, isKeyword, makeErrorValue } from '@kaluchi/qlang-core';
 import { get } from '../../src/client.mjs';
 
 // ── Conversion helpers ──────────────────────────────────────────
@@ -138,17 +138,80 @@ const overloadsImpl    = axisOp('@overloads',    '/overloads');
 
 // ── References — single endpoint, all kinds, no refKind filter ──
 
-const refsImpl = axisOp('@refs', '/refs');
+/**
+ * Resolve a widening modifier passed to an overloaded axis. The
+ * language parser hands the captured argument as a keyword value
+ * (`:all`, `:call`, …); the server-side endpoint expects the raw
+ * name string. Error values lifted into the modifier slot (e.g. a
+ * prior failure on the fail-track) short-circuit to null so the
+ * caller omits the query parameter rather than forwarding garbage.
+ */
+async function modifierName(modifierLambda, subject) {
+    const modifierValue = await modifierLambda(subject);
+    if (!isKeyword(modifierValue)) return null;
+    return modifierValue.name;
+}
+
+/**
+ * @refs widens via an optional refKind keyword:
+ *     node | @refs              → server default for the subject kind
+ *     node | @refs(:all)        → every refKind (call/read/write/typeUse)
+ *     node | @refs(:call)       → call-sites only
+ *     field | @refs(:write)     → writes only
+ * Narrowing below the server default is always available in the
+ * pipeline via `filter(/refKind | eq("…"))`.
+ */
+const refsImpl = overloadedOp('@refs', 2, {
+    0: async (subject) => {
+        const fqn = fqnOf(subject);
+        if (fqn === null) return missingSubject('@refs', subject);
+        return getEndpoint(`/refs?of=${enc(fqn)}`);
+    },
+    1: async (subject, refKindLambda) => {
+        const fqn = fqnOf(subject);
+        if (fqn === null) return missingSubject('@refs', subject);
+        const refKind = await modifierName(refKindLambda, subject);
+        const path = refKind !== null
+            ? `/refs?of=${enc(fqn)}&refKind=${enc(refKind)}`
+            : `/refs?of=${enc(fqn)}`;
+        return getEndpoint(path);
+    }
+});
 
 // ── Resources ───────────────────────────────────────────────────
 
 const classpathImpl = axisOp('@classpath', '/classpath');
 const sourceImpl    = axisOp('@source',    '/source');
 
-// ── Problems — workspace-wide, scope via filter on qlang side ───
-
-const problemsImpl = nullaryOp('@problems',
-        async () => getEndpoint('/problems'));
+/**
+ * @problems accepts an optional scope keyword widening the marker
+ * set the server walks:
+ *     @problems            → workspace default
+ *     @problems(:workspace) → explicit workspace scope
+ *     @problems(:project)   → subject is a :project node or fqn
+ *     @problems(:file)      → subject is a :file node or path
+ * Scope is admissible as a modifier (normally narrowing is pipeline-
+ * side) because `:workspace` on a giant project tree would be
+ * prohibitively expensive as the unconditional default.
+ */
+const problemsImpl = overloadedOp('@problems', 2, {
+    0: async () => getEndpoint('/problems'),
+    1: async (subject, scopeLambda) => {
+        const scope = await modifierName(scopeLambda, subject);
+        if (scope === null || scope === 'workspace') {
+            return getEndpoint('/problems');
+        }
+        const of = fqnOf(subject);
+        if (of === null) return missingSubject('@problems', subject);
+        if (scope === 'project') {
+            return getEndpoint(`/problems?project=${enc(of)}`);
+        }
+        if (scope === 'file') {
+            return getEndpoint(`/problems?file=${enc(of)}`);
+        }
+        return getEndpoint('/problems');
+    }
+});
 
 // ── Locator factory ─────────────────────────────────────────────
 
