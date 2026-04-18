@@ -23,7 +23,7 @@ are not admissible outside their native scope.
 | Term | Meaning |
 |---|---|
 | **node-Map** | An immutable qlang Map representing one entity of the graph (a type, method, field, package, project, file, or compilation problem). Every node-Map carries the canonical header and at least one identity field. |
-| **canonical header** | The five fields every node-Map carries: `:fqn`, `:kind`, `:origin`, `:location`, `:containingProject`. Readable from any node-Map without kind-awareness. |
+| **canonical header** | The five fields a code-element node-Map carries: `:fqn`, `:kind`, `:origin`, `:location`, `:containingProject`. `:problem` and `:reference` records omit `:fqn` (they have no stable identifier); `:project` / `:package` / `:file` omit `:location` or carry only its `:file` component. Every node still carries `:kind` and `:origin`. |
 | **skeleton** | A node-Map carrying the canonical header plus a small set of cheap per-kind identity fields (`:name`, `:signature`, `:modifiers`, `:containingType`, `:returnType`, …). Axes that fan out (`@members`, `@subtypes`, `@refs`) return skeletons. Cheap to produce in bulk. |
 | **detail** | A node-Map carrying the canonical header plus the full per-kind payload (javadoc, type parameters, interfaces, source ranges, classpath entries, …). Seed operands (`@type`, `@method`, `@field`, `@project`, `@package`, `@file`) return detail. |
 | **seed** | An operand that produces a starting `pipeValue` without needing one — either nullary (`@projects`, `@problems`) or taking a String/Map subject that identifies a single node (`@type`, `@method`, `@types("*Pat*")`). Seeds begin a pipeline. |
@@ -35,7 +35,7 @@ are not admissible outside their native scope.
 | Term | Meaning |
 |---|---|
 | **fqn** | Fully qualified name — the single identity String of a node. One key `:fqn` across all kinds; the format is dictated by `:kind`. |
-| **fqn format by kind** | `:type` → `pkg.Class` (inner classes: `pkg.Outer.Inner`); `:method` → `pkg.Class#method(ParamFqn,…)`; `:field` → `pkg.Class#fieldName`; `:package` → `pkg.sub`; `:project` → project name (not a path); `:file` → absolute filesystem path; `:problem` → composite `{file}:{line}:{col}` key. |
+| **fqn format by kind** | `:type` → `pkg.Class` (inner classes: `pkg.Outer.Inner`); `:method` → `pkg.Class#method(ParamFqn,…)`; `:field` → `pkg.Class#fieldName`; `:package` → `pkg.sub`; `:project` → project name (not a path); `:file` → absolute filesystem path; `:classpathEntry` → composite `project#entryKind#path`. `:problem` and `:reference` have no `:fqn` — they are identified by location + structural tuple. |
 | **subject polymorphism** | Every axis accepts either a node-Map subject (skeleton or detail) or a String `fqn` subject. `@asNode` lifts a String to its corresponding seed node under the hood. `@members("pkg.Foo")` and `nodeMap \| @members` are equivalent. |
 
 ### Enumerated fields
@@ -54,15 +54,26 @@ and filter predicates.
 
 ### Location
 
-Every node-Map carries `:location` as a sub-Map with a fixed shape:
+Code-element node-Maps (`:type`, `:method`, `:field`) carry
+`:location` as a sub-Map:
 
 ```
 {:file       <absolute path>
  :startLine  <int, 1-based, inclusive>
  :endLine    <int, 1-based, inclusive>
+ :lineCount  <int, endLine - startLine + 1>
  :nameStart  <int, UTF-16 offset of the name span>
  :nameEnd    <int, UTF-16 offset of the name span end>}
 ```
+
+`:lineCount` is pre-computed to keep `sortWith(desc(/location/lineCount))`
+a one-liner instead of the `add(m | /location/endLine | sub(m |
+/location/startLine), 1)` reshape.
+
+`:problem` carries only `:file :startLine :endLine` (markers are
+line-granular, no name span). `:project`, `:package`, `:file`
+omit `:location` entirely — they are containers, not code
+positions.
 
 Binary-origin nodes carry an attachment-source path or `null`.
 
@@ -87,6 +98,134 @@ all print on stdout as qlang error values (`!{:kind …
 :message … :trail …}`). Non-zero exit would cancel sibling
 parallel tool calls in agent harnesses; errors travel as data,
 never as exit status.
+
+## Node-Map schemas
+
+The canonical header — `:fqn`, `:kind`, `:origin`, `:location`,
+`:containingProject` — appears on every code-element node-Map.
+`:problem` omits `:fqn` (markers have no stable identifier).
+`:project` / `:package` / `:file` omit `:location` or carry a
+partial form; sub-field tables below show exactly which fields
+are present on each kind.
+
+### `:type`
+
+| Field | Skeleton | Detail | Notes |
+|---|---|---|---|
+| `:fqn` `:kind` `:origin` `:location` `:containingProject` | ✓ | ✓ | canonical header |
+| `:containingPackage` | ✓ | ✓ | package fqn |
+| `:typeKind` | ✓ | ✓ | `"class"` / `"interface"` / `"enum"` / `"annotation"` / `"record"` |
+| `:modifiers` | ✓ | ✓ | Vec of strings |
+| `:annotations` | ✓ | ✓ | Vec of FQN strings |
+| `:isTestScope` | ✓ | ✓ | boolean |
+| `:typeParameters` |   | ✓ | Vec of `{:name :bound?}` |
+| `:interfaces` |   | ✓ | Vec of FQN strings |
+| `:superclass` |   | ✓ | FQN string (absent for interfaces) |
+| `:isAnonymous` |   | ✓ | boolean, omitted when false |
+| `:isDeprecated` |   | ✓ | boolean, omitted when false |
+| `:javadocSummary` |   | ✓ | first-sentence string |
+
+### `:method`
+
+| Field | Skeleton | Detail | Notes |
+|---|---|---|---|
+| canonical header | ✓ | ✓ | — |
+| `:name` `:signature` | ✓ | ✓ | signature is `name(ParamFqn,…)` |
+| `:modifiers` `:annotations` `:isTestScope` | ✓ | ✓ | — |
+| `:containingType` | ✓ | ✓ | FQN string |
+| `:returnType` | ✓ | ✓ | FQN string (absent on constructors) |
+| `:parameters` |   | ✓ | Vec of `{:name :type}` |
+| `:typeParameters` |   | ✓ | Vec of `{:name :bound?}` |
+| `:throws` |   | ✓ | Vec of FQN strings |
+| `:isConstructor` `:isAbstract` `:isDefault` `:isDeprecated` |   | ✓ | boolean, each omitted when false |
+| `:javadocSummary` |   | ✓ | first-sentence string |
+
+### `:field`
+
+| Field | Skeleton | Detail | Notes |
+|---|---|---|---|
+| canonical header | ✓ | ✓ | — |
+| `:name` | ✓ | ✓ | local name |
+| `:containingType` | ✓ | ✓ | FQN string |
+| `:modifiers` `:annotations` `:isTestScope` | ✓ | ✓ | — |
+| `:type` | ✓ | ✓ | field type FQN |
+| `:isConstant` |   | ✓ | true iff static+final, omitted when false |
+| `:isDeprecated` |   | ✓ | boolean, omitted when false |
+| `:javadocSummary` |   | ✓ | first-sentence string |
+
+### `:package`
+
+| Field | Skeleton | Detail | Notes |
+|---|---|---|---|
+| `:fqn` `:kind` `:origin` | ✓ | ✓ | no `:location` (packages are not a code position) |
+| `:containingProject` | ✓ | ✓ | — |
+| `:typeCount` | ✓ | ✓ | top-level types |
+| `:sourceRoot` | ✓ | ✓ | relative path of the source root housing the package |
+
+### `:project`
+
+| Field | Skeleton | Detail | Notes |
+|---|---|---|---|
+| `:fqn` `:kind` `:origin` | ✓ | ✓ | `:fqn` = project name, not a path |
+| `:rootPath` | ✓ | ✓ | absolute filesystem path |
+| `:natures` | ✓ | ✓ | Vec of short strings (`"java"`, `"maven"`, `"pde"`, `"CheckstyleNature"`, …) |
+| `:isTestScope` | ✓ | ✓ | true only when the project hosts tests exclusively |
+| `:repo` `:branch` | ✓ | ✓ | present when EGit-managed |
+| `:classpathEntries` |   | ✓ | Vec of `:classpathEntry` skeletons |
+| `:dependencies` |   | ✓ | Vec of required-project names |
+| `:sourceRoots` |   | ✓ | Vec of relative source-root paths |
+| `:outputLocation` |   | ✓ | build output path |
+
+### `:file`
+
+| Field | Skeleton | Detail | Notes |
+|---|---|---|---|
+| `:fqn` `:kind` `:origin` | ✓ | ✓ | `:fqn` = absolute path |
+| `:containingProject` | ✓ | ✓ | — |
+| `:language` | ✓ | ✓ | `"java"` for compilation units |
+| `:charset` `:modificationTime` | ✓ | ✓ | file metadata |
+
+### `:problem`
+
+| Field | Present | Notes |
+|---|---|---|
+| `:kind` `:origin` | ✓ | no `:fqn` — markers have no stable identifier |
+| `:location` | ✓ | `:file :startLine :endLine` — `:startLine` and `:endLine` carry the same value (markers are line-granular) |
+| `:containingProject` | ✓ | — |
+| `:severity` | ✓ | `"error"` / `"warning"` (default scope filters to error) |
+| `:message` | ✓ | marker text |
+| `:markerType` | ✓ | currently `"jdt"` only |
+
+### `:reference`
+
+Reference records are ephemeral node-Maps produced by `@refs` /
+`@outgoingRefs`. No `:fqn` — identified by the `(from, to,
+refKind, location)` tuple. The `:from` / `:to` slots carry
+regular skeletons a downstream axis or renderer consumes.
+
+| Field | Present | Notes |
+|---|---|---|
+| `:kind` | ✓ | always `"reference"` |
+| `:origin` | ✓ | matches the side visible in source |
+| `:refKind` | ✓ | `"call"` / `"read"` / `"write"` / `"typeUse"` |
+| `:from` | ✓ | skeleton of the source-side member |
+| `:to` | ✓ | skeleton of the target (incoming refs reiterate the query subject here) |
+| `:location` | (`@refs` only) | call-site location on the from-side |
+| `:containingProject` | ✓ | mirrors the from-side's project |
+
+### `:classpathEntry`
+
+Nested inside `:project` detail under `:classpathEntries`.
+
+| Field | Present | Notes |
+|---|---|---|
+| `:fqn` | ✓ | composite `project#entryKind#path` |
+| `:kind` `:origin` `:containingProject` | ✓ | — |
+| `:entryKind` | ✓ | `"source"` / `"library"` / `"project"` / `"container"` / `"variable"` |
+| `:path` | ✓ | workspace-relative for source, absolute for libraries, container name for containers |
+| `:outputLocation` | source entries | workspace-relative build-output path |
+| `:isTest` | test source roots | boolean |
+| `:isExported` | when true | boolean |
 
 ## Modifier convention — widen at modifier, narrow in pipeline
 
