@@ -153,8 +153,9 @@ public class NodeBuilderTest {
     void typeSkeletonHasHeaderPlusFilterFields() throws Exception {
         JsonObject skeleton = NodeBuilder.typeSkeleton(
                 type("test.model.Dog"));
-        assertEquals(8, skeleton.entrySet().size(),
-                "5 header + typeKind + modifiers + containingPackage, got: "
+        assertEquals(10, skeleton.entrySet().size(),
+                "5 header + typeKind + modifiers + containingPackage "
+                + "+ annotations + isTestScope, got: "
                 + skeleton);
         assertEquals("test.model.Dog",
                 skeleton.get("fqn").getAsString());
@@ -169,8 +170,9 @@ public class NodeBuilderTest {
     void methodSkeletonHasHeaderPlusFilterFields() throws Exception {
         IMethod barkMethod = method("test.model.Dog", "bark", null);
         JsonObject skeleton = NodeBuilder.methodSkeleton(barkMethod);
-        assertEquals(10, skeleton.entrySet().size(),
-                "5 header + name + signature + modifiers + containingType + returnType, got: "
+        assertEquals(12, skeleton.entrySet().size(),
+                "5 header + name + signature + modifiers + containingType "
+                + "+ returnType + annotations + isTestScope, got: "
                 + skeleton);
         assertEquals("test.model.Dog#bark()",
                 skeleton.get("fqn").getAsString());
@@ -182,8 +184,9 @@ public class NodeBuilderTest {
         IType dog = type("test.model.Dog");
         IField ageField = dog.getField("age");
         JsonObject skeleton = NodeBuilder.fieldSkeleton(ageField);
-        assertEquals(9, skeleton.entrySet().size(),
-                "5 header + name + modifiers + containingType + type, got: "
+        assertEquals(11, skeleton.entrySet().size(),
+                "5 header + name + modifiers + containingType + type "
+                + "+ annotations + isTestScope, got: "
                 + skeleton);
         assertEquals("test.model.Dog#age",
                 skeleton.get("fqn").getAsString());
