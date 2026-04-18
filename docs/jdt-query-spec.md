@@ -186,7 +186,7 @@ returns a markdown String.
 | `mdHierarchy` | type detail with resolved supertypes/subtypes | markdown tree with `↑` / `↓` arrows, badges, per-entry `file:line-range` |
 | `mdOutline` | type detail with member skeletons | structural tree grouped by kind, with modifiers / return types / signatures |
 | `mdRefs` | result of `@refs` | refs grouped by declaring type, with badges and optional javadoc inline |
-| `mdProjectInfo` | project detail + `maxLines` modifier | adaptive renderer: descends package → type → method visibility tiers (public / protected / package / private) until the richest tier that fits `maxLines` is reached |
+| `mdImplementors` | type / method detail with resolved implementors | flat list with badges + per-entry location |
 
 ### Rendering contract
 
@@ -433,8 +433,8 @@ CLI:
   lib/jdt/graph.qlang            — `:jdt/graph` module source (descriptors, conduits)
   lib/jdt/graph.impl.mjs         — JS impls for every builtin descriptor
   lib/jdt/render.impl.mjs        — (planned) `mdSource` / `mdHierarchy` /
-                                   `mdOutline` / `mdRefs` / `mdProjectInfo`
-                                   host-bound render operands
+                                   `mdOutline` / `mdRefs` / `mdTypes` /
+                                   `mdImplementors` host-bound render operands
 
 Plugin (server):
   plugin/src/io/github/kaluchi/jdtbridge/GraphHandler.java  — request dispatch
