@@ -86,10 +86,20 @@ sync with the server JSON contract.)*
 
 ## Commands
 
-### `jdt q <qlang-pipeline> [--json]`
+### `jdt q <qlang-pipeline>`
 
-*(Signature, flags, bootstrap behaviour, error mapping. To be
-filled in.)*
+Output is always qlang-literal via `printValue`. No `--json` flag:
+qlang-sourced data stays in its native formalism, round-trips
+losslessly through `parse + evalQuery`, composes natively as
+`jdt X | jdt q '...'` without `jq` bridging. Tagged JSON was a
+process bridge that erased keyword / Set / Error identity on the
+wire — the CLI has no reason to produce it.
+
+Strings print raw (unquoted) so `jdt q '"X" | @source' > X.java`
+stays byte-faithful.
+
+*(Full signature / flags / bootstrap behaviour / error mapping
+TBD.)*
 
 ## Modifier convention — widen at modifier, narrow in pipeline
 

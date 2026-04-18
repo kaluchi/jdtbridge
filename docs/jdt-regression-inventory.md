@@ -328,7 +328,28 @@ Used by `jdt status` in both text and JSON modes.
    narrowing because `:workspace` is prohibitively expensive as
    a default.
 
-## JSON removal scope
+## JSON removal — landed
+
+**Decision (2026-04-18, implemented).** The minimum-viable rule:
+
+1. **qlang-sourced output stays qlang** — no conversion to tagged
+   or plain JSON on the CLI side. `jdt q` has no `--json` flag.
+2. **Plain-JSON passthrough commands keep `--json`** unchanged —
+   `jdt git / editors / launch list / launch configs / launch
+   config / test runs / agent list / use / setup remote` all
+   operate as before. JSONL streaming (`jdt test run -f / test
+   status -f`) unchanged.
+3. **Composite "mixed" commands drop `--json` entirely** —
+   `jdt status --json` removed. The dashboard is markdown-only;
+   machine-readable access goes through the individual source
+   commands.
+
+This was the narrow, zero-risk subset of the broader inventory
+below — it eliminated the three-way-formalism confusion without
+breaking any existing plain-JSON consumer. Full scope analysis
+preserved below for reference.
+
+## JSON removal scope (original full analysis)
 
 Exploratory inventory of the `--json` surface across the CLI. Goal:
 assess the cost of eliminating JSON as an output format entirely and

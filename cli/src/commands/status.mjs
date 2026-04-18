@@ -10,7 +10,6 @@
 
 import { execSync } from "node:child_process";
 import { basename } from "node:path";
-import { fromTaggedJSON, toPlain } from "@kaluchi/qlang-core";
 import { normalizePath } from "../paths.mjs";
 
 // ---- Public API ----
@@ -18,24 +17,11 @@ import { normalizePath } from "../paths.mjs";
 const SECTION_NAMES = ["intro", "git", "editors", "problems", "launch-configs", "launches", "tests", "projects", "help", "guide"];
 
 export async function status(args) {
-  const jsonFlag = args.includes("--json");
   const quiet = args.includes("-q") || args.includes("--quiet");
   const requested = args.filter((a) => !a.startsWith("-"));
   const sections = requested.length > 0
     ? requested.filter((s) => SECTION_NAMES.includes(s))
     : SECTION_NAMES.filter((s) => s !== "guide" && s !== "help");
-
-  if (jsonFlag) {
-    const dataSections = sections.filter((s) => !new Set(["intro", "guide", "help"]).has(s));
-    const result = {};
-    for (const name of dataSections) {
-      const descriptor = JSON_COMMANDS[name];
-      if (!descriptor) continue;
-      result[name] = readJsonSection(descriptor);
-    }
-    console.log(JSON.stringify(result, null, 2));
-    return;
-  }
 
   const META_SECTIONS = new Set(["intro", "guide", "help"]);
   const results = [];
@@ -74,34 +60,6 @@ function formatSection({ title, cmd, body, description }, { bare, quiet }) {
   if (bare) return body;
   const desc = (!quiet && description) ? description + "\n\n" : "";
   return `## ${title}\n\n${desc}\`\`\`bash\n$ ${cmd}\n${body}\n\`\`\``;
-}
-
-/**
- * Per-section JSON source. Two flavors:
- *  - { kind: "cli",  cmd }   — legacy CLI subcommand emitting plain JSON
- *  - { kind: "qlang", cmd }   — `jdt q --json ...` emitting tagged JSON;
- *                               status converts to plain via toPlain()
- *                               so the composite --json output keeps one
- *                               stable shape regardless of source.
- */
-const JSON_COMMANDS = {
-  git: { kind: "cli", cmd: "jdt git --json" },
-  editors: { kind: "cli", cmd: "jdt editors --json" },
-  problems: { kind: "qlang", cmd: `jdt q --json "@problems"` },
-  "launch-configs": { kind: "cli", cmd: "jdt launch configs --json" },
-  launches: { kind: "cli", cmd: "jdt launch list --json" },
-  tests: { kind: "cli", cmd: "jdt test runs --json" },
-  projects: { kind: "qlang", cmd: `jdt q --json "@projects * inter(#{:fqn :rootPath :repo :branch})"` },
-};
-
-function readJsonSection({ kind, cmd }) {
-  try {
-    const parsed = JSON.parse(cliCmd(cmd));
-    if (kind === "qlang") return toPlain(fromTaggedJSON(parsed));
-    return parsed;
-  } catch {
-    return null;
-  }
 }
 
 // ---- Renderers (return { title, cmd, body }) ----
@@ -328,11 +286,11 @@ export function ago(ms) {
 }
 
 // Exported for compositor testing
-export { formatSection, helpSection, guideSection, SECTION_NAMES, JSON_COMMANDS };
+export { formatSection, helpSection, guideSection, SECTION_NAMES };
 
 export const help = `CLI screenshot of Eclipse — composite view of IDE state.
 
-Usage:  jdt status [sections...] [-q] [--json]
+Usage:  jdt status [sections...] [-q]
 
 Sections (default: all):
   intro           context for AI agents (shown by default, suppressed by -q)
@@ -348,11 +306,14 @@ Sections (default: all):
 
 Options:
   -q, --quiet  suppress meta-sections (intro, help, guide) and descriptions
-  --json       composite JSON of all data sections
 
 Examples:
   jdt status                    full dashboard
   jdt status -q                 full dashboard, no intro/help/guide
   jdt status editors problems   editors + problems
   jdt status help               command reference
-  jdt status --json             all sections as JSON`;
+
+Machine-readable access to any single section goes through the
+underlying command directly: jdt git --json, jdt editors --json,
+jdt launch configs --json, jdt test runs --json, jdt q '@problems',
+jdt q '@projects'.`;

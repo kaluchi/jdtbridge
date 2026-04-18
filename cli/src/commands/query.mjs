@@ -5,6 +5,12 @@
 // error descriptor printed on stdout in the same shape qlang's `!{}`
 // literal produces. Non-zero exit would cancel sibling parallel tool
 // calls in Claude Code; errors travel as data, not as exit status.
+//
+// Output is always qlang-literal via `printValue` — qlang-sourced data
+// stays in its native formalism, round-trips losslessly through
+// parse + evalQuery, and composes as `jdt X | jdt q '...'` without
+// jq bridging. No --json flag: tagged JSON was a process bridge that
+// erased keyword/Set/Error identity on the wire.
 
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -16,7 +22,6 @@ import {
   isErrorValue,
   makeErrorValue,
 } from '@kaluchi/qlang-core';
-import { toTaggedJSON } from '@kaluchi/qlang-core/codec';
 import { bindIoOperands } from '@kaluchi/qlang-cli/io-operands';
 import { bindFormatOperands } from '@kaluchi/qlang-cli/format-operands';
 import { bindParseOperands } from '@kaluchi/qlang-cli/parse-operands';
@@ -82,10 +87,8 @@ function usageErrorValue(message, usage) {
   return makeErrorValue(descriptor);
 }
 
-function printQueryResult(value, jsonFlag) {
-  if (jsonFlag) {
-    console.log(JSON.stringify(toTaggedJSON(value), null, 2));
-  } else if (typeof value === 'string' && !isErrorValue(value)) {
+function printQueryResult(value) {
+  if (typeof value === 'string' && !isErrorValue(value)) {
     // Raw string results (e.g. `@source` returning a file's contents)
     // print without quotes/escapes so `jdt q '"X" | @source' > X.java`
     // produces a byte-faithful file.
@@ -96,17 +99,13 @@ function printQueryResult(value, jsonFlag) {
 }
 
 export async function query(args) {
-  const jsonFlag = args.includes('--json');
   const queryParts = args.filter(a => !a.startsWith('--'));
   const querySource = queryParts[0];
   if (!querySource) {
-    printQueryResult(
-      usageErrorValue(
-        'jdt q requires a qlang pipeline as its first positional argument.',
-        'jdt q <qlang-query> [--json]'
-      ),
-      jsonFlag
-    );
+    printQueryResult(usageErrorValue(
+      'jdt q requires a qlang pipeline as its first positional argument.',
+      'jdt q <qlang-query>'
+    ));
     return;
   }
   const session = await createSession({ locator: createLocator() });
@@ -127,7 +126,7 @@ export async function query(args) {
   const cellEntry = await session.evalCell(`use(:jdt/graph) | ${querySource}`);
 
   if (cellEntry.error) {
-    printQueryResult(parseErrorToValue(cellEntry.error, cellEntry.uri), jsonFlag);
+    printQueryResult(parseErrorToValue(cellEntry.error, cellEntry.uri));
     return;
   }
 
@@ -136,18 +135,22 @@ export async function query(args) {
     // silent on the auto-print to avoid double-output.
     return;
   }
-  printQueryResult(cellEntry.result, jsonFlag);
+  printQueryResult(cellEntry.result);
 }
 
 export const help = `Evaluate a qlang pipeline against the Eclipse JDT graph.
 
-Usage:  jdt q <qlang-query> [--json]
+Usage:  jdt q <qlang-query>
 
 Runs with use(:jdt/graph) pre-loaded. The graph is navigated through
 operand axes that all consume node-Maps OR fqn/fqmn Strings (subject
 polymorphism); every operand returns canonical-shape nodes (skeletons
 or detail) with five-field headers (:fqn :kind :origin :location
 :containingProject) plus per-kind detail fields.
+
+Output is qlang-literal (via printValue) — round-trips losslessly
+through parse + evalQuery, composes natively as \`jdt X | jdt q
+'...'\` without jq bridging. Strings print raw (unquoted).
 
 Root queries:
   @types("*Pat*") [:sourceOnly]    workspace pattern search

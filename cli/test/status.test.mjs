@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   formatSection, helpSection, guideSection, reposFromServer,
-  buildDirtyMap, ago, cliCmd, SECTION_NAMES, JSON_COMMANDS,
+  buildDirtyMap, ago, cliCmd, SECTION_NAMES,
 } from "../src/commands/status.mjs";
 
 // ---- formatSection ----
@@ -147,33 +147,6 @@ describe("SECTION_NAMES", () => {
     const guideIdx = SECTION_NAMES.indexOf("guide");
     expect(helpIdx).toBeGreaterThan(projectsIdx);
     expect(helpIdx).toBeLessThan(guideIdx);
-  });
-});
-
-// ---- JSON_COMMANDS ----
-
-describe("JSON_COMMANDS", () => {
-  const metaSections = new Set(["intro", "guide", "help"]);
-  const dataSections = SECTION_NAMES.filter((s) => !metaSections.has(s));
-
-  it("covers all data sections", () => {
-    for (const name of dataSections) {
-      expect(JSON_COMMANDS[name]).toBeDefined();
-      expect(JSON_COMMANDS[name].cmd).toContain("--json");
-    }
-  });
-
-  it("excludes meta sections", () => {
-    for (const name of metaSections) {
-      expect(JSON_COMMANDS[name]).toBeUndefined();
-    }
-  });
-
-  it("each descriptor carries a kind ∈ {cli, qlang} and a jdt cmd", () => {
-    for (const descriptor of Object.values(JSON_COMMANDS)) {
-      expect(["cli", "qlang"]).toContain(descriptor.kind);
-      expect(descriptor.cmd).toMatch(/^jdt /);
-    }
   });
 });
 

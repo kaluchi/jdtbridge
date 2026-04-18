@@ -109,24 +109,6 @@ describe("jdt q — read-only exit-0 contract", () => {
     expect(stdout).toContain("Type not found: no.such.Type");
   });
 
-  it("parse error --json emits tagged-JSON descriptor, no non-zero exit", async () => {
-    await setupMock(() => {});
-    const { query } = await import("../src/commands/query.mjs");
-    await query(["bad syntax [[[", "--json"]);
-    expect(io.exits).toEqual([]);
-    const stdout = io.logs.join("\n");
-    const payload = JSON.parse(stdout);
-    expect(payload).toHaveProperty("$error");
-    const descriptor = payload.$error;
-    expect(descriptor).toHaveProperty("$map");
-    const entries = descriptor.$map;
-    const findEntry = (keywordName) =>
-      entries.find((e) => e[0].$keyword === keywordName);
-    expect(findEntry("kind")[1]).toEqual({ $keyword: "parse-error" });
-    expect(findEntry("origin")[1]).toEqual({ $keyword: "qlang/parse" });
-    expect(findEntry("thrown")[1]).toEqual({ $keyword: "ParseError" });
-  });
-
   it("successful string result prints raw (no quotes), no non-zero exit", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
