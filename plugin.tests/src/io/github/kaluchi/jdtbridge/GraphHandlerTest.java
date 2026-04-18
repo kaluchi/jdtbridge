@@ -131,11 +131,35 @@ public class GraphHandlerTest {
         JsonObject result = parse(handler.handleMethod(
                 params("of", "test.edge.Calculator#add")));
         assertTrue(isError(result));
+        var error = errorOf(result);
+        var context = error.getAsJsonObject("context");
         assertEquals("ambiguous-match",
-                errorOf(result).get("kind").getAsString());
-        assertEquals(3,
-                errorOf(result).getAsJsonObject("context")
-                .get("matchCount").getAsInt());
+                error.get("kind").getAsString());
+        assertEquals(3, context.get("matchCount").getAsInt());
+
+        var candidates = context.getAsJsonArray("candidates");
+        assertNotNull(candidates,
+                "ambiguous-match carries :candidates so the caller "
+                + "routes `!| /context/candidates` to pick a "
+                + "disambiguated FQMN without a second discovery "
+                + "roundtrip");
+        assertEquals(3, candidates.size());
+        var candidateFqmns = candidates.asList().stream()
+                .map(JsonElement::getAsString).toList();
+        assertTrue(candidateFqmns.stream()
+                .allMatch(fqmn -> fqmn.startsWith(
+                        "test.edge.Calculator#add(")),
+                "every candidate is a concrete FQMN with parameters; "
+                + "got " + candidateFqmns);
+
+        String message = error.get("message").getAsString();
+        for (String candidate : candidateFqmns) {
+            assertTrue(message.contains(candidate),
+                    "error message lists every candidate FQMN so "
+                    + "the user (and LLM) can see the alternatives "
+                    + "without routing into :context; message=\""
+                    + message + "\"");
+        }
     }
 
     @Test

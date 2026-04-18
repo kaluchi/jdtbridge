@@ -1,5 +1,6 @@
 package io.github.kaluchi.jdtbridge;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -111,7 +112,7 @@ class GraphHandler {
             }
             if (matches.size() > 1) {
                 return ErrorDescriptor.ambiguousMatch(fqmn,
-                        matches.size()).toJsonString();
+                        fqmnsOf(matches)).toJsonString();
             }
             return NodeBuilder.methodDetail(matches.get(0)).toString();
         } catch (Exception e) {
@@ -994,7 +995,7 @@ class GraphHandler {
             if (matches.size() > 1) {
                 return ResolvedTarget.err(
                         ErrorDescriptor.ambiguousMatch(
-                                identifier, matches.size())
+                                identifier, fqmnsOf(matches))
                                 .toJsonString());
             }
             IMethod m = matches.get(0);
@@ -1021,10 +1022,28 @@ class GraphHandler {
         if (matches.size() > 1) {
             return ResolvedTarget.err(
                     ErrorDescriptor.ambiguousMatch(
-                            identifier, matches.size()).toJsonString());
+                            identifier, fqmnsOf(matches)).toJsonString());
         }
         IMethod m = matches.get(0);
         return ResolvedTarget.ok(m, NodeBuilder.methodSkeleton(m));
+    }
+
+    /**
+     * Project the candidate IMethod list onto their FQMN strings for
+     * an AmbiguousMatch error descriptor. The list becomes the
+     * `:candidates` field a caller routes to `!| /context/candidates`
+     * to choose a disambiguated FQMN and retry.
+     */
+    private static List<String> fqmnsOf(List<IMethod> methods) {
+        var out = new ArrayList<String>(methods.size());
+        for (IMethod m : methods) {
+            try {
+                out.add(NodeBuilder.fqmnOf(m));
+            } catch (JavaModelException ignored) {
+                out.add(m.getElementName() + "(?)");
+            }
+        }
+        return out;
     }
 
     // ── Common helper: validate :of param, resolve type, build Vec ──

@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 
 import com.google.gson.JsonObject;
@@ -65,10 +67,20 @@ public class ErrorDescriptorTest {
     }
 
     @Test
-    void ambiguousMatchCarriesCount() {
-        var d = ErrorDescriptor.ambiguousMatch("Foo#bar", 3);
+    void ambiguousMatchCarriesCandidates() {
+        var d = ErrorDescriptor.ambiguousMatch("Foo#bar",
+                List.of("Foo#bar()", "Foo#bar(String)",
+                        "Foo#bar(int)"));
         assertEquals(3, ctx(d).get("matchCount").getAsInt());
         assertEquals("Foo#bar", ctx(d).get("fqmn").getAsString());
+        var candidates = ctx(d).getAsJsonArray("candidates");
+        assertEquals(3, candidates.size());
+        assertEquals("Foo#bar()",
+                candidates.get(0).getAsString());
+        assertEquals("Foo#bar(String)",
+                candidates.get(1).getAsString());
+        assertEquals("Foo#bar(int)",
+                candidates.get(2).getAsString());
     }
 
     @Test
@@ -159,7 +171,8 @@ public class ErrorDescriptorTest {
             ErrorDescriptor.invalidFqn("x"),
             ErrorDescriptor.invalidFqmn("x"),
             ErrorDescriptor.missingParameter("name"),
-            ErrorDescriptor.ambiguousMatch("X#m", 2),
+            ErrorDescriptor.ambiguousMatch("X#m",
+                    List.of("X#m(int)", "X#m(String)")),
             ErrorDescriptor.wrongSubjectKind("@op", "type", "method"),
             ErrorDescriptor.readonlyNode("X", "binary"),
             ErrorDescriptor.planStale("changed"),

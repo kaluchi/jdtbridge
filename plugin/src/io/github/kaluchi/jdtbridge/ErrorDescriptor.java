@@ -97,11 +97,17 @@ class ErrorDescriptor {
                 "Missing parameter: " + name).with("parameter", name);
     }
 
-    static ErrorDescriptor ambiguousMatch(String fqmn, int matchCount) {
+    static ErrorDescriptor ambiguousMatch(String fqmn,
+            java.util.List<String> candidates) {
+        var arr = new com.google.gson.JsonArray();
+        for (String candidate : candidates) arr.add(candidate);
         return new ErrorDescriptor("ambiguous-match", "AmbiguousMatch",
                 "Ambiguous match for " + fqmn + ": "
-                + matchCount + " candidates")
-                .with("fqmn", fqmn).with("matchCount", matchCount);
+                + candidates.size() + " candidates — "
+                + String.join(", ", candidates))
+                .with("fqmn", fqmn)
+                .with("matchCount", candidates.size())
+                .with("candidates", arr);
     }
 
     static ErrorDescriptor wrongSubjectKind(String operand,
