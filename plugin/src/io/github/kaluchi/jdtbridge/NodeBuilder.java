@@ -472,6 +472,20 @@ class NodeBuilder {
             obj.addProperty("rootPath",
                     project.getLocation().toOSString());
         }
+        // :natures lives on the skeleton (not just detail) because
+        // workspace-wide filters like `@projects | filter(/natures
+        // | any(eq("java")))` are the baseline pre-filter before any
+        // per-project axis (@packagesInProject / @typesInProject)
+        // that would fail on non-Java natures. Cheap to read —
+        // IProjectDescription is already loaded for each open
+        // project.
+        try {
+            var natures = new JsonArray();
+            for (String id : project.getDescription().getNatureIds()) {
+                natures.add(ProjectHandler.shortNature(id));
+            }
+            obj.add("natures", natures);
+        } catch (Exception ignored) { /* closed / deleted project */ }
         // Git context — workspace projects overwhelmingly live in
         // git repos and the membership is fundamental enough that
         // bulk listings (jdt q '@projects') must show it without an
@@ -492,12 +506,6 @@ class NodeBuilder {
 
     static JsonObject projectDetail(IProject project) throws Exception {
         var obj = projectSkeleton(project);
-
-        var natures = new JsonArray();
-        for (String id : project.getDescription().getNatureIds()) {
-            natures.add(ProjectHandler.shortNature(id));
-        }
-        obj.add("natures", natures);
 
         IJavaProject jp = JavaCore.create(project);
         if (jp != null && jp.exists()) {

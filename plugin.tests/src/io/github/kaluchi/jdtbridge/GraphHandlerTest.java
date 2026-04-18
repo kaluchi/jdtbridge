@@ -636,6 +636,27 @@ public class GraphHandlerTest {
     }
 
     @Test
+    void projectSkeletonCarriesNatures() {
+        var arr = JsonParser.parseString(handler.handleProjects(
+                ProjectScope.ALL)).getAsJsonArray();
+        JsonObject fixture = arr.asList().stream()
+                .map(JsonElement::getAsJsonObject)
+                .filter(e -> "jdtbridge-test".equals(
+                        e.get("fqn").getAsString()))
+                .findFirst().orElseThrow();
+        var natures = fixture.getAsJsonArray("natures");
+        assertNotNull(natures,
+                ":natures must be on the project skeleton so "
+                + "`@projects | filter(/natures | any(eq(\"java\")))` "
+                + "avoids an N+1 @detail roundtrip");
+        boolean hasJava = natures.asList().stream()
+                .map(JsonElement::getAsString)
+                .anyMatch("java"::equals);
+        assertTrue(hasJava,
+                "fixture project has the Java nature");
+    }
+
+    @Test
     void projectDetailCarriesNaturesAndDependencies() {
         JsonObject result = parse(handler.handleProject(
                 params("of", "jdtbridge-test")));
