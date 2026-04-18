@@ -18,7 +18,10 @@
           :docs ["Type pattern search across the workspace. Subject is a name or wildcard pattern (\"*Controller*\")."
                  "Optional modifier :sourceOnly excludes binary types."
                  "Returns Vec of :type skeletons."]
-          :examples []
+          :examples [{:doc "All types matching a wildcard pattern"
+                      :snippet "\"*Service\" | @types * /fqn"}
+                     {:doc "Workspace-source only — exclude binary dependencies"
+                      :snippet "\"*Handler\" | @types | @sourceOnly * /fqn"}]
           :throws [:InvalidFqn]}
 
  :@type {:qlang/kind :builtin
@@ -29,7 +32,10 @@
          :returns :map
          :docs ["Single :type detail by fully qualified name."
                 "Inner classes use dotted form: pkg.Outer.Inner."]
-         :examples []
+         :examples [{:doc "Type detail — header plus modifiers, interfaces, javadoc summary, annotations, isTestScope"
+                     :snippet "\"io.github.kaluchi.jdtbridge.HttpServer\" | @type"}
+                    {:doc "Inner class — dotted form"
+                     :snippet "\"io.github.kaluchi.jdtbridge.HttpServer.Response\" | @type | /typeKind"}]
          :throws [:TypeNotFound]}
 
  :@method {:qlang/kind :builtin
@@ -39,7 +45,10 @@
            :modifiers []
            :returns :map
            :docs ["Single :method detail by FQMN. Supports both inline-paren signatures and the bare-name form (must be unambiguous)."]
-           :examples []
+           :examples [{:doc "Method detail by full FQMN"
+                       :snippet "\"io.github.kaluchi.jdtbridge.HttpServer#start(java.net.InetAddress,int)\" | @method"}
+                      {:doc "Ambiguous bare name — descriptor carries :candidates for disambiguation"
+                       :snippet "\"io.github.kaluchi.jdtbridge.HttpServer#start\" | @method !| /context/candidates"}]
            :throws [:MethodNotFound :AmbiguousMatch :InvalidFqmn]}
 
  :@field {:qlang/kind :builtin
@@ -49,7 +58,8 @@
           :modifiers []
           :returns :map
           :docs ["Single :field detail by FQMN (pkg.Type#fieldName)."]
-          :examples []
+          :examples [{:doc "Field detail — type, modifiers, annotations"
+                      :snippet "\"io.github.kaluchi.jdtbridge.HttpServer#search\" | @field"}]
           :throws [:FieldNotFound :InvalidFqmn]}
 
  :@project {:qlang/kind :builtin
@@ -59,7 +69,8 @@
             :modifiers []
             :returns :map
             :docs ["Single :project detail by name. Carries natures, classpathEntries, dependencies, sourceRoots, repo and branch when EGit-managed."]
-            :examples []
+            :examples [{:doc "Project detail by name"
+                        :snippet "\"io.github.kaluchi.jdtbridge\" | @project"}]
             :throws [:ProjectNotFound]}
 
  :@projects {:qlang/kind :builtin
@@ -69,7 +80,12 @@
              :modifiers []
              :returns :vec
              :docs ["All open workspace projects in the current session scope. Vec of :project skeletons."]
-             :examples []
+             :examples [{:doc "Every open project — one HTTP"
+                         :snippet "@projects * /fqn"}
+                        {:doc "Java-project pre-filter via the skeleton :natures field"
+                         :snippet "@projects | filter(/natures | any(eq(\"java\"))) * /fqn"}
+                        {:doc "Test-only projects (fragments that host nothing but tests)"
+                         :snippet "@projects | filter(/isTestScope) * /fqn"}]
              :throws []}
 
  :@package {:qlang/kind :builtin
@@ -79,7 +95,8 @@
             :modifiers []
             :returns :map
             :docs ["Single :package detail by FQN."]
-            :examples []
+            :examples [{:doc "Package detail"
+                        :snippet "\"io.github.kaluchi.jdtbridge\" | @package"}]
             :throws [:PackageNotFound]}
 
  :@file {:qlang/kind :builtin
@@ -89,7 +106,8 @@
          :modifiers []
          :returns :map
          :docs ["Single :file detail by absolute filesystem path."]
-         :examples []
+         :examples [{:doc "File detail — holds :typesInFile pointer"
+                     :snippet "\"D:/git/eclipse-jdt-search/plugin/src/io/github/kaluchi/jdtbridge/HttpServer.java\" | @file"}]
          :throws [:FileNotFound]}
 
  |~ ── Containment down ──────────────────────────────────────── ~~|
@@ -101,7 +119,10 @@
             :modifiers []
             :returns :vec
             :docs ["Direct children of a type — methods, fields, inner types. Vec of skeletons."]
-            :examples []
+            :examples [{:doc "Every declared member of a type"
+                        :snippet "\"io.github.kaluchi.jdtbridge.HttpServer\" | @members | table"}
+                       {:doc "Public members only"
+                        :snippet "\"io.github.kaluchi.jdtbridge.HttpServer\" | @members | filter(/modifiers | any(eq(\"public\"))) * /fqn"}]
             :throws [:TypeNotFound]}
 
  :@methods {:qlang/kind :builtin
@@ -111,7 +132,10 @@
             :modifiers []
             :returns :vec
             :docs ["Methods declared directly in the type."]
-            :examples []
+            :examples [{:doc "Method skeletons — signature, modifiers, returnType, annotations"
+                        :snippet "\"io.github.kaluchi.jdtbridge.HttpServer\" | @methods | table"}
+                       {:doc "Largest methods by line count — :lineCount comes from /location"
+                        :snippet "\"io.github.kaluchi.jdtbridge.HttpServer\" | @methods | sortWith(desc(/location/lineCount)) | take(5) * {:fqn /fqn :lines /location/lineCount}"}]
             :throws [:TypeNotFound]}
 
  :@fields {:qlang/kind :builtin
@@ -121,7 +145,10 @@
            :modifiers []
            :returns :vec
            :docs ["Fields declared directly in the type."]
-           :examples []
+           :examples [{:doc "Field skeletons — type, modifiers, annotations"
+                       :snippet "\"io.github.kaluchi.jdtbridge.HttpServer\" | @fields | table"}
+                      {:doc "Only static fields"
+                       :snippet "\"io.github.kaluchi.jdtbridge.HttpServer\" | @fields | filter(/modifiers | any(eq(\"static\"))) * /name"}]
            :throws [:TypeNotFound]}
 
  :@innerTypes {:qlang/kind :builtin
@@ -131,7 +158,8 @@
                :modifiers []
                :returns :vec
                :docs ["Inner types declared in the given type."]
-               :examples []
+               :examples [{:doc "Nested types of a class"
+                           :snippet "\"io.github.kaluchi.jdtbridge.HttpServer\" | @innerTypes * /fqn"}]
                :throws [:TypeNotFound]}
 
  :@typesInPackage {:qlang/kind :builtin
@@ -141,7 +169,8 @@
                    :modifiers []
                    :returns :vec
                    :docs ["All top-level types in the given package, aggregated across source roots."]
-                   :examples []
+                   :examples [{:doc "Every type in a package"
+                               :snippet "\"io.github.kaluchi.jdtbridge\" | @typesInPackage * /fqn"}]
                    :throws []}
 
  :@typesInFile {:qlang/kind :builtin
@@ -151,7 +180,8 @@
                 :modifiers []
                 :returns :vec
                 :docs ["Top-level types declared in the given Java file."]
-                :examples []
+                :examples [{:doc "Types defined in a single .java file"
+                            :snippet "\"D:/git/eclipse-jdt-search/plugin/src/io/github/kaluchi/jdtbridge/HttpServer.java\" | @typesInFile * /fqn"}]
                 :throws [:FileNotFound]}
 
  :@packagesInProject {:qlang/kind :builtin
@@ -161,7 +191,10 @@
                       :modifiers []
                       :returns :vec
                       :docs ["Non-empty source packages in the project, deduped per name."]
-                      :examples []
+                      :examples [{:doc "Packages of a project, ready to fan out with @typesInPackage"
+                                  :snippet "\"io.github.kaluchi.jdtbridge\" | @packagesInProject * /fqn"}
+                                 {:doc "Every source type in a project"
+                                  :snippet "\"io.github.kaluchi.jdtbridge\" | @packagesInProject * @typesInPackage | flat * /fqn"}]
                       :throws [:ProjectNotFound]}
 
  |~ ── Hierarchy ─────────────────────────────────────────────── ~~|
@@ -173,7 +206,8 @@
            :modifiers []
            :returns :vec
            :docs ["Direct supertypes — superclass plus directly-declared interfaces. Transitive ascent via @ancestors conduit."]
-           :examples []
+           :examples [{:doc "Direct parents of a type"
+                       :snippet "\"io.github.kaluchi.jdtbridge.ui.WelcomeStartupHandler\" | @supers * /fqn"}]
            :throws [:TypeNotFound]}
 
  :@subtypes {:qlang/kind :builtin
@@ -183,7 +217,10 @@
              :modifiers []
              :returns :vec
              :docs ["Direct subtypes only. Transitive descent via @descendants conduit."]
-             :examples []
+             :examples [{:doc "Direct subtypes of a type"
+                         :snippet "\"org.eclipse.core.runtime.jobs.Job\" | @subtypes * /fqn"}
+                        {:doc "Workspace-source subtypes only"
+                         :snippet "\"org.eclipse.core.runtime.jobs.Job\" | @subtypes | @sourceOnly * /fqn"}]
              :throws [:TypeNotFound]}
 
  :@implementors {:qlang/kind :builtin
@@ -193,7 +230,10 @@
                  :modifiers []
                  :returns :vec
                  :docs ["Subtypes (for :type subject) or override-methods (for :method subject)."]
-                 :examples []
+                 :examples [{:doc "Classes implementing an interface"
+                             :snippet "\"org.eclipse.core.runtime.IStartup\" | @implementors * /fqn"}
+                            {:doc "Concrete overrides of an interface method"
+                             :snippet "\"org.eclipse.core.runtime.IStartup#earlyStartup()\" | @implementors * /fqn"}]
                  :throws [:TypeNotFound :MethodNotFound]}
 
  :@overrides {:qlang/kind :builtin
@@ -203,7 +243,8 @@
               :modifiers []
               :returns :map
               :docs ["The closest super-method this method overrides, or null when no override exists."]
-              :examples []
+              :examples [{:doc "Resolve a method's override target (null when none)"
+                          :snippet "\"io.github.kaluchi.jdtbridge.ui.WelcomeStartupHandler#earlyStartup()\" | @overrides | /fqn"}]
               :throws [:MethodNotFound :WrongSubjectKind]}
 
  :@overloads {:qlang/kind :builtin
@@ -213,7 +254,8 @@
               :modifiers []
               :returns :vec
               :docs ["Sibling methods of the same name in the containing type, including the queried method."]
-              :examples []
+              :examples [{:doc "Every overload of a method name, including the queried one"
+                          :snippet "\"io.github.kaluchi.jdtbridge.HttpServer#start(java.net.InetAddress,int)\" | @overloads * /fqn"}]
               :throws [:MethodNotFound :WrongSubjectKind]}
 
  |~ ── References ────────────────────────────────────────────── ~~|
@@ -227,7 +269,12 @@
          :docs ["Incoming references to the given node (subject) of the given kind."
                 "Modifier is the refKind keyword: :call | :read | :write | :typeUse | :all."
                 "For methods, :call (default) returns invocations. For fields, :read/:write select access mode. For types, :typeUse covers extends/implements/typeUse."]
-          :examples []
+          :examples [{:doc "Everything that references a type (typeUse default)"
+                      :snippet "\"io.github.kaluchi.jdtbridge.HttpServer\" | @refs * /from/fqn | distinct"}
+                     {:doc "Union of every refKind the server recognizes"
+                      :snippet "\"io.github.kaluchi.jdtbridge.HttpServer\" | @refs(:all) * /refKind | distinct"}
+                     {:doc "Field writes only"
+                      :snippet "\"io.github.kaluchi.jdtbridge.HttpServer#search\" | @refs(:write) * /from/fqn"}]
           :throws [:TypeNotFound :MethodNotFound :FieldNotFound]}
 
  :@outgoingRefs {:qlang/kind :builtin
@@ -240,7 +287,10 @@
                         "Returns Vec of :reference nodes where :from is the subject skeleton and :to is the referenced target."
                         "Subject must be a type / method / field with available source. Binary-origin subjects fail because the AST visitor needs a compilation unit."
                         ":refKind labels: :call (method invocation), :read (field / constant access), :typeUse (type reference in signatures, casts, instanceof)."]
-                 :examples []
+                 :examples [{:doc "Every outgoing edge from a method body"
+                             :snippet "\"io.github.kaluchi.jdtbridge.ui.WelcomeStartupHandler#earlyStartup()\" | @outgoingRefs * {:to /to/fqn :refKind /refKind}"}
+                            {:doc "Type-dependency set of a method — @typeUses sugar does the same filter + distinct"
+                             :snippet "\"io.github.kaluchi.jdtbridge.ui.WelcomeStartupHandler#earlyStartup()\" | @typeUses * /fqn"}]
                  :throws [:TypeNotFound :MethodNotFound :FieldNotFound :WrongSubjectKind]}
 
  :@classpath {:qlang/kind :builtin
@@ -250,7 +300,10 @@
               :modifiers []
               :returns :vec
               :docs ["Classpath entries of the given project."]
-              :examples []
+              :examples [{:doc "Classpath entries of a project"
+                          :snippet "\"io.github.kaluchi.jdtbridge\" | @classpath | table"}
+                         {:doc "Test-scope source roots"
+                          :snippet "\"io.github.kaluchi.jdtbridge\" | @classpath | filter(/entryKind | eq(\"source\")) | filter(/isTest) * /path"}]
               :throws [:ProjectNotFound]}
 
  |~ ── Source / diagnostics ────────────────────────────────────── ~|
@@ -263,7 +316,10 @@
            :returns :map
            :docs ["Source text of a type or member. Returns {:node <detail> :text <source>}."
                   "Top-level types include the full compilation unit."]
-           :examples []
+           :examples [{:doc "Method body as raw source text (String result — prints unquoted)"
+                       :snippet "\"io.github.kaluchi.jdtbridge.HttpServer#start()\" | @source"}
+                      {:doc "Full compilation unit of a type"
+                       :snippet "\"io.github.kaluchi.jdtbridge.Json\" | @source"}]
            :throws [:TypeNotFound :MethodNotFound :FieldNotFound]}
 
  :@problems {:qlang/kind :builtin
@@ -274,7 +330,12 @@
              :returns :vec
              :docs ["Compilation problems in the given scope."
                     "Optional modifier: :file, :project, or :workspace."]
-             :examples []
+             :examples [{:doc "Workspace-wide compilation problems"
+                         :snippet "@problems | table"}
+                        {:doc "Single project scope — subject is the project fqn"
+                         :snippet "\"io.github.kaluchi.jdtbridge\" | @problems(:project) | table"}
+                        {:doc "Errors only (filter after the widened scope)"
+                         :snippet "@problems | filter(/severity | eq(\"error\"))"}]
              :throws [:FileNotFound :ProjectNotFound]}}
 | use
 
