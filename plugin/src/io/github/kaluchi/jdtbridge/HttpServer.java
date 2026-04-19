@@ -25,7 +25,6 @@ import java.util.concurrent.TimeUnit;
  */
 public class HttpServer {
 
-    private final SearchHandler search = new SearchHandler();
     private final GraphHandler graph = new GraphHandler();
     private final DiagnosticsHandler diagnostics =
             new DiagnosticsHandler();
@@ -40,7 +39,6 @@ public class HttpServer {
             new TestSessionHandler();
     private final TestHandler testHandler =
             new TestHandler();
-    private final ProjectHandler projectInfo = new ProjectHandler();
     private final LogHandler logHandler = new LogHandler();
     private final SessionScope sessionScope = new SessionScope();
     private final RequestTracker requestTracker = new RequestTracker();
