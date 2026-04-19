@@ -317,17 +317,24 @@ public class HttpServer {
             } else {
                 Log.error("Request error", e);
             }
+        } finally {
+            // Per-request caches in NodeBuilder are keyed to the
+            // worker thread; clear so the next request on the
+            // same thread doesn't read stale entries.
+            NodeBuilder.clearTestScopeCache();
         }
     }
 
     /**
      * Recognize the socket-level conditions that surface when the
-     * client bailed before the response finished writing — broken
-     * pipe on Unix, the Russian / German / localized "подключение
-     * разорвано" flavors on Windows, and the common message heads
-     * every JVM emits for a reset peer or closed connection.
+     * client bailed before the response finished writing. Primary
+     * signal is the exception class — SocketException or
+     * EOFException anywhere in the cause chain means the peer's
+     * gone. The message-substring list catches the same class of
+     * failure when it's been wrapped in a generic IOException
+     * whose cause doesn't reify as SocketException.
      */
-    private static boolean isClientDisconnect(Throwable t) {
+    static boolean isClientDisconnect(Throwable t) {
         for (Throwable cursor = t; cursor != null;
                 cursor = cursor.getCause()) {
             if (cursor instanceof java.net.SocketException
@@ -335,14 +342,39 @@ public class HttpServer {
                 return true;
             }
             String msg = cursor.getMessage();
-            if (msg != null && (
-                    msg.contains("Broken pipe")
-                    || msg.contains("Connection reset")
-                    || msg.contains("connection was aborted")
-                    || msg.contains("разорвала"))) {
+            if (msg != null && containsDisconnectSignature(msg)) {
                 return true;
             }
         }
+        return false;
+    }
+
+    /** Message-substring match for wrapped disconnects. */
+    private static boolean containsDisconnectSignature(String msg) {
+        // POSIX / generic
+        if (msg.contains("Broken pipe")) return true;
+        if (msg.contains("Connection reset")) return true;
+        // Windows English — WSAECONNABORTED
+        if (msg.contains("connection was aborted")) return true;
+        if (msg.contains("established connection was aborted"))
+            return true;
+        if (msg.contains("existing connection was forcibly closed"))
+            return true;
+        // Windows Russian (ru_RU locale)
+        if (msg.contains("разорвала")) return true;
+        if (msg.contains("разорвано")) return true;
+        if (msg.contains("прервано")) return true;
+        // Windows German (de_DE)
+        if (msg.contains("Verbindung wurde")
+                && msg.contains("abgebrochen")) return true;
+        if (msg.contains("bestehende Verbindung wurde")) return true;
+        // Windows French (fr_FR)
+        if (msg.contains("connexion existante a")
+                && msg.contains("interrompue")) return true;
+        if (msg.contains("connexion a été abandonnée")) return true;
+        // Windows Spanish (es_ES)
+        if (msg.contains("conexión existente")
+                && msg.contains("forzosamente")) return true;
         return false;
     }
 

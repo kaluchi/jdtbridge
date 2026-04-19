@@ -18,27 +18,36 @@ import { keyword } from '@kaluchi/qlang-core';
 // values. Every access goes through a keyword() lookup; interning
 // once at module load keeps the hot path allocation-free.
 
-const K_NODE           = keyword('node');
-const K_TEXT           = keyword('text');
-const K_OUTGOING       = keyword('outgoing');
-const K_INCOMING       = keyword('incoming');
-const K_SUPERS         = keyword('supers');
-const K_SUBTYPES       = keyword('subtypes');
-const K_REFS           = keyword('refs');
-const K_FQN            = keyword('fqn');
-const K_KIND           = keyword('kind');
-const K_TYPE_KIND      = keyword('typeKind');
-const K_MODIFIERS      = keyword('modifiers');
-const K_RETURN_TYPE    = keyword('returnType');
-const K_CONTAINING_TP  = keyword('containingType');
-const K_LOCATION       = keyword('location');
-const K_FILE           = keyword('file');
-const K_START_LINE     = keyword('startLine');
-const K_END_LINE       = keyword('endLine');
-const K_FROM           = keyword('from');
-const K_TO             = keyword('to');
-const K_REF_KIND       = keyword('refKind');
-const K_JAVADOC        = keyword('javadocSummary');
+// Bundle-level keys
+const K_NODE       = keyword('node');
+const K_TEXT       = keyword('text');
+const K_OUTGOING   = keyword('outgoing');
+const K_INCOMING   = keyword('incoming');
+const K_SUPERS     = keyword('supers');
+const K_SUBTYPES   = keyword('subtypes');
+const K_MEMBERS    = keyword('members');
+const K_REFS       = keyword('refs');
+
+// Node-Map fields
+const K_FQN           = keyword('fqn');
+const K_KIND          = keyword('kind');
+const K_TYPE_KIND     = keyword('typeKind');
+const K_NAME          = keyword('name');
+const K_SIGNATURE     = keyword('signature');
+const K_TYPE          = keyword('type');
+const K_MODIFIERS     = keyword('modifiers');
+const K_RETURN_TYPE   = keyword('returnType');
+const K_CONTAINING_TP = keyword('containingType');
+const K_LOCATION      = keyword('location');
+const K_FILE          = keyword('file');
+const K_START_LINE    = keyword('startLine');
+const K_END_LINE      = keyword('endLine');
+const K_JAVADOC       = keyword('javadocSummary');
+
+// Reference-record fields
+const K_FROM          = keyword('from');
+const K_TO            = keyword('to');
+const K_REF_KIND      = keyword('refKind');
 
 function mapGet(m, key) {
     return m instanceof Map ? m.get(key) : undefined;
@@ -161,17 +170,18 @@ function formatMdSource(bundle) {
         out.push('```');
     }
 
+    const subjectKind = mapGet(node, K_KIND);
     const outgoing = mapGet(bundle, K_OUTGOING);
     if (Array.isArray(outgoing) && outgoing.length > 0) {
         out.push('');
-        out.push('#### Outgoing Calls:');
+        out.push('#### ' + outgoingHeader(subjectKind) + ':');
         out.push(...renderRefGroup(outgoing, 'to'));
     }
 
     const incoming = mapGet(bundle, K_INCOMING);
     if (Array.isArray(incoming) && incoming.length > 0) {
         out.push('');
-        out.push('#### Incoming Calls:');
+        out.push('#### ' + incomingHeader(subjectKind) + ':');
         out.push(...renderRefGroup(incoming, 'from'));
     }
 
@@ -192,6 +202,31 @@ function formatMdSource(bundle) {
     }
 
     return out.join('\n');
+}
+
+/**
+ * Header phrasing for the Outgoing / Incoming ref sections. A
+ * method's refs are typically calls; a field's are accesses; a
+ * type's are references (typeUse / extends / parameter). Matches
+ * the vocabulary a reader already uses when talking about the
+ * subject kind.
+ */
+function outgoingHeader(subjectKind) {
+    switch (subjectKind) {
+        case 'method': return 'Outgoing calls';
+        case 'field':  return 'Outgoing accesses';
+        case 'type':   return 'Outgoing references';
+        default:       return 'Outgoing';
+    }
+}
+
+function incomingHeader(subjectKind) {
+    switch (subjectKind) {
+        case 'method': return 'Incoming calls';
+        case 'field':  return 'Incoming accesses';
+        case 'type':   return 'Incoming references';
+        default:       return 'Incoming';
+    }
 }
 
 // ── Reference-group rendering ──────────────────────────────────
@@ -338,10 +373,6 @@ function kindHeader(kind) {
 
 // ── mdOutline: structural tree of a type ───────────────────────
 
-const K_NAME      = keyword('name');
-const K_SIGNATURE = keyword('signature');
-const K_TYPE      = keyword('type');
-
 /**
  * Bundle shape for mdOutline:
  *   :node    — :type detail node-Map (required)
@@ -464,8 +495,6 @@ function lineRangeSuffix(node) {
     }
     return startLine + '-' + endLine;
 }
-
-const K_MEMBERS = keyword('members');
 
 // ── Operand bindings ───────────────────────────────────────────
 

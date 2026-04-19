@@ -60,8 +60,8 @@ describe("mdSource", () => {
     ]);
     const md = await runWithBundle("mdSource",
         map([["node", node]]));
-    expect(md).not.toContain("Outgoing Calls");
-    expect(md).not.toContain("Incoming Calls");
+    expect(md).not.toContain("Outgoing");
+    expect(md).not.toContain("Incoming");
     expect(md).not.toContain("Hierarchy");
     expect(md).toContain("#### [C] pkg.Foo");
   });
@@ -92,10 +92,32 @@ describe("mdSource", () => {
       ["outgoing", [outRef]],
       ["incoming", [inRef]],
     ]));
-    expect(md).toContain("#### Outgoing Calls:");
+    expect(md).toContain("#### Outgoing calls:");
     expect(md).toContain("[M] `pkg.Other#doStuff(int)` → `void`");
-    expect(md).toContain("#### Incoming Calls:");
+    expect(md).toContain("#### Incoming calls:");
     expect(md).toContain("[M] `pkg.Caller#invoke()`");
+  });
+
+  it("labels refs by subject kind — type subject → references", async () => {
+    const typeUseRef = map([
+      ["kind", "reference"],
+      ["refKind", "typeUse"],
+      ["from", map([
+        ["fqn", "pkg.Caller"],
+        ["kind", "type"],
+        ["typeKind", "class"],
+      ])],
+    ]);
+    const md = await runWithBundle("mdSource", map([
+      ["node", map([
+        ["fqn", "pkg.Foo"],
+        ["kind", "type"],
+        ["typeKind", "class"],
+      ])],
+      ["incoming", [typeUseRef]],
+    ]));
+    expect(md).toContain("#### Incoming references:");
+    expect(md).not.toContain("Incoming calls");
   });
 
   it("routes type-kind badge via :typeKind on types", async () => {

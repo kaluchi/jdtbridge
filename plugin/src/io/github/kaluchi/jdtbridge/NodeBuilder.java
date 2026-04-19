@@ -226,6 +226,27 @@ class NodeBuilder {
     // ── Test-scope classification ───────────────────────────────────
 
     /**
+     * Per-type annotation-fallback cache, live for the duration of
+     * a single request. Fan-out pipelines hit the same type dozens
+     * of times (one call per method skeleton) — without this cache
+     * every @methods skeleton on a 50-method type scans every
+     * method for @Test annotations N² times.
+     *
+     * ThreadLocal so each worker thread maintains its own map;
+     * clears on dispatch exit so state doesn't leak across
+     * unrelated requests.
+     */
+    private static final ThreadLocal<java.util.Map<IType, Boolean>>
+            TEST_ANNOTATION_CACHE =
+            ThreadLocal.withInitial(java.util.HashMap::new);
+
+    /** Clear the per-request test-scope cache. Called after each
+     *  top-level request handler completes. */
+    static void clearTestScopeCache() {
+        TEST_ANNOTATION_CACHE.remove();
+    }
+
+    /**
      * Whether an element lives in a test-scoped source root or
      * carries a test-annotation signature. Two signals combined:
      *
@@ -238,7 +259,8 @@ class NodeBuilder {
      *     layouts may keep a single source root unflagged yet still
      *     host test code. A type declaring any method annotated
      *     with a JUnit/TestNG `@*Test*` qualifies the whole type
-     *     (and every member of it).
+     *     (and every member of it). The containing-type scan result
+     *     is memoized per request.
      *
      * Short-circuits on the first positive signal. Defaults to false
      * — production-scope unless proven otherwise.
@@ -265,14 +287,21 @@ class NodeBuilder {
         }
         IType type = (element instanceof IType t) ? t
                 : (IType) element.getAncestor(IJavaElement.TYPE);
-        if (type != null) {
-            try {
-                for (IMethod m : type.getMethods()) {
-                    if (hasTestAnnotation(m)) return true;
+        if (type == null) return false;
+        var cache = TEST_ANNOTATION_CACHE.get();
+        Boolean cached = cache.get(type);
+        if (cached != null) return cached;
+        boolean result = false;
+        try {
+            for (IMethod m : type.getMethods()) {
+                if (hasTestAnnotation(m)) {
+                    result = true;
+                    break;
                 }
-            } catch (JavaModelException ignored) { /* unreadable */ }
-        }
-        return false;
+            }
+        } catch (JavaModelException ignored) { /* unreadable */ }
+        cache.put(type, result);
+        return result;
     }
 
     /**
