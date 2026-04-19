@@ -309,6 +309,33 @@ describe("mdRefs", () => {
     expect(md).not.toContain("pkg.Foo#bar()");
   });
 
+  it("skips directionless rows and picks side from the next :direction", async () => {
+    // Mixed Vec — a hand-crafted row without :direction precedes
+    // server-shaped rows. The directionless row must not short-
+    // circuit the side pick; the first :direction-bearing row wins.
+    const subject = map([["fqn", "pkg.Foo"], ["kind", "type"],
+                         ["typeKind", "class"]]);
+    const caller = map([["fqn", "pkg.Caller"], ["kind", "type"],
+                        ["typeKind", "class"]]);
+    const directionless = map([
+      ["kind", "reference"],
+      ["refKind", "typeUse"],
+      ["from", caller],
+      ["to", subject],
+    ]);
+    const incoming = map([
+      ["kind", "reference"],
+      ["direction", "incoming"],
+      ["refKind", "typeUse"],
+      ["from", caller],
+      ["to", subject],
+    ]);
+    const md = await runWithBundle("mdRefs",
+        [directionless, incoming]);
+    expect(md).toContain("pkg.Caller");
+    expect(md).not.toContain("pkg.Foo");
+  });
+
   it("single-record incoming still renders caller", async () => {
     // N=1 edge case — :direction removes the fqn-fixity heuristic
     // ambiguity that used to require N≥2.

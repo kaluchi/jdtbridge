@@ -367,8 +367,11 @@ function formatMdRefs(refs) {
 /**
  * Side to render is driven by :direction on the reference record —
  * server stamps every @incomingRefs hit with "incoming" and every
- * @outgoingRefs hit with "outgoing". Records without :direction
- * (bundles hand-built in tests) fall through to :to.
+ * @outgoingRefs hit with "outgoing". The first record that carries a
+ * recognised :direction wins. Records without :direction (hand-built
+ * test bundles, or mixed Vecs where only some rows come from the
+ * server) are skipped — a whole Vec with no :direction falls through
+ * to :to.
  */
 function pickRefSide(refs) {
     for (const ref of refs) {
@@ -376,7 +379,6 @@ function pickRefSide(refs) {
         const dir = mapGet(ref, K_DIRECTION);
         if (dir === 'incoming') return 'from';
         if (dir === 'outgoing') return 'to';
-        break;
     }
     return 'to';
 }
