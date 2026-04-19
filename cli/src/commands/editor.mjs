@@ -1,7 +1,7 @@
 import { basename } from "node:path";
 import { get } from "../client.mjs";
 import { extractPositional, parseFqmn } from "../args.mjs";
-import { toSandboxPath } from "../paths.mjs";
+import { translateHostPath } from "../path-translate.mjs";
 import { output } from "../output.mjs";
 import { formatTable } from "../format/table.mjs";
 
@@ -15,7 +15,7 @@ export async function editors(args = []) {
         r.active ? ">" : "",
         r.fqn ? `\`${r.fqn}\`` : basename(r.file),
         r.project || "",
-        toSandboxPath(r.file),
+        translateHostPath(r.file),
       ]);
       console.log(formatTable([" ", "FILE", "PROJECT", "PATH"], rows));
     },

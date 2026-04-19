@@ -10,7 +10,8 @@ import { execSync } from "node:child_process";
 import { basename } from "node:path";
 import { get } from "../client.mjs";
 import { extractPositional, parseFlags } from "../args.mjs";
-import { toSandboxPath, normalizePath } from "../paths.mjs";
+import { normalizePath } from "../paths.mjs";
+import { translateHostPath } from "../path-translate.mjs";
 import { output } from "../output.mjs";
 import { formatTable } from "../format/table.mjs";
 import { green, yellow } from "../color.mjs";
@@ -54,7 +55,7 @@ async function gitList(args = []) {
   // JSON: clean structured data for programmatic consumption
   const data = repoData.map(({ repo, dirtyLines }) => ({
     name: repo.name,
-    path: toSandboxPath(repo.path),
+    path: translateHostPath(repo.path),
     branch: repo.branch,
     dirty: dirtyLines.length,
     files: dirtyLines.map((l) => stripAnsi(l.trim())),
@@ -66,7 +67,7 @@ async function gitList(args = []) {
       const headers = ["REPO", "STATUS", "PATH", "BRANCH"];
       const rows = [];
       for (const { repo, dirtyLines } of repoData) {
-        const repoPath = toSandboxPath(repo.path);
+        const repoPath = translateHostPath(repo.path);
         const status = dirtyLines.length > 0
           ? yellow(`${dirtyLines.length} modified`)
           : green("clean");

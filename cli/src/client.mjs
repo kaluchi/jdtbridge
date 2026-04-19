@@ -55,6 +55,16 @@ export function resetClient() {
   _instance = null;
 }
 
+/**
+ * Instance that resolved the current request — populated by
+ * {@link connect}. Null before the first `get` / `post` call or
+ * right after `resetClient`. Used by path translation to pick
+ * the right per-instance mount cache.
+ */
+export function currentInstance() {
+  return _instance;
+}
+
 function authHeaders(inst) {
   const target = inst || _instance;
   const headers = {};

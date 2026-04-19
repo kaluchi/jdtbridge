@@ -1,12 +1,9 @@
 // JSON output helpers — walk a response tree and rewrite
-// host-absolute paths through toSandboxPath so the model inside a
-// Docker sandbox sees them in its own filesystem convention.
-//
-// `:fqn` is NEVER remapped — fqn is an identifier round-tripped
-// back to the plugin verbatim. Only `:file`, `:path`, `:rootPath`,
-// `:outputLocation` carry filesystem paths.
+// host-absolute paths to the CLI's filesystem convention via the
+// remote-instance project-paths cache. `:fqn` is never remapped;
+// it is an identifier round-tripped back to the plugin verbatim.
 
-import { toSandboxPath } from "./paths.mjs";
+import { translateHostPath } from "./path-translate.mjs";
 
 const PATH_KEY_NAMES = ["file", "path", "rootPath", "outputLocation"];
 
@@ -16,7 +13,7 @@ export function remapJsonPaths(obj) {
   } else if (obj && typeof obj === "object") {
     for (const key of Object.keys(obj)) {
       if (PATH_KEY_NAMES.includes(key) && typeof obj[key] === "string") {
-        obj[key] = toSandboxPath(obj[key]);
+        obj[key] = translateHostPath(obj[key]);
       } else {
         remapJsonPaths(obj[key]);
       }

@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createServer } from "node:http";
 import { setColorEnabled } from "../src/color.mjs";
-import { toSandboxPath } from "../src/paths.mjs";
 
 // Behavior tests for non-graph CLI commands. Graph-axis endpoint
 // coverage lives in GraphHandlerTest (plugin.tests).
@@ -46,14 +45,21 @@ describe("commands (integration)", () => {
   afterEach(async () => {
     io.restore();
     if (server) await stopServer(server);
-    vi.doUnmock("../src/paths.mjs");
+    vi.doUnmock("../src/path-translate.mjs");
     vi.resetModules();
   });
 
+  // Stand-in for the real per-instance mount cache: rewrites
+  // Windows drive letters to `/<drive>/…` without loading the
+  // JSON cache file. Lets editor/git tests assert remap behaviour
+  // without provisioning a full remote-instance fixture.
   function mockSandboxPaths() {
-    vi.doMock("../src/paths.mjs", async (importOriginal) => {
+    vi.doMock("../src/path-translate.mjs", async (importOriginal) => {
       const orig = await importOriginal();
-      return { ...orig, toSandboxPath: (p) => p && /^[A-Z]:[/\\]/.test(p) ? "/" + p[0].toLowerCase() + p.slice(2).replace(/\\/g, "/") : p };
+      return { ...orig, translateHostPath: (p) => p
+          && /^[A-Z]:[/\\]/.test(p)
+          ? "/" + p[0].toLowerCase() + p.slice(2).replace(/\\/g, "/")
+          : p };
     });
   }
 
@@ -127,7 +133,10 @@ describe("commands (integration)", () => {
     expect(out).toContain("`com.example.Bar`");
     expect(out).toContain(">");
     expect(out).toContain("my-server");
-    expect(out).toContain(toSandboxPath("D:/projects/src/Foo.java"));
+    // Without a remote-instance mount cache, translateHostPath
+    // returns paths unchanged — the raw Eclipse path appears in
+    // the output.
+    expect(out).toContain("D:/projects/src/Foo.java");
   });
 
   it("editors shows basename for non-java files", async () => {

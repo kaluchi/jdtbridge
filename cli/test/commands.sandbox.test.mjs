@@ -17,14 +17,17 @@ describe("sandbox paths and bulk assertions", () => {
   afterEach(async () => {
     io.restore();
     if (server) await stopServer(server);
-    vi.doUnmock("../src/paths.mjs");
+    vi.doUnmock("../src/path-translate.mjs");
     vi.resetModules();
   });
 
   function mockSandboxPaths() {
-    vi.doMock("../src/paths.mjs", async (importOriginal) => {
+    vi.doMock("../src/path-translate.mjs", async (importOriginal) => {
       const orig = await importOriginal();
-      return { ...orig, toSandboxPath: (p) => p && /^[A-Z]:[/\\]/.test(p) ? "/" + p[0].toLowerCase() + p.slice(2).replace(/\\/g, "/") : p };
+      return { ...orig, translateHostPath: (p) => p
+          && /^[A-Z]:[/\\]/.test(p)
+          ? "/" + p[0].toLowerCase() + p.slice(2).replace(/\\/g, "/")
+          : p };
     });
   }
 

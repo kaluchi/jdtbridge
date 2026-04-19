@@ -164,12 +164,23 @@ describe("graph.impl — concurrency semaphore", () => {
 });
 
 describe("graph.impl — path remapping at the plugin boundary", () => {
-  it("rewrites :path on classpath responses via toSandboxPath", async () => {
-    // Server returns a Windows-style path; on Linux CLI this must
-    // be remapped BEFORE the value reaches the qlang session, so
-    // downstream pipelines always see local-shape paths.
+  // Stub translateHostPath with a deterministic D:\→/d/ mapping
+  // so these tests don't depend on per-instance cache fixtures.
+  function mockTranslator() {
+    vi.doMock("../src/path-translate.mjs",
+        async (importOriginal) => {
+          const orig = await importOriginal();
+          return { ...orig, translateHostPath: (p) =>
+              typeof p === "string" && /^[A-Z]:[\\/]/.test(p)
+                  ? "/" + p[0].toLowerCase()
+                      + p.slice(2).replace(/\\/g, "/")
+                  : p };
+        });
+  }
+
+  it("rewrites :path on classpath responses via translator", async () => {
     process.env.JDT_GRAPH_CACHE = "0";
-    vi.stubGlobal("process", { ...process, platform: "linux" });
+    mockTranslator();
     vi.doMock("../src/client.mjs", () => ({
       get: async () => [{
         fqn: "proj#source#D:\\git\\proj\\src",
@@ -192,12 +203,12 @@ describe("graph.impl — path remapping at the plugin boundary", () => {
     const { result } = await session.evalCell(
         '"proj" | @classpath * /path');
     expect(result).toEqual(["/d/git/proj/src"]);
-    vi.unstubAllGlobals();
+    vi.doUnmock("../src/path-translate.mjs");
   });
 
   it("does NOT rewrite :fqn even if it contains a path", async () => {
     process.env.JDT_GRAPH_CACHE = "0";
-    vi.stubGlobal("process", { ...process, platform: "linux" });
+    mockTranslator();
     vi.doMock("../src/client.mjs", () => ({
       get: async () => ({
         fqn: "D:\\git\\proj\\src\\Foo.java",
@@ -220,12 +231,12 @@ describe("graph.impl — path remapping at the plugin boundary", () => {
     // :fqn is an identifier — server echoes the host path as-is
     // so the client can round-trip it back.
     expect(result).toBe("D:\\git\\proj\\src\\Foo.java");
-    vi.unstubAllGlobals();
+    vi.doUnmock("../src/path-translate.mjs");
   });
 
   it("walks nested :location/:file", async () => {
     process.env.JDT_GRAPH_CACHE = "0";
-    vi.stubGlobal("process", { ...process, platform: "linux" });
+    mockTranslator();
     vi.doMock("../src/client.mjs", () => ({
       get: async () => ({
         fqn: "pkg.Foo",
@@ -251,6 +262,6 @@ describe("graph.impl — path remapping at the plugin boundary", () => {
     const { result } = await session.evalCell(
         '"pkg.Foo" | @type | /location/file');
     expect(result).toBe("/d/git/proj/src/pkg/Foo.java");
-    vi.unstubAllGlobals();
+    vi.doUnmock("../src/path-translate.mjs");
   });
 });
