@@ -216,15 +216,23 @@ carry regular skeletons a downstream axis or renderer consumes.
 
 ### `:classpathEntry`
 
-Nested inside `:project` detail under `:classpathEntries`.
+Returned by `@classpath` and nested inside `:project` detail under
+`:classpathEntries`. The server returns a **resolved** classpath —
+container entries (`JRE_CONTAINER`, M2E `MAVEN2_CLASSPATH_CONTAINER`)
+are expanded into their constituent library / source / project
+entries before the client sees them. Maven dependencies appear as
+individual JARs with absolute filesystem paths; JRE modules the
+same.
 
 | Field | Present | Notes |
 |---|---|---|
 | `:fqn` | ✓ | composite `project#entryKind#path` |
-| `:kind` `:origin` `:containingProject` | ✓ | — |
-| `:entryKind` | ✓ | `"source"` / `"library"` / `"project"` / `"container"` / `"variable"` |
-| `:path` | ✓ | workspace-relative for source, absolute for libraries, container name for containers |
-| `:outputLocation` | source entries | workspace-relative build-output path |
+| `:kind` | ✓ | always `"classpathEntry"` |
+| `:origin` | ✓ | `"source"` for source roots, `"binary"` for library / project entries |
+| `:containingProject` | ✓ | — |
+| `:entryKind` | ✓ | `"source"` / `"library"` / `"project"` (container / variable kinds never appear on the wire — they are resolved away) |
+| `:path` | ✓ | **absolute filesystem path** on the Eclipse host, host-native format (Windows `D:\…`, Linux `/…`). CLI remaps host→sandbox for the caller's runtime. |
+| `:outputLocation` | source entries | absolute filesystem path, same format as `:path` |
 | `:isTest` | test source roots | boolean |
 | `:isExported` | when true | boolean |
 
