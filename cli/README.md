@@ -114,8 +114,7 @@ jdt maven up -q                                        # quiet mode, suppress gu
 ```bash
 jdt organize-imports <file>                            # (alias: oi) organize imports
 jdt format <file>                                      # (alias: fmt) format code (Eclipse settings)
-jdt rename <FQN> <newName>                             # rename type
-jdt rename <FQMN> <newName>                            # rename method (FQMN includes method)
+jdt rename <FQN> <newName>                             # rename type or method (FQN = pkg.T or pkg.T#m(A))
 jdt rename <FQN> <newName> --field <old>               # rename field
 jdt move <FQN> <target.package>                        # move type to another package
 ```
@@ -142,7 +141,7 @@ Console output persists in Eclipse and is available via `launch logs` at any tim
 ### Editor
 
 ```bash
-jdt open <FQMN>                                        # open in Eclipse editor
+jdt open <FQN>                                         # open in Eclipse editor
 ```
 
 ### Workspace detail

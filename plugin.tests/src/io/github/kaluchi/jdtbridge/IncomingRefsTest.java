@@ -72,11 +72,11 @@ public class IncomingRefsTest {
         void barkCalledByCreateDog() throws Exception {
             var json = source("test.model.Dog", "bark");
             var inc = refsDir(json, "incoming");
-            var fqmns = StreamSupport.stream(
+            var fqns = StreamSupport.stream(
                     inc.spliterator(), false)
-                    .map(e -> str(e.getAsJsonObject(), "fqmn"))
+                    .map(e -> str(e.getAsJsonObject(), "fqn"))
                     .collect(Collectors.toSet());
-            assertTrue(fqmns.stream()
+            assertTrue(fqns.stream()
                     .anyMatch(f -> f.contains(
                             "AnimalService#createDog")));
         }
@@ -109,24 +109,24 @@ public class IncomingRefsTest {
         }
 
         @Test
-        void barkIncomingFqmnUsesHash() throws Exception {
+        void barkIncomingFqnUsesHash() throws Exception {
             var json = source("test.model.Dog", "bark");
             for (JsonElement e : refsDir(json, "incoming")) {
-                String fqmn = str(e.getAsJsonObject(), "fqmn");
-                assertTrue(fqmn.contains("#"));
+                String fqn = str(e.getAsJsonObject(), "fqn");
+                assertTrue(fqn.contains("#"));
             }
         }
 
         @Test
         void barkIncomingDeduped() throws Exception {
             var json = source("test.model.Dog", "bark");
-            var fqmns = StreamSupport.stream(
+            var fqns = StreamSupport.stream(
                     refsDir(json, "incoming").spliterator(),
                     false)
-                    .map(e -> str(e.getAsJsonObject(), "fqmn"))
+                    .map(e -> str(e.getAsJsonObject(), "fqn"))
                     .toList();
-            assertEquals(fqmns.size(),
-                    Set.copyOf(fqmns).size());
+            assertEquals(fqns.size(),
+                    Set.copyOf(fqns).size());
         }
 
         @Test
@@ -145,11 +145,11 @@ public class IncomingRefsTest {
             var json = source(
                     "test.service.AnimalService", "process");
             var inc = refsDir(json, "incoming");
-            var fqmns = StreamSupport.stream(
+            var fqns = StreamSupport.stream(
                     inc.spliterator(), false)
-                    .map(e -> str(e.getAsJsonObject(), "fqmn"))
+                    .map(e -> str(e.getAsJsonObject(), "fqn"))
                     .collect(Collectors.toSet());
-            assertTrue(fqmns.stream()
+            assertTrue(fqns.stream()
                     .anyMatch(f -> f.contains(
                             "CallerService#callProcess")));
         }

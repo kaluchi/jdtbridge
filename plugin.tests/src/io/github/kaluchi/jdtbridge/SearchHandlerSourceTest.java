@@ -58,11 +58,11 @@ public class SearchHandlerSourceTest {
         return result;
     }
 
-    static JsonObject findRef(JsonArray refs, String fqmnPart) {
+    static JsonObject findRef(JsonArray refs, String fqnPart) {
         for (JsonElement e : refs) {
             var ref = e.getAsJsonObject();
-            if (ref.has("fqmn") && ref.get("fqmn")
-                    .getAsString().contains(fqmnPart)) {
+            if (ref.has("fqn") && ref.get("fqn")
+                    .getAsString().contains(fqnPart)) {
                 return ref;
             }
         }
@@ -112,10 +112,10 @@ public class SearchHandlerSourceTest {
     class MethodSourceStructure {
 
         @Test
-        void fqmnExact() throws Exception {
+        void fqnExact() throws Exception {
             var json = srcMethod("test.model.Dog", "bark");
             assertEquals("test.model.Dog#bark()",
-                    json.get("fqmn").getAsString());
+                    json.get("fqn").getAsString());
         }
 
         @Test
@@ -161,10 +161,10 @@ public class SearchHandlerSourceTest {
     class TypeSourceStructure {
 
         @Test
-        void fqmnExact() throws Exception {
+        void fqnExact() throws Exception {
             var json = src("test.model.Dog", null);
             assertEquals("test.model.Dog",
-                    json.get("fqmn").getAsString());
+                    json.get("fqn").getAsString());
         }
 
         @Test
@@ -232,22 +232,22 @@ public class SearchHandlerSourceTest {
         }
 
         @Test
-        void eachOverloadHasFqmn() throws Exception {
+        void eachOverloadHasFqn() throws Exception {
             var resp = handler.handleSource(
                     Map.of("class", "test.edge.Calculator",
                             "method", "add"), ProjectScope.ALL);
             var arr = JsonParser.parseString(resp.body())
                     .getAsJsonArray();
-            var fqmns = new java.util.HashSet<String>();
+            var fqns = new java.util.HashSet<String>();
             for (JsonElement e : arr) {
-                fqmns.add(e.getAsJsonObject()
-                        .get("fqmn").getAsString());
+                fqns.add(e.getAsJsonObject()
+                        .get("fqn").getAsString());
             }
-            assertTrue(fqmns.contains(
+            assertTrue(fqns.contains(
                     "test.edge.Calculator#add(int, int)"));
-            assertTrue(fqmns.contains(
+            assertTrue(fqns.contains(
                     "test.edge.Calculator#add(double, double)"));
-            assertTrue(fqmns.contains(
+            assertTrue(fqns.contains(
                     "test.edge.Calculator#add(int, int, int)"));
         }
 
@@ -262,7 +262,7 @@ public class SearchHandlerSourceTest {
                             .body()).getAsJsonObject();
             assertEquals(
                     "test.edge.Calculator#add(int, int, int)",
-                    json.get("fqmn").getAsString());
+                    json.get("fqn").getAsString());
         }
     }
 
@@ -276,7 +276,7 @@ public class SearchHandlerSourceTest {
                     "test.service.AnimalService", "process");
             for (JsonElement e : refsDir(json, "outgoing")) {
                 var ref = e.getAsJsonObject();
-                assertTrue(ref.has("fqmn"));
+                assertTrue(ref.has("fqn"));
                 assertTrue(ref.has("kind"));
                 assertTrue(ref.has("scope"));
             }

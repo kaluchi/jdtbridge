@@ -83,14 +83,14 @@ of any command.
 
 `jdt q '<qlang-pipeline>'` evaluates a qlang pipeline against the
 Eclipse semantic graph. The graph is navigated through operand axes
-that consume a node-Map (skeleton or detail) OR a fqn/fqmn string
+that consume a node-Map (skeleton or detail) OR a fqn string
 from `pipeValue`. Output is qlang-literal; fqn strings in the result
 are ready subjects for the next step.
 
 Axes (see `docs/jdt-query-spec.md` for the full catalog):
 
 ```
-@types("*Pattern")  @type(fqn)  @method(fqmn)  @field(fqmn)
+@types("*Pattern")  @type(fqn)  @method(fqn)  @field(fqn)
 @project(name)  @projects  @package(fqn)  @file(absPath)
 @members  @methods  @fields  @innerTypes
 @typesInPackage  @typesInFile  @packagesInProject
@@ -117,19 +117,23 @@ Sugar conduits for common audits:
 @asNode                  lift fqn String → point-looked-up node
 ```
 
-### FQMN (Fully Qualified Method Name)
+### FQN — member form
 
-Axes accept FQMN in one argument — class and method together:
+Every node carries one identifier field, `:fqn`. Per kind:
 
 ```
-pkg.Class#method              any overload (disambiguate via AmbiguousMatch :candidates)
-pkg.Class#method()            zero-arg overload
-pkg.Class#method(String)      specific signature
-pkg.Class.method(String)      Eclipse Copy Qualified Name style
+pkg.Class                     type
+pkg.Class#fieldName           field or unambiguous method by name
+pkg.Class#method()            zero-arg method
+pkg.Class#method(String)      method with erased parameter signature
+pkg.Class.method(String)      Eclipse Copy Qualified Name — also accepted
 ```
 
-Types can be simple (`String`) or FQN (`java.lang.String`).
-Generics are stripped: `List<String>` matches `List`.
+A bare `pkg.Class#method` without parens is ambiguous when the
+type has multiple overloads; the error descriptor carries
+`:candidates` so the caller can pick and retry. Types can be
+simple (`String`) or qualified (`java.lang.String`); generics
+are stripped — `List<String>` matches `List`.
 
 ### Pipeline composability
 

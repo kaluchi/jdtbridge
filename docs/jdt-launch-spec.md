@@ -89,8 +89,8 @@ Columns:
 - **CONFIGID** — configuration name (unique identifier for `jdt launch run`)
 - **CONFIGTYPE** — Eclipse ILaunchConfigurationType (human-readable name)
 - **PROJECT** — Java project (from `org.eclipse.jdt.launching.PROJECT_ATTR`)
-- **TARGET** — synthesized FQMN, type-specific:
-  - JUnit class: `class#method` (FQMN from `MAIN_TYPE` + `TESTNAME`)
+- **TARGET** — synthesized FQN, type-specific:
+  - JUnit class: `class#method` (FQN from `MAIN_TYPE` + `TESTNAME`)
   - JUnit package: package name (parsed from `CONTAINER`)
   - JUnit project: empty (redundant with PROJECT)
   - Java Application: main class (from `MAIN_TYPE`)
@@ -127,7 +127,7 @@ org.eclipse.jdt.launching.VM_ARGUMENTS          -ea
 ```
 
 Header rows (Name, Type, Project, Target, File) are synthesized from
-raw attributes. Target uses the same FQMN logic as `launch configs`.
+raw attributes. Target uses the same FQN logic as `launch configs`.
 Remaining attributes are shown with full Eclipse key names and all values
 (including false and empty). Multiline values are aligned to the VALUE column.
 
@@ -161,7 +161,7 @@ Design decisions:
 - `getAttributes()` preserves types: strings, booleans, integers, lists, maps.
   This is richer than parsing XML where everything is a string.
 - The text and JSON views share the same data from a single endpoint.
-  Target synthesis (FQMN) happens on the CLI side from raw attributes,
+  Target synthesis (FQN) happens on the CLI side from raw attributes,
   not on the server — keeps the API clean and the rendering consistent
   between `configs` and `config`.
 

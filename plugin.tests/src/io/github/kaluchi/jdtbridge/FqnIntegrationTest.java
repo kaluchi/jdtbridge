@@ -17,10 +17,12 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
- * Integration tests for FQMN (Fully Qualified Method Name) support.
- * Tests paramTypes-based method resolution against real JDT types.
+ * Integration tests for member FQN resolution — the
+ * {@code pkg.Type#name(P1,P2)} form for methods and the
+ * {@code pkg.Type#name} form for fields. Exercises paramTypes-based
+ * overload disambiguation against real JDT types.
  */
-public class FqmnIntegrationTest {
+public class FqnIntegrationTest {
 
     private static final SearchHandler handler = new SearchHandler();
 

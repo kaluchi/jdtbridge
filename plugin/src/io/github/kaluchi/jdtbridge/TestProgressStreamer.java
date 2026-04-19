@@ -44,13 +44,13 @@ class TestProgressStreamer {
 
                 if (!matchesFilter(status, filter)) return;
 
-                String fqmn = tc.getTestClassName()
+                String fqn = tc.getTestClassName()
                         + "#" + tc.getTestMethodName();
                 double time = tc.getElapsedTimeInSeconds();
 
                 var event = new JsonObject();
                 event.addProperty("event", "case");
-                event.addProperty("fqmn", fqmn);
+                event.addProperty("fqn", fqn);
                 event.addProperty("status", status);
                 event.addProperty("time",
                         Double.isNaN(time) ? 0.0 : time);
@@ -156,13 +156,13 @@ class TestProgressStreamer {
                     if (!matchesFilter(status, filter))
                         continue;
 
-                    String fqmn = tc.getTestClassName()
+                    String fqn = tc.getTestClassName()
                             + "#" + tc.getTestMethodName();
                     double time = tc.getElapsedTimeInSeconds();
 
                     var event = new JsonObject();
                     event.addProperty("event", "case");
-                    event.addProperty("fqmn", fqmn);
+                    event.addProperty("fqn", fqn);
                     event.addProperty("status", status);
                     event.addProperty("time",
                             Double.isNaN(time) ? 0.0 : time);

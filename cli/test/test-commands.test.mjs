@@ -123,7 +123,7 @@ describe("test commands", () => {
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
-  it("test run sends method param with FQMN#method", async () => {
+  it("test run sends method param with FQN#method", async () => {
     await setupMock((req, res) => {
       if (req.url.includes("/test/run")) {
         expect(req.url).toContain("class=com.example.FooTest");
@@ -214,7 +214,7 @@ describe("test commands", () => {
         res.end(JSON.stringify({ ok: true, configId: "test-stream-1", pid: "900" }));
       } else if (req.url.includes("/test/status/stream")) {
         res.writeHead(200, { "Content-Type": "application/x-ndjson" });
-        res.write(JSON.stringify({ event: "case", fqmn: "Foo#bar", status: "FAIL", time: 0.1, trace: "err" }) + "\n");
+        res.write(JSON.stringify({ event: "case", fqn: "Foo#bar", status: "FAIL", time: 0.1, trace: "err" }) + "\n");
         res.write(JSON.stringify({ event: "finished", total: 1, passed: 0, failed: 1, errors: 0, ignored: 0, time: 0.1 }) + "\n");
         res.end();
       } else if (req.url.includes("/test/status")) {
@@ -236,7 +236,7 @@ describe("test commands", () => {
         res.end(JSON.stringify({ ok: true, configId: "JsonlTest", testRunId: "JsonlTest:1775009", launchId: "JsonlTest:901", pid: "901", reused: false }));
       } else if (req.url.includes("/test/status/stream")) {
         res.writeHead(200, { "Content-Type": "application/x-ndjson" });
-        res.write(JSON.stringify({ event: "case", fqmn: "Foo#bar", status: "PASS", time: 0.1 }) + "\n");
+        res.write(JSON.stringify({ event: "case", fqn: "Foo#bar", status: "PASS", time: 0.1 }) + "\n");
         res.write(JSON.stringify({ event: "finished", total: 1, passed: 1, failed: 0, errors: 0, ignored: 0, time: 0.1 }) + "\n");
         res.end();
       } else if (req.url.includes("/test/status")) {
@@ -288,7 +288,7 @@ describe("test commands", () => {
         configId: "test-123", state: "finished",
         total: 5, completed: 5, passed: 4, failed: 1, errors: 0, ignored: 0,
         time: 2.3,
-        entries: [{ fqmn: "Foo#bar", status: "FAIL", time: 0.1, trace: "err" }],
+        entries: [{ fqn: "Foo#bar", status: "FAIL", time: 0.1, trace: "err" }],
       }));
     });
     const { testStatus } = await import("../src/commands/test-status.mjs");

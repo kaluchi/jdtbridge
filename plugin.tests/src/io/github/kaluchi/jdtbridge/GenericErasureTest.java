@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Generics erasure contract: all FQMNs in source output must be
+ * Generics erasure contract: all FQNs in source output must be
  * generics-free. {@code Map<String,String>} → {@code Map}.
  * This ensures Zero-Modification Navigation (principle #3).
  */
@@ -54,15 +54,15 @@ public class GenericErasureTest {
                 ? obj.get(key).getAsString() : null;
     }
 
-    static void assertNoGenericsInFqmns(JsonObject json,
+    static void assertNoGenericsInFqns(JsonObject json,
             String context) {
         for (JsonElement e : refs(json)) {
             JsonObject ref = e.getAsJsonObject();
-            String fqmn = str(ref, "fqmn");
-            assertNotNull(fqmn, "ref missing fqmn: " + ref);
-            assertFalse(fqmn.contains("<"),
-                    context + " — FQMN contains generics: "
-                    + fqmn);
+            String fqn = str(ref, "fqn");
+            assertNotNull(fqn, "ref missing fqn: " + ref);
+            assertFalse(fqn.contains("<"),
+                    context + " — FQN contains generics: "
+                    + fqn);
         }
     }
 
@@ -133,7 +133,7 @@ public class GenericErasureTest {
             var json = sourceJson(
                     "test.service.GenericCallerService",
                     "saveItems");
-            assertNoGenericsInFqmns(json, "saveItems outgoing");
+            assertNoGenericsInFqns(json, "saveItems outgoing");
         }
 
         @Test
@@ -141,7 +141,7 @@ public class GenericErasureTest {
             var json = sourceJson(
                     "test.service.GenericCallerService",
                     "lookup");
-            assertNoGenericsInFqmns(json, "lookup outgoing");
+            assertNoGenericsInFqns(json, "lookup outgoing");
         }
 
         @Test
@@ -152,12 +152,12 @@ public class GenericErasureTest {
             boolean found = false;
             for (JsonElement e : refs(json)) {
                 JsonObject ref = e.getAsJsonObject();
-                String fqmn = str(ref, "fqmn");
-                if (fqmn != null
-                        && fqmn.contains("Repository#save")) {
+                String fqn = str(ref, "fqn");
+                if (fqn != null
+                        && fqn.contains("Repository#save")) {
                     assertEquals(
                             "test.edge.Repository#save(List)",
-                            fqmn,
+                            fqn,
                             "Param should be erased to List");
                     found = true;
                 }
@@ -175,17 +175,17 @@ public class GenericErasureTest {
         void incomingRefsHaveNoGenerics() throws Exception {
             // Repository.save(List<String>) is called by
             // GenericCallerService.saveItems(List<String>)
-            // The incoming ref FQMN must be generics-free.
+            // The incoming ref FQN must be generics-free.
             // Repository.save has overloads → server returns
             // JSON array. Use findByIds (no overloads) instead.
             var json = sourceJson(
                     "test.edge.Repository", "findByIds");
             for (JsonElement e : refs(json)) {
                 JsonObject ref = e.getAsJsonObject();
-                String fqmn = str(ref, "fqmn");
-                assertNotNull(fqmn);
-                assertFalse(fqmn.contains("<"),
-                        "Incoming FQMN has generics: " + fqmn);
+                String fqn = str(ref, "fqn");
+                assertNotNull(fqn);
+                assertFalse(fqn.contains("<"),
+                        "Incoming FQN has generics: " + fqn);
             }
         }
     }
@@ -245,9 +245,9 @@ public class GenericErasureTest {
                         && ref.get("anonymous").getAsBoolean()) {
                     foundAnon = true;
                     assertTrue(
-                            str(ref, "fqmn").contains("$"),
-                            "Anonymous FQMN should contain $: "
-                            + str(ref, "fqmn"));
+                            str(ref, "fqn").contains("$"),
+                            "Anonymous FQN should contain $: "
+                            + str(ref, "fqn"));
                 }
             }
             assertTrue(foundAnon,
@@ -255,7 +255,7 @@ public class GenericErasureTest {
         }
 
         @Test
-        void anonymousSubtypeHasEnclosingFqmn()
+        void anonymousSubtypeHasEnclosingFqn()
                 throws Exception {
             var json = sourceJson(
                     "test.service.AnonymousCallerService",
@@ -264,9 +264,9 @@ public class GenericErasureTest {
                 JsonObject ref = e.getAsJsonObject();
                 if (ref.has("anonymous")
                         && ref.get("anonymous").getAsBoolean()) {
-                    String enc = str(ref, "enclosingFqmn");
+                    String enc = str(ref, "enclosingFqn");
                     assertNotNull(enc,
-                            "Anonymous should have enclosingFqmn: "
+                            "Anonymous should have enclosingFqn: "
                             + ref);
                     assertTrue(enc.contains(
                             "AnonymousCallerService"
@@ -282,19 +282,19 @@ public class GenericErasureTest {
             var json = sourceJson(
                     "test.service.AnonymousCallerService",
                     "createAnonymous");
-            var fqmns = new java.util.ArrayList<String>();
+            var fqns = new java.util.ArrayList<String>();
             for (JsonElement e : refs(json)) {
                 JsonObject ref = e.getAsJsonObject();
                 if (ref.has("implementationOf")) {
-                    fqmns.add(str(ref, "fqmn"));
+                    fqns.add(str(ref, "fqn"));
                 }
             }
-            assertTrue(fqmns.stream()
+            assertTrue(fqns.stream()
                     .anyMatch(f -> f.contains("Dog")),
-                    "Dog: " + fqmns);
-            assertTrue(fqmns.stream()
+                    "Dog: " + fqns);
+            assertTrue(fqns.stream()
                     .anyMatch(f -> f.contains("Cat")),
-                    "Cat: " + fqmns);
+                    "Cat: " + fqns);
         }
     }
 
@@ -318,19 +318,19 @@ public class GenericErasureTest {
         }
 
         @Test
-        void implementationsHaveNavigableFqmn()
+        void implementationsHaveNavigableFqn()
                 throws Exception {
             var json = sourceJson(
                     "test.model.Animal", "name");
             var impls = json.getAsJsonArray("implementations");
             for (var e : impls) {
                 var impl = e.getAsJsonObject();
-                String fqmn = str(impl, "fqmn");
-                assertNotNull(fqmn,
-                        "impl should have fqmn: " + impl);
-                assertTrue(fqmn.contains("#name"),
-                        "fqmn should contain #name: "
-                        + fqmn);
+                String fqn = str(impl, "fqn");
+                assertNotNull(fqn,
+                        "impl should have fqn: " + impl);
+                assertTrue(fqn.contains("#name"),
+                        "fqn should contain #name: "
+                        + fqn);
             }
         }
 
@@ -370,7 +370,7 @@ public class GenericErasureTest {
                     "implementations");
             var srcFqns = new java.util.HashSet<String>();
             for (var e : srcImpls) {
-                srcFqns.add(str(e.getAsJsonObject(), "fqmn")
+                srcFqns.add(str(e.getAsJsonObject(), "fqn")
                         .split("#")[0]);
             }
 
@@ -410,7 +410,7 @@ public class GenericErasureTest {
             var impls = json.getAsJsonArray("implementations");
             boolean foundParrot = false;
             for (var e : impls) {
-                if (str(e.getAsJsonObject(), "fqmn")
+                if (str(e.getAsJsonObject(), "fqn")
                         .contains("Parrot")) {
                     foundParrot = true;
                 }
@@ -423,16 +423,16 @@ public class GenericErasureTest {
         @Test
         void noDuplicatesBetweenImplsAndIncoming()
                 throws Exception {
-            // REGRESSION: no FQMN should appear in both
+            // REGRESSION: no FQN should appear in both
             // implementations AND incoming calls
             var json = sourceJson(
                     "test.model.Animal", "name");
-            var implFqmns = new java.util.HashSet<String>();
+            var implFqns = new java.util.HashSet<String>();
             if (json.has("implementations")) {
                 for (var e : json.getAsJsonArray(
                         "implementations")) {
-                    implFqmns.add(str(
-                            e.getAsJsonObject(), "fqmn"));
+                    implFqns.add(str(
+                            e.getAsJsonObject(), "fqn"));
                 }
             }
             for (var e : refs(json)) {
@@ -440,9 +440,9 @@ public class GenericErasureTest {
                 if ("incoming".equals(
                         str(ref, "direction"))) {
                     assertFalse(
-                            implFqmns.contains(
-                                    str(ref, "fqmn")),
-                            "DUPLICATE: " + str(ref, "fqmn")
+                            implFqns.contains(
+                                    str(ref, "fqn")),
+                            "DUPLICATE: " + str(ref, "fqn")
                             + " in both Implementations and "
                             + "Incoming Calls");
                 }
@@ -454,12 +454,12 @@ public class GenericErasureTest {
             // Same regression check for abstract class method
             var json = sourceJson(
                     "test.edge.AbstractPet", "speak");
-            var implFqmns = new java.util.HashSet<String>();
+            var implFqns = new java.util.HashSet<String>();
             if (json.has("implementations")) {
                 for (var e : json.getAsJsonArray(
                         "implementations")) {
-                    implFqmns.add(str(
-                            e.getAsJsonObject(), "fqmn"));
+                    implFqns.add(str(
+                            e.getAsJsonObject(), "fqn"));
                 }
             }
             for (var e : refs(json)) {
@@ -467,15 +467,15 @@ public class GenericErasureTest {
                 if ("incoming".equals(
                         str(ref, "direction"))) {
                     assertFalse(
-                            implFqmns.contains(
-                                    str(ref, "fqmn")),
-                            "DUPLICATE: " + str(ref, "fqmn"));
+                            implFqns.contains(
+                                    str(ref, "fqn")),
+                            "DUPLICATE: " + str(ref, "fqn"));
                 }
             }
         }
 
         @Test
-        void anonymousImplHasEnclosingFqmn()
+        void anonymousImplHasEnclosingFqn()
                 throws Exception {
             var json = sourceJson(
                     "test.model.Animal", "name");
@@ -487,9 +487,9 @@ public class GenericErasureTest {
                         && impl.get("anonymous")
                                 .getAsBoolean()) {
                     assertNotNull(
-                            str(impl, "enclosingFqmn"),
+                            str(impl, "enclosingFqn"),
                             "Anonymous impl must have "
-                            + "enclosingFqmn: " + impl);
+                            + "enclosingFqn: " + impl);
                 }
             }
         }

@@ -1,6 +1,6 @@
 import { basename } from "node:path";
 import { get } from "../client.mjs";
-import { extractPositional, parseFqmn } from "../args.mjs";
+import { extractPositional, parseFqn } from "../args.mjs";
 import { translateHostPath } from "../path-translate.mjs";
 import { output } from "../output.mjs";
 import { formatTable } from "../format/table.mjs";
@@ -24,7 +24,7 @@ export async function editors(args = []) {
 
 export async function open(args) {
   const pos = extractPositional(args);
-  const parsed = parseFqmn(pos[0]);
+  const parsed = parseFqn(pos[0]);
   const fqn = parsed.className;
   const method = parsed.method || pos[1];
   if (!fqn) {

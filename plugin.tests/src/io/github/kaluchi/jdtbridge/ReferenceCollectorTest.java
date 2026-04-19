@@ -70,7 +70,7 @@ public class ReferenceCollectorTest {
                 allRefs.putAll(ReferenceCollector.collect(m));
             }
 
-            // No java.* type FQMNs as keys
+            // No java.* type FQNs as keys
             for (String key : allRefs.keySet()) {
                 assertFalse(key.startsWith("java."),
                         "Should skip java.* types: " + key);
@@ -104,7 +104,7 @@ public class ReferenceCollectorTest {
             }
             assertEquals(refs.size(),
                     refs.keySet().stream().distinct().count(),
-                    "All refs should be unique by FQMN");
+                    "All refs should be unique by FQN");
         }
     }
 
@@ -185,7 +185,7 @@ public class ReferenceCollectorTest {
             for (var ref : refs.values()) {
                 assertNotNull(ref.element(),
                         "Ref should have element: "
-                        + ref.fqmn());
+                        + ref.fqn());
             }
         }
 
@@ -199,21 +199,21 @@ public class ReferenceCollectorTest {
             for (var ref : refs.values()) {
                 assertNotNull(ref.declaringTypeKind(),
                         "Ref should have declaringTypeKind: "
-                        + ref.fqmn());
+                        + ref.fqn());
             }
         }
 
         @Test
-        void noRefHasNullFqmn() throws Exception {
+        void noRefHasNullFqn() throws Exception {
             IType type = JdtUtils.findType(
                     "test.service.AnimalService");
             for (IMethod m : type.getMethods()) {
                 var refs = ReferenceCollector.collect(m);
                 for (var ref : refs.values()) {
-                    assertNotNull(ref.fqmn(),
-                            "Ref fqmn should not be null");
-                    assertFalse(ref.fqmn().isEmpty(),
-                            "Ref fqmn should not be empty");
+                    assertNotNull(ref.fqn(),
+                            "Ref fqn should not be null");
+                    assertFalse(ref.fqn().isEmpty(),
+                            "Ref fqn should not be empty");
                 }
             }
         }

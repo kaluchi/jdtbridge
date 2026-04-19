@@ -51,14 +51,14 @@ class ErrorDescriptor {
                 "Type not found: " + fqn).with("fqn", fqn);
     }
 
-    static ErrorDescriptor methodNotFound(String fqmn) {
+    static ErrorDescriptor methodNotFound(String fqn) {
         return new ErrorDescriptor("method-not-found", "MethodNotFound",
-                "Method not found: " + fqmn).with("fqmn", fqmn);
+                "Method not found: " + fqn).with("fqn", fqn);
     }
 
-    static ErrorDescriptor fieldNotFound(String fqmn) {
+    static ErrorDescriptor fieldNotFound(String fqn) {
         return new ErrorDescriptor("field-not-found", "FieldNotFound",
-                "Field not found: " + fqmn).with("fqmn", fqmn);
+                "Field not found: " + fqn).with("fqn", fqn);
     }
 
     static ErrorDescriptor packageNotFound(String fqn) {
@@ -81,12 +81,6 @@ class ErrorDescriptor {
                 "Invalid fully qualified name: " + value).with("value", value);
     }
 
-    static ErrorDescriptor invalidFqmn(String value) {
-        return new ErrorDescriptor("invalid-fqmn", "InvalidFqmn",
-                "Invalid fully qualified member name: " + value)
-                .with("value", value);
-    }
-
     static ErrorDescriptor missingParameter(String name) {
         return new ErrorDescriptor("missing-parameter", "MissingParameter",
                 "Missing parameter: " + name).with("parameter", name);
@@ -107,15 +101,15 @@ class ErrorDescriptor {
                 .with("allowed", arr);
     }
 
-    static ErrorDescriptor ambiguousMatch(String fqmn,
+    static ErrorDescriptor ambiguousMatch(String fqn,
             java.util.List<String> candidates) {
         var arr = new com.google.gson.JsonArray();
         for (String candidate : candidates) arr.add(candidate);
         return new ErrorDescriptor("ambiguous-match", "AmbiguousMatch",
-                "Ambiguous match for " + fqmn + ": "
+                "Ambiguous match for " + fqn + ": "
                 + candidates.size() + " candidates — "
                 + String.join(", ", candidates))
-                .with("fqmn", fqmn)
+                .with("fqn", fqn)
                 .with("matchCount", candidates.size())
                 .with("candidates", arr);
     }

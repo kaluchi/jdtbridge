@@ -222,7 +222,7 @@ function refSectionHeader(direction, subjectKind) {
  * `sideKey` picks which side is the "other" — for outgoing refs
  * from the viewed member we show :to, for incoming :from.
  *
- * A line per distinct target FQMN; the `[badge] fqmn` form is the
+ * A line per distinct target FQN; the `[badge] fqn` form is the
  * zero-modification-navigation primitive — copy a line and
  * `jdt q '"…" | @source'` renders its card.
  */

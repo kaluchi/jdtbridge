@@ -41,20 +41,20 @@ public class ErrorDescriptorTest {
     }
 
     @Test
-    void methodNotFoundCarriesFqmn() {
+    void methodNotFoundCarriesFqn() {
         var d = ErrorDescriptor.methodNotFound("com.example.Foo#bar()");
         assertEquals("method-not-found",
                 inner(d).get("kind").getAsString());
         assertEquals("com.example.Foo#bar()",
-                ctx(d).get("fqmn").getAsString());
+                ctx(d).get("fqn").getAsString());
     }
 
     @Test
-    void fieldNotFoundCarriesFqmn() {
+    void fieldNotFoundCarriesFqn() {
         var d = ErrorDescriptor.fieldNotFound("com.example.Foo#x");
         assertEquals("field-not-found", inner(d).get("kind").getAsString());
         assertEquals("com.example.Foo#x",
-                ctx(d).get("fqmn").getAsString());
+                ctx(d).get("fqn").getAsString());
     }
 
     @Test
@@ -72,7 +72,7 @@ public class ErrorDescriptorTest {
                 List.of("Foo#bar()", "Foo#bar(String)",
                         "Foo#bar(int)"));
         assertEquals(3, ctx(d).get("matchCount").getAsInt());
-        assertEquals("Foo#bar", ctx(d).get("fqmn").getAsString());
+        assertEquals("Foo#bar", ctx(d).get("fqn").getAsString());
         var candidates = ctx(d).getAsJsonArray("candidates");
         assertEquals(3, candidates.size());
         assertEquals("Foo#bar()",
@@ -151,7 +151,6 @@ public class ErrorDescriptorTest {
             ErrorDescriptor.projectNotFound("p"),
             ErrorDescriptor.fileNotFound("/x"),
             ErrorDescriptor.invalidFqn("x"),
-            ErrorDescriptor.invalidFqmn("x"),
             ErrorDescriptor.missingParameter("name"),
             ErrorDescriptor.ambiguousMatch("X#m",
                     List.of("X#m(int)", "X#m(String)")),

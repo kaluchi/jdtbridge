@@ -94,7 +94,7 @@ Each renderer calls the standalone CLI command via `execSync` and returns
 - `quiet` = suppress description text
 
 Descriptions provide Eclipse-specific context: view names, shortcuts,
-domain identifiers (CONFIGID, TestRunId, FQMN). They anchor agents
+domain identifiers (CONFIGID, TestRunId, FQN). They anchor agents
 to high-entropy Eclipse terms so they connect CLI output to IDE concepts.
 
 This means `jdt status` is always consistent with standalone commands —
@@ -197,6 +197,6 @@ independently refreshable.
 
 - **[jdt-launch-spec.md](jdt-launch-spec.md)** — `launch-configs` section
   shows the same data as `jdt launch configs`. TARGET column uses the
-  FQMN synthesis described in the launch spec.
+  FQN synthesis described in the launch spec.
 - **[jdt-spec](jdt-spec.md)** — `--json` output principles and
   per-command JSON shapes.

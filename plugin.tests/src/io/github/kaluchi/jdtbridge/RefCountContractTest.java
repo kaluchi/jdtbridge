@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Contract tests: exact ref counts and FQMNs for fixture methods.
+ * Contract tests: exact ref counts and FQNs for fixture methods.
  * These tests break if fixture source changes — that's intentional.
  * They guarantee the ref collector output is deterministic and
  * complete.
@@ -49,7 +49,7 @@ public class RefCountContractTest {
         return ReferenceCollector.collect(method);
     }
 
-    static Set<String> fqmns(
+    static Set<String> fqns(
             Map<String, ReferenceCollector.Ref> refs) {
         return refs.keySet();
     }
@@ -87,11 +87,11 @@ public class RefCountContractTest {
         return result;
     }
 
-    static JsonObject findRef(JsonArray refs, String fqmnPart) {
+    static JsonObject findRef(JsonArray refs, String fqnPart) {
         for (JsonElement e : refs) {
             JsonObject ref = e.getAsJsonObject();
-            String fqmn = str(ref, "fqmn");
-            if (fqmn != null && fqmn.contains(fqmnPart)) {
+            String fqn = str(ref, "fqn");
+            if (fqn != null && fqn.contains(fqnPart)) {
                 return ref;
             }
         }
@@ -124,18 +124,18 @@ public class RefCountContractTest {
             // process(Animal animal) { animal.name(); }
             // Refs: Animal (type), Animal#name() (method)
             assertEquals(2, refs.size(),
-                    "Exact ref count: " + fqmns(refs));
+                    "Exact ref count: " + fqns(refs));
         }
 
         @Test
-        void exactOutgoingFqmns() throws Exception {
+        void exactOutgoingFqns() throws Exception {
             var refs = collectMethod(
                     "test.service.AnimalService", "process");
             assertTrue(refs.containsKey(
                     "test.model.Animal#name()"),
-                    "Should have Animal#name: " + fqmns(refs));
+                    "Should have Animal#name: " + fqns(refs));
             assertTrue(refs.containsKey("test.model.Animal"),
-                    "Should have Animal type: " + fqmns(refs));
+                    "Should have Animal type: " + fqns(refs));
         }
 
         @Test
@@ -149,27 +149,27 @@ public class RefCountContractTest {
             // Dog, Cat, AbstractPet implement Animal#name()
             assertTrue(implCount >= 3,
                     "At least 3 implementations: "
-                    + fqmns(refs));
+                    + fqns(refs));
         }
 
         @Test
-        void implementationFqmnsExact() throws Exception {
+        void implementationFqnsExact() throws Exception {
             var refs = collectMethod(
                     "test.service.AnimalService", "process");
             ReferenceCollector.resolveImplementations(refs);
-            var implFqmns = refs.values().stream()
+            var implFqns = refs.values().stream()
                     .filter(r -> r.implementationOf() != null)
-                    .map(r -> r.fqmn())
+                    .map(r -> r.fqn())
                     .collect(Collectors.toSet());
-            assertTrue(implFqmns.stream()
+            assertTrue(implFqns.stream()
                     .anyMatch(f -> f.contains("Dog#name")),
-                    "Dog impl: " + implFqmns);
-            assertTrue(implFqmns.stream()
+                    "Dog impl: " + implFqns);
+            assertTrue(implFqns.stream()
                     .anyMatch(f -> f.contains("Cat#name")),
-                    "Cat impl: " + implFqmns);
-            assertTrue(implFqmns.stream()
+                    "Cat impl: " + implFqns);
+            assertTrue(implFqns.stream()
                     .anyMatch(f -> f.contains("AbstractPet#name")),
-                    "AbstractPet impl: " + implFqmns);
+                    "AbstractPet impl: " + implFqns);
         }
 
         @Test
@@ -183,7 +183,7 @@ public class RefCountContractTest {
                             "test.model.Animal#name()",
                             ref.implementationOf(),
                             "All impls should point to "
-                            + "Animal#name: " + ref.fqmn());
+                            + "Animal#name: " + ref.fqn());
                 }
             }
         }
@@ -231,7 +231,7 @@ public class RefCountContractTest {
             // Dog (type), Dog#bark() (method)
             // new Dog() is constructor — may or may not appear
             assertTrue(refs.size() >= 2,
-                    "At least Dog + bark: " + fqmns(refs));
+                    "At least Dog + bark: " + fqns(refs));
         }
 
         @Test
@@ -239,7 +239,7 @@ public class RefCountContractTest {
             var refs = collectMethod(
                     "test.service.AnimalService", "createDog");
             var dogRef = refs.get("test.model.Dog");
-            assertNotNull(dogRef, "Dog type: " + fqmns(refs));
+            assertNotNull(dogRef, "Dog type: " + fqns(refs));
             assertEquals(ReferenceCollector.RefKind.TYPE,
                     dogRef.kind());
             assertEquals("class", dogRef.declaringTypeKind());
@@ -250,7 +250,7 @@ public class RefCountContractTest {
             var refs = collectMethod(
                     "test.service.AnimalService", "createDog");
             var barkRef = refs.get("test.model.Dog#bark()");
-            assertNotNull(barkRef, "bark: " + fqmns(refs));
+            assertNotNull(barkRef, "bark: " + fqns(refs));
             assertEquals(ReferenceCollector.RefKind.METHOD,
                     barkRef.kind());
             assertEquals("class", barkRef.declaringTypeKind());
@@ -285,11 +285,11 @@ public class RefCountContractTest {
                     "getParrotName");
             // p.name() → AbstractPet#name(), Parrot type
             assertTrue(refs.size() >= 1,
-                    "Should have refs: " + fqmns(refs));
+                    "Should have refs: " + fqns(refs));
             var nameRef = refs.values().stream()
-                    .filter(r -> r.fqmn().contains("#name("))
+                    .filter(r -> r.fqn().contains("#name("))
                     .findFirst().orElse(null);
-            assertNotNull(nameRef, "name ref: " + fqmns(refs));
+            assertNotNull(nameRef, "name ref: " + fqns(refs));
             assertTrue(nameRef.isInherited(),
                     "name() is inherited on Parrot");
             assertEquals("test.edge.AbstractPet",
@@ -304,7 +304,7 @@ public class RefCountContractTest {
             var nameRef = refs.get(
                     "test.model.Animal#name()");
             assertNotNull(nameRef,
-                    "Animal#name: " + fqmns(refs));
+                    "Animal#name: " + fqns(refs));
             assertEquals("interface",
                     nameRef.declaringTypeKind());
             assertFalse(nameRef.isInherited());
@@ -319,10 +319,10 @@ public class RefCountContractTest {
                     "getStaticValue");
             // Outer.StaticNested.VALUE (constant)
             var valueRef = refs.values().stream()
-                    .filter(r -> r.fqmn().contains("VALUE"))
+                    .filter(r -> r.fqn().contains("VALUE"))
                     .findFirst().orElse(null);
             assertNotNull(valueRef,
-                    "VALUE ref: " + fqmns(refs));
+                    "VALUE ref: " + fqns(refs));
             assertTrue(valueRef.isStatic());
             assertEquals(ReferenceCollector.RefKind.CONSTANT,
                     valueRef.kind());
@@ -336,9 +336,9 @@ public class RefCountContractTest {
                     "getColor");
             // Color.RED — enum constant
             var redRef = refs.values().stream()
-                    .filter(r -> r.fqmn().contains("RED"))
+                    .filter(r -> r.fqn().contains("RED"))
                     .findFirst().orElse(null);
-            assertNotNull(redRef, "RED: " + fqmns(refs));
+            assertNotNull(redRef, "RED: " + fqns(refs));
             assertTrue(redRef.isStatic());
             assertEquals("enum", redRef.declaringTypeKind());
         }
@@ -350,10 +350,10 @@ public class RefCountContractTest {
                     "getSharedDog");
             // return SHARED_DOG — same-class field
             var fieldRef = refs.values().stream()
-                    .filter(r -> r.fqmn().contains("SHARED_DOG"))
+                    .filter(r -> r.fqn().contains("SHARED_DOG"))
                     .findFirst().orElse(null);
             assertNotNull(fieldRef,
-                    "SHARED_DOG: " + fqmns(refs));
+                    "SHARED_DOG: " + fqns(refs));
             assertTrue(fieldRef.isStatic());
             assertEquals("Dog", fieldRef.resolvedType());
             assertEquals("test.model.Dog",
@@ -370,14 +370,14 @@ public class RefCountContractTest {
     class DogNameOverride {
 
         @Test
-        void overrideTargetFqmnExact() throws Exception {
+        void overrideTargetFqnExact() throws Exception {
             var json = sourceJson("test.model.Dog", "name");
             var ot = json.getAsJsonObject("overrideTarget");
             assertNotNull(ot, "Should have overrideTarget");
             assertEquals("method", str(ot, "kind"));
             assertEquals("interface", str(ot, "typeKind"));
             assertEquals("test.model.Animal#name()",
-                    str(ot, "fqmn"));
+                    str(ot, "fqn"));
         }
     }
 
@@ -385,7 +385,7 @@ public class RefCountContractTest {
     class ParrotSpeakOverride {
 
         @Test
-        void overrideTargetFqmnExact() throws Exception {
+        void overrideTargetFqnExact() throws Exception {
             var json = sourceJson(
                     "test.edge.Parrot", "speak");
             var ot = json.getAsJsonObject("overrideTarget");
@@ -393,7 +393,7 @@ public class RefCountContractTest {
             assertEquals("method", str(ot, "kind"));
             assertEquals("class", str(ot, "typeKind"));
             assertEquals("test.edge.AbstractPet#speak()",
-                    str(ot, "fqmn"));
+                    str(ot, "fqn"));
         }
     }
 
@@ -443,12 +443,12 @@ public class RefCountContractTest {
                 var sub = e.getAsJsonObject();
                 if (sub.has("anonymous")
                         && sub.get("anonymous").getAsBoolean()) {
-                    assertNotNull(str(sub, "enclosingFqmn"),
-                            "Anonymous should have enclosingFqmn");
-                    assertTrue(str(sub, "enclosingFqmn")
+                    assertNotNull(str(sub, "enclosingFqn"),
+                            "Anonymous should have enclosingFqn");
+                    assertTrue(str(sub, "enclosingFqn")
                             .contains("createAnonymous"),
                             "Enclosing: "
-                            + str(sub, "enclosingFqmn"));
+                            + str(sub, "enclosingFqn"));
                     assertNotNull(str(sub, "file"),
                             "Should have file path");
                     assertTrue(sub.has("line"),
@@ -664,10 +664,10 @@ public class RefCountContractTest {
             var refs = collectMethod(
                     "test.service.GenericService", "get");
             var itemRef = refs.values().stream()
-                    .filter(r -> r.fqmn().contains("item"))
+                    .filter(r -> r.fqn().contains("item"))
                     .findFirst().orElse(null);
             assertNotNull(itemRef,
-                    "get() accesses item: " + fqmns(refs));
+                    "get() accesses item: " + fqns(refs));
             assertTrue(itemRef.isTypeVariable());
             assertEquals("test.model.Animal",
                     itemRef.typeBound());
@@ -680,7 +680,7 @@ public class RefCountContractTest {
             assertTrue(refs.containsKey(
                     "test.model.Animal#name()"),
                     "name() calls item.name() → Animal#name: "
-                    + fqmns(refs));
+                    + fqns(refs));
         }
 
         @Test
@@ -688,10 +688,10 @@ public class RefCountContractTest {
             var refs = collectMethod(
                     "test.service.GenericService", "set");
             var itemRef = refs.values().stream()
-                    .filter(r -> r.fqmn().contains("item"))
+                    .filter(r -> r.fqn().contains("item"))
                     .findFirst().orElse(null);
             assertNotNull(itemRef,
-                    "set() writes item: " + fqmns(refs));
+                    "set() writes item: " + fqns(refs));
         }
     }
 
@@ -708,11 +708,11 @@ public class RefCountContractTest {
                     "test.service.CallerService", "callProcess");
             // callProcess: new Dog(), service.process(dog)
             assertTrue(refs.containsKey("test.model.Dog"),
-                    "Dog type: " + fqmns(refs));
+                    "Dog type: " + fqns(refs));
             assertTrue(refs.values().stream()
-                    .anyMatch(r -> r.fqmn().contains(
+                    .anyMatch(r -> r.fqn().contains(
                             "AnimalService#process")),
-                    "AnimalService#process: " + fqmns(refs));
+                    "AnimalService#process: " + fqns(refs));
         }
 
         @Test
@@ -721,9 +721,9 @@ public class RefCountContractTest {
                     "test.service.CallerService",
                     "callCreateDog");
             assertTrue(refs.values().stream()
-                    .anyMatch(r -> r.fqmn().contains(
+                    .anyMatch(r -> r.fqn().contains(
                             "AnimalService#createDog")),
-                    "Should call createDog: " + fqmns(refs));
+                    "Should call createDog: " + fqns(refs));
         }
 
         @Test
@@ -748,14 +748,14 @@ public class RefCountContractTest {
         }
 
         @Test
-        void incomingRefFqmnUsesHashSeparator()
+        void incomingRefFqnUsesHashSeparator()
                 throws Exception {
             var json = sourceJson("test.model.Dog", "bark");
             for (JsonElement e
                     : refsWithDirection(json, "incoming")) {
-                String fqmn = str(e.getAsJsonObject(), "fqmn");
-                assertTrue(fqmn.contains("#"),
-                        "FQMN should use #: " + fqmn);
+                String fqn = str(e.getAsJsonObject(), "fqn");
+                assertTrue(fqn.contains("#"),
+                        "FQN should use #: " + fqn);
             }
         }
 
@@ -773,13 +773,13 @@ public class RefCountContractTest {
         @Test
         void incomingRefsDeduped() throws Exception {
             var json = sourceJson("test.model.Dog", "bark");
-            var fqmns = StreamSupport.stream(
+            var fqns = StreamSupport.stream(
                     refsWithDirection(json, "incoming")
                             .spliterator(), false)
-                    .map(e -> str(e.getAsJsonObject(), "fqmn"))
+                    .map(e -> str(e.getAsJsonObject(), "fqn"))
                     .toList();
-            assertEquals(fqmns.size(),
-                    Set.copyOf(fqmns).size());
+            assertEquals(fqns.size(),
+                    Set.copyOf(fqns).size());
         }
     }
 
@@ -791,7 +791,7 @@ public class RefCountContractTest {
                 throws Exception {
             var json = sourceJson(
                     "test.service.AnimalService", "process");
-            assertNotNull(str(json, "fqmn"));
+            assertNotNull(str(json, "fqn"));
             assertNotNull(str(json, "file"));
             assertTrue(json.get("startLine").getAsInt() > 0);
             assertTrue(json.get("endLine").getAsInt() > 0);
@@ -828,7 +828,7 @@ public class RefCountContractTest {
             for (JsonElement e
                     : refsWithDirection(json, "outgoing")) {
                 JsonObject ref = e.getAsJsonObject();
-                assertNotNull(str(ref, "fqmn"));
+                assertNotNull(str(ref, "fqn"));
                 assertNotNull(str(ref, "kind"));
                 assertNotNull(str(ref, "direction"));
                 assertNotNull(str(ref, "scope"));

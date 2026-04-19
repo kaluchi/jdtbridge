@@ -61,9 +61,9 @@ public class EnrichedRefTest {
 
     static ReferenceCollector.Ref find(
             Map<String, ReferenceCollector.Ref> refs,
-            String fqmnPart) {
+            String fqnPart) {
         return refs.values().stream()
-                .filter(r -> r.fqmn().contains(fqmnPart))
+                .filter(r -> r.fqn().contains(fqnPart))
                 .findFirst().orElse(null);
     }
 
@@ -297,9 +297,9 @@ public class EnrichedRefTest {
             assertNotNull(ref, "Should find name() call: "
                     + refs.keySet());
             // Declaring type should be AbstractPet
-            assertTrue(ref.fqmn().contains("AbstractPet"),
+            assertTrue(ref.fqn().contains("AbstractPet"),
                     "name() should resolve to AbstractPet: "
-                    + ref.fqmn());
+                    + ref.fqn());
             assertTrue(ref.isInherited(),
                     "Parrot.name() inherited from AbstractPet");
         }
@@ -546,7 +546,7 @@ public class EnrichedRefTest {
             IMethod method = type.getMethods()[0];
             String json = SourceReport.toJson(
                     "test", method, "D:/t.java", "code", 1, 1,
-                    Map.of(ref.fqmn(), ref), null);
+                    Map.of(ref.fqn(), ref), null);
             assertTrue(json.contains(
                     "\"returnTypeFqn\":\"test.model.Dog\""),
                     "Should have Dog FQN: " + json);
@@ -563,7 +563,7 @@ public class EnrichedRefTest {
             IMethod method = type.getMethods()[0];
             String json = SourceReport.toJson(
                     "test", method, "D:/t.java", "code", 1, 1,
-                    Map.of(ref.fqmn(), ref), null);
+                    Map.of(ref.fqn(), ref), null);
             assertTrue(json.contains(
                     "\"returnTypeKind\":\"class\""),
                     "Should have returnTypeKind:class: " + json);

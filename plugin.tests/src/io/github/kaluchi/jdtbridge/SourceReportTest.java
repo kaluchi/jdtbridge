@@ -130,7 +130,7 @@ public class SourceReportTest {
             var parsed = JsonParser.parseString(json)
                     .getAsJsonObject();
             assertEquals("test.model.Dog",
-                    parsed.get("fqmn").getAsString());
+                    parsed.get("fqn").getAsString());
             assertTrue(parsed.has("supertypes"));
             assertFalse(parsed.has("refs"));
         }
@@ -151,7 +151,7 @@ public class SourceReportTest {
                     .getAsJsonObject();
             assertEquals(
                     "test.service.AnimalService#process(Animal)",
-                    parsed.get("fqmn").getAsString());
+                    parsed.get("fqn").getAsString());
             assertTrue(parsed.has("refs"));
             assertTrue(json.contains(
                     "\"direction\":\"outgoing\""),

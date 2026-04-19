@@ -170,7 +170,7 @@ export const help = `jdt q — pipeline query over the Eclipse JDT semantic grap
 Usage:  jdt q <qlang-pipeline>
 
 A pipeline is SEED | step | step … . The seed is either a String
-(FQN / FQMN / wildcard pattern) or a nullary axis (@projects,
+(an fqn, or a wildcard like "*Service") or a nullary axis (@projects,
 @problems). Every step reads pipeValue from the step before and
 returns a new value. Exit code is always 0; errors travel on
 stdout as \`!{:kind … :message …}\` values — route them with \`!|\`.
@@ -183,7 +183,7 @@ stdout as \`!{:kind … :message …}\` values — route them with \`!|\`.
   # 2. Full card for a method — source + refs + hierarchy, markdown
   jdt q '"pkg.Foo#bar()" | @sourceCard' > bar.md
 
-  # 3. Who calls a method (distinct FQMNs)
+  # 3. Who calls a method (distinct FQNs)
   jdt q '"pkg.Foo#bar" | @callers * /fqn | distinct'
 
   # 4. Full supertype chain of a type
@@ -233,7 +233,7 @@ value so the next step composes. A Vec of 10k node-Maps followed by
 
 Seeds (string → node, or nullary):
   "fqn"                | @type  @package  @project  @file
-  "fqmn"               | @method  @field
+  "fqn"               | @method  @field
   "*pattern*"          | @types
   @projects            @problems            @problems(:project|:file)
 

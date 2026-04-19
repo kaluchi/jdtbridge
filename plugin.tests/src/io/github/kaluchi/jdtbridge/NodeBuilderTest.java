@@ -91,18 +91,18 @@ public class NodeBuilderTest {
     }
 
     @Test
-    void fqmnOfMethodCarriesHashAndCompactSignature() throws Exception {
+    void fqnOfMethodCarriesHashAndCompactSignature() throws Exception {
         IMethod barkMethod = method("test.model.Dog", "bark", null);
         assertEquals("test.model.Dog#bark()",
-                NodeBuilder.fqmnOf(barkMethod));
+                NodeBuilder.fqnOf(barkMethod));
     }
 
     @Test
-    void fqmnOfFieldOmitsParens() throws Exception {
+    void fqnOfFieldOmitsParens() throws Exception {
         IType dog = type("test.model.Dog");
         IField ageField = dog.getField("age");
         assertEquals("test.model.Dog#age",
-                NodeBuilder.fqmnOf(ageField));
+                NodeBuilder.fqnOf(ageField));
     }
 
     // ── Field translators ───────────────────────────────────────────

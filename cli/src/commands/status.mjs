@@ -90,7 +90,7 @@ async function renderEditors() {
     body: cliCmd("jdt editors"),
     description:
       "Eclipse editor area — open tabs. Active tab marked >.\n"
-      + "jdt open <FQMN> opens a type in the Java Editor (F3 equivalent).",
+      + "jdt open <FQN> opens a type in the Java Editor (F3 equivalent).",
   };
 }
 

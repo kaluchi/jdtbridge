@@ -1,6 +1,6 @@
 // Test status formatter.
 // Formats test session snapshots and streaming JSONL events.
-// Uses FQMN with # separator and [M] badges for navigation.
+// Uses FQN with # separator and [M] badges for navigation.
 
 import { red, green, yellow, bold, dim } from "../color.mjs";
 
@@ -58,22 +58,22 @@ export function formatTestEvent(jsonLine) {
 
   if (parsed.event === "case") {
     const status = parsed.status;
-    const fqmn = parsed.fqmn;
+    const fqn = parsed.fqn;
     const time = formatTime(parsed.time);
 
     if (status === "PASS") {
-      console.log(`${green("PASS")} [M] \`${fqmn}\` ${dim(time)}`);
+      console.log(`${green("PASS")} [M] \`${fqn}\` ${dim(time)}`);
     } else if (status === "FAIL") {
-      console.log(`${red("FAIL")} [M] \`${fqmn}\` ${dim(time)}`);
+      console.log(`${red("FAIL")} [M] \`${fqn}\` ${dim(time)}`);
       printTrace(parsed);
     } else if (status === "ERROR") {
       console.log(
-        `${bold(red("ERROR"))} [M] \`${fqmn}\` ${dim(time)}`,
+        `${bold(red("ERROR"))} [M] \`${fqn}\` ${dim(time)}`,
       );
       printTrace(parsed);
     } else if (status === "IGNORED") {
       console.log(
-        `${yellow("IGNORED")} [M] \`${fqmn}\``,
+        `${yellow("IGNORED")} [M] \`${fqn}\``,
       );
     }
     return true;
@@ -87,21 +87,21 @@ export function formatTestEvent(jsonLine) {
  */
 function formatEntry(f) {
   const status = f.status;
-  const fqmn = f.fqmn;
+  const fqn = f.fqn;
   const time = formatTime(f.time);
 
   if (status === "PASS") {
-    console.log(`${green("PASS")} [M] \`${fqmn}\` ${dim(time)}`);
+    console.log(`${green("PASS")} [M] \`${fqn}\` ${dim(time)}`);
   } else if (status === "FAIL") {
-    console.log(`${red("FAIL")} [M] \`${fqmn}\` ${dim(time)}`);
+    console.log(`${red("FAIL")} [M] \`${fqn}\` ${dim(time)}`);
     printTrace(f);
   } else if (status === "ERROR") {
     console.log(
-      `${bold(red("ERROR"))} [M] \`${fqmn}\` ${dim(time)}`,
+      `${bold(red("ERROR"))} [M] \`${fqn}\` ${dim(time)}`,
     );
     printTrace(f);
   } else if (status === "IGNORED") {
-    console.log(`${yellow("IGNORED")} [M] \`${fqmn}\``);
+    console.log(`${yellow("IGNORED")} [M] \`${fqn}\``);
   }
 }
 
@@ -171,9 +171,9 @@ export function testRunGuide(testRunId, launchId) {
   \`jdt launch stop ${launchId}\`            abort
   \`jdt launch clear ${launchId}\`           remove
 
-**Navigate** — FQMNs from status output are copy-pasteable:
-  \`jdt q '"<FQMN>" | @source'\`            view test source
-  \`jdt test run <FQMN> -f\`                re-run single test
+**Navigate** — FQNs from status output are copy-pasteable:
+  \`jdt q '"<FQN>" | @source'\`            view test source
+  \`jdt test run <FQN> -f\`                re-run single test
 
 Add \`-q\` to suppress this guide.`;
 }

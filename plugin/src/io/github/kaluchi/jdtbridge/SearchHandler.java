@@ -298,7 +298,7 @@ class SearchHandler {
                 IType sub = m.getDeclaringType();
                 if (sub.isAnonymous()) continue;
                 var e = typeEntry(sub);
-                e.addProperty("fqmn", entry.getKey());
+                e.addProperty("fqn", entry.getKey());
                 int[] implRange = getLinesOfMember(m);
                 e.addProperty("startLine", implRange[0]);
                 e.addProperty("endLine", implRange[1]);
@@ -608,11 +608,11 @@ class SearchHandler {
                         method, fullSource);
                 if (src == null) continue;
                 String sig = JdtUtils.compactSignature(method);
-                String mFqmn = fqn + "#" + sig;
+                String mFqn = fqn + "#" + sig;
                 var refs = ReferenceCollector.collect(method);
                 var incoming = collectIncomingRefs(method, scope);
                 String json = SourceReport.toJson(
-                        mFqmn, method, absPath, src,
+                        mFqn, method, absPath, src,
                         lines[0], lines[1], refs, incoming);
                 if (!first) arrJson.append(",");
                 arrJson.append(json);
@@ -628,7 +628,7 @@ class SearchHandler {
     }
 
     private HttpServer.Response resolvedResponse(IMember member,
-            String fqn, String methodName, String absPath,
+            String typeFqn, String methodName, String absPath,
             String fullSource, Map<String, String> params,
             ProjectScope scope) throws Exception {
         int[] lines = memberLines(member, fullSource);
@@ -649,19 +649,19 @@ class SearchHandler {
             return HttpServer.Response.json(
                     HttpServer.jsonError("Source not available"));
         }
-        String fqmn = methodName != null
-                ? fqn + "#" + methodName
+        String fqn = methodName != null
+                ? typeFqn + "#" + methodName
                         + JdtUtils.compactSignature((IMethod) member)
                                 .substring(
                                         ((IMethod) member)
                                                 .getElementName()
                                                 .length())
-                : fqn;
+                : typeFqn;
 
         var refs = ReferenceCollector.collect(member);
         var incoming = collectIncomingRefs(member, scope);
         String json = SourceReport.toJson(
-                fqmn, member, absPath, source,
+                fqn, member, absPath, source,
                 lines[0], lines[1], refs, incoming);
 
         return HttpServer.Response.json(json);

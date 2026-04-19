@@ -42,10 +42,10 @@ import org.eclipse.jdt.core.search.SearchRequestor;
  * Endpoint surface (point lookups + polymorphic detail):
  * <ul>
  *   <li>{@code /type?of=<fqn>}     — single :type detail</li>
- *   <li>{@code /method?of=<fqmn>}  — single :method detail; supports
+ *   <li>{@code /method?of=<fqn>}  — single :method detail; supports
  *       paramTypes for overload disambiguation</li>
- *   <li>{@code /field?of=<fqmn>}   — single :field detail</li>
- *   <li>{@code /detail?of=<fqn-or-fqmn>} — polymorphic; routes by
+ *   <li>{@code /field?of=<fqn>}   — single :field detail</li>
+ *   <li>{@code /detail?of=<fqn-or-fqn>} — polymorphic; routes by
  *       {@code #}-presence in the identifier</li>
  * </ul>
  * Subsequent batches add bulk-search ({@code /types}), navigation
@@ -74,21 +74,21 @@ class GraphHandler {
     }
 
     /**
-     * Single point-lookup for a method by FQMN. Optional
+     * Single point-lookup for a method by FQN. Optional
      * {@code paramTypes} param disambiguates overloads; absent means
      * "any overload" — fails with AmbiguousMatch when multiple exist.
      */
     String handleMethod(Map<String, String> params) {
-        String fqmn = params.get("of");
-        if (fqmn == null || fqmn.isBlank()) {
+        String fqn = params.get("of");
+        if (fqn == null || fqn.isBlank()) {
             return ErrorDescriptor.missingParameter("of").toJsonString();
         }
-        int hash = fqmn.indexOf('#');
+        int hash = fqn.indexOf('#');
         if (hash < 0) {
-            return ErrorDescriptor.invalidFqmn(fqmn).toJsonString();
+            return ErrorDescriptor.invalidFqn(fqn).toJsonString();
         }
-        String typeFqn = fqmn.substring(0, hash);
-        String memberPart = fqmn.substring(hash + 1);
+        String typeFqn = fqn.substring(0, hash);
+        String memberPart = fqn.substring(hash + 1);
         int paren = memberPart.indexOf('(');
         String methodName = paren < 0
                 ? memberPart : memberPart.substring(0, paren);
@@ -103,58 +103,56 @@ class GraphHandler {
         try {
             IType type = JdtUtils.findType(typeFqn);
             if (type == null) {
-                return ErrorDescriptor.typeNotFound(typeFqn)
-                        .with("fqmn", fqmn).toJsonString();
+                return ErrorDescriptor.typeNotFound(typeFqn).toJsonString();
             }
             var matches = JdtUtils.findMethods(type, methodName,
                     paramTypesParam);
             if (matches.isEmpty()) {
-                return ErrorDescriptor.methodNotFound(fqmn).toJsonString();
+                return ErrorDescriptor.methodNotFound(fqn).toJsonString();
             }
             if (matches.size() > 1) {
-                return ErrorDescriptor.ambiguousMatch(fqmn,
-                        fqmnsOf(matches)).toJsonString();
+                return ErrorDescriptor.ambiguousMatch(fqn,
+                        fqnsOf(matches)).toJsonString();
             }
             return NodeBuilder.methodDetail(matches.get(0)).toString();
         } catch (Exception e) {
-            Log.warn("/method failed for " + fqmn, e);
+            Log.warn("/method failed for " + fqn, e);
             return ErrorDescriptor.jdtInternalError(
-                    "Failed to resolve method: " + fqmn, e).toJsonString();
+                    "Failed to resolve method: " + fqn, e).toJsonString();
         }
     }
 
-    /** Single point-lookup for a field by FQMN. */
+    /** Single point-lookup for a field by FQN. */
     String handleField(Map<String, String> params) {
-        String fqmn = params.get("of");
-        if (fqmn == null || fqmn.isBlank()) {
+        String fqn = params.get("of");
+        if (fqn == null || fqn.isBlank()) {
             return ErrorDescriptor.missingParameter("of").toJsonString();
         }
-        int hash = fqmn.indexOf('#');
+        int hash = fqn.indexOf('#');
         if (hash < 0) {
-            return ErrorDescriptor.invalidFqmn(fqmn).toJsonString();
+            return ErrorDescriptor.invalidFqn(fqn).toJsonString();
         }
-        String typeFqn = fqmn.substring(0, hash);
-        String fieldName = fqmn.substring(hash + 1);
+        String typeFqn = fqn.substring(0, hash);
+        String fieldName = fqn.substring(hash + 1);
         if (fieldName.contains("(")) {
-            return ErrorDescriptor.invalidFqmn(fqmn)
-                    .with("reason", "field FQMN must not contain parens")
+            return ErrorDescriptor.invalidFqn(fqn)
+                    .with("reason", "field FQN must not contain parens")
                     .toJsonString();
         }
         try {
             IType type = JdtUtils.findType(typeFqn);
             if (type == null) {
-                return ErrorDescriptor.typeNotFound(typeFqn)
-                        .with("fqmn", fqmn).toJsonString();
+                return ErrorDescriptor.typeNotFound(typeFqn).toJsonString();
             }
             IField field = type.getField(fieldName);
             if (field == null || !field.exists()) {
-                return ErrorDescriptor.fieldNotFound(fqmn).toJsonString();
+                return ErrorDescriptor.fieldNotFound(fqn).toJsonString();
             }
             return NodeBuilder.fieldDetail(field).toString();
         } catch (Exception e) {
-            Log.warn("/field failed for " + fqmn, e);
+            Log.warn("/field failed for " + fqn, e);
             return ErrorDescriptor.jdtInternalError(
-                    "Failed to resolve field: " + fqmn, e).toJsonString();
+                    "Failed to resolve field: " + fqn, e).toJsonString();
         }
     }
 
@@ -803,8 +801,8 @@ class GraphHandler {
             java.util.Set.of("all", "call", "read", "write", "typeUse");
 
     String handleRefsTo(Map<String, String> params, ProjectScope scope) {
-        String fqmn = params.get("of");
-        if (fqmn == null || fqmn.isBlank()) {
+        String fqn = params.get("of");
+        if (fqn == null || fqn.isBlank()) {
             return ErrorDescriptor.missingParameter("of").toJsonString();
         }
         String refKindParam = params.getOrDefault("refKind", "all");
@@ -814,7 +812,7 @@ class GraphHandler {
                     .toJsonString();
         }
         try {
-            ResolvedTarget target = resolveTarget(fqmn, params);
+            ResolvedTarget target = resolveTarget(fqn, params);
             if (target.errorJson != null) return target.errorJson;
 
             int searchPattern = IJavaSearchConstants.REFERENCES;
@@ -832,7 +830,7 @@ class GraphHandler {
                     target.element, searchPattern);
             if (pattern == null) {
                 return ErrorDescriptor.jdtInternalError(
-                        "Cannot create search pattern for " + fqmn, null)
+                        "Cannot create search pattern for " + fqn, null)
                         .toJsonString();
             }
 
@@ -859,9 +857,9 @@ class GraphHandler {
                     null);
             return arr.toString();
         } catch (Exception e) {
-            Log.warn("/refs?to failed for " + fqmn, e);
+            Log.warn("/refs?to failed for " + fqn, e);
             return ErrorDescriptor.jdtInternalError(
-                    "Failed /refs to=" + fqmn, e).toJsonString();
+                    "Failed /refs to=" + fqn, e).toJsonString();
         }
     }
 
@@ -877,7 +875,7 @@ class GraphHandler {
      * Outgoing references from a source member. Returns Vec of
      * :reference nodes where the subject-as-`:from` calls / reads
      * / touches the target carried under `:to`. AST-visitor based
-     * (ReferenceCollector) — resolves bindings to FQMN and kind.
+     * (ReferenceCollector) — resolves bindings to FQN and kind.
      *
      * Member-scoped: calls on a type flatten into one record per
      * distinct callee across every declared method body. Constants
@@ -887,12 +885,12 @@ class GraphHandler {
      */
     String handleOutgoingRefs(Map<String, String> params,
             ProjectScope scope) {
-        String fqmn = params.get("of");
-        if (fqmn == null || fqmn.isBlank()) {
+        String fqn = params.get("of");
+        if (fqn == null || fqn.isBlank()) {
             return ErrorDescriptor.missingParameter("of").toJsonString();
         }
         try {
-            ResolvedTarget target = resolveTarget(fqmn, params);
+            ResolvedTarget target = resolveTarget(fqn, params);
             if (target.errorJson != null) return target.errorJson;
             if (!(target.element instanceof IMember member)) {
                 return ErrorDescriptor.wrongSubjectKind(
@@ -932,9 +930,9 @@ class GraphHandler {
             }
             return arr.toString();
         } catch (Exception e) {
-            Log.warn("/outgoingRefs failed for " + fqmn, e);
+            Log.warn("/outgoingRefs failed for " + fqn, e);
             return ErrorDescriptor.jdtInternalError(
-                    "Failed /outgoingRefs of=" + fqmn, e).toJsonString();
+                    "Failed /outgoingRefs of=" + fqn, e).toJsonString();
         }
     }
 
@@ -961,17 +959,17 @@ class GraphHandler {
 
     private String resolveTargetMethod(Map<String, String> params,
             String endpointName, MethodHandler body) {
-        String fqmn = params.get("of");
-        if (fqmn == null || fqmn.isBlank()) {
+        String fqn = params.get("of");
+        if (fqn == null || fqn.isBlank()) {
             return ErrorDescriptor.missingParameter("of").toJsonString();
         }
         ResolvedTarget target;
         try {
-            target = resolveTarget(fqmn, params);
+            target = resolveTarget(fqn, params);
         } catch (Exception e) {
             Log.warn(endpointName + " resolve failed", e);
             return ErrorDescriptor.jdtInternalError(
-                    "Failed " + endpointName + " for " + fqmn, e)
+                    "Failed " + endpointName + " for " + fqn, e)
                     .toJsonString();
         }
         if (target.errorJson != null) return target.errorJson;
@@ -990,7 +988,7 @@ class GraphHandler {
         return element.getClass().getSimpleName();
     }
 
-    /** Result of FQN/FQMN resolution: either an element + skeleton, or an error JSON. */
+    /** Result of FQN/FQN resolution: either an element + skeleton, or an error JSON. */
     private static final class ResolvedTarget {
         final IJavaElement element;
         final JsonObject skeleton;
@@ -1031,8 +1029,7 @@ class GraphHandler {
         IType type = JdtUtils.findType(typeFqn);
         if (type == null) {
             return ResolvedTarget.err(
-                    ErrorDescriptor.typeNotFound(typeFqn)
-                            .with("fqmn", identifier).toJsonString());
+                    ErrorDescriptor.typeNotFound(typeFqn).toJsonString());
         }
         if (!memberPart.contains("(")) {
             // Field first (no parens means no method signature)
@@ -1052,7 +1049,7 @@ class GraphHandler {
             if (matches.size() > 1) {
                 return ResolvedTarget.err(
                         ErrorDescriptor.ambiguousMatch(
-                                identifier, fqmnsOf(matches))
+                                identifier, fqnsOf(matches))
                                 .toJsonString());
             }
             IMethod m = matches.get(0);
@@ -1079,23 +1076,23 @@ class GraphHandler {
         if (matches.size() > 1) {
             return ResolvedTarget.err(
                     ErrorDescriptor.ambiguousMatch(
-                            identifier, fqmnsOf(matches)).toJsonString());
+                            identifier, fqnsOf(matches)).toJsonString());
         }
         IMethod m = matches.get(0);
         return ResolvedTarget.ok(m, NodeBuilder.methodSkeleton(m));
     }
 
     /**
-     * Project the candidate IMethod list onto their FQMN strings for
+     * Project the candidate IMethod list onto their FQN strings for
      * an AmbiguousMatch error descriptor. The list becomes the
      * `:candidates` field a caller routes to `!| /context/candidates`
-     * to choose a disambiguated FQMN and retry.
+     * to choose a disambiguated FQN and retry.
      */
-    private static List<String> fqmnsOf(List<IMethod> methods) {
+    private static List<String> fqnsOf(List<IMethod> methods) {
         var out = new ArrayList<String>(methods.size());
         for (IMethod m : methods) {
             try {
-                out.add(NodeBuilder.fqmnOf(m));
+                out.add(NodeBuilder.fqnOf(m));
             } catch (JavaModelException ignored) {
                 out.add(m.getElementName() + "(?)");
             }

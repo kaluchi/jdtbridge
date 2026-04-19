@@ -161,7 +161,7 @@ public class ProjectScopeIntegrationTest {
             var json = JsonParser.parseString(resp.body())
                     .getAsJsonObject();
             assertEquals("test.model.Dog",
-                    json.get("fqmn").getAsString());
+                    json.get("fqn").getAsString());
         }
 
         @Test

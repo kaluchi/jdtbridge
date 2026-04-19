@@ -2,7 +2,7 @@
    :jdt/graph — canonical access surface for the Eclipse JDT graph.
 
    Every operand consumes either a node-Map (skeleton or detail —
-   see the ABI doc) or a fqn/fqmn String, and returns either a
+   see the ABI doc) or a fqn String, and returns either a
    single node, a Vec of nodes, or — on failure — an Error value
    riding the fail-track with the server's structured descriptor.
    ───────────────────────────────────────────────────────────────── ~|
@@ -43,12 +43,12 @@
            :subject [:map :string]
            :modifiers []
            :returns :map
-           :docs ["Single :method detail by FQMN. Supports both inline-paren signatures and the bare-name form (must be unambiguous)."]
-           :examples [{:doc "Method detail by full FQMN"
+           :docs ["Single :method detail by FQN. Supports both inline-paren signatures and the bare-name form (must be unambiguous)."]
+           :examples [{:doc "Method detail by full FQN"
                        :snippet "\"io.github.kaluchi.jdtbridge.HttpServer#start(java.net.InetAddress,int)\" | @method"}
                       {:doc "Ambiguous bare name — descriptor carries :candidates for disambiguation"
                        :snippet "\"io.github.kaluchi.jdtbridge.HttpServer#start\" | @method !| /context/candidates"}]
-           :throws [:MethodNotFound :AmbiguousMatch :InvalidFqmn]}
+           :throws [:MethodNotFound :AmbiguousMatch :InvalidFqn]}
 
  :@field {:qlang/kind :builtin
           :qlang/impl null
@@ -56,10 +56,10 @@
           :subject [:map :string]
           :modifiers []
           :returns :map
-          :docs ["Single :field detail by FQMN (pkg.Type#fieldName)."]
+          :docs ["Single :field detail by FQN (pkg.Type#fieldName)."]
           :examples [{:doc "Field detail — type, modifiers, annotations"
                       :snippet "\"io.github.kaluchi.jdtbridge.HttpServer#search\" | @field"}]
-          :throws [:FieldNotFound :InvalidFqmn]}
+          :throws [:FieldNotFound :InvalidFqn]}
 
  :@project {:qlang/kind :builtin
             :qlang/impl null
@@ -344,8 +344,8 @@
 
 |~~ Polymorphic seed lift. Map subjects (skeleton/detail) pass
     through. String subjects dispatch by shape:
-      - has '#' and '(' → @method (FQMN with explicit signature)
-      - has '#', no '(' → @field (FQMN for a field)
+      - has '#' and '(' → @method (FQN with explicit signature)
+      - has '#', no '(' → @field (FQN for a field)
       - no '#'          → @type (FQN for a type)
     A bare method name without parens (`Type#method`) is
     syntactically indistinguishable from a field reference — to
@@ -377,7 +377,7 @@ let(:@containingFile, @asNode | /location/file | unless(eq(null), @file))
 |~~ Enrich a skeleton-node into a detail-node. Routes by :kind to
     the appropriate point-lookup operand (@type / @method / @field /
     @project / @package / @file). Idempotent on detail-nodes.
-    Accepts String FQN/FQMN subjects via @asNode. Unknown :kind
+    Accepts String FQN/FQN subjects via @asNode. Unknown :kind
     raises :unsupported-detail-kind on the fail-track. ~~|
 let(:@detail, @asNode | as(:n) | /kind | as(:k)
     | cond(eq("type"),    n | @type,

@@ -20,10 +20,10 @@ import java.util.Map;
 class SourceReport {
 
     /** An incoming reference (caller). */
-    record IncomingRef(String fqmn, String file, int line,
+    record IncomingRef(String fqn, String file, int line,
             String typeKind, boolean isProjectSource) {}
 
-    static String toJson(String fqmn, IMember member,
+    static String toJson(String fqn, IMember member,
             String absPath, String source,
             int startLine, int endLine,
             Map<String, ReferenceCollector.Ref> refs,
@@ -35,7 +35,7 @@ class SourceReport {
                 ? declaringType.getFullyQualifiedName() : "";
 
         var result = new JsonObject();
-        result.addProperty("fqmn", fqmn);
+        result.addProperty("fqn", fqn);
         result.addProperty("file", absPath);
         result.addProperty("startLine", startLine);
         result.addProperty("endLine", endLine);
@@ -65,7 +65,7 @@ class SourceReport {
         var refsArr = new JsonArray();
         for (var ref : refs.values()) {
             var entry = new JsonObject();
-            entry.addProperty("fqmn", ref.fqmn());
+            entry.addProperty("fqn", ref.fqn());
             entry.addProperty("direction", "outgoing");
             entry.addProperty("kind",
                     ref.kind().name().toLowerCase());
@@ -76,7 +76,7 @@ class SourceReport {
                         ref.declaringTypeKind());
             }
 
-            String refTypeFqn = extractTypeFqn(ref.fqmn());
+            String refTypeFqn = extractTypeFqn(ref.fqn());
 
             // Classify: same-class, project, dependency
             if (refTypeFqn.equals(ownFqn)) {
@@ -143,7 +143,7 @@ class SourceReport {
                             String encTypeFqn =
                                     m.getDeclaringType()
                                             .getFullyQualifiedName();
-                            entry.addProperty("enclosingFqmn",
+                            entry.addProperty("enclosingFqn",
                                     encTypeFqn + "#"
                                     + JdtUtils.compactSignature(m));
                         }
@@ -174,14 +174,14 @@ class SourceReport {
             var implArr = new JsonArray();
             for (var e : impls.entrySet()) {
                 var entry = new JsonObject();
-                entry.addProperty("fqmn", e.getKey());
+                entry.addProperty("fqn", e.getKey());
                 try {
                     IType dt = e.getValue().getDeclaringType();
                     if (dt != null && dt.isAnonymous()) {
                         entry.addProperty("anonymous", true);
                         var parent = dt.getParent();
                         if (parent instanceof IMethod em) {
-                            entry.addProperty("enclosingFqmn",
+                            entry.addProperty("enclosingFqn",
                                     em.getDeclaringType()
                                             .getFullyQualifiedName()
                                     + "#" + JdtUtils
@@ -195,12 +195,12 @@ class SourceReport {
         }
 
         // Incoming refs (callers) — exclude any that match
-        // an implementation FQMN (rare: impl also calls super)
+        // an implementation FQN (rare: impl also calls super)
         if (incomingRefs != null) {
             for (var inc : incomingRefs) {
-                if (impls.containsKey(inc.fqmn())) continue;
+                if (impls.containsKey(inc.fqn())) continue;
                 var entry = new JsonObject();
-                entry.addProperty("fqmn", inc.fqmn());
+                entry.addProperty("fqn", inc.fqn());
                 entry.addProperty("direction", "incoming");
                 entry.addProperty("kind", "method");
                 if (inc.typeKind() != null) {
@@ -417,7 +417,7 @@ class SourceReport {
 
     /**
      * Build a hierarchy entry with full metadata: fqn, kind,
-     * file, line range, anonymous + enclosingFqmn.
+     * file, line range, anonymous + enclosingFqn.
      */
     static JsonObject hierEntry(IType t) {
         var s = new JsonObject();
@@ -435,7 +435,7 @@ class SourceReport {
                 s.addProperty("anonymous", true);
                 var parent = t.getParent();
                 if (parent instanceof IMethod m) {
-                    s.addProperty("enclosingFqmn",
+                    s.addProperty("enclosingFqn",
                             m.getDeclaringType()
                                     .getFullyQualifiedName()
                             + "#" + JdtUtils
@@ -446,9 +446,9 @@ class SourceReport {
         return s;
     }
 
-    private static String extractTypeFqn(String fqmn) {
-        int hash = fqmn.indexOf('#');
-        return hash >= 0 ? fqmn.substring(0, hash) : fqmn;
+    private static String extractTypeFqn(String fqn) {
+        int hash = fqn.indexOf('#');
+        return hash >= 0 ? fqn.substring(0, hash) : fqn;
     }
 
     /**
@@ -502,7 +502,7 @@ class SourceReport {
     private static JsonObject overrideJson(IType type, IMethod method,
             String methodName) throws JavaModelException {
         var obj = new JsonObject();
-        obj.addProperty("fqmn",
+        obj.addProperty("fqn",
                 type.getFullyQualifiedName()
                 + "#" + methodName + "("
                 + ReferenceCollector.paramSig(method)

@@ -246,12 +246,12 @@ public class EdgeCaseIntegrationTest {
             JsonObject o = e.getAsJsonObject();
             assertNotNull(o.get("source"), "Should have source");
             assertTrue(o.has("refs"), "Should have refs");
-            String fqmn = o.get("fqmn").getAsString();
-            if (fqmn.equals("test.edge.Calculator#add(int, int)"))
+            String fqn = o.get("fqn").getAsString();
+            if (fqn.equals("test.edge.Calculator#add(int, int)"))
                 hasIntInt = true;
-            if (fqmn.equals("test.edge.Calculator#add(double, double)"))
+            if (fqn.equals("test.edge.Calculator#add(double, double)"))
                 hasDoubleDouble = true;
-            if (fqmn.equals("test.edge.Calculator#add(int, int, int)"))
+            if (fqn.equals("test.edge.Calculator#add(int, int, int)"))
                 hasIntIntInt = true;
         }
         assertTrue(hasIntInt, "Should have int overload");

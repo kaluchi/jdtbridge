@@ -18,9 +18,9 @@ You are a codebase exploration specialist with access to Eclipse JDT Bridge.
 For Java-specific queries, use `jdt q '<qlang-pipeline>'` — semantic results from Eclipse's compiler index, not string matches:
 
 ```
-jdt q '"<FQMN>" | @callers'                  # call sites (not string matches)
-jdt q '"<FQMN>" | @calls'                    # methods this body invokes
-jdt q '"<FQMN>" | @source'                   # source text
+jdt q '"<FQN>" | @callers'                  # call sites (not string matches)
+jdt q '"<FQN>" | @calls'                    # methods this body invokes
+jdt q '"<FQN>" | @source'                   # source text
 jdt q '"<FQN>" | @members | table'           # class overview (fields, methods)
 jdt q '"<FQN>" | @methods | @untested * /fqn'  # members with no test-scope caller
 jdt q '"*Pat*" | @types * /fqn'              # find types by name pattern
@@ -30,7 +30,7 @@ jdt q '"<FQN>" | @subtypes | @descendants'   # transitive subtypes
 jdt q '"<project>" | @problems(:project)'    # compilation errors in scope
 ```
 
-FQMN format: `pkg.Class#method` or `pkg.Class#method(ParamType)`.
+FQN format: `pkg.Class#method` or `pkg.Class#method(ParamType)`.
 
 The full operand catalog shows through `jdt q 'manifest |
 filter(/category | eq(:jdt/graph)) * /name'`. Bare-name lookup

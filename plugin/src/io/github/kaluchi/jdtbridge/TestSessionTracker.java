@@ -175,12 +175,12 @@ class TestSessionTracker extends TestRunListener {
 
         String className = tc.getTestClassName();
         String methodName = tc.getTestMethodName();
-        String fqmn = className + "#" + methodName;
+        String fqn = className + "#" + methodName;
         double elapsed = tc.getElapsedTimeInSeconds();
 
         var event = new JsonObject();
         event.addProperty("event", "case");
-        event.addProperty("fqmn", fqmn);
+        event.addProperty("fqn", fqn);
         event.addProperty("status", status);
         event.addProperty("time",
                 Double.isNaN(elapsed) ? 0.0 : elapsed);

@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { parseFqmn } from "../src/args.mjs";
+import { parseFqn } from "../src/args.mjs";
 
-describe("parseFqmn", () => {
+describe("parseFqn", () => {
   // ---- Plain FQN (no method) ----
 
   describe("plain FQN — no method", () => {
     it("simple class name", () => {
-      expect(parseFqmn("com.example.Foo")).toEqual({
+      expect(parseFqn("com.example.Foo")).toEqual({
         className: "com.example.Foo",
         method: null,
         paramTypes: null,
@@ -14,7 +14,7 @@ describe("parseFqmn", () => {
     });
 
     it("single-segment name", () => {
-      expect(parseFqmn("Foo")).toEqual({
+      expect(parseFqn("Foo")).toEqual({
         className: "Foo",
         method: null,
         paramTypes: null,
@@ -22,7 +22,7 @@ describe("parseFqmn", () => {
     });
 
     it("deep package", () => {
-      expect(parseFqmn("io.github.kaluchi.jdtbridge.SearchHandler")).toEqual({
+      expect(parseFqn("io.github.kaluchi.jdtbridge.SearchHandler")).toEqual({
         className: "io.github.kaluchi.jdtbridge.SearchHandler",
         method: null,
         paramTypes: null,
@@ -30,7 +30,7 @@ describe("parseFqmn", () => {
     });
 
     it("null input", () => {
-      expect(parseFqmn(null)).toEqual({
+      expect(parseFqn(null)).toEqual({
         className: null,
         method: null,
         paramTypes: null,
@@ -38,7 +38,7 @@ describe("parseFqmn", () => {
     });
 
     it("undefined input", () => {
-      expect(parseFqmn(undefined)).toEqual({
+      expect(parseFqn(undefined)).toEqual({
         className: null,
         method: null,
         paramTypes: null,
@@ -46,7 +46,7 @@ describe("parseFqmn", () => {
     });
 
     it("empty string", () => {
-      expect(parseFqmn("")).toEqual({
+      expect(parseFqn("")).toEqual({
         className: null,
         method: null,
         paramTypes: null,
@@ -58,7 +58,7 @@ describe("parseFqmn", () => {
 
   describe("javadoc style — hash separator", () => {
     it("method without signature", () => {
-      expect(parseFqmn("com.example.Foo#bar")).toEqual({
+      expect(parseFqn("com.example.Foo#bar")).toEqual({
         className: "com.example.Foo",
         method: "bar",
         paramTypes: null,
@@ -66,7 +66,7 @@ describe("parseFqmn", () => {
     });
 
     it("method with empty parens — zero-arg", () => {
-      expect(parseFqmn("com.example.Foo#bar()")).toEqual({
+      expect(parseFqn("com.example.Foo#bar()")).toEqual({
         className: "com.example.Foo",
         method: "bar",
         paramTypes: [],
@@ -74,7 +74,7 @@ describe("parseFqmn", () => {
     });
 
     it("method with one param — simple name", () => {
-      expect(parseFqmn("com.example.Foo#bar(String)")).toEqual({
+      expect(parseFqn("com.example.Foo#bar(String)")).toEqual({
         className: "com.example.Foo",
         method: "bar",
         paramTypes: ["String"],
@@ -82,7 +82,7 @@ describe("parseFqmn", () => {
     });
 
     it("method with one param — FQN", () => {
-      expect(parseFqmn("com.example.Foo#bar(java.lang.String)")).toEqual({
+      expect(parseFqn("com.example.Foo#bar(java.lang.String)")).toEqual({
         className: "com.example.Foo",
         method: "bar",
         paramTypes: ["java.lang.String"],
@@ -90,7 +90,7 @@ describe("parseFqmn", () => {
     });
 
     it("method with multiple params", () => {
-      expect(parseFqmn("com.example.Foo#bar(String, int)")).toEqual({
+      expect(parseFqn("com.example.Foo#bar(String, int)")).toEqual({
         className: "com.example.Foo",
         method: "bar",
         paramTypes: ["String", "int"],
@@ -98,7 +98,7 @@ describe("parseFqmn", () => {
     });
 
     it("method with array param", () => {
-      expect(parseFqmn("com.example.Foo#bar(String[])")).toEqual({
+      expect(parseFqn("com.example.Foo#bar(String[])")).toEqual({
         className: "com.example.Foo",
         method: "bar",
         paramTypes: ["String[]"],
@@ -107,7 +107,7 @@ describe("parseFqmn", () => {
 
     it("method with multiple params including array", () => {
       expect(
-        parseFqmn("com.example.Foo#bar(java.lang.String, java.lang.String[])"),
+        parseFqn("com.example.Foo#bar(java.lang.String, java.lang.String[])"),
       ).toEqual({
         className: "com.example.Foo",
         method: "bar",
@@ -116,7 +116,7 @@ describe("parseFqmn", () => {
     });
 
     it("method with 2D array param", () => {
-      expect(parseFqmn("com.example.Foo#bar(int[][])")).toEqual({
+      expect(parseFqn("com.example.Foo#bar(int[][])")).toEqual({
         className: "com.example.Foo",
         method: "bar",
         paramTypes: ["int[][]"],
@@ -125,7 +125,7 @@ describe("parseFqmn", () => {
 
     it("method with many params", () => {
       expect(
-        parseFqmn("com.example.Foo#bar(int, String, boolean, double)"),
+        parseFqn("com.example.Foo#bar(int, String, boolean, double)"),
       ).toEqual({
         className: "com.example.Foo",
         method: "bar",
@@ -134,7 +134,7 @@ describe("parseFqmn", () => {
     });
 
     it("constructor-like (class name as method)", () => {
-      expect(parseFqmn("com.example.Foo#Foo(int)")).toEqual({
+      expect(parseFqn("com.example.Foo#Foo(int)")).toEqual({
         className: "com.example.Foo",
         method: "Foo",
         paramTypes: ["int"],
@@ -147,7 +147,7 @@ describe("parseFqmn", () => {
   describe("Eclipse copy style — dot separator with parens", () => {
     it("method with one param", () => {
       expect(
-        parseFqmn(
+        parseFqn(
           "io.github.kaluchi.jdtbridge.SearchHandler.normalizePackage(String)",
         ),
       ).toEqual({
@@ -158,7 +158,7 @@ describe("parseFqmn", () => {
     });
 
     it("method with empty parens", () => {
-      expect(parseFqmn("com.example.Foo.bar()")).toEqual({
+      expect(parseFqn("com.example.Foo.bar()")).toEqual({
         className: "com.example.Foo",
         method: "bar",
         paramTypes: [],
@@ -166,7 +166,7 @@ describe("parseFqmn", () => {
     });
 
     it("method with multiple params", () => {
-      expect(parseFqmn("com.example.Foo.bar(String, int)")).toEqual({
+      expect(parseFqn("com.example.Foo.bar(String, int)")).toEqual({
         className: "com.example.Foo",
         method: "bar",
         paramTypes: ["String", "int"],
@@ -175,7 +175,7 @@ describe("parseFqmn", () => {
 
     it("method with FQN params", () => {
       expect(
-        parseFqmn("com.example.Foo.bar(java.lang.String, java.util.List)"),
+        parseFqn("com.example.Foo.bar(java.lang.String, java.util.List)"),
       ).toEqual({
         className: "com.example.Foo",
         method: "bar",
@@ -184,7 +184,7 @@ describe("parseFqmn", () => {
     });
 
     it("inner class method", () => {
-      expect(parseFqmn("com.example.Outer.Inner.method(String)")).toEqual({
+      expect(parseFqn("com.example.Outer.Inner.method(String)")).toEqual({
         className: "com.example.Outer.Inner",
         method: "method",
         paramTypes: ["String"],
@@ -193,7 +193,7 @@ describe("parseFqmn", () => {
 
     it("does NOT parse as method when no parens", () => {
       // Without parens, dot notation is ambiguous — treated as plain FQN
-      expect(parseFqmn("com.example.Foo.bar")).toEqual({
+      expect(parseFqn("com.example.Foo.bar")).toEqual({
         className: "com.example.Foo.bar",
         method: null,
         paramTypes: null,
@@ -203,12 +203,12 @@ describe("parseFqmn", () => {
 
   // ---- Generics erasure ----
   // Generics are stripped from param types (type erasure).
-  // Map<String,Integer> → Map. This ensures FQMNs are canonical
+  // Map<String,Integer> → Map. This ensures FQNs are canonical
   // and match regardless of generic info.
 
   describe("generics erasure in parameters", () => {
     it("simple generic param — erased", () => {
-      expect(parseFqmn("com.example.Foo#bar(List<String>)")).toEqual({
+      expect(parseFqn("com.example.Foo#bar(List<String>)")).toEqual({
         className: "com.example.Foo",
         method: "bar",
         paramTypes: ["List"],
@@ -217,7 +217,7 @@ describe("parseFqmn", () => {
 
     it("generic with comma inside — single erased param", () => {
       expect(
-        parseFqmn("com.example.Foo#bar(Map<String, Integer>)"),
+        parseFqn("com.example.Foo#bar(Map<String, Integer>)"),
       ).toEqual({
         className: "com.example.Foo",
         method: "bar",
@@ -227,7 +227,7 @@ describe("parseFqmn", () => {
 
     it("generic param followed by another param", () => {
       expect(
-        parseFqmn("com.example.Foo#bar(Map<String, Integer>, int)"),
+        parseFqn("com.example.Foo#bar(Map<String, Integer>, int)"),
       ).toEqual({
         className: "com.example.Foo",
         method: "bar",
@@ -237,7 +237,7 @@ describe("parseFqmn", () => {
 
     it("nested generics — fully erased", () => {
       expect(
-        parseFqmn("com.example.Foo#bar(Map<String, List<Integer>>)"),
+        parseFqn("com.example.Foo#bar(Map<String, List<Integer>>)"),
       ).toEqual({
         className: "com.example.Foo",
         method: "bar",
@@ -247,7 +247,7 @@ describe("parseFqmn", () => {
 
     it("multiple generic params", () => {
       expect(
-        parseFqmn(
+        parseFqn(
           "com.example.Foo#bar(List<String>, Map<String, Integer>, int)",
         ),
       ).toEqual({
@@ -258,7 +258,7 @@ describe("parseFqmn", () => {
     });
 
     it("generic array — erased but array preserved", () => {
-      expect(parseFqmn("Foo#bar(List<String>[])")).toEqual({
+      expect(parseFqn("Foo#bar(List<String>[])")).toEqual({
         className: "Foo",
         method: "bar",
         paramTypes: ["List[]"],
@@ -267,7 +267,7 @@ describe("parseFqmn", () => {
 
     it("FQN generic — erased", () => {
       expect(
-        parseFqmn("Foo#bar(java.util.Map<java.lang.String, java.lang.Integer>)"),
+        parseFqn("Foo#bar(java.util.Map<java.lang.String, java.lang.Integer>)"),
       ).toEqual({
         className: "Foo",
         method: "bar",
@@ -277,7 +277,7 @@ describe("parseFqmn", () => {
 
     it("Eclipse Copy Qualified Name with generics", () => {
       expect(
-        parseFqmn(
+        parseFqn(
           "io.github.kaluchi.jdtbridge.SearchHandler.handleFind(Map<String, String>)",
         ),
       ).toEqual({
@@ -288,7 +288,7 @@ describe("parseFqmn", () => {
     });
 
     it("no generics — unchanged", () => {
-      expect(parseFqmn("Foo#bar(String, int)")).toEqual({
+      expect(parseFqn("Foo#bar(String, int)")).toEqual({
         className: "Foo",
         method: "bar",
         paramTypes: ["String", "int"],
@@ -300,7 +300,7 @@ describe("parseFqmn", () => {
 
   describe("inner classes", () => {
     it("inner class with hash — method", () => {
-      expect(parseFqmn("com.example.Outer.Inner#method(String)")).toEqual({
+      expect(parseFqn("com.example.Outer.Inner#method(String)")).toEqual({
         className: "com.example.Outer.Inner",
         method: "method",
         paramTypes: ["String"],
@@ -308,7 +308,7 @@ describe("parseFqmn", () => {
     });
 
     it("inner class with hash — no params", () => {
-      expect(parseFqmn("com.example.Outer.Inner#method")).toEqual({
+      expect(parseFqn("com.example.Outer.Inner#method")).toEqual({
         className: "com.example.Outer.Inner",
         method: "method",
         paramTypes: null,
@@ -317,7 +317,7 @@ describe("parseFqmn", () => {
 
     it("deeply nested inner class", () => {
       expect(
-        parseFqmn("com.example.A.B.C.D#method(int)"),
+        parseFqn("com.example.A.B.C.D#method(int)"),
       ).toEqual({
         className: "com.example.A.B.C.D",
         method: "method",
@@ -330,7 +330,7 @@ describe("parseFqmn", () => {
 
   describe("edge cases", () => {
     it("hash at end — empty method name", () => {
-      expect(parseFqmn("com.example.Foo#")).toEqual({
+      expect(parseFqn("com.example.Foo#")).toEqual({
         className: "com.example.Foo",
         method: null,
         paramTypes: null,
@@ -338,7 +338,7 @@ describe("parseFqmn", () => {
     });
 
     it("whitespace in params is trimmed", () => {
-      expect(parseFqmn("Foo#bar(  String  ,  int  )")).toEqual({
+      expect(parseFqn("Foo#bar(  String  ,  int  )")).toEqual({
         className: "Foo",
         method: "bar",
         paramTypes: ["String", "int"],
@@ -346,7 +346,7 @@ describe("parseFqmn", () => {
     });
 
     it("single param with spaces", () => {
-      expect(parseFqmn("Foo#bar( String )")).toEqual({
+      expect(parseFqn("Foo#bar( String )")).toEqual({
         className: "Foo",
         method: "bar",
         paramTypes: ["String"],
@@ -354,7 +354,7 @@ describe("parseFqmn", () => {
     });
 
     it("array params with spaces", () => {
-      expect(parseFqmn("Foo#bar( String[] , int[] )")).toEqual({
+      expect(parseFqn("Foo#bar( String[] , int[] )")).toEqual({
         className: "Foo",
         method: "bar",
         paramTypes: ["String[]", "int[]"],
@@ -362,7 +362,7 @@ describe("parseFqmn", () => {
     });
 
     it("only parens with dot — no package", () => {
-      expect(parseFqmn("Foo.bar()")).toEqual({
+      expect(parseFqn("Foo.bar()")).toEqual({
         className: "Foo",
         method: "bar",
         paramTypes: [],
@@ -371,7 +371,7 @@ describe("parseFqmn", () => {
 
     it("method reference pasted from stack trace won't match (no parens, dot)", () => {
       // com.example.Foo.bar — treated as FQN since no parens or hash
-      expect(parseFqmn("com.example.Foo.bar")).toEqual({
+      expect(parseFqn("com.example.Foo.bar")).toEqual({
         className: "com.example.Foo.bar",
         method: null,
         paramTypes: null,
@@ -379,7 +379,7 @@ describe("parseFqmn", () => {
     });
 
     it("primitive array types", () => {
-      expect(parseFqmn("Foo#bar(byte[], char[], long[])")).toEqual({
+      expect(parseFqn("Foo#bar(byte[], char[], long[])")).toEqual({
         className: "Foo",
         method: "bar",
         paramTypes: ["byte[]", "char[]", "long[]"],
@@ -387,7 +387,7 @@ describe("parseFqmn", () => {
     });
 
     it("no closing paren — still parses", () => {
-      expect(parseFqmn("Foo#bar(String")).toEqual({
+      expect(parseFqn("Foo#bar(String")).toEqual({
         className: "Foo",
         method: "bar",
         paramTypes: ["String"],
@@ -400,7 +400,7 @@ describe("parseFqmn", () => {
   describe("real-world examples", () => {
     it("Eclipse Copy Qualified Name — long FQN", () => {
       expect(
-        parseFqmn(
+        parseFqn(
           "io.github.kaluchi.jdtbridge.SearchHandler.normalizePackage(String)",
         ),
       ).toEqual({
@@ -412,7 +412,7 @@ describe("parseFqmn", () => {
 
     it("javadoc @see style", () => {
       expect(
-        parseFqmn("java.lang.String#valueOf(int)"),
+        parseFqn("java.lang.String#valueOf(int)"),
       ).toEqual({
         className: "java.lang.String",
         method: "valueOf",
@@ -422,7 +422,7 @@ describe("parseFqmn", () => {
 
     it("Maven Surefire style — no params", () => {
       expect(
-        parseFqmn("com.example.util.ObjectMapperTest#testSerialize"),
+        parseFqn("com.example.util.ObjectMapperTest#testSerialize"),
       ).toEqual({
         className: "com.example.util.ObjectMapperTest",
         method: "testSerialize",
@@ -432,7 +432,7 @@ describe("parseFqmn", () => {
 
     it("overloaded save with specific signature", () => {
       expect(
-        parseFqmn("com.example.dao.OrderRepository#save(Order)"),
+        parseFqn("com.example.dao.OrderRepository#save(Order)"),
       ).toEqual({
         className: "com.example.dao.OrderRepository",
         method: "save",
@@ -442,7 +442,7 @@ describe("parseFqmn", () => {
 
     it("JUnit test from user's example", () => {
       expect(
-        parseFqmn("org.junit.Foo#bar(java.lang.String, java.lang.String[])"),
+        parseFqn("org.junit.Foo#bar(java.lang.String, java.lang.String[])"),
       ).toEqual({
         className: "org.junit.Foo",
         method: "bar",
@@ -452,7 +452,7 @@ describe("parseFqmn", () => {
 
     it("method with no params — explicit zero-arg", () => {
       expect(
-        parseFqmn("com.example.Service#shutdown()"),
+        parseFqn("com.example.Service#shutdown()"),
       ).toEqual({
         className: "com.example.Service",
         method: "shutdown",

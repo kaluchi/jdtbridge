@@ -46,9 +46,9 @@ public class ImplementationResolutionTest {
 
     static ReferenceCollector.Ref find(
             Map<String, ReferenceCollector.Ref> refs,
-            String fqmnPart) {
+            String fqnPart) {
         return refs.values().stream()
-                .filter(r -> r.fqmn().contains(fqmnPart))
+                .filter(r -> r.fqn().contains(fqnPart))
                 .findFirst().orElse(null);
     }
 

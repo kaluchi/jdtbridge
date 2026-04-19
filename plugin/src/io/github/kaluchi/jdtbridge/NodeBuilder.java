@@ -104,7 +104,7 @@ class NodeBuilder {
         return sb.toString();
     }
 
-    /** Erased parameter signature for FQMN: {@code "T1,T2,T3"} or {@code ""} for nullary. */
+    /** Erased parameter signature for FQN: {@code "T1,T2,T3"} or {@code ""} for nullary. */
     static String erasedParams(IMethod method) throws JavaModelException {
         String[] paramTypes = method.getParameterTypes();
         if (paramTypes.length == 0) return "";
@@ -122,16 +122,16 @@ class NodeBuilder {
         return method.getElementName() + "(" + erasedParams(method) + ")";
     }
 
-    /** FQMN of a method: {@code pkg.Type#name(erased,params)}. */
-    static String fqmnOf(IMethod method) throws JavaModelException {
+    /** FQN of a method: {@code pkg.Type#name(erased,params)}. */
+    static String fqnOf(IMethod method) throws JavaModelException {
         IType declaring = method.getDeclaringType();
         String typeFqn = declaring != null
                 ? fqnOf(declaring) : "";
         return typeFqn + "#" + compactSignature(method);
     }
 
-    /** FQMN of a field: {@code pkg.Type#fieldName}. */
-    static String fqmnOf(IField field) {
+    /** FQN of a field: {@code pkg.Type#fieldName}. */
+    static String fqnOf(IField field) {
         IType declaring = field.getDeclaringType();
         String typeFqn = declaring != null
                 ? fqnOf(declaring) : "";
@@ -529,7 +529,7 @@ class NodeBuilder {
     // ── :method ─────────────────────────────────────────────────────
 
     static JsonObject methodSkeleton(IMethod method) throws JavaModelException {
-        var obj = baseHeader(fqmnOf(method), "method", originOf(method));
+        var obj = baseHeader(fqnOf(method), "method", originOf(method));
         JsonObject loc = location(method);
         if (loc != null) obj.add("location", loc);
         obj.addProperty("containingProject",
@@ -621,7 +621,7 @@ class NodeBuilder {
     // ── :field ──────────────────────────────────────────────────────
 
     static JsonObject fieldSkeleton(IField field) {
-        var obj = baseHeader(fqmnOf(field), "field", originOf(field));
+        var obj = baseHeader(fqnOf(field), "field", originOf(field));
         JsonObject loc = location(field);
         if (loc != null) obj.add("location", loc);
         obj.addProperty("containingProject",

@@ -47,7 +47,7 @@ public class OverrideTargetTest {
             var ot = json.getAsJsonObject("overrideTarget");
             assertNotNull(ot);
             assertEquals("test.model.Animal#name()",
-                    ot.get("fqmn").getAsString());
+                    ot.get("fqn").getAsString());
         }
 
         @Test
@@ -56,7 +56,7 @@ public class OverrideTargetTest {
             var ot = json.getAsJsonObject("overrideTarget");
             assertNotNull(ot);
             assertEquals("test.model.Animal#name()",
-                    ot.get("fqmn").getAsString());
+                    ot.get("fqn").getAsString());
         }
 
         @Test
@@ -83,7 +83,7 @@ public class OverrideTargetTest {
             var ot = json.getAsJsonObject("overrideTarget");
             assertNotNull(ot);
             assertEquals("test.model.Animal#name()",
-                    ot.get("fqmn").getAsString());
+                    ot.get("fqn").getAsString());
             assertEquals("interface",
                     ot.get("typeKind").getAsString());
         }
@@ -98,7 +98,7 @@ public class OverrideTargetTest {
             var ot = json.getAsJsonObject("overrideTarget");
             assertNotNull(ot);
             assertEquals("test.edge.AbstractPet#speak()",
-                    ot.get("fqmn").getAsString());
+                    ot.get("fqn").getAsString());
         }
 
         @Test

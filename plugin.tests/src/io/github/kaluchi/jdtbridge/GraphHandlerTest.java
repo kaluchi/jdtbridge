@@ -108,7 +108,7 @@ public class GraphHandlerTest {
     // ── /method ─────────────────────────────────────────────────────
 
     @Test
-    void methodReturnsDetailForFqmnWithSignature() {
+    void methodReturnsDetailForFqnWithSignature() {
         JsonObject result = parse(handler.handleMethod(
                 params("of", "test.edge.Calculator#add(int,int)")));
         assertEquals("test.edge.Calculator#add(int,int)",
@@ -142,21 +142,21 @@ public class GraphHandlerTest {
         assertNotNull(candidates,
                 "ambiguous-match carries :candidates so the caller "
                 + "routes `!| /context/candidates` to pick a "
-                + "disambiguated FQMN without a second discovery "
+                + "disambiguated FQN without a second discovery "
                 + "roundtrip");
         assertEquals(3, candidates.size());
-        var candidateFqmns = candidates.asList().stream()
+        var candidateFqns = candidates.asList().stream()
                 .map(JsonElement::getAsString).toList();
-        assertTrue(candidateFqmns.stream()
-                .allMatch(fqmn -> fqmn.startsWith(
+        assertTrue(candidateFqns.stream()
+                .allMatch(fqn -> fqn.startsWith(
                         "test.edge.Calculator#add(")),
-                "every candidate is a concrete FQMN with parameters; "
-                + "got " + candidateFqmns);
+                "every candidate is a concrete FQN with parameters; "
+                + "got " + candidateFqns);
 
         String message = error.get("message").getAsString();
-        for (String candidate : candidateFqmns) {
+        for (String candidate : candidateFqns) {
             assertTrue(message.contains(candidate),
-                    "error message lists every candidate FQMN so "
+                    "error message lists every candidate FQN so "
                     + "the user (and LLM) can see the alternatives "
                     + "without routing into :context; message=\""
                     + message + "\"");
@@ -177,21 +177,26 @@ public class GraphHandlerTest {
         JsonObject result = parse(handler.handleMethod(
                 params("of", "test.model.Dog")));
         assertTrue(isError(result));
-        assertEquals("invalid-fqmn",
+        assertEquals("invalid-fqn",
                 errorOf(result).get("kind").getAsString());
     }
 
     @Test
-    void methodErrorTypeNotFoundCarriesBothFqnAndFqmn() {
+    void methodErrorTypeNotFoundCarriesOnlyTheUnresolvedFqn() {
         JsonObject result = parse(handler.handleMethod(
                 params("of", "no.such.Class#foo()")));
         assertTrue(isError(result));
         assertEquals("type-not-found",
                 errorOf(result).get("kind").getAsString());
         var ctx = errorOf(result).getAsJsonObject("context");
+        // :fqn names the identifier that could not be resolved —
+        // just the type part, since that is what actually failed.
+        // The caller already knows what it passed; the error
+        // descriptor does not echo its input back.
         assertEquals("no.such.Class", ctx.get("fqn").getAsString());
-        assertEquals("no.such.Class#foo()",
-                ctx.get("fqmn").getAsString());
+        assertEquals(1, ctx.size(),
+                ":fqn is the only context field — no echo of the "
+                + "caller's full identifier");
     }
 
     // ── /field ──────────────────────────────────────────────────────
@@ -212,7 +217,7 @@ public class GraphHandlerTest {
         JsonObject result = parse(handler.handleField(
                 params("of", "test.model.Dog#age()")));
         assertTrue(isError(result));
-        assertEquals("invalid-fqmn",
+        assertEquals("invalid-fqn",
                 errorOf(result).get("kind").getAsString());
     }
 
@@ -472,15 +477,15 @@ public class GraphHandlerTest {
         var arr = JsonParser.parseString(handler.handleImplementors(
                 params("of", "test.model.Animal#name()")))
                 .getAsJsonArray();
-        var fqmns = new java.util.HashSet<String>();
+        var fqns = new java.util.HashSet<String>();
         for (var entry : arr) {
-            fqmns.add(entry.getAsJsonObject().get("fqn").getAsString());
+            fqns.add(entry.getAsJsonObject().get("fqn").getAsString());
             assertEquals("method",
                     entry.getAsJsonObject().get("kind").getAsString());
         }
-        assertTrue(fqmns.contains("test.model.Dog#name()"));
-        assertTrue(fqmns.contains("test.model.Cat#name()"));
-        assertTrue(fqmns.contains("test.edge.AbstractPet#name()"));
+        assertTrue(fqns.contains("test.model.Dog#name()"));
+        assertTrue(fqns.contains("test.model.Cat#name()"));
+        assertTrue(fqns.contains("test.edge.AbstractPet#name()"));
     }
 
     // ── /refs?to= ───────────────────────────────────────────────────

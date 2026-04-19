@@ -413,7 +413,7 @@ public class SearchIntegrationTest {
         assertEquals("application/json", resp.contentType());
         var json = parse(resp);
         assertEquals("test.model.Dog",
-                json.get("fqmn").getAsString());
+                json.get("fqn").getAsString());
         String source = json.get("source").getAsString();
         assertTrue(source.contains("public class Dog"));
         assertTrue(source.contains("public void bark()"));
@@ -428,7 +428,7 @@ public class SearchIntegrationTest {
         assertEquals("application/json", resp.contentType());
         var json = parse(resp);
         assertEquals("test.model.Dog#bark()",
-                json.get("fqmn").getAsString());
+                json.get("fqn").getAsString());
         assertNotNull(json.get("source").getAsString());
         assertTrue(json.get("startLine").getAsInt() > 0);
     }
@@ -439,7 +439,7 @@ public class SearchIntegrationTest {
                 Map.of("class", "test.service.AnimalService",
                         "method", "process"), ALL));
         assertEquals("test.service.AnimalService#process(Animal)",
-                json.get("fqmn").getAsString());
+                json.get("fqn").getAsString());
 
         JsonArray allRefs = json.getAsJsonArray("refs");
         for (JsonElement e : allRefs) {
@@ -487,7 +487,7 @@ public class SearchIntegrationTest {
         assertEquals("method",
                 ot.get("kind").getAsString());
         assertEquals("test.model.Animal#name()",
-                ot.get("fqmn").getAsString());
+                ot.get("fqn").getAsString());
     }
 
     @Test
@@ -495,7 +495,7 @@ public class SearchIntegrationTest {
         var json = parse(handler.handleSource(
                 Map.of("class", "test.model.Animal"), ALL));
         assertEquals("test.model.Animal",
-                json.get("fqmn").getAsString());
+                json.get("fqn").getAsString());
 
         JsonArray subs = json.getAsJsonArray("subtypes");
         assertNotNull(subs);
@@ -550,11 +550,11 @@ public class SearchIntegrationTest {
     }
 
     private static JsonObject findRef(JsonArray refs,
-            String fqmnPart) {
+            String fqnPart) {
         for (JsonElement e : refs) {
             var ref = e.getAsJsonObject();
-            if (ref.has("fqmn") && ref.get("fqmn")
-                    .getAsString().contains(fqmnPart)) {
+            if (ref.has("fqn") && ref.get("fqn")
+                    .getAsString().contains(fqnPart)) {
                 return ref;
             }
         }

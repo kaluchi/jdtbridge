@@ -37,20 +37,20 @@ export function extractPositional(args) {
 }
 
 /**
- * Parse a Fully Qualified Method Name (FQMN) string.
+ * Parse an FQN string that may address a type, a method, or a field.
  *
  * Supported formats:
- *   "pkg.Class#method(Type, Type)"  — javadoc / surefire style
- *   "pkg.Class#method"              — method without signature
+ *   "pkg.Class"                     — type
+ *   "pkg.Class#method(Type, Type)"  — method with erased signature
+ *   "pkg.Class#method"              — method (no signature) or field
  *   "pkg.Class.method(Type, Type)"  — Eclipse Copy Qualified Name style
- *   "pkg.Class"                     — plain FQN (no method)
  *
  * Returns { className, method, paramTypes } where paramTypes is:
  *   null  — no signature specified (any overload)
  *   []    — empty parens, i.e. zero-arg method
  *   ["String", "int[]", ...] — explicit parameter types
  */
-export function parseFqmn(input) {
+export function parseFqn(input) {
   if (!input) return { className: null, method: null, paramTypes: null };
 
   // Javadoc style: Class#method or Class#method(params)

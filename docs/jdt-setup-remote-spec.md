@@ -26,7 +26,7 @@ instance. Creates instance files in `~/.jdtbridge/remote-instances/`.
    paths (Windows drive letters, different mount points) must never
    reach agent output. Every path returned by jdt commands is
    translated to a jdt-host absolute path using project path cache.
-   Without cache, FQMN commands work but file-path output shows
+   Without cache, FQN commands work but file-path output shows
    untranslated Eclipse paths which agents cannot use.
 
 ## Syntax
@@ -555,7 +555,7 @@ atomically (temp file + rename).
 ### Path resolution
 
 **Eclipse path → jdt-host path** (output translation — the only
-direction the CLI needs, since FQN / FQMN inputs never carry a
+direction the CLI needs, since FQN inputs never carry a
 filesystem path):
 
 For each path-keyed field (`:path`, `:file`, `:rootPath`,

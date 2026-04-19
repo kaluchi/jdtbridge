@@ -1,5 +1,5 @@
 import { get } from "../client.mjs";
-import { extractPositional, parseFlags, parseFqmn } from "../args.mjs";
+import { extractPositional, parseFlags, parseFqn } from "../args.mjs";
 import {
   formatTestRunHeader,
   testRunGuide,
@@ -18,7 +18,7 @@ export async function testRun(args) {
   const flags = parseFlags(args);
 
   let url = "/test/run?";
-  const parsed = parseFqmn(pos[0]);
+  const parsed = parseFqn(pos[0]);
   const fqn = parsed.className;
 
   if (fqn) {

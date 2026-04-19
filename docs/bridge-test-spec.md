@@ -86,7 +86,7 @@ Response:
   "time": 0.0,
   "entries": [
     {
-      "fqmn": "pkg.MyTest#testMethod",
+      "fqn": "pkg.MyTest#testMethod",
       "status": "FAIL",
       "time": 0.123,
       "trace": "java.lang.AssertionError: ...",
@@ -115,10 +115,10 @@ live events via `ITestSessionListener`.
 
 Events (one JSON object per line):
 ```jsonl
-{"event":"case","fqmn":"pkg.MyTest#testMethod","status":"PASS","time":0.001,"suite":"MyTestSuite"}
-{"event":"case","fqmn":"pkg.MyTest#testFailing","status":"FAIL","time":0.123,"trace":"...","expected":"3","actual":"2"}
-{"event":"case","fqmn":"pkg.MyTest#testError","status":"ERROR","time":0.050,"trace":"NullPointerException..."}
-{"event":"case","fqmn":"pkg.MyTest#testSkipped","status":"IGNORED"}
+{"event":"case","fqn":"pkg.MyTest#testMethod","status":"PASS","time":0.001,"suite":"MyTestSuite"}
+{"event":"case","fqn":"pkg.MyTest#testFailing","status":"FAIL","time":0.123,"trace":"...","expected":"3","actual":"2"}
+{"event":"case","fqn":"pkg.MyTest#testError","status":"ERROR","time":0.050,"trace":"NullPointerException..."}
+{"event":"case","fqn":"pkg.MyTest#testSkipped","status":"IGNORED"}
 ```
 
 `finished` event is NOT sent by the streamer — the stream simply
@@ -126,7 +126,7 @@ closes when the session ends. The CLI synthesizes the summary from
 accumulated counts.
 
 Case event fields:
-- `fqmn` — `Class#method`, copy-pasteable to `jdt q` axes or `jdt test run`
+- `fqn` — `Class#method`, copy-pasteable to `jdt q` axes or `jdt test run`
 - `status` — `PASS`, `FAIL`, `ERROR`, `IGNORED`
 - `time` — elapsed seconds
 - `trace` — stack trace (FAIL/ERROR only)

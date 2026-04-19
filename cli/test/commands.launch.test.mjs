@@ -404,7 +404,7 @@ describe("launch commands", () => {
     expect(out).toContain("org.eclipse.jdt.junit.TEST_KIND");
   });
 
-  it("launch config text shows synthesized Target as FQMN", async () => {
+  it("launch config text shows synthesized Target as FQN", async () => {
     const detail = {
       configId: "FooTest", configType: "JUnit", configTypeId: "org.eclipse.jdt.junit.launchconfig",
       attributes: {

@@ -188,7 +188,7 @@ class JdtUtils {
 
     /**
      * Find all implementations of an interface/abstract method
-     * via type hierarchy. Returns FQMN → IMethod map.
+     * via type hierarchy. Returns FQN → IMethod map.
      * Shared by SourceReport and SearchHandler.
      */
     static java.util.LinkedHashMap<String, IMethod>
