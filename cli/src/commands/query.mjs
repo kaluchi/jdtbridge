@@ -198,6 +198,24 @@ stdout as \`!{:kind … :message …}\` values — route them with \`!|\`.
   # 7. Hotspots — biggest methods in a type, ranked
   jdt q '"pkg.Foo" | @methods | sortWith(desc(/location/lineCount)) | take(5) * {:fqn /fqn :lines /location/lineCount} | table'
 
+  # 8. Project-wide dead code — every type's public orphans
+  jdt q '"my.project" | @typesInProject * @publicOrphans | flat * /fqn'
+  -- pattern: Vec-of-nodes | * conduit | flat * /fqn  — distribute,
+  -- flatten the per-type Vecs, project fqn. Reuse for @tests,
+  -- @untested, @typeUses, etc. across a project.
+
+───── Volume estimate — size a result before reading it ─────
+
+  Vec | count                              just the number
+  Vec | @overview                          {:count N :head[5] :tail[5]}
+  Vec | as(:v) | {:n v | count :fqns v * /fqn}
+                                           count + every fqn, inline
+  String | split("\\n") | count            line count of @source output
+
+Stay native — no wc / head / tail pipes. Each step returns a qlang
+value so the next step composes. A Vec of 10k node-Maps followed by
+\`| count\` costs one HTTP round-trip, same as the full fetch.
+
 ───── qlang grammar ─────
 
   a | b        apply b to a
@@ -222,7 +240,7 @@ Seeds (string → node, or nullary):
 Containment:
   type    | @members  @methods  @fields  @innerTypes
   package | @typesInPackage       file | @typesInFile
-  project | @packagesInProject    node | @classpath
+  project | @packagesInProject  @typesInProject    node | @classpath
   node    | @containingType  @containingPackage  @containingFile
                               @containingProject
 
@@ -240,10 +258,11 @@ Sugar conduits:
   method | @callers  @testCallers  @productionCallers
   field  | @readers  @writers
   member | @calls  @typeUses  @dependsOn  @usedBy
-  node   | @detail           lift skeleton → detail
+  type   | @tests                 test-scope callers across type + members
+  node   | @detail                lift skeleton → detail
   element| @annotated(fqn)  @deprecated  @testMethods
   element| @untested  @publicOrphans  @deadCode
-  Vec    | @sourceOnly                 | @inProject(projName)
+  Vec    | @sourceOnly  @overview  |  @inProject(projName)
 
 Markdown cards (return a String — pipe to a file):
   "pkg.Foo#bar()" | @sourceCard      header + code + refs + hierarchy

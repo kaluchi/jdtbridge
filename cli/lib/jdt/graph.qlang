@@ -475,6 +475,28 @@ let(:@sourceOnly, filter(/origin | eq("source")))
 let(:@inProject, [:projName],
     filter(/containingProject | eq(projName)))
 
+|~~ Volume estimate for a Vec — before committing to reading the
+    full result. Returns `{:count N :head [first 5] :tail [last 5]}`.
+    Use when a pipeline might return a large Vec of node-Maps and
+    the caller needs to decide whether to narrow further (filter,
+    take) or consume it all. Works on any Vec — node-Maps, fqn
+    Strings, numbers. ~~|
+let(:@overview,
+    as(:v)
+    | {:count v | count
+       :head v | take(5)
+       :tail v | reverse | take(5) | reverse})
+
+|~~ Every top-level :type declared in the given project. The bare
+    `@packagesInProject * @typesInPackage | flat` chain bleeds
+    across fragment projects because package names are shared,
+    so the result is re-filtered via @inProject on the project's
+    fqn. Accepts String project name or project node-Map. ~~|
+let(:@typesInProject,
+    @project | as(:p) | /fqn | as(:pn)
+    | p | @packagesInProject * @typesInPackage | flat
+    | @inProject(pn))
+
 |~ ── Test-scope conduits ────────────────────────────────────── ~|
 
 |~~ Subset of callers whose declaring type is test-scope. For
