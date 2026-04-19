@@ -373,13 +373,9 @@ let(:@containingFile, @asNode | /location/file | unless(eq(null), @file))
 
 |~~ Enrich a skeleton-node into a detail-node. Routes by :kind to
     the appropriate point-lookup operand (@type / @method / @field /
-    @project / @package / @file). Idempotent on detail-nodes —
-    re-fetches the same identity. Accepts String FQN/FQMN subjects
-    via @asNode (syntactic dispatch) before the :kind routing.
-    Unknown :kind fails onto the fail-track rather than silently
-    handing back the original subject — that fallthrough masks
-    malformed upstream values and makes downstream breakage hard
-    to localise. ~~|
+    @project / @package / @file). Idempotent on detail-nodes.
+    Accepts String FQN/FQMN subjects via @asNode. Unknown :kind
+    raises :unsupported-detail-kind on the fail-track. ~~|
 let(:@detail, @asNode | as(:n) | /kind | as(:k)
     | cond(eq("type"),    n | @type,
            eq("method"),  n | @method,

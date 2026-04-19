@@ -186,6 +186,10 @@ public class HttpServer {
     }
 
     private void handle(Socket socket) {
+        long startNs = System.nanoTime();
+        String method = null;
+        String path = null;
+        String sessionHeader = null;
         try (socket) {
             socket.setSoTimeout(30_000);
             BufferedReader reader = new BufferedReader(
@@ -198,11 +202,10 @@ public class HttpServer {
             String[] parts = requestLine.split(" ");
             if (parts.length < 2) return;
 
-            String method = parts[0];
+            method = parts[0];
 
             // Read headers
             String authHeader = null;
-            String sessionHeader = null;
             int contentLength = 0;
             String line;
             while ((line = reader.readLine()) != null
@@ -235,7 +238,6 @@ public class HttpServer {
             }
 
             String fullPath = parts[1];
-            String path;
             Map<String, String> params;
             int q = fullPath.indexOf('?');
             if (q >= 0) {
@@ -295,7 +297,6 @@ public class HttpServer {
             ProjectScope scope = sessionScope.resolve(
                     sessionHeader);
 
-            long startNs = System.nanoTime();
             Response resp = dispatch(path, params, body, scope);
             long durationMs = (System.nanoTime() - startNs) / 1_000_000;
             sendResponse(socket, resp);
@@ -307,15 +308,21 @@ public class HttpServer {
                         + durationMs + "ms");
             }
         } catch (Exception e) {
+            long durationMs = (System.nanoTime() - startNs) / 1_000_000;
+            if (method != null && path != null) {
+                requestTracker.logRequest(sessionHeader, method,
+                        path, 500, durationMs);
+                if (durationMs >= SLOW_REQUEST_THRESHOLD_MS) {
+                    Log.info("slow-failed " + method + " " + path
+                            + " " + durationMs + "ms");
+                }
+            }
             if (isClientDisconnect(e)) {
-                // The CLI closed its socket before we finished
-                // writing — timeout, Ctrl+C, process exit. Not a
-                // server fault; logging at Error level swamps the
-                // Eclipse Error Log with noise that doesn't need
-                // attention.
-                Log.info("client disconnected: " + e.getMessage());
+                Log.info("client disconnected after " + durationMs
+                        + "ms: " + e.getMessage());
             } else {
-                Log.error("Request error", e);
+                Log.error("Request error after " + durationMs
+                        + "ms", e);
             }
         }
     }

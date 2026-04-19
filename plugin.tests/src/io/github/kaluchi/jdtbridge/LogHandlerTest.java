@@ -3,9 +3,13 @@ package io.github.kaluchi.jdtbridge;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Unit coverage for {@link LogHandler#parseEntries}. The parser
@@ -114,6 +118,59 @@ class LogHandlerTest {
         List<LogHandler.Entry> entries = LogHandler.parseEntries(log);
         assertEquals(1, entries.size());
         assertEquals("", entries.get(0).message());
+    }
+
+    @TempDir
+    Path tmp;
+
+    @Test
+    void readTailBytesReadsEntireFileWhenSmallerThanCap()
+            throws Exception {
+        Path p = tmp.resolve("small.log");
+        Files.writeString(p, "!ENTRY a 1 0 t\n!MESSAGE m\n",
+                StandardCharsets.UTF_8);
+        String content = LogHandler.readTailBytes(p, 1024);
+        assertEquals("!ENTRY a 1 0 t\n!MESSAGE m\n", content);
+    }
+
+    @Test
+    void readTailBytesAlignsToNextNewlineWhenTruncated()
+            throws Exception {
+        Path p = tmp.resolve("big.log");
+        // Head garbage that will be dropped; tail entry survives.
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 500; i++) {
+            sb.append("garbage line ").append(i).append('\n');
+        }
+        sb.append("!ENTRY b 4 0 t\n!MESSAGE tail\n");
+        Files.writeString(p, sb.toString(), StandardCharsets.UTF_8);
+
+        // Cap below the total size forces a truncate-and-align path.
+        String tail = LogHandler.readTailBytes(p, 256);
+        assertTrue(tail.length() <= 256);
+        assertTrue(tail.contains("!ENTRY b 4 0 t"),
+                "aligned tail must contain a full !ENTRY header, "
+                + "not a mid-line suffix");
+        // First character is immediately after a '\n' alignment.
+        List<LogHandler.Entry> entries = LogHandler.parseEntries(tail);
+        assertEquals(1, entries.size());
+        assertEquals("tail", entries.get(0).message());
+    }
+
+    @Test
+    void readTailBytesReturnsEmptyWhenNoNewlineInWindow()
+            throws Exception {
+        // Pathological case: the whole file is one unterminated
+        // blob (binary garbage, a crashed writer, …). The tail
+        // window contains no '\n', so alignment walks off the end.
+        // parseEntries must see an empty String, not NPE or loop.
+        Path p = tmp.resolve("blob.log");
+        byte[] blob = new byte[1024];
+        java.util.Arrays.fill(blob, (byte) 'x');
+        Files.write(p, blob);
+        String tail = LogHandler.readTailBytes(p, 128);
+        assertEquals("", tail);
+        assertEquals(0, LogHandler.parseEntries(tail).size());
     }
 
     @Test

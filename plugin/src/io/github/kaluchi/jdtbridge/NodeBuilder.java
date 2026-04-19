@@ -226,28 +226,11 @@ class NodeBuilder {
     // ── Test-scope classification ───────────────────────────────────
 
     /**
-     * Whether an element lives in a test-scoped source root or
-     * carries a test-annotation signature. Two signals combined:
-     *
-     *  1. Classpath-attribute — Maven/M2E promotes src/test/java /
-     *     src/test/resources to IClasspathEntry.isTest() = true.
-     *     Decisive when present: any type/method/field under such a
-     *     root is test-scope by construction. For Maven/Gradle
-     *     projects — the overwhelming majority — this branch is
-     *     authoritative and fires first.
-     *
-     *  2. Annotation fallback — PDE fragments and hand-rolled test
-     *     layouts may keep a single source root unflagged yet still
-     *     host test code. A type declaring any method annotated
-     *     with a JUnit/TestNG `@*Test*` qualifies the whole type.
-     *     Cost: a single getMethods() walk per invocation; a type
-     *     visited N times from a fan-out pipeline scans N times.
-     *     We accept the repetition rather than carry a cache —
-     *     fan-out on PDE-fragment types is a narrow scenario and
-     *     the walk is milliseconds on realistic method counts.
-     *
-     * Short-circuits on the first positive signal. Defaults to false
-     * — production-scope unless proven otherwise.
+     * True when the element sits in a test-scoped source root or in
+     * a containing type that declares any JUnit/TestNG-annotated
+     * method. Classpath-attribute signal fires first; annotation
+     * scan runs only when the classpath does not classify the root.
+     * Defaults to false.
      */
     static boolean isTestScope(IJavaElement element) {
         if (element == null) return false;

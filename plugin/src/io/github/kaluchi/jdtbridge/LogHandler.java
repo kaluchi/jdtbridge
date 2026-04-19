@@ -61,27 +61,18 @@ class LogHandler {
         return arr.toString();
     }
 
-    /**
-     * Cap on how many bytes off the tail of {@code .metadata/.log}
-     * we read in a single response. Eclipse rotates {@code .log} to
-     * {@code .log.bak} at ~1 MB by default, so the live file almost
-     * never exceeds a megabyte — but a user can disable rotation
-     * (system property {@code eclipse.log.size.max=0}) and accrue
-     * hundreds of MB. Loading that into a single String stalls the
-     * plugin for seconds and risks OutOfMemoryError in a busy
-     * worker. Reading the last 16 MB covers >99% of realistic tail
-     * sizes and keeps a hard ceiling on cost.
-     */
+    /** Cap on how many bytes off the tail of .log are read per request. */
     private static final long MAX_READ_BYTES = 16L * 1024 * 1024;
 
     /**
-     * Read at most {@code maxBytes} off the end of {@code path}. If
-     * the file is shorter, reads the whole file. When truncated,
-     * scans forward to the next {@code \n} so we always start on a
-     * clean line (and {@link #parseEntries} will drop the partial
-     * prefix before the first {@code !ENTRY}).
+     * Read at most {@code maxBytes} off the end of {@code path}.
+     * Shorter files are read whole. Truncated reads are aligned to
+     * the next {@code \n} so the result always starts on a line
+     * boundary (the partial prefix before the first {@code !ENTRY}
+     * is dropped by {@link #parseEntries}).
      */
-    private static String readTailBytes(Path path, long maxBytes)
+    /** Package-private for direct testing — not part of the API. */
+    static String readTailBytes(Path path, long maxBytes)
             throws IOException {
         long size = Files.size(path);
         if (size <= maxBytes) {

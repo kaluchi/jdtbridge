@@ -81,44 +81,21 @@ function missingSubject(operandName, subject) {
 
 const enc = encodeURIComponent;
 
-/**
- * Per-axis HTTP timeout. Graph operands are non-interactive —
- * an LLM composes a pipeline and waits for the answer; a 10-30 s
- * ceiling on expensive queries (@outgoingRefs on large compilation
- * units, @incomingRefs with many hits, transitive walks) truncates
- * legitimate work mid-flight. Default is 5 minutes; an agent or
- * CI run can raise or lower via JDT_GRAPH_TIMEOUT_MS.
- */
-const GRAPH_TIMEOUT_MS = (() => {
-    const override = Number.parseInt(
-        process.env.JDT_GRAPH_TIMEOUT_MS ?? '', 10);
+function envInt(name, fallback) {
+    const override = Number.parseInt(process.env[name] ?? '', 10);
     return Number.isFinite(override) && override > 0
         ? override
-        : 300_000;
-})();
+        : fallback;
+}
 
-/**
- * Cap simultaneous in-flight HTTP calls into the plugin. qlang `*`
- * runs its body through Promise.all over the entire subject Vec,
- * so `@projects * @members * @methods` naturally fans out into
- * hundreds of concurrent requests. Unbounded, that queues on
- * Eclipse's workspace lock — a handful finish, the rest wait past
- * the CLI timeout, and the Error Log fills with broken-pipe
- * entries once the CLI bails.
- *
- * The limiter is a cooperative semaphore: each getEndpoint call
- * waits until a slot frees, then holds it for the duration of the
- * HTTP round-trip. Order is FIFO over the wait queue.
- *
- * Default concurrency: 8. JDT_GRAPH_CONCURRENCY tunes per-process.
- */
-const GRAPH_CONCURRENCY = (() => {
-    const override = Number.parseInt(
-        process.env.JDT_GRAPH_CONCURRENCY ?? '', 10);
-    return Number.isFinite(override) && override > 0
-        ? override
-        : 8;
-})();
+// HTTP timeout per axis call. Override: JDT_GRAPH_TIMEOUT_MS.
+const GRAPH_TIMEOUT_MS = envInt('JDT_GRAPH_TIMEOUT_MS', 300_000);
+
+// Max simultaneous in-flight HTTP calls. Override: JDT_GRAPH_CONCURRENCY.
+// qlang `*` fans out through Promise.all; without a ceiling a deep
+// fan-out like `@projects * @members * @methods` drowns Eclipse's
+// workspace lock and starves the CLI past its timeout.
+const GRAPH_CONCURRENCY = envInt('JDT_GRAPH_CONCURRENCY', 8);
 
 let inFlight = 0;
 const waiters = [];
@@ -137,26 +114,9 @@ function releaseSlot() {
     else inFlight--;
 }
 
-/**
- * Per-process request cache. Keyed by the full endpoint path
- * (including `?of=…` and `&refKind=…`). A qlang pipeline is a
- * short-lived process — typing the same fqn twice costs two
- * HTTP calls unless we dedupe.
- *
- * The cache also dedupes concurrent identical requests: two axes
- * racing the same path get the same in-flight Promise instead of
- * each holding its own semaphore slot. On a fan-out that revisits
- * the same targets (e.g. `@methods * @containingType | distinct
- * * @type` — same container type reached via multiple methods),
- * this can collapse dozens of redundant round-trips into one.
- *
- * qlang values are immutable at the language level so sharing a
- * single cached response across every caller is safe.
- *
- * Disable with JDT_GRAPH_CACHE=0 when you need to see fresh data
- * mid-session (rare; the process restarts between queries so by
- * default every `jdt q` invocation already has a cold cache).
- */
+// Per-process cache keyed by the full endpoint path. Dedupes both
+// repeat lookups and concurrent identical in-flight requests.
+// Disable: JDT_GRAPH_CACHE=0.
 const GRAPH_CACHE_ENABLED =
     process.env.JDT_GRAPH_CACHE !== '0';
 
@@ -176,6 +136,7 @@ function getEndpoint(path) {
     const cached = requestCache.get(path);
     if (cached) return cached;
     const promise = fetchUncached(path);
+    promise.catch(() => requestCache.delete(path));
     requestCache.set(path, promise);
     return promise;
 }
@@ -233,44 +194,25 @@ const overloadsImpl    = axisOp('@overloads',    '/overloads');
 
 // ── References — single endpoint, all kinds, no refKind filter ──
 
-/**
- * Resolve a widening modifier passed to an overloaded axis. The
- * language parser hands the captured argument as a keyword value
- * (`:all`, `:call`, …); the server-side endpoint expects the raw
- * name string. Error values lifted into the modifier slot (e.g. a
- * prior failure on the fail-track) short-circuit to null so the
- * caller omits the query parameter rather than forwarding garbage.
- */
+// Modifier keyword → raw name string; non-keyword → null.
 async function modifierName(modifierLambda, subject) {
     const modifierValue = await modifierLambda(subject);
-    if (!isKeyword(modifierValue)) return null;
-    return modifierValue.name;
+    return isKeyword(modifierValue) ? modifierValue.name : null;
 }
 
-/**
- * @incomingRefs widens via an optional refKind keyword:
- *     node | @incomingRefs              → server default for the subject kind
- *     node | @incomingRefs(:all)        → every refKind (call/read/write/typeUse)
- *     node | @incomingRefs(:call)       → call-sites only
- *     field | @incomingRefs(:write)     → writes only
- * Narrowing below the server default is always available in the
- * pipeline via `filter(/refKind | eq("…"))`.
- */
+// @incomingRefs(:refKind?) — optional refKind widens the search.
+async function fetchIncomingRefs(subject, refKind) {
+    const fqn = fqnOf(subject);
+    if (fqn === null) return missingSubject('@incomingRefs', subject);
+    const suffix = refKind !== null ? `&refKind=${enc(refKind)}` : '';
+    return getEndpoint(`/refs?of=${enc(fqn)}${suffix}`);
+}
+
 const incomingRefsImpl = overloadedOp('@incomingRefs', 2, {
-    0: async (subject) => {
-        const fqn = fqnOf(subject);
-        if (fqn === null) return missingSubject('@incomingRefs', subject);
-        return getEndpoint(`/refs?of=${enc(fqn)}`);
-    },
-    1: async (subject, refKindLambda) => {
-        const fqn = fqnOf(subject);
-        if (fqn === null) return missingSubject('@incomingRefs', subject);
-        const refKind = await modifierName(refKindLambda, subject);
-        const path = refKind !== null
-            ? `/refs?of=${enc(fqn)}&refKind=${enc(refKind)}`
-            : `/refs?of=${enc(fqn)}`;
-        return getEndpoint(path);
-    }
+    0: (subject) => fetchIncomingRefs(subject, null),
+    1: async (subject, refKindLambda) =>
+        fetchIncomingRefs(subject,
+            await modifierName(refKindLambda, subject))
 });
 
 // ── Outgoing references — subject-member calls / reads / type-uses ──
@@ -282,34 +224,22 @@ const outgoingRefsImpl = axisOp('@outgoingRefs', '/outgoingRefs');
 const classpathImpl = axisOp('@classpath', '/classpath');
 const sourceImpl    = axisOp('@source',    '/source');
 
-/**
- * @problems accepts an optional scope keyword widening the marker
- * set the server walks:
- *     @problems            → workspace default
- *     @problems(:workspace) → explicit workspace scope
- *     @problems(:project)   → subject is a :project node or fqn
- *     @problems(:file)      → subject is a :file node or path
- * Scope is admissible as a modifier (normally narrowing is pipeline-
- * side) because `:workspace` on a giant project tree would be
- * prohibitively expensive as the unconditional default.
- */
+// @problems(:scope?) — :workspace (default) / :project / :file.
+const PROBLEMS_SCOPE_PARAM = { project: 'project', file: 'file' };
+
+async function fetchProblems(subject, scope) {
+    const param = PROBLEMS_SCOPE_PARAM[scope];
+    if (!param) return getEndpoint('/problems');
+    const subjectFqn = fqnOf(subject);
+    if (subjectFqn === null) return missingSubject('@problems', subject);
+    return getEndpoint(`/problems?${param}=${enc(subjectFqn)}`);
+}
+
 const problemsImpl = overloadedOp('@problems', 2, {
-    0: async () => getEndpoint('/problems'),
-    1: async (subject, scopeLambda) => {
-        const scope = await modifierName(scopeLambda, subject);
-        if (scope === null || scope === 'workspace') {
-            return getEndpoint('/problems');
-        }
-        const subjectFqn = fqnOf(subject);
-        if (subjectFqn === null) return missingSubject('@problems', subject);
-        if (scope === 'project') {
-            return getEndpoint(`/problems?project=${enc(subjectFqn)}`);
-        }
-        if (scope === 'file') {
-            return getEndpoint(`/problems?file=${enc(subjectFqn)}`);
-        }
-        return getEndpoint('/problems');
-    }
+    0: () => getEndpoint('/problems'),
+    1: async (subject, scopeLambda) =>
+        fetchProblems(subject,
+            await modifierName(scopeLambda, subject))
 });
 
 // ── Locator factory ─────────────────────────────────────────────

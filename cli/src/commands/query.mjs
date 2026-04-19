@@ -113,11 +113,6 @@ function printQueryResult(value) {
 }
 
 export async function query(args) {
-  // jdt q takes no flags — the pipeline itself carries every knob
-  // (modifiers, conduits, filters). A --foo argument is almost
-  // always a typo'd pipeline char or a stale habit from pre-qlang
-  // commands; surface it so the user notices rather than silently
-  // dropping it and running the next positional as the pipeline.
   const flags = args.filter(a => a.startsWith('--'));
   if (flags.length > 0) {
     process.stderr.write(
@@ -159,8 +154,11 @@ export async function query(args) {
   }
 
   if (didExplicitStdoutEffect) {
-    // The pipeline already pushed bytes to stdout via @out — stay
-    // silent on the auto-print to avoid double-output.
+    // Error values route to stderr so they survive alongside an
+    // @out redirect without contaminating its stdout.
+    if (isErrorValue(cellEntry.result)) {
+      process.stderr.write(printValue(cellEntry.result) + '\n');
+    }
     return;
   }
   printQueryResult(cellEntry.result);

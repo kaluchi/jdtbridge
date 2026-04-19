@@ -26,7 +26,6 @@ const K_INCOMING   = keyword('incoming');
 const K_SUPERS     = keyword('supers');
 const K_SUBTYPES   = keyword('subtypes');
 const K_MEMBERS    = keyword('members');
-const K_REFS       = keyword('refs');
 
 // Node-Map fields
 const K_FQN           = keyword('fqn');
@@ -175,14 +174,14 @@ function formatMdSource(bundle) {
     const outgoing = mapGet(bundle, K_OUTGOING);
     if (Array.isArray(outgoing) && outgoing.length > 0) {
         out.push('');
-        out.push('#### ' + outgoingHeader(subjectKind) + ':');
+        out.push('#### ' + refSectionHeader('Outgoing', subjectKind) + ':');
         out.push(...renderRefGroup(outgoing, 'to'));
     }
 
     const incoming = mapGet(bundle, K_INCOMING);
     if (Array.isArray(incoming) && incoming.length > 0) {
         out.push('');
-        out.push('#### ' + incomingHeader(subjectKind) + ':');
+        out.push('#### ' + refSectionHeader('Incoming', subjectKind) + ':');
         out.push(...renderRefGroup(incoming, 'from'));
     }
 
@@ -205,29 +204,14 @@ function formatMdSource(bundle) {
     return out.join('\n');
 }
 
-/**
- * Header phrasing for the Outgoing / Incoming ref sections. A
- * method's refs are typically calls; a field's are accesses; a
- * type's are references (typeUse / extends / parameter). Matches
- * the vocabulary a reader already uses when talking about the
- * subject kind.
- */
-function outgoingHeader(subjectKind) {
-    switch (subjectKind) {
-        case 'method': return 'Outgoing calls';
-        case 'field':  return 'Outgoing accesses';
-        case 'type':   return 'Outgoing references';
-        default:       return 'Outgoing';
-    }
-}
+const REF_NOUN = {
+    method: 'calls',
+    field:  'accesses',
+    type:   'references',
+};
 
-function incomingHeader(subjectKind) {
-    switch (subjectKind) {
-        case 'method': return 'Incoming calls';
-        case 'field':  return 'Incoming accesses';
-        case 'type':   return 'Incoming references';
-        default:       return 'Incoming';
-    }
+function refSectionHeader(direction, subjectKind) {
+    return direction + ' ' + (REF_NOUN[subjectKind] ?? 'refs');
 }
 
 // ── Reference-group rendering ──────────────────────────────────
@@ -319,15 +303,10 @@ function formatMdHierarchy(bundle) {
 // ── mdRefs: flat refs list (Vec of reference records) ─────────
 
 /**
- * Input: Vec of :reference records (result of @incomingRefs /
- * @outgoingRefs). Output: flat markdown list one line per ref,
- * `[badge] fqmn → returnType — javadoc`, grouped by refKind when
- * the Vec spans multiple kinds.
- *
- * Side selection reads :direction off the first record —
- * "incoming" renders :from (callers); "outgoing" renders :to
- * (targets). Absent :direction (hand-crafted bundles) falls back
- * to :to, which matches the outgoing shape.
+ * Render a Vec of :reference records as a flat markdown list, one
+ * line per distinct target, grouped by :refKind when the Vec
+ * mixes kinds. Subject side is picked from :direction on the
+ * first record carrying it; absent :direction → :to.
  */
 function formatMdRefs(refs) {
     if (!Array.isArray(refs)) {
@@ -364,15 +343,7 @@ function formatMdRefs(refs) {
     return out.join('\n');
 }
 
-/**
- * Side to render is driven by :direction on the reference record —
- * server stamps every @incomingRefs hit with "incoming" and every
- * @outgoingRefs hit with "outgoing". The first record that carries a
- * recognised :direction wins. Records without :direction (hand-built
- * test bundles, or mixed Vecs where only some rows come from the
- * server) are skipped — a whole Vec with no :direction falls through
- * to :to.
- */
+// First record with a recognised :direction wins; all-absent → 'to'.
 function pickRefSide(refs) {
     for (const ref of refs) {
         if (!(ref instanceof Map)) continue;
