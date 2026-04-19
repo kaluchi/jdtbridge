@@ -182,7 +182,8 @@ Hierarchy:
   @overrides(method)  @overloads(method)
 
 References:
-  @refs(node) [:call|:read|:write|:typeUse|:all]
+  @incomingRefs(node) [:call|:read|:write|:typeUse|:all]
+  @outgoingRefs(node)
   @callers(node) @readers(node) @writers(node)  -- sugar conduits
 
 Detail:
@@ -195,7 +196,7 @@ as captured args — that's RPC. Examples:
   jdt q '"*Service" | @types * /fqn'
   jdt q '"test.model.Dog" | @type | @members | filter(/modifiers | any(eq("public")))'
   jdt q '"test.model.Animal" | @subtypes * /fqn'
-  jdt q '"test.model.Dog#bark()" | @refs * /from/fqn | distinct'
+  jdt q '"test.model.Dog#bark()" | @incomingRefs * /from/fqn | distinct'
   jdt q '@projects * @members * @methods | filter(/modifiers | any(eq("public"))) | filter(@callers | empty) * /fqn'
 
 All 69 qlang builtins are available (filter, sort, count, groupBy, * fan-out, !| fail-track).

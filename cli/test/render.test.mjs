@@ -251,10 +251,10 @@ describe("mdRefs", () => {
     expect(md).toBe("");
   });
 
-  it("auto-picks :from side for incoming refs (same :to across Vec)", async () => {
-    // Simulates `"Foo" | @refs` — every record points at Foo on
-    // :to, callers vary on :from. mdRefs should surface callers,
-    // not repeat the subject.
+  it(":direction \"incoming\" renders :from side (callers)", async () => {
+    // Simulates `"Foo" | @incomingRefs` — server stamps every
+    // record with :direction "incoming"; mdRefs surfaces :from
+    // without any fqn-fixity heuristic.
     const subject = map([["fqn", "pkg.Foo"], ["kind", "type"],
                          ["typeKind", "class"]]);
     const caller1 = map([["fqn", "pkg.Caller1"], ["kind", "type"],
@@ -263,12 +263,14 @@ describe("mdRefs", () => {
                          ["typeKind", "class"]]);
     const ref1 = map([
       ["kind", "reference"],
+      ["direction", "incoming"],
       ["refKind", "typeUse"],
       ["from", caller1],
       ["to", subject],
     ]);
     const ref2 = map([
       ["kind", "reference"],
+      ["direction", "incoming"],
       ["refKind", "typeUse"],
       ["from", caller2],
       ["to", subject],
@@ -282,20 +284,21 @@ describe("mdRefs", () => {
     expect(subjectHits.length).toBe(0);
   });
 
-  it("auto-picks :to side for outgoing refs (same :from across Vec)", async () => {
-    // Simulates `"pkg.Foo#bar()" | @outgoingRefs` — every record
-    // originates at Foo#bar on :from; targets vary on :to.
+  it(":direction \"outgoing\" renders :to side (targets)", async () => {
+    // Simulates `"pkg.Foo#bar()" | @outgoingRefs`.
     const subject = map([["fqn", "pkg.Foo#bar()"], ["kind", "method"]]);
     const target1 = map([["fqn", "pkg.Target1#a()"], ["kind", "method"]]);
     const target2 = map([["fqn", "pkg.Target2#b()"], ["kind", "method"]]);
     const ref1 = map([
       ["kind", "reference"],
+      ["direction", "outgoing"],
       ["refKind", "call"],
       ["from", subject],
       ["to", target1],
     ]);
     const ref2 = map([
       ["kind", "reference"],
+      ["direction", "outgoing"],
       ["refKind", "call"],
       ["from", subject],
       ["to", target2],
@@ -304,5 +307,22 @@ describe("mdRefs", () => {
     expect(md).toContain("pkg.Target1#a()");
     expect(md).toContain("pkg.Target2#b()");
     expect(md).not.toContain("pkg.Foo#bar()");
+  });
+
+  it("single-record incoming still renders caller", async () => {
+    // N=1 edge case — :direction removes the fqn-fixity heuristic
+    // ambiguity that used to require N≥2.
+    const ref = map([
+      ["kind", "reference"],
+      ["direction", "incoming"],
+      ["refKind", "typeUse"],
+      ["from", map([["fqn", "pkg.Caller"], ["kind", "type"],
+                    ["typeKind", "class"]])],
+      ["to", map([["fqn", "pkg.Foo"], ["kind", "type"],
+                  ["typeKind", "class"]])],
+    ]);
+    const md = await runWithBundle("mdRefs", [ref]);
+    expect(md).toContain("pkg.Caller");
+    expect(md).not.toContain("pkg.Foo");
   });
 });

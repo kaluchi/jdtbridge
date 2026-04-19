@@ -304,7 +304,7 @@ Two parallel subagents in the same terminal tab:
 
 ```
 Subagent A (bash PID 1234):  jdt use 1 && jdt q '"Foo" | @callers'
-Subagent B (bash PID 5678):  jdt use 2 && jdt q '"Bar" | @refs'
+Subagent B (bash PID 5678):  jdt use 2 && jdt q '"Bar" | @incomingRefs'
 ```
 
 Both write `term-<WT_SESSION>.json` — last writer wins (race).
@@ -319,7 +319,7 @@ If subagents do NOT call `jdt use` (main agent pinned earlier):
 ```
 Main agent bash1:  jdt use 1                   → term pin = ws1
 Subagent A bash2:  jdt q '"Foo" | @callers'    → ppid pin not found → term pin = ws1 ✓
-Subagent B bash3:  jdt q '"Bar" | @refs'       → ppid pin not found → term pin = ws1 ✓
+Subagent B bash3:  jdt q '"Bar" | @incomingRefs'       → ppid pin not found → term pin = ws1 ✓
 ```
 
 All subagents inherit the main agent's choice via terminal pin.

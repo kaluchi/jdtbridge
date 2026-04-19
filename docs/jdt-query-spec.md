@@ -24,10 +24,10 @@ are not admissible outside their native scope.
 |---|---|
 | **node-Map** | An immutable qlang Map representing one entity of the graph (a type, method, field, package, project, file, or compilation problem). Every node-Map carries the canonical header and at least one identity field. |
 | **canonical header** | The five fields a code-element node-Map carries: `:fqn`, `:kind`, `:origin`, `:location`, `:containingProject`. `:problem` and `:reference` records omit `:fqn` (they have no stable identifier); `:project` / `:package` / `:file` omit `:location` or carry only its `:file` component. Every node still carries `:kind` and `:origin`. |
-| **skeleton** | A node-Map carrying the canonical header plus a small set of cheap per-kind identity fields (`:name`, `:signature`, `:modifiers`, `:containingType`, `:returnType`, …). Axes that fan out (`@members`, `@subtypes`, `@refs`) return skeletons. Cheap to produce in bulk. |
+| **skeleton** | A node-Map carrying the canonical header plus a small set of cheap per-kind identity fields (`:name`, `:signature`, `:modifiers`, `:containingType`, `:returnType`, …). Axes that fan out (`@members`, `@subtypes`, `@incomingRefs`) return skeletons. Cheap to produce in bulk. |
 | **detail** | A node-Map carrying the canonical header plus the full per-kind payload (javadoc, type parameters, interfaces, source ranges, classpath entries, …). Seed operands (`@type`, `@method`, `@field`, `@project`, `@package`, `@file`) return detail. |
 | **seed** | An operand that produces a starting `pipeValue` without needing one — either nullary (`@projects`, `@problems`) or taking a String/Map subject that identifies a single node (`@type`, `@method`, `@types("*Pat*")`). Seeds begin a pipeline. |
-| **axis** | An operand that navigates from an existing node to one or more related nodes (`@members`, `@supers`, `@refs`, `@containingType`). Axes consume a subject from `pipeValue`. |
+| **axis** | An operand that navigates from an existing node to one or more related nodes (`@members`, `@supers`, `@incomingRefs`, `@containingType`). Axes consume a subject from `pipeValue`. |
 | **conduit** | A `let`-bound qlang fragment living inside the `:jdt/graph` module, composed from primitive axes (`@callers`, `@ancestors`, `@descendants`, `@publicOrphans`, `@asNode`, `@detail`). Conduits are documented and introspectable via `reify`. |
 
 ### Identity
@@ -47,7 +47,7 @@ and filter predicates.
 |---|---|---|
 | `:kind` | `"type"`, `"method"`, `"field"`, `"package"`, `"project"`, `"file"`, `"problem"` | every node-Map |
 | `:origin` | `"source"`, `"binary"` | every node-Map (workspace source vs classpath JAR) |
-| `:refKind` | `"call"`, `"read"`, `"write"`, `"typeUse"`, `"all"` | `@refs` modifier and `/refKind` on reference records |
+| `:refKind` | `"call"`, `"read"`, `"write"`, `"typeUse"`, `"all"` | `@incomingRefs` modifier and `/refKind` on reference records |
 | `:typeKind` | `"class"`, `"interface"`, `"enum"`, `"annotation"`, `"record"` | `:type` detail |
 | `:severity` | `"error"`, `"warning"`, `"info"` | `:problem` detail |
 | `:problems` scope modifier | `:workspace`, `:project`, `:file` | `@problems` keyword modifier |
@@ -82,7 +82,7 @@ Binary-origin nodes carry an attachment-source path or `null`.
 | Term | Meaning |
 |---|---|
 | **pipeValue** | The current value flowing through the pipeline (qlang core concept). Axes read their subject from `pipeValue`. |
-| **captured arg** | Expression inside `()` after an operand name — for graph axes, these are *modifiers* only (e.g. `@refs(:call)`). Subject identifiers flow through `pipeValue`. |
+| **captured arg** | Expression inside `()` after an operand name — for graph axes, these are *modifiers* only (e.g. `@incomingRefs(:call)`). Subject identifiers flow through `pipeValue`. |
 | **seed fqn** | A String fqn used as the initial `pipeValue` of a pipeline (`"pkg.Foo" \| @subtypes`). |
 
 ## Commands
@@ -198,19 +198,20 @@ are present on each kind.
 
 ### `:reference`
 
-Reference records are ephemeral node-Maps produced by `@refs` /
-`@outgoingRefs`. No `:fqn` — identified by the `(from, to,
-refKind, location)` tuple. The `:from` / `:to` slots carry
-regular skeletons a downstream axis or renderer consumes.
+Reference records are ephemeral node-Maps produced by
+`@incomingRefs` / `@outgoingRefs`. No `:fqn` — identified by the
+`(from, to, refKind, location)` tuple. The `:from` / `:to` slots
+carry regular skeletons a downstream axis or renderer consumes.
 
 | Field | Present | Notes |
 |---|---|---|
 | `:kind` | ✓ | always `"reference"` |
+| `:direction` | ✓ | `"incoming"` from `@incomingRefs`, `"outgoing"` from `@outgoingRefs`. Drives `mdRefs` side selection; lets downstream qlang distinguish the two sources even after concat. |
 | `:origin` | ✓ | matches the side visible in source |
 | `:refKind` | ✓ | `"call"` / `"read"` / `"write"` / `"typeUse"` |
 | `:from` | ✓ | skeleton of the source-side member |
 | `:to` | ✓ | skeleton of the target (incoming refs reiterate the query subject here) |
-| `:location` | (`@refs` only) | call-site location on the from-side |
+| `:location` | (`@incomingRefs` only) | call-site location on the from-side |
 | `:containingProject` | ✓ | mirrors the from-side's project |
 
 ### `:classpathEntry`
@@ -236,15 +237,15 @@ projection. One rule, all operands.
 
 | Direction | Mechanism | Example |
 |---|---|---|
-| Widen (more data) | Captured-arg modifier | `@refs(:all)` — every refKind returned |
-| Narrow (subset) | qlang pipeline step | `@refs(:all) \| filter(/refKind \| eq("call"))` |
+| Widen (more data) | Captured-arg modifier | `@incomingRefs(:all)` — every refKind returned |
+| Narrow (subset) | qlang pipeline step | `@incomingRefs(:all) \| filter(/refKind \| eq("call"))` |
 
 The LLM composing a query holds one mental rule: "to get more I
 pass a modifier, to get less I filter".
 
 ### Admissible modifier shapes
 
-- **Scope widening** — `@refs(:all)` widens beyond the `:call`
+- **Scope widening** — `@incomingRefs(:all)` widens beyond the `:call`
   default to every refKind. `@problems(:workspace)` widens past
   the narrower `:project` / `:file` scopes.
 - **Payload widening** — a modifier attaches extra fields to the
@@ -291,7 +292,7 @@ renderer — one-shot from an fqn or node subject:
 
 | Conduit | Expands to |
 |---|---|
-| `@sourceCard` | `{:node @detail :text @source :outgoing @outgoingRefs :incoming @refs(:all)} \| mdSource` |
+| `@sourceCard` | `{:node @detail :text @source :outgoing @outgoingRefs :incoming @incomingRefs(:all)} \| mdSource` |
 | `@hierarchyCard` | `{:node @detail :supers @supers :subtypes @subtypes} \| mdHierarchy` |
 | `@outlineCard` | `{:node @detail :members @members} \| mdOutline` |
 

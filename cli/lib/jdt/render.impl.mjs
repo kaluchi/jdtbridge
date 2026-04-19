@@ -48,6 +48,7 @@ const K_JAVADOC       = keyword('javadocSummary');
 const K_FROM          = keyword('from');
 const K_TO            = keyword('to');
 const K_REF_KIND      = keyword('refKind');
+const K_DIRECTION     = keyword('direction');
 
 function mapGet(m, key) {
     return m instanceof Map ? m.get(key) : undefined;
@@ -140,7 +141,7 @@ function locationLine(node) {
  *   :node      — detail node-Map of the viewed member
  *   :text      — source text String
  *   :outgoing  — Vec of :reference records produced by @outgoingRefs
- *   :incoming  — Vec of :reference records produced by @refs
+ *   :incoming  — Vec of :reference records produced by @incomingRefs
  *   :supers    — Vec of :type skeletons (type-level only)
  *   :subtypes  — Vec of :type skeletons (type-level only)
  *
@@ -318,17 +319,15 @@ function formatMdHierarchy(bundle) {
 // ── mdRefs: flat refs list (Vec of reference records) ─────────
 
 /**
- * Input: Vec of :reference records (result of @refs /
+ * Input: Vec of :reference records (result of @incomingRefs /
  * @outgoingRefs). Output: flat markdown list one line per ref,
  * `[badge] fqmn → returnType — javadoc`, grouped by refKind when
  * the Vec spans multiple kinds.
  *
- * Auto-detects which side to render: if every record carries the
- * same `:to/:fqn` the Vec is @refs output (incoming, target is
- * the query subject) so `:from` is the interesting side. If every
- * record carries the same `:from/:fqn` the Vec is @outgoingRefs
- * output so `:to` is interesting. Mixed Vecs fall back to `:to`
- * — there's no single subject to hide behind.
+ * Side selection reads :direction off the first record —
+ * "incoming" renders :from (callers); "outgoing" renders :to
+ * (targets). Absent :direction (hand-crafted bundles) falls back
+ * to :to, which matches the outgoing shape.
  */
 function formatMdRefs(refs) {
     if (!Array.isArray(refs)) {
@@ -366,49 +365,19 @@ function formatMdRefs(refs) {
 }
 
 /**
- * Decide which side of every reference record is the "other end"
- * relative to the query subject. @refs output pins :to (every
- * record points at the same target — the subject); @outgoingRefs
- * pins :from (every record originates at the same subject body).
- *
- * Sides that are uniformly absent from the Vec cannot hide a
- * subject — we must fall back to the other side or the render
- * will be empty. A Vec with :to only gets rendered through :to,
- * :from only through :from, both present and varying → :to.
+ * Side to render is driven by :direction on the reference record —
+ * server stamps every @incomingRefs hit with "incoming" and every
+ * @outgoingRefs hit with "outgoing". Records without :direction
+ * (bundles hand-built in tests) fall through to :to.
  */
 function pickRefSide(refs) {
-    let toFqn = null;
-    let fromFqn = null;
-    let first = true;
-    let toFixed = true;
-    let fromFixed = true;
-    let hasAnyTo = false;
-    let hasAnyFrom = false;
     for (const ref of refs) {
         if (!(ref instanceof Map)) continue;
-        const toSide = mapGet(ref, K_TO);
-        const fromSide = mapGet(ref, K_FROM);
-        if (toSide instanceof Map) hasAnyTo = true;
-        if (fromSide instanceof Map) hasAnyFrom = true;
-        const to = mapGet(toSide, K_FQN);
-        const from = mapGet(fromSide, K_FQN);
-        if (first) {
-            toFqn = to;
-            fromFqn = from;
-            first = false;
-            continue;
-        }
-        if (to !== toFqn) toFixed = false;
-        if (from !== fromFqn) fromFixed = false;
+        const dir = mapGet(ref, K_DIRECTION);
+        if (dir === 'incoming') return 'from';
+        if (dir === 'outgoing') return 'to';
+        break;
     }
-    // If only one side is present in the Vec, render through it.
-    if (hasAnyTo && !hasAnyFrom) return 'to';
-    if (hasAnyFrom && !hasAnyTo) return 'from';
-    // Both sides present: the fixed side is the subject, the
-    // varying side is the "other end" a reader wants to see.
-    if (toFixed && !fromFixed) return 'from';
-    if (fromFixed && !toFixed) return 'to';
-    // Both fixed (self-refs?) or both varying — default to :to.
     return 'to';
 }
 

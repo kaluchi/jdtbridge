@@ -526,6 +526,10 @@ public class GraphHandlerTest {
         assertTrue(arr.size() >= 1, "bark() has at least one caller");
         var first = arr.get(0).getAsJsonObject();
         assertEquals("reference", first.get("kind").getAsString());
+        assertEquals("incoming", first.get("direction").getAsString(),
+                "/refs (handleRefsTo) stamps every record with "
+                + ":direction \"incoming\" so downstream renderers "
+                + "know which side is the query subject");
         assertEquals("call", first.get("refKind").getAsString());
         assertEquals("test.model.Dog#bark()",
                 first.getAsJsonObject("to").get("fqn").getAsString());
@@ -702,6 +706,11 @@ public class GraphHandlerTest {
             var obj = node.getAsJsonObject();
             assertEquals("reference",
                     obj.get("kind").getAsString());
+            assertEquals("outgoing",
+                    obj.get("direction").getAsString(),
+                    "@outgoingRefs stamps every record with "
+                    + ":direction \"outgoing\" — symmetric with "
+                    + "@incomingRefs \"incoming\"");
             var from = obj.getAsJsonObject("from");
             assertNotNull(from,
                     "every outgoing ref carries :from pointing back "

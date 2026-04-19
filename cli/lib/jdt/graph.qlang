@@ -260,22 +260,24 @@
 
  |~ ── References ────────────────────────────────────────────── ~~|
 
- :@refs {:qlang/kind :builtin
-         :qlang/impl null
-         :category :jdt/graph
-         :subject [:map :string]
-         :modifiers [:keyword]
-         :returns :vec
-         :docs ["Incoming references to the given node (subject) of the given kind."
-                "Modifier is the refKind keyword: :call | :read | :write | :typeUse | :all."
-                "For methods, :call (default) returns invocations. For fields, :read/:write select access mode. For types, :typeUse covers extends/implements/typeUse."]
-          :examples [{:doc "Everything that references a type (typeUse default)"
-                      :snippet "\"io.github.kaluchi.jdtbridge.HttpServer\" | @refs * /from/fqn | distinct"}
-                     {:doc "Union of every refKind the server recognizes"
-                      :snippet "\"io.github.kaluchi.jdtbridge.HttpServer\" | @refs(:all) * /refKind | distinct"}
-                     {:doc "Field writes only"
-                      :snippet "\"io.github.kaluchi.jdtbridge.HttpServer#search\" | @refs(:write) * /from/fqn"}]
-          :throws [:TypeNotFound :MethodNotFound :FieldNotFound]}
+ :@incomingRefs {:qlang/kind :builtin
+                 :qlang/impl null
+                 :category :jdt/graph
+                 :subject [:map :string]
+                 :modifiers [:keyword]
+                 :returns :vec
+                 :docs ["Incoming references to the given node (subject) of the given kind."
+                        "Modifier is the refKind keyword: :call | :read | :write | :typeUse | :all."
+                        "For methods, :call (default) returns invocations. For fields, :read/:write select access mode. For types, :typeUse covers extends/implements/typeUse."
+                        "Returns Vec of :reference nodes where :to is the subject skeleton, :from is the caller, :direction is \"incoming\"."
+                        "Outgoing-side companion: @outgoingRefs."]
+                 :examples [{:doc "Everything that references a type (typeUse default)"
+                             :snippet "\"io.github.kaluchi.jdtbridge.HttpServer\" | @incomingRefs * /from/fqn | distinct"}
+                            {:doc "Union of every refKind the server recognizes"
+                             :snippet "\"io.github.kaluchi.jdtbridge.HttpServer\" | @incomingRefs(:all) * /refKind | distinct"}
+                            {:doc "Field writes only"
+                             :snippet "\"io.github.kaluchi.jdtbridge.HttpServer#search\" | @incomingRefs(:write) * /from/fqn"}]
+                 :throws [:TypeNotFound :MethodNotFound :FieldNotFound]}
 
  :@outgoingRefs {:qlang/kind :builtin
                  :qlang/impl null
@@ -284,9 +286,10 @@
                  :modifiers []
                  :returns :vec
                  :docs ["Outgoing references from a source member — the types / methods / fields referenced inside the subject's body."
-                        "Returns Vec of :reference nodes where :from is the subject skeleton and :to is the referenced target."
+                        "Returns Vec of :reference nodes where :from is the subject skeleton, :to is the referenced target, :direction is \"outgoing\"."
                         "Subject must be a type / method / field with available source. Binary-origin subjects fail because the AST visitor needs a compilation unit."
-                        ":refKind labels: :call (method invocation), :read (field / constant access), :typeUse (type reference in signatures, casts, instanceof)."]
+                        ":refKind labels: :call (method invocation), :read (field / constant access), :typeUse (type reference in signatures, casts, instanceof)."
+                        "Incoming-side companion: @incomingRefs."]
                  :examples [{:doc "Every outgoing edge from a method body"
                              :snippet "\"io.github.kaluchi.jdtbridge.ui.WelcomeStartupHandler#earlyStartup()\" | @outgoingRefs * {:to /to/fqn :refKind /refKind}"}
                             {:doc "Type-dependency set of a method — @typeUses sugar does the same filter + distinct"
@@ -384,13 +387,13 @@ let(:@detail, @asNode | as(:n) | /kind
 
 |~~ Incoming call sites of a method — :from skeleton nodes
     from each :call reference. ~~|
-let(:@callers, @refs | filter(/refKind | eq("call"))  * /from)
+let(:@callers, @incomingRefs | filter(/refKind | eq("call"))  * /from)
 
 |~~ Read-access call sites of a field. ~~|
-let(:@readers, @refs | filter(/refKind | eq("read"))  * /from)
+let(:@readers, @incomingRefs | filter(/refKind | eq("read"))  * /from)
 
 |~~ Write-access call sites of a field. ~~|
-let(:@writers, @refs | filter(/refKind | eq("write")) * /from)
+let(:@writers, @incomingRefs | filter(/refKind | eq("write")) * /from)
 
 |~~ Methods the subject body invokes. Outgoing-side companion
     to @callers. Returns distinct :to skeletons. ~~|
@@ -443,7 +446,7 @@ let(:@dependsOn,
     :type skeletons. ~~|
 let(:@usedBy,
     as(:self)
-    | [self | @refs(:typeUse) * /from | filter(/kind | eq("type")),
+    | [self | @incomingRefs(:typeUse) * /from | filter(/kind | eq("type")),
        self | @subtypes]
     | flat | distinct)
 
@@ -484,14 +487,14 @@ let(:@untested,
 |~~ For a type node, every test-scope caller across the type
     itself plus its declared methods and fields. Returns the Vec
     of distinct test-scope :from skeletons — the "which tests
-    exercise this type" answer. Per-fqn @refs errors (unreachable
+    exercise this type" answer. Per-fqn @incomingRefs errors (unreachable
     members, binary-origin extras) are swallowed via `!| []` so
     a single bad fqn does not crater the audit. ~~|
 let(:@tests,
     as(:self)
     | [[self | /fqn], self | @methods * /fqn, self | @fields * /fqn]
     | flat
-    * (@refs !| [])
+    * (@incomingRefs !| [])
     | flat * /from
     | filter(/isTestScope)
     | distinct)
@@ -529,8 +532,8 @@ let(:@sourceCard,
     @asNode | as(:self)
     | {:node     self | @detail
        :text     self | @source
-       :outgoing self | @outgoingRefs !| []
-       :incoming self | @refs(:all)   !| []}
+       :outgoing self | @outgoingRefs     !| []
+       :incoming self | @incomingRefs(:all) !| []}
     | mdSource)
 
 |~~ Type hierarchy card — ↑ supers / ↓ subtypes flat markdown. ~~|

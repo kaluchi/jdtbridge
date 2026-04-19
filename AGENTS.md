@@ -95,8 +95,8 @@ Axes (see `docs/jdt-query-spec.md` for the full catalog):
 @members  @methods  @fields  @innerTypes
 @typesInPackage  @typesInFile  @packagesInProject
 @supers  @subtypes  @ancestors  @descendants  @implementors
-@refs(:kind?)  @callers  @readers  @writers
-@outgoingRefs  @calls  @typeUses
+@incomingRefs(:kind?)  @outgoingRefs
+@callers  @readers  @writers  @calls  @typeUses
 @overrides  @overloads
 @source  @detail  @classpath  @problems(:scope?)
 ```

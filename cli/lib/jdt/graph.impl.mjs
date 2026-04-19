@@ -85,7 +85,7 @@ const enc = encodeURIComponent;
  * Per-axis HTTP timeout. Graph operands are non-interactive —
  * an LLM composes a pipeline and waits for the answer; a 10-30 s
  * ceiling on expensive queries (@outgoingRefs on large compilation
- * units, @refs with many hits, transitive walks) truncates
+ * units, @incomingRefs with many hits, transitive walks) truncates
  * legitimate work mid-flight. Default is 5 minutes; an agent or
  * CI run can raise or lower via JDT_GRAPH_TIMEOUT_MS.
  */
@@ -248,23 +248,23 @@ async function modifierName(modifierLambda, subject) {
 }
 
 /**
- * @refs widens via an optional refKind keyword:
- *     node | @refs              → server default for the subject kind
- *     node | @refs(:all)        → every refKind (call/read/write/typeUse)
- *     node | @refs(:call)       → call-sites only
- *     field | @refs(:write)     → writes only
+ * @incomingRefs widens via an optional refKind keyword:
+ *     node | @incomingRefs              → server default for the subject kind
+ *     node | @incomingRefs(:all)        → every refKind (call/read/write/typeUse)
+ *     node | @incomingRefs(:call)       → call-sites only
+ *     field | @incomingRefs(:write)     → writes only
  * Narrowing below the server default is always available in the
  * pipeline via `filter(/refKind | eq("…"))`.
  */
-const refsImpl = overloadedOp('@refs', 2, {
+const incomingRefsImpl = overloadedOp('@incomingRefs', 2, {
     0: async (subject) => {
         const fqn = fqnOf(subject);
-        if (fqn === null) return missingSubject('@refs', subject);
+        if (fqn === null) return missingSubject('@incomingRefs', subject);
         return getEndpoint(`/refs?of=${enc(fqn)}`);
     },
     1: async (subject, refKindLambda) => {
         const fqn = fqnOf(subject);
-        if (fqn === null) return missingSubject('@refs', subject);
+        if (fqn === null) return missingSubject('@incomingRefs', subject);
         const refKind = await modifierName(refKindLambda, subject);
         const path = refKind !== null
             ? `/refs?of=${enc(fqn)}&refKind=${enc(refKind)}`
@@ -336,7 +336,7 @@ export function createImpls() {
         '@implementors': implementorsImpl,
         '@overrides':   overridesImpl,
         '@overloads':   overloadsImpl,
-        '@refs':        refsImpl,
+        '@incomingRefs': incomingRefsImpl,
         '@outgoingRefs': outgoingRefsImpl,
         '@source':      sourceImpl,
         '@classpath':   classpathImpl,

@@ -939,6 +939,7 @@ class GraphHandler {
 
                 var node = new JsonObject();
                 node.addProperty("kind", "reference");
+                node.addProperty("direction", "outgoing");
                 node.addProperty("origin",
                         NodeBuilder.originOf(targetElement));
                 node.addProperty("refKind",

@@ -1018,6 +1018,7 @@ class NodeBuilder {
             SearchMatch match, String refKind) throws JavaModelException {
         var obj = new JsonObject();
         obj.addProperty("kind", "reference");
+        obj.addProperty("direction", "incoming");
         obj.addProperty("origin", originOfMatch(match));
 
         JsonObject loc = matchLocation(match);
