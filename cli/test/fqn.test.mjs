@@ -22,8 +22,8 @@ describe("parseFqn", () => {
     });
 
     it("deep package", () => {
-      expect(parseFqn("io.github.kaluchi.jdtbridge.SearchHandler")).toEqual({
-        className: "io.github.kaluchi.jdtbridge.SearchHandler",
+      expect(parseFqn("io.github.kaluchi.jdtbridge.GraphHandler")).toEqual({
+        className: "io.github.kaluchi.jdtbridge.GraphHandler",
         method: null,
         paramTypes: null,
       });
@@ -148,11 +148,11 @@ describe("parseFqn", () => {
     it("method with one param", () => {
       expect(
         parseFqn(
-          "io.github.kaluchi.jdtbridge.SearchHandler.normalizePackage(String)",
+          "io.github.kaluchi.jdtbridge.NodeBuilder.shortNature(String)",
         ),
       ).toEqual({
-        className: "io.github.kaluchi.jdtbridge.SearchHandler",
-        method: "normalizePackage",
+        className: "io.github.kaluchi.jdtbridge.NodeBuilder",
+        method: "shortNature",
         paramTypes: ["String"],
       });
     });
@@ -278,11 +278,11 @@ describe("parseFqn", () => {
     it("Eclipse Copy Qualified Name with generics", () => {
       expect(
         parseFqn(
-          "io.github.kaluchi.jdtbridge.SearchHandler.handleFind(Map<String, String>)",
+          "io.github.kaluchi.jdtbridge.GraphHandler.handleType(Map<String, String>)",
         ),
       ).toEqual({
-        className: "io.github.kaluchi.jdtbridge.SearchHandler",
-        method: "handleFind",
+        className: "io.github.kaluchi.jdtbridge.GraphHandler",
+        method: "handleType",
         paramTypes: ["Map"],
       });
     });
@@ -401,11 +401,11 @@ describe("parseFqn", () => {
     it("Eclipse Copy Qualified Name — long FQN", () => {
       expect(
         parseFqn(
-          "io.github.kaluchi.jdtbridge.SearchHandler.normalizePackage(String)",
+          "io.github.kaluchi.jdtbridge.NodeBuilder.shortNature(String)",
         ),
       ).toEqual({
-        className: "io.github.kaluchi.jdtbridge.SearchHandler",
-        method: "normalizePackage",
+        className: "io.github.kaluchi.jdtbridge.NodeBuilder",
+        method: "shortNature",
         paramTypes: ["String"],
       });
     });

@@ -519,7 +519,7 @@ class NodeBuilder {
             obj.addProperty("isDeprecated", true);
         }
 
-        String javadocSummary = SourceReport.javadocSummary(type);
+        String javadocSummary = javadocSummary(type);
         if (javadocSummary != null) {
             obj.addProperty("javadocSummary", javadocSummary);
         }
@@ -611,7 +611,7 @@ class NodeBuilder {
             obj.addProperty("isDeprecated", true);
         }
 
-        String javadocSummary = SourceReport.javadocSummary(method);
+        String javadocSummary = javadocSummary(method);
         if (javadocSummary != null) {
             obj.addProperty("javadocSummary", javadocSummary);
         }
@@ -639,6 +639,65 @@ class NodeBuilder {
         obj.add("annotations", annotationsOf(field, declaring));
         obj.addProperty("isTestScope", isTestScope(field));
         return obj;
+    }
+
+    /**
+     * First-sentence summary of an element's javadoc, or null when
+     * the element has no attached doc. Strips comment markers and
+     * the leading per-line {@code *} asterisk, then stops at the
+     * first {@code @}-tag, blank line, or {@code <p>} separator.
+     */
+    static String javadocSummary(IJavaElement element) {
+        if (!(element instanceof IMember m)) return null;
+        try {
+            ISourceRange range = m.getJavadocRange();
+            if (range == null) return null;
+            var cu = m.getCompilationUnit();
+            String source = cu != null ? cu.getSource()
+                    : (m.getClassFile() != null
+                            ? m.getClassFile().getSource()
+                            : null);
+            if (source == null) return null;
+            String raw = source.substring(range.getOffset(),
+                    range.getOffset() + range.getLength());
+            return firstJavadocSentence(raw);
+        } catch (Exception e) { return null; }
+    }
+
+    private static String firstJavadocSentence(String javadoc) {
+        String text = javadoc
+                .replaceAll("^/\\*\\*\\s*", "")
+                .replaceAll("\\s*\\*/$", "")
+                .replaceAll("(?m)^\\s*\\*\\s?", "")
+                .strip();
+        var sb = new StringBuilder();
+        for (String line : text.split("\n")) {
+            String trimmed = line.strip();
+            if (trimmed.startsWith("@") || trimmed.equals("<p>")
+                    || trimmed.isEmpty()) {
+                break;
+            }
+            if (sb.length() > 0) sb.append(" ");
+            sb.append(trimmed);
+        }
+        return sb.length() == 0 ? null : sb.toString();
+    }
+
+    /**
+     * Collapse an Eclipse nature id to a short domain keyword
+     * ({@code "java"} / {@code "maven"} / {@code "pde"} /
+     * {@code "gradle"}); fall back to the terminal segment of the
+     * nature id for anything the rule set does not recognise.
+     */
+    static String shortNature(String natureId) {
+        if (natureId.contains("javanature")) return "java";
+        if (natureId.contains("maven")) return "maven";
+        if (natureId.contains("pde") || natureId.contains("Plugin")) {
+            return "pde";
+        }
+        if (natureId.contains("gradle")) return "gradle";
+        int dot = natureId.lastIndexOf('.');
+        return dot >= 0 ? natureId.substring(dot + 1) : natureId;
     }
 
     // ── :project ────────────────────────────────────────────────────
@@ -669,7 +728,7 @@ class NodeBuilder {
         try {
             var natures = new JsonArray();
             for (String id : project.getDescription().getNatureIds()) {
-                natures.add(ProjectHandler.shortNature(id));
+                natures.add(shortNature(id));
             }
             obj.add("natures", natures);
         } catch (Exception ignored) { /* closed / deleted project */ }
@@ -1124,7 +1183,7 @@ class NodeBuilder {
             obj.addProperty("isDeprecated", true);
         }
 
-        String javadocSummary = SourceReport.javadocSummary(field);
+        String javadocSummary = javadocSummary(field);
         if (javadocSummary != null) {
             obj.addProperty("javadocSummary", javadocSummary);
         }
