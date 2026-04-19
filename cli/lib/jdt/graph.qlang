@@ -375,15 +375,23 @@ let(:@containingFile, @asNode | /location/file | unless(eq(null), @file))
     the appropriate point-lookup operand (@type / @method / @field /
     @project / @package / @file). Idempotent on detail-nodes —
     re-fetches the same identity. Accepts String FQN/FQMN subjects
-    via @asNode (syntactic dispatch) before the :kind routing. ~~|
-let(:@detail, @asNode | as(:n) | /kind
+    via @asNode (syntactic dispatch) before the :kind routing.
+    Unknown :kind fails onto the fail-track rather than silently
+    handing back the original subject — that fallthrough masks
+    malformed upstream values and makes downstream breakage hard
+    to localise. ~~|
+let(:@detail, @asNode | as(:n) | /kind | as(:k)
     | cond(eq("type"),    n | @type,
            eq("method"),  n | @method,
            eq("field"),   n | @field,
            eq("project"), n | @project,
            eq("package"), n | @package,
            eq("file"),    n | @file,
-           n))
+           !{:kind :unsupported-detail-kind
+             :thrown :UnsupportedDetailKind
+             :origin :jdt/graph
+             :message "@detail cannot route subject — :kind is not one of type/method/field/project/package/file"
+             :context {:subjectKind k :subject n}}))
 
 |~~ Incoming call sites of a method — :from skeleton nodes
     from each :call reference. ~~|

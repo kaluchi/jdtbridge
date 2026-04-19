@@ -113,6 +113,19 @@ function printQueryResult(value) {
 }
 
 export async function query(args) {
+  // jdt q takes no flags — the pipeline itself carries every knob
+  // (modifiers, conduits, filters). A --foo argument is almost
+  // always a typo'd pipeline char or a stale habit from pre-qlang
+  // commands; surface it so the user notices rather than silently
+  // dropping it and running the next positional as the pipeline.
+  const flags = args.filter(a => a.startsWith('--'));
+  if (flags.length > 0) {
+    process.stderr.write(
+        `jdt q: ignoring unrecognised flag${
+            flags.length > 1 ? 's' : ''} ${flags.join(' ')}\n`
+        + 'jdt q takes no flags — pass the qlang pipeline as the '
+        + 'single positional argument.\n');
+  }
   const queryParts = args.filter(a => !a.startsWith('--'));
   const querySource = queryParts[0];
   if (!querySource) {

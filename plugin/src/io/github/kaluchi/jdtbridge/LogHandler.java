@@ -1,6 +1,8 @@
 package io.github.kaluchi.jdtbridge;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -43,7 +45,7 @@ class LogHandler {
 
         String content;
         try {
-            content = Files.readString(logFile, StandardCharsets.UTF_8);
+            content = readTailBytes(logFile, MAX_READ_BYTES);
         } catch (IOException e) {
             return ErrorDescriptor.ioError(
                     "Cannot read " + logFile + ": " + e.getMessage())
@@ -57,6 +59,51 @@ class LogHandler {
             arr.add(all.get(i).toJson());
         }
         return arr.toString();
+    }
+
+    /**
+     * Cap on how many bytes off the tail of {@code .metadata/.log}
+     * we read in a single response. Eclipse rotates {@code .log} to
+     * {@code .log.bak} at ~1 MB by default, so the live file almost
+     * never exceeds a megabyte — but a user can disable rotation
+     * (system property {@code eclipse.log.size.max=0}) and accrue
+     * hundreds of MB. Loading that into a single String stalls the
+     * plugin for seconds and risks OutOfMemoryError in a busy
+     * worker. Reading the last 16 MB covers >99% of realistic tail
+     * sizes and keeps a hard ceiling on cost.
+     */
+    private static final long MAX_READ_BYTES = 16L * 1024 * 1024;
+
+    /**
+     * Read at most {@code maxBytes} off the end of {@code path}. If
+     * the file is shorter, reads the whole file. When truncated,
+     * scans forward to the next {@code \n} so we always start on a
+     * clean line (and {@link #parseEntries} will drop the partial
+     * prefix before the first {@code !ENTRY}).
+     */
+    private static String readTailBytes(Path path, long maxBytes)
+            throws IOException {
+        long size = Files.size(path);
+        if (size <= maxBytes) {
+            return Files.readString(path, StandardCharsets.UTF_8);
+        }
+        try (SeekableByteChannel ch = Files.newByteChannel(path)) {
+            ch.position(size - maxBytes);
+            ByteBuffer buf = ByteBuffer.allocate((int) maxBytes);
+            while (buf.hasRemaining() && ch.read(buf) > 0) { /* drain */ }
+            buf.flip();
+            // Align to the next newline so we never hand parseEntries
+            // half of a multi-byte UTF-8 sequence or a truncated
+            // !ENTRY header.
+            int start = 0;
+            while (start < buf.limit()
+                    && buf.get(start) != (byte) '\n') {
+                start++;
+            }
+            if (start < buf.limit()) start++;
+            return new String(buf.array(), start,
+                    buf.limit() - start, StandardCharsets.UTF_8);
+        }
     }
 
     /**

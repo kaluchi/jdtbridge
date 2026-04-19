@@ -232,16 +232,28 @@ class NodeBuilder {
      * every @methods skeleton on a 50-method type scans every
      * method for @Test annotations N² times.
      *
-     * ThreadLocal so each worker thread maintains its own map;
-     * clears on dispatch exit so state doesn't leak across
-     * unrelated requests.
+     * ThreadLocal so each worker thread maintains its own map with
+     * no cross-thread contention. Request lifecycle is the caller's
+     * responsibility: {@code HttpServer.handle} invokes
+     * {@link #clearTestScopeCache()} in its {@code finally} block,
+     * which removes the ThreadLocal binding (not just clears the
+     * map) so a later request on the same pooled worker starts
+     * from {@code withInitial} — no stale entries can survive.
+     * Read paths are additive only; no writer needs the previous
+     * map, so we never observe a half-cleared cache.
      */
     private static final ThreadLocal<java.util.Map<IType, Boolean>>
             TEST_ANNOTATION_CACHE =
             ThreadLocal.withInitial(java.util.HashMap::new);
 
-    /** Clear the per-request test-scope cache. Called after each
-     *  top-level request handler completes. */
+    /**
+     * Drop the current thread's test-scope cache. Called from
+     * {@code HttpServer.handle}'s {@code finally} block — not at
+     * request start — because the dispatch path may be entered
+     * recursively from within a handler (nested node-skeleton
+     * build, error mapping), and clearing on entry would wipe the
+     * outer frame's memoisation.
+     */
     static void clearTestScopeCache() {
         TEST_ANNOTATION_CACHE.remove();
     }
