@@ -182,9 +182,8 @@ let). Examples:
   jdt q 'manifest | filter(/category | eq(:jdt/graph)) * /name'
   -- list all graph operands
 
-Any operand without args shows its descriptor:
-  jdt q '@subtypes'
-  -- :docs, :examples, :throws for this operand
+Reify an operand's descriptor for docs + examples + throws:
+  jdt q 'reify(:@subtypes)'
 
 The sections below are live output from the running Eclipse instance.
 Each section is produced by a command shown in its header.

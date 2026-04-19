@@ -1,12 +1,8 @@
-// Path utilities for workspace-relative paths.
-
-/**
- * Strip leading slash from workspace-relative path.
- * Eclipse returns paths like /my-server/src/... — we want my-server/src/...
- */
-export function stripProject(wsPath) {
-  return wsPath.startsWith("/") ? wsPath.slice(1) : wsPath;
-}
+// Path utilities.
+//
+// Plugin responses carry absolute filesystem paths. The legacy
+// /organize-imports and /format endpoints still take workspace-
+// relative input — toWsPath ensures a leading slash for those.
 
 /**
  * Ensure path starts with / for workspace-relative API calls.

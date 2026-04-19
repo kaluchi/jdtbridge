@@ -1,20 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { stripProject, toWsPath, hostToSandboxPath } from "../src/paths.mjs";
+import { toWsPath, hostToSandboxPath } from "../src/paths.mjs";
 import { remapJsonPaths } from "../src/json-output.mjs";
-
-describe("stripProject", () => {
-  it("strips leading slash", () => {
-    expect(stripProject("/my-server/src/main/java/Foo.java")).toBe(
-      "my-server/src/main/java/Foo.java",
-    );
-  });
-
-  it("returns path as-is if no leading slash", () => {
-    expect(stripProject("my-server/src/Foo.java")).toBe(
-      "my-server/src/Foo.java",
-    );
-  });
-});
 
 describe("toWsPath", () => {
   it("adds leading slash", () => {

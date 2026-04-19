@@ -168,54 +168,70 @@ export const help = `Evaluate a qlang pipeline against the Eclipse JDT graph.
 
 Usage:  jdt q <qlang-query>
 
-Runs with use(:jdt/graph) pre-loaded. The graph is navigated through
-operand axes that all consume node-Maps OR fqn/fqmn Strings (subject
-polymorphism); every operand returns canonical-shape nodes (skeletons
-or detail) with five-field headers (:fqn :kind :origin :location
-:containingProject) plus per-kind detail fields.
+The :jdt/graph module is pre-loaded. Every @-operand is NULLARY —
+it takes its subject from pipeValue, never from a captured arg.
+Seed the pipeline with a literal String (FQN / FQMN / pattern) or
+a nullary entry-point (@projects, @problems), then chain operands
+that read pipeValue. Subject polymorphism: operands accept the
+canonical node-Map produced by a prior step OR the raw fqn/fqmn
+String that identifies the same node.
 
-Output is qlang-literal (via printValue) — round-trips losslessly
-through parse + evalQuery, composes natively as \`jdt X | jdt q
-'...'\` without jq bridging. Strings print raw (unquoted).
+Output is qlang-literal (via printValue) — round-trips through
+parse + evalQuery and composes as \`jdt q '…' | jdt q '…'\`. Raw
+Strings print unquoted so \`jdt q '"Foo" | @source' > Foo.java\`
+writes the file byte-faithful.
 
-Root queries:
-  @types("*Pat*") [:sourceOnly]    workspace pattern search
-  @type(fqn)  @method(fqmn)  @field(fqmn)
-  @project(name)  @projects  @package(fqn)  @file(absPath)
+Pattern search:
+  "*Service" | @types                type-name wildcard (workspace-wide)
+  "*Handler" | @types | @sourceOnly  exclude binary dependencies
+
+Point lookup (FQN / FQMN as pipeline seed):
+  "pkg.Type"                | @type
+  "pkg.Type#method(ArgFqn)" | @method
+  "pkg.Type#fieldName"      | @field
+  "project-name"            | @project
+  "pkg.sub"                 | @package
+  "/abs/path/to/File.java"  | @file
+                              @projects      (nullary)
+                              @problems      (nullary, or scoped)
 
 Containment:
-  @containingType(node)  @containingProject(node)
-  @members @methods @fields @innerTypes (node)
-  @typesInPackage @typesInFile @packagesInProject (node)
+  node | @containingType      node | @containingProject
+  node | @containingPackage   node | @containingFile
+  type | @members             type | @methods
+  type | @fields              type | @innerTypes
+  package | @typesInPackage   file | @typesInFile
+  project | @packagesInProject
 
 Hierarchy:
-  @supers @subtypes @implementors (node)
-  @overrides(method)  @overloads(method)
+  type | @supers       type | @subtypes      type | @ancestors
+  type | @descendants  type | @implementors
+  method | @overrides  method | @overloads
 
 References:
-  @incomingRefs(node) [:call|:read|:write|:typeUse|:all]
-  @outgoingRefs(node)
-  @callers(node) @readers(node) @writers(node)  -- sugar conduits
+  node   | @incomingRefs           default scope for subject kind
+  node   | @incomingRefs(:all)     modifier widens refKind filter
+  field  | @incomingRefs(:write)   one of :call :read :write :typeUse :all
+  member | @outgoingRefs           what the subject body touches
 
-Detail:
-  @detail(skeleton)  -> detail-node    @classpath(project)
+Sugar conduits:
+  method | @callers    field | @readers    field | @writers
+  member | @calls      member | @typeUses
+  skeleton | @detail   -> detail-node
+  project | @classpath -> resolved classpath entries, absolute paths
 
-Pipelines start with a SEED (literal string or nullary operand)
-and chain operands that read pipeValue. Operands never take FQN
-as captured args — that's RPC. Examples:
+Reify a descriptor (docs + examples for an operand or conduit):
+  reify(:@incomingRefs)
+  manifest | filter(/category | eq(:jdt/graph)) * /name
+  -- enumerate the full graph axis + conduit catalog
 
-  jdt q '"*Service" | @types * /fqn'
-  jdt q '"test.model.Dog" | @type | @members | filter(/modifiers | any(eq("public")))'
-  jdt q '"test.model.Animal" | @subtypes * /fqn'
-  jdt q '"test.model.Dog#bark()" | @incomingRefs * /from/fqn | distinct'
-  jdt q '@projects * @members * @methods | filter(/modifiers | any(eq("public"))) | filter(@callers | empty) * /fqn'
+Exit code is always 0 — errors (parse, usage, fail-track) travel
+on stdout as qlang error values (\`!{:kind … :message …}\`). Use
+\`!|\` inside the pipeline to route around errors.
 
-All 69 qlang builtins are available (filter, sort, count, groupBy, * fan-out, !| fail-track).
-Bare-name reify on any operand = its descriptor:
-  jdt q '@subtypes'   shows :docs/:examples/:throws for the operand.
-  jdt q 'manifest | filter(/category | eq(:jdt/graph)) * /name'
-  -- enumerate the full graph axis catalog.
-
-Exit code is always 0 — errors (parse, usage, fail-track) travel on
-stdout as qlang error values (\`!{:kind ... :message ...}\`). Use
-\`!|\` inside the pipeline to route around errors.`;
+Paths in responses (:path, :file, :rootPath, :outputLocation) are
+absolute filesystem paths on the Eclipse host. The CLI remaps them
+to the runtime's filesystem convention via toSandboxPath before
+they reach the pipeline, so a Linux-sandboxed agent sees its own
+mount paths, not host Windows paths. :fqn is an identifier, never
+remapped — round-trip it back to the API verbatim.`;
