@@ -280,7 +280,10 @@ class GraphHandler {
                 return "null";
             } catch (Exception e) {
                 Log.warn("/overrides walk failed", e);
-                return "null";
+                return ErrorDescriptor.jdtInternalError(
+                        "Failed /overrides for "
+                                + method.getElementName(), e)
+                        .toJsonString();
             }
         });
     }
@@ -417,7 +420,7 @@ class GraphHandler {
                         .toJsonString();
             }
             var arr = new JsonArray();
-            for (var entry : jp.getRawClasspath()) {
+            for (var entry : jp.getResolvedClasspath(true)) {
                 arr.add(NodeBuilder.classpathEntrySkeleton(
                         entry, project));
             }
@@ -656,11 +659,6 @@ class GraphHandler {
             }
 
             String text = NodeBuilder.sourceTextOf(member);
-            if (text == null) {
-                return ErrorDescriptor.ioError(
-                        "Source not available for " + identifier)
-                        .toJsonString();
-            }
             return new com.google.gson.Gson().toJson(text);
         } catch (Exception e) {
             Log.warn("/source failed for " + identifier, e);
@@ -684,8 +682,10 @@ class GraphHandler {
 
             org.eclipse.core.resources.IResource resource;
             if (filePath != null && !filePath.isBlank()) {
-                resource = root.findMember(filePath);
-                if (resource == null) {
+                var absolute = org.eclipse.core.runtime.Path
+                        .fromOSString(filePath);
+                resource = root.getFileForLocation(absolute);
+                if (resource == null || !resource.exists()) {
                     return ErrorDescriptor.fileNotFound(filePath).toJsonString();
                 }
             } else if (projectName != null && !projectName.isBlank()) {
@@ -712,7 +712,7 @@ class GraphHandler {
             for (var marker : markers) {
                 int severity = marker.getAttribute(
                         org.eclipse.core.resources.IMarker.SEVERITY, -1);
-                if (severity < org.eclipse.core.resources.IMarker.SEVERITY_ERROR) continue;
+                if (severity < org.eclipse.core.resources.IMarker.SEVERITY_WARNING) continue;
                 if (!scope.containsProject(
                         marker.getResource().getProject().getName())) continue;
 
@@ -744,8 +744,8 @@ class GraphHandler {
             }
             return arr.toString();
         } catch (Exception e) {
-            Log.warn("/problems2 failed", e);
-            return ErrorDescriptor.jdtInternalError("Failed /problems2", e).toJsonString();
+            Log.warn("/problems failed", e);
+            return ErrorDescriptor.jdtInternalError("Failed /problems", e).toJsonString();
         }
     }
 
@@ -831,12 +831,20 @@ class GraphHandler {
      *   <li>type target:   {@code :typeUse} (synonymous with default {@code :all})</li>
      * </ul>
      */
+    private static final java.util.Set<String> VALID_REF_KINDS =
+            java.util.Set.of("all", "call", "read", "write", "typeUse");
+
     String handleRefsTo(Map<String, String> params, ProjectScope scope) {
         String fqmn = params.get("of");
         if (fqmn == null || fqmn.isBlank()) {
             return ErrorDescriptor.missingParameter("of").toJsonString();
         }
         String refKindParam = params.getOrDefault("refKind", "all");
+        if (!VALID_REF_KINDS.contains(refKindParam)) {
+            return ErrorDescriptor.invalidModifier(
+                    "refKind", refKindParam, VALID_REF_KINDS)
+                    .toJsonString();
+        }
         try {
             ResolvedTarget target = resolveTarget(fqmn, params);
             if (target.errorJson != null) return target.errorJson;

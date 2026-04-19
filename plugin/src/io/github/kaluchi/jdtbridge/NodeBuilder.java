@@ -704,7 +704,7 @@ class NodeBuilder {
         IJavaProject jp = JavaCore.create(project);
         if (jp != null && jp.exists()) {
             var classpath = new JsonArray();
-            for (IClasspathEntry entry : jp.getRawClasspath()) {
+            for (IClasspathEntry entry : jp.getResolvedClasspath(true)) {
                 classpath.add(classpathEntrySkeleton(entry, project));
             }
             obj.add("classpathEntries", classpath);
@@ -719,17 +719,18 @@ class NodeBuilder {
             for (IPackageFragmentRoot root
                     : jp.getPackageFragmentRoots()) {
                 if (root.getKind()
-                        == IPackageFragmentRoot.K_SOURCE) {
+                        == IPackageFragmentRoot.K_SOURCE
+                        && root.getResource() != null
+                        && root.getResource().getLocation() != null) {
                     sourceRoots.add(root.getResource()
-                            .getProjectRelativePath().toString());
+                            .getLocation().toOSString());
                 }
             }
             obj.add("sourceRoots", sourceRoots);
 
-            String outputLoc = jp.getOutputLocation() != null
-                    ? jp.getOutputLocation().toString() : null;
-            if (outputLoc != null) {
-                obj.addProperty("outputLocation", outputLoc);
+            if (jp.getOutputLocation() != null) {
+                obj.addProperty("outputLocation",
+                        workspacePathAbsolute(jp.getOutputLocation()));
             }
 
             String compliance =
@@ -856,79 +857,168 @@ class NodeBuilder {
 
     // ── :classpathEntry ─────────────────────────────────────────────
 
+    /**
+     * :classpathEntry skeleton for a RESOLVED classpath entry.
+     * Callers must pass entries from
+     * {@link IJavaProject#getResolvedClasspath(boolean)} — container
+     * and variable kinds have been expanded into their constituent
+     * source / library / project entries by that call, so this
+     * builder handles only those three.
+     * <ul>
+     *   <li>{@code :path} — absolute filesystem path on the Eclipse
+     *       host, in the host's native format (Windows:
+     *       {@code D:\…}, Linux: {@code /…}).</li>
+     *   <li>{@code :origin} — {@code "source"} for source roots,
+     *       {@code "binary"} for library JARs and project-dep
+     *       outputs.</li>
+     *   <li>{@code :outputLocation} — absolute filesystem path,
+     *       same format as {@code :path}. Present only on source
+     *       entries that override the project default.</li>
+     * </ul>
+     */
     static JsonObject classpathEntrySkeleton(IClasspathEntry entry,
             IProject project) {
-        String entryKind = switch (entry.getEntryKind()) {
-            case IClasspathEntry.CPE_SOURCE    -> "source";
-            case IClasspathEntry.CPE_LIBRARY   -> "library";
-            case IClasspathEntry.CPE_PROJECT   -> "project";
-            case IClasspathEntry.CPE_VARIABLE  -> "variable";
-            case IClasspathEntry.CPE_CONTAINER -> "container";
-            default -> "unknown";
-        };
-        String path = entry.getPath() != null
-                ? entry.getPath().toOSString() : "";
+        int kind = entry.getEntryKind();
+        String entryKind;
+        String origin;
+        switch (kind) {
+            case IClasspathEntry.CPE_SOURCE:
+                entryKind = "source"; origin = "source"; break;
+            case IClasspathEntry.CPE_LIBRARY:
+                entryKind = "library"; origin = "binary"; break;
+            case IClasspathEntry.CPE_PROJECT:
+                entryKind = "project"; origin = "binary"; break;
+            default:
+                throw new IllegalStateException(
+                        "resolved classpath must not contain entry kind "
+                        + kind + "; callers must feed "
+                        + "IJavaProject.getResolvedClasspath(true)");
+        }
+        String absolutePath = resolveEntryPath(entry);
         String projName = project.getName();
-        String fqn = projName + "#" + entryKind + "#" + path;
+        String fqn = projName + "#" + entryKind + "#" + absolutePath;
 
-        var obj = baseHeader(fqn, "classpathEntry", "source");
+        var obj = baseHeader(fqn, "classpathEntry", origin);
         obj.addProperty("containingProject", projName);
         obj.addProperty("entryKind", entryKind);
-        obj.addProperty("path", path);
+        obj.addProperty("path", absolutePath);
         if (entry.getOutputLocation() != null) {
             obj.addProperty("outputLocation",
-                    entry.getOutputLocation().toOSString());
+                    workspacePathAbsolute(entry.getOutputLocation()));
         }
         if (entry.isTest()) obj.addProperty("isTest", true);
         if (entry.isExported()) obj.addProperty("isExported", true);
         return obj;
     }
 
+    /**
+     * Absolute filesystem path for a classpath entry. Workspace-
+     * internal paths resolve through the workspace root; external
+     * paths (library JARs outside the workspace, JDK modules)
+     * already carry a filesystem-absolute {@code IPath} and pass
+     * through verbatim. An entry path that resolves to neither is
+     * a contract violation — throws rather than emit ambiguous
+     * data.
+     */
+    private static String resolveEntryPath(IClasspathEntry entry) {
+        var entryPath = entry.getPath();
+        if (entryPath == null) {
+            throw new IllegalStateException(
+                    "classpath entry has no path: " + entry);
+        }
+        var resource = workspaceRoot().findMember(entryPath);
+        if (resource != null && resource.getLocation() != null) {
+            return resource.getLocation().toOSString();
+        }
+        String raw = entryPath.toOSString();
+        if (new java.io.File(raw).isAbsolute()) {
+            return raw;
+        }
+        throw new IllegalStateException(
+                "Unresolvable classpath entry path: " + entryPath
+                + " (workspace lookup missed and path is not "
+                + "filesystem-absolute)");
+    }
+
+    private static org.eclipse.core.resources.IWorkspaceRoot workspaceRoot() {
+        return org.eclipse.core.resources.ResourcesPlugin
+                .getWorkspace().getRoot();
+    }
+
+    private static String workspacePathAbsolute(
+            org.eclipse.core.runtime.IPath workspacePath) {
+        var resource = workspaceRoot().findMember(workspacePath);
+        if (resource == null || resource.getLocation() == null) {
+            throw new IllegalStateException(
+                    "Cannot resolve absolute path for " + workspacePath);
+        }
+        return resource.getLocation().toOSString();
+    }
+
     // ── Source text extraction ─────────────────────────────────────
 
     /**
-     * Byte-exact source text for a member. Top-level types include
-     * the full compilation unit (package + imports + type body).
-     * Methods, fields, and inner types return their declaration range
-     * read from disk to preserve indentation.
+     * Source text for a member, sliced along line boundaries.
+     * Top-level types return the full compilation unit. Methods,
+     * fields, and inner types return the full lines that span their
+     * declaration range — leading indentation of the opening line
+     * is preserved, and the trailing newline of the closing line is
+     * included.
+     * <p>
+     * Text is read from the JDT working-copy source (same source
+     * the declaration range is measured against), so unsaved edits
+     * stay consistent. Line separators of the source are kept as
+     * authored — CRLF files stay CRLF, LF files stay LF.
      */
-    static String sourceTextOf(IMember member) {
-        try {
-            boolean isTopLevelType = member instanceof IType t
-                    && t.getDeclaringType() == null;
-            if (isTopLevelType) {
-                ICompilationUnit cu = member.getCompilationUnit();
-                if (cu != null) return cu.getSource();
-                IClassFile cf = member.getClassFile();
-                return cf != null ? cf.getSource() : null;
+    static String sourceTextOf(IMember member) throws JavaModelException {
+        boolean isTopLevelType = member instanceof IType t
+                && t.getDeclaringType() == null;
+        if (isTopLevelType) {
+            ICompilationUnit cu = member.getCompilationUnit();
+            if (cu != null) return cu.getSource();
+            IClassFile cf = member.getClassFile();
+            if (cf == null) {
+                throw new IllegalStateException(
+                        "type has neither compilation unit nor class file: "
+                        + member.getElementName());
             }
-            ISourceRange range = member.getSourceRange();
-            if (range == null || range.getOffset() < 0) {
-                return member.getSource();
-            }
-            String absPath = filePathOf(member);
-            String fullSource = sourceOf(member);
-            if (absPath != null && fullSource != null) {
-                int startLine = offsetToLine(fullSource,
-                        range.getOffset());
-                int endLine = offsetToLine(fullSource,
-                        range.getOffset() + range.getLength());
-                try {
-                    var path = java.nio.file.Path.of(absPath);
-                    if (java.nio.file.Files.exists(path)) {
-                        var lines = java.nio.file.Files.readAllLines(path);
-                        int from = Math.max(0, startLine - 1);
-                        int to = Math.min(lines.size(), endLine);
-                        return String.join("\n",
-                                lines.subList(from, to)) + "\n";
-                    }
-                } catch (Exception ignored) { /* fall through */ }
-            }
-            return member.getSource();
-        } catch (JavaModelException e) {
-            Log.warn("sourceTextOf failed", e);
-            return null;
+            return cf.getSource();
         }
+        ISourceRange range = member.getSourceRange();
+        String fullSource = sourceOf(member);
+        if (range == null || range.getOffset() < 0) {
+            throw new IllegalStateException(
+                    "member has no source range: "
+                    + member.getElementName());
+        }
+        if (fullSource == null) {
+            throw new IllegalStateException(
+                    "compilation unit source unavailable for "
+                    + member.getElementName());
+        }
+        int start = lineStart(fullSource, range.getOffset());
+        int end = lineEnd(fullSource,
+                range.getOffset() + range.getLength());
+        return fullSource.substring(start, end);
+    }
+
+    /** Offset of the first char on the line containing {@code off}. */
+    private static int lineStart(String source, int off) {
+        int i = Math.min(off, source.length());
+        while (i > 0 && source.charAt(i - 1) != '\n') i--;
+        return i;
+    }
+
+    /**
+     * Offset immediately after the line terminator of the line
+     * containing {@code off}. Returns {@code source.length()} when
+     * the last line has no trailing terminator.
+     */
+    private static int lineEnd(String source, int off) {
+        int i = Math.min(off, source.length());
+        int n = source.length();
+        while (i < n && source.charAt(i) != '\n') i++;
+        return i < n ? i + 1 : n;
     }
 
     // ── :reference ──────────────────────────────────────────────────

@@ -162,3 +162,95 @@ describe("graph.impl — concurrency semaphore", () => {
     await Promise.all(pending);
   });
 });
+
+describe("graph.impl — path remapping at the plugin boundary", () => {
+  it("rewrites :path on classpath responses via toSandboxPath", async () => {
+    // Server returns a Windows-style path; on Linux CLI this must
+    // be remapped BEFORE the value reaches the qlang session, so
+    // downstream pipelines always see local-shape paths.
+    process.env.JDT_GRAPH_CACHE = "0";
+    vi.stubGlobal("process", { ...process, platform: "linux" });
+    vi.doMock("../src/client.mjs", () => ({
+      get: async () => [{
+        fqn: "proj#source#D:\\git\\proj\\src",
+        kind: "classpathEntry",
+        entryKind: "source",
+        origin: "source",
+        path: "D:\\git\\proj\\src",
+      }],
+    }));
+    vi.resetModules();
+    const graphImpl = await import(
+        "../lib/jdt/graph.impl.mjs?pathremap=" + Date.now());
+    const { createSession } = await import(
+        "@kaluchi/qlang-core/session");
+    const session = await createSession();
+    const impls = graphImpl.createImpls();
+    for (const [name, fn] of Object.entries(impls)) {
+      session.bind(name, fn);
+    }
+    const { result } = await session.evalCell(
+        '"proj" | @classpath * /path');
+    expect(result).toEqual(["/d/git/proj/src"]);
+    vi.unstubAllGlobals();
+  });
+
+  it("does NOT rewrite :fqn even if it contains a path", async () => {
+    process.env.JDT_GRAPH_CACHE = "0";
+    vi.stubGlobal("process", { ...process, platform: "linux" });
+    vi.doMock("../src/client.mjs", () => ({
+      get: async () => ({
+        fqn: "D:\\git\\proj\\src\\Foo.java",
+        kind: "file",
+        origin: "source",
+      }),
+    }));
+    vi.resetModules();
+    const graphImpl = await import(
+        "../lib/jdt/graph.impl.mjs?fqnremap=" + Date.now());
+    const { createSession } = await import(
+        "@kaluchi/qlang-core/session");
+    const session = await createSession();
+    const impls = graphImpl.createImpls();
+    for (const [name, fn] of Object.entries(impls)) {
+      session.bind(name, fn);
+    }
+    const { result } = await session.evalCell(
+        '"D:\\\\git\\\\proj\\\\src\\\\Foo.java" | @file | /fqn');
+    // :fqn is an identifier — server echoes the host path as-is
+    // so the client can round-trip it back.
+    expect(result).toBe("D:\\git\\proj\\src\\Foo.java");
+    vi.unstubAllGlobals();
+  });
+
+  it("walks nested :location/:file", async () => {
+    process.env.JDT_GRAPH_CACHE = "0";
+    vi.stubGlobal("process", { ...process, platform: "linux" });
+    vi.doMock("../src/client.mjs", () => ({
+      get: async () => ({
+        fqn: "pkg.Foo",
+        kind: "type",
+        origin: "source",
+        location: {
+          file: "D:\\git\\proj\\src\\pkg\\Foo.java",
+          startLine: 1,
+          endLine: 10,
+        },
+      }),
+    }));
+    vi.resetModules();
+    const graphImpl = await import(
+        "../lib/jdt/graph.impl.mjs?locremap=" + Date.now());
+    const { createSession } = await import(
+        "@kaluchi/qlang-core/session");
+    const session = await createSession();
+    const impls = graphImpl.createImpls();
+    for (const [name, fn] of Object.entries(impls)) {
+      session.bind(name, fn);
+    }
+    const { result } = await session.evalCell(
+        '"pkg.Foo" | @type | /location/file');
+    expect(result).toBe("/d/git/proj/src/pkg/Foo.java");
+    vi.unstubAllGlobals();
+  });
+});

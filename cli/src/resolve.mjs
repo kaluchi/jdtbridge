@@ -33,15 +33,18 @@ export async function resolveInstance() {
     };
   }
 
-  // Discover once, reuse across steps 2-4
+  // Discover once, reuse across steps 2-4. Filter to live
+  // instances up front — remote instances have no PID to check.
   const instances = await discoverInstances();
+  const live = instances.filter(
+      i => i.remote || !i.pid || isPidAlive(i.pid));
 
   // Step 2: ppid pin
   const ppidFile = `ppid-${process.ppid}.json`;
   const ppidPin = readPin(ppidFile);
   if (ppidPin) {
     if (isPidAlive(process.ppid)) {
-      const match = findByWorkspace(instances, ppidPin.workspace);
+      const match = findByWorkspace(live, ppidPin.workspace);
       if (match) return match;
     }
     deletePin(ppidFile);
@@ -53,7 +56,7 @@ export async function resolveInstance() {
     const termFile = `term-${termId}.json`;
     const termPin = readPin(termFile);
     if (termPin) {
-      const match = findByWorkspace(instances, termPin.workspace);
+      const match = findByWorkspace(live, termPin.workspace);
       if (match) return match;
       // Workspace offline — stale pin
       deletePin(termFile);
@@ -61,11 +64,6 @@ export async function resolveInstance() {
   }
 
   // Step 4: discovery fallback
-  if (instances.length === 0) return null;
-  if (instances.length === 1) return instances[0];
-
-  // Filter to live instances — remote instances have no PID to check
-  const live = instances.filter(i => i.remote || !i.pid || isPidAlive(i.pid));
   if (live.length === 0) return null;
   if (live.length === 1) return live[0];
 

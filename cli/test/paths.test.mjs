@@ -111,6 +111,17 @@ describe("hostToSandboxPath", () => {
 });
 
 describe("remapJsonPaths", () => {
+  async function loadOnLinux() {
+    vi.stubGlobal("process", { ...process, platform: "linux" });
+    const mod = await import(
+        "../src/json-output.mjs?linux-json=" + Date.now());
+    return mod.remapJsonPaths;
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("remaps file keys in flat object", () => {
     const obj = { file: "D:/project/src/Foo.java", fqn: "com.Foo" };
     // On win32, toSandboxPath is a no-op, so file stays the same
@@ -129,12 +140,6 @@ describe("remapJsonPaths", () => {
     expect(arr[1].file).toBe("/path/Bar.java");
   });
 
-  it("remaps location keys", () => {
-    const obj = { name: "proj", location: "/ws/proj" };
-    remapJsonPaths(obj);
-    expect(obj.location).toBe("/ws/proj");
-  });
-
   it("recurses into nested objects", () => {
     const obj = { items: [{ nested: { file: "/a/b.java" } }] };
     remapJsonPaths(obj);
@@ -146,4 +151,65 @@ describe("remapJsonPaths", () => {
     expect(() => remapJsonPaths(42)).not.toThrow();
     expect(() => remapJsonPaths("str")).not.toThrow();
   });
+
+  it("remaps :path (classpath entries) on Linux", async () => {
+    const remap = await loadOnLinux();
+    const obj = { path: "D:/git/proj/src/main/java" };
+    remap(obj);
+    expect(obj.path).toBe("/d/git/proj/src/main/java");
+  });
+
+  it("remaps :rootPath on project detail on Linux", async () => {
+    const remap = await loadOnLinux();
+    const obj = { fqn: "proj", rootPath: "D:/git/proj" };
+    remap(obj);
+    expect(obj.rootPath).toBe("/d/git/proj");
+    expect(obj.fqn).toBe("proj");
+  });
+
+  it("remaps :outputLocation on classpath entries on Linux", async () => {
+    const remap = await loadOnLinux();
+    const obj = { outputLocation: "D:/git/proj/target/classes" };
+    remap(obj);
+    expect(obj.outputLocation).toBe("/d/git/proj/target/classes");
+  });
+
+  it("does NOT remap :fqn even when it looks like a path", async () => {
+    // file-kind skeletons carry absolute path in :fqn — it is an
+    // identifier round-tripped back to @file, never rewritten.
+    const remap = await loadOnLinux();
+    const obj = { fqn: "D:/proj/src/Foo.java", kind: "file" };
+    remap(obj);
+    expect(obj.fqn).toBe("D:/proj/src/Foo.java");
+  });
+
+  it("does NOT remap :location as a string (deprecated — now a sub-map key)", async () => {
+    // Pre-qlang handlers had :location as a string; current API
+    // carries :location as a sub-map {:file …}. The string form is
+    // no longer a path field — only :file inside counts.
+    const remap = await loadOnLinux();
+    const obj = { location: "D:/ws/proj" };
+    remap(obj);
+    expect(obj.location).toBe("D:/ws/proj");
+  });
+
+  it("walks deeply nested classpath response on Linux", async () => {
+    const remap = await loadOnLinux();
+    const obj = {
+      classpathEntries: [
+        { entryKind: "source", path: "D:/git/proj/src/main/java",
+          outputLocation: "D:/git/proj/target/classes" },
+        { entryKind: "library",
+          path: "C:/Users/x/.m2/repository/guava-33.0.0.jar" },
+      ],
+    };
+    remap(obj);
+    expect(obj.classpathEntries[0].path)
+        .toBe("/d/git/proj/src/main/java");
+    expect(obj.classpathEntries[0].outputLocation)
+        .toBe("/d/git/proj/target/classes");
+    expect(obj.classpathEntries[1].path)
+        .toBe("/c/Users/x/.m2/repository/guava-33.0.0.jar");
+  });
 });
+

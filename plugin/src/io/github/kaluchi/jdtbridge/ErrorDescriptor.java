@@ -97,6 +97,21 @@ class ErrorDescriptor {
                 "Missing parameter: " + name).with("parameter", name);
     }
 
+    static ErrorDescriptor invalidModifier(String parameter,
+            String value, java.util.Set<String> allowed) {
+        var arr = new com.google.gson.JsonArray();
+        var sorted = new java.util.ArrayList<>(allowed);
+        java.util.Collections.sort(sorted);
+        for (String a : sorted) arr.add(a);
+        return new ErrorDescriptor("invalid-modifier", "InvalidModifier",
+                "Unrecognised " + parameter + " \"" + value
+                + "\"; expected one of "
+                + String.join(", ", sorted))
+                .with("parameter", parameter)
+                .with("value", value)
+                .with("allowed", arr);
+    }
+
     static ErrorDescriptor ambiguousMatch(String fqmn,
             java.util.List<String> candidates) {
         var arr = new com.google.gson.JsonArray();

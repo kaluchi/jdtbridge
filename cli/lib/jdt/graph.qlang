@@ -13,14 +13,13 @@
           :qlang/impl null
           :category :jdt/graph
           :subject [:map :string]
-          :modifiers [:keyword]
+          :modifiers []
           :returns :vec
           :docs ["Type pattern search across the workspace. Subject is a name or wildcard pattern (\"*Controller*\")."
-                 "Optional modifier :sourceOnly excludes binary types."
-                 "Returns Vec of :type skeletons."]
+                 "Returns Vec of :type skeletons; binary dependencies included. Pipeline `@sourceOnly` conduit drops them."]
           :examples [{:doc "All types matching a wildcard pattern"
                       :snippet "\"*Service\" | @types * /fqn"}
-                     {:doc "Workspace-source only — exclude binary dependencies"
+                     {:doc "Workspace-source only — exclude binary dependencies via conduit"
                       :snippet "\"*Handler\" | @types | @sourceOnly * /fqn"}]
           :throws [:InvalidFqn]}
 
@@ -316,10 +315,11 @@
            :category :jdt/graph
            :subject [:map :string]
            :modifiers []
-           :returns :map
-           :docs ["Source text of a type or member. Returns {:node <detail> :text <source>}."
-                  "Top-level types include the full compilation unit."]
-           :examples [{:doc "Method body as raw source text (String result — prints unquoted)"
+           :returns :string
+           :docs ["Raw source text of a type or member as a String."
+                  "Top-level types return the full compilation unit."
+                  "Prints unquoted — `jdt q '\"X\" | @source' > X.java` writes a byte-faithful file."]
+           :examples [{:doc "Method body as source text"
                        :snippet "\"io.github.kaluchi.jdtbridge.HttpServer#start()\" | @source"}
                       {:doc "Full compilation unit of a type"
                        :snippet "\"io.github.kaluchi.jdtbridge.Json\" | @source"}]
@@ -342,12 +342,15 @@
              :throws [:FileNotFound :ProjectNotFound]}}
 | use
 
-|~~ Polymorphic seed lift. For Map subjects (skeleton/detail) — pass
-    through. For String subjects, infer node kind from FQN syntax and
-    point-lookup via @method (has '#' and '('), @field (has '#', no
-    '('), or @type (no '#'). The @containing* axes use @asNode so
-    callers may write either `node | @containingType` or
-    `"X#m()" | @containingType` without explicit lift. ~~|
+|~~ Polymorphic seed lift. Map subjects (skeleton/detail) pass
+    through. String subjects dispatch by shape:
+      - has '#' and '(' → @method (FQMN with explicit signature)
+      - has '#', no '(' → @field (FQMN for a field)
+      - no '#'          → @type (FQN for a type)
+    A bare method name without parens (`Type#method`) is
+    syntactically indistinguishable from a field reference — to
+    resolve a method use `Type#method(ArgTypes)` or feed it to
+    @method directly. ~~|
 let(:@asNode, as(:subj)
     | reify | /type | as(:subjType)
     | subj

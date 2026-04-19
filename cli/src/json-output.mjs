@@ -1,32 +1,30 @@
-// JSON output helpers for --json flag.
-// Separate module so tests can mock toSandboxPath in paths.mjs
-// and the mock propagates through the import chain.
+// JSON output helpers — walk a response tree and rewrite
+// host-absolute paths through toSandboxPath so the model inside a
+// Docker sandbox sees them in its own filesystem convention.
+//
+// `:fqn` is NEVER remapped — fqn is an identifier round-tripped
+// back to the plugin verbatim. Only `:file`, `:path`, `:rootPath`,
+// `:outputLocation` carry filesystem paths.
 
 import { toSandboxPath } from "./paths.mjs";
 
-/**
- * Recursively apply toSandboxPath to all "file" and "location" values
- * in a JSON-serializable object. Ensures consistent path format in
- * Docker sandbox environments.
- */
+const PATH_KEY_NAMES = ["file", "path", "rootPath", "outputLocation"];
+
 export function remapJsonPaths(obj) {
   if (Array.isArray(obj)) {
-    for (const item of obj) remapJsonPaths(item);
+    obj.forEach(remapJsonPaths);
   } else if (obj && typeof obj === "object") {
     for (const key of Object.keys(obj)) {
-      if ((key === "file" || key === "location") && typeof obj[key] === "string") {
+      if (PATH_KEY_NAMES.includes(key) && typeof obj[key] === "string") {
         obj[key] = toSandboxPath(obj[key]);
       } else {
         remapJsonPaths(obj[key]);
       }
     }
   }
+  return obj;
 }
 
-/**
- * Print data as JSON with sandbox path remapping.
- * Standard --json output: remap file/location paths, pretty-print, log.
- */
 export function printJson(data) {
   remapJsonPaths(data);
   console.log(JSON.stringify(data, null, 2));

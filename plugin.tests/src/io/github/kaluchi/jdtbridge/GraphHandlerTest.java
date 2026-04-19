@@ -2,6 +2,7 @@ package io.github.kaluchi.jdtbridge;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -892,6 +893,76 @@ public class GraphHandlerTest {
     }
 
     @Test
+    void classpathResolvedExpandsContainers() {
+        // getResolvedClasspath(true) flattens JRE_CONTAINER / M2E
+        // into their constituent library entries; container/variable
+        // kinds must not reach the client.
+        var arr = JsonParser.parseString(handler.handleClasspath(
+                params("of", "jdtbridge-test"))).getAsJsonArray();
+        for (var entry : arr) {
+            String entryKind = entry.getAsJsonObject()
+                    .get("entryKind").getAsString();
+            assertTrue(java.util.Set.of("source", "library", "project")
+                            .contains(entryKind),
+                    "resolved classpath must only emit "
+                    + "source/library/project; got " + entryKind);
+        }
+    }
+
+    @Test
+    void classpathEntryOriginMatchesKind() {
+        var arr = JsonParser.parseString(handler.handleClasspath(
+                params("of", "jdtbridge-test"))).getAsJsonArray();
+        for (var entry : arr) {
+            JsonObject e = entry.getAsJsonObject();
+            String entryKind = e.get("entryKind").getAsString();
+            String origin = e.get("origin").getAsString();
+            String expected = "source".equals(entryKind)
+                    ? "source" : "binary";
+            assertEquals(expected, origin,
+                    "entryKind=" + entryKind
+                    + " must carry origin=" + expected);
+        }
+    }
+
+    @Test
+    void classpathPathsAreAbsoluteFilesystemPaths() {
+        // No workspace-relative leaks. Every :path must be an
+        // absolute OS filesystem path — File.isAbsolute() verifies
+        // irrespective of path separator.
+        var arr = JsonParser.parseString(handler.handleClasspath(
+                params("of", "jdtbridge-test"))).getAsJsonArray();
+        for (var entry : arr) {
+            String path = entry.getAsJsonObject().get("path").getAsString();
+            assertTrue(new java.io.File(path).isAbsolute(),
+                    ":path must be absolute, got " + path);
+        }
+    }
+
+    @Test
+    void classpathSourceEntryHasAbsoluteOutputLocation() {
+        var arr = JsonParser.parseString(handler.handleClasspath(
+                params("of", "jdtbridge-test"))).getAsJsonArray();
+        boolean sawSource = false;
+        for (var entry : arr) {
+            JsonObject e = entry.getAsJsonObject();
+            if (!"source".equals(e.get("entryKind").getAsString())) continue;
+            sawSource = true;
+            // Source entries may OR may not carry their own
+            // outputLocation override; if present it must be absolute.
+            var outputLoc = e.get("outputLocation");
+            if (outputLoc != null && !outputLoc.isJsonNull()) {
+                String raw = outputLoc.getAsString();
+                assertTrue(new java.io.File(raw).isAbsolute(),
+                        ":outputLocation must be absolute, got " + raw);
+            }
+        }
+        assertTrue(sawSource,
+                "fixture project expected to have at least one "
+                + "source entry");
+    }
+
+    @Test
     void packageReturnsDetailWithTypeCount() {
         JsonObject result = parse(handler.handlePackage(
                 params("of", "test.model")));
@@ -990,6 +1061,78 @@ public class GraphHandlerTest {
         assertEquals("error", first.get("severity").getAsString());
         assertNotNull(first.get("message"));
         assertNotNull(first.get("location"));
+    }
+
+    @Test
+    void problemsSeverityFilterAcceptsWarnings() {
+        // The filter was previously severity >= SEVERITY_ERROR which
+        // silently dropped every warning and made the "warning" label
+        // dead code. Filter is now severity >= SEVERITY_WARNING.
+        var arr = JsonParser.parseString(handler.handleProblems(
+                params("project", "jdtbridge-test"),
+                ProjectScope.ALL)).getAsJsonArray();
+        for (var entry : arr) {
+            String sev = entry.getAsJsonObject()
+                    .get("severity").getAsString();
+            assertTrue(java.util.Set.of("error", "warning").contains(sev),
+                    ":severity must be error or warning, got " + sev);
+        }
+    }
+
+    @Test
+    void problemsFileScopeRejectsWorkspaceRelativePath() {
+        // /jdtbridge-test/src/... is workspace-relative — not a real
+        // filesystem path. The handler must fail with file-not-found
+        // rather than silently matching through findMember.
+        JsonObject result = parse(handler.handleProblems(
+                params("file", "/jdtbridge-test/src/test/broken/BrokenClass.java"),
+                ProjectScope.ALL));
+        assertTrue(isError(result),
+                "workspace-relative paths must not be accepted as :file");
+        assertEquals("file-not-found",
+                errorOf(result).get("kind").getAsString());
+    }
+
+    @Test
+    void refsToRejectsUnknownRefKind() {
+        // Unknown refKind was silently passed through, producing a
+        // ref vec labelled with the bogus kind. Handler now rejects.
+        JsonObject result = parse(handler.handleRefsTo(
+                paramsMulti("of", "test.model.Dog#bark()",
+                            "refKind", "bogus"),
+                ProjectScope.ALL));
+        assertTrue(isError(result),
+                "unrecognised refKind must fail-track, not run search");
+        JsonObject err = errorOf(result);
+        assertEquals("invalid-modifier",
+                err.get("kind").getAsString());
+        JsonObject ctx = err.getAsJsonObject("context");
+        assertEquals("refKind",
+                ctx.get("parameter").getAsString());
+        assertEquals("bogus",
+                ctx.get("value").getAsString());
+        var allowed = ctx.getAsJsonArray("allowed");
+        assertNotNull(allowed, "error carries :allowed set");
+        var allowedStrings = new java.util.HashSet<String>();
+        for (var a : allowed) allowedStrings.add(a.getAsString());
+        assertTrue(allowedStrings.containsAll(
+                java.util.Set.of("all", "call", "read", "write", "typeUse")));
+    }
+
+    @Test
+    void refsToAcceptsAllRecognisedRefKinds() {
+        // Successful responses are JSON arrays; the invalid-modifier
+        // guard returns an object with _error. A simple substring
+        // check avoids tripping the Array/Object shape mismatch.
+        for (String rk : new String[] {"all", "call", "typeUse"}) {
+            String raw = handler.handleRefsTo(
+                    paramsMulti("of", "test.model.Dog",
+                                "refKind", rk),
+                    ProjectScope.ALL);
+            assertFalse(raw.contains("\"invalid-modifier\""),
+                    "recognised refKind '" + rk
+                    + "' must not trip invalid-modifier; got " + raw);
+        }
     }
 
     // ── Cross-cutting: every error carries origin :jdt/plugin ───────

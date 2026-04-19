@@ -20,6 +20,7 @@
 import { nullaryOp, overloadedOp } from '@kaluchi/qlang-core/dispatch';
 import { keyword, isKeyword, makeErrorValue } from '@kaluchi/qlang-core';
 import { get } from '../../src/client.mjs';
+import { remapJsonPaths } from '../../src/json-output.mjs';
 
 // ── Conversion helpers ──────────────────────────────────────────
 
@@ -125,7 +126,8 @@ const requestCache = new Map();
 async function fetchUncached(path) {
     await acquireSlot();
     try {
-        return liftServerResponse(await get(path, GRAPH_TIMEOUT_MS));
+        const raw = await get(path, GRAPH_TIMEOUT_MS);
+        return liftServerResponse(remapJsonPaths(raw));
     } finally {
         releaseSlot();
     }
