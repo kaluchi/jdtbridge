@@ -317,11 +317,6 @@ public class HttpServer {
             } else {
                 Log.error("Request error", e);
             }
-        } finally {
-            // Per-request caches in NodeBuilder are keyed to the
-            // worker thread; clear so the next request on the
-            // same thread doesn't read stale entries.
-            NodeBuilder.clearTestScopeCache();
         }
     }
 

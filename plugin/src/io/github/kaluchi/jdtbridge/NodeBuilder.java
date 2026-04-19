@@ -226,53 +226,25 @@ class NodeBuilder {
     // ── Test-scope classification ───────────────────────────────────
 
     /**
-     * Per-type annotation-fallback cache, live for the duration of
-     * a single request. Fan-out pipelines hit the same type dozens
-     * of times (one call per method skeleton) — without this cache
-     * every @methods skeleton on a 50-method type scans every
-     * method for @Test annotations N² times.
-     *
-     * ThreadLocal so each worker thread maintains its own map with
-     * no cross-thread contention. Request lifecycle is the caller's
-     * responsibility: {@code HttpServer.handle} invokes
-     * {@link #clearTestScopeCache()} in its {@code finally} block,
-     * which removes the ThreadLocal binding (not just clears the
-     * map) so a later request on the same pooled worker starts
-     * from {@code withInitial} — no stale entries can survive.
-     * Read paths are additive only; no writer needs the previous
-     * map, so we never observe a half-cleared cache.
-     */
-    private static final ThreadLocal<java.util.Map<IType, Boolean>>
-            TEST_ANNOTATION_CACHE =
-            ThreadLocal.withInitial(java.util.HashMap::new);
-
-    /**
-     * Drop the current thread's test-scope cache. Called from
-     * {@code HttpServer.handle}'s {@code finally} block — not at
-     * request start — because the dispatch path may be entered
-     * recursively from within a handler (nested node-skeleton
-     * build, error mapping), and clearing on entry would wipe the
-     * outer frame's memoisation.
-     */
-    static void clearTestScopeCache() {
-        TEST_ANNOTATION_CACHE.remove();
-    }
-
-    /**
      * Whether an element lives in a test-scoped source root or
      * carries a test-annotation signature. Two signals combined:
      *
      *  1. Classpath-attribute — Maven/M2E promotes src/test/java /
      *     src/test/resources to IClasspathEntry.isTest() = true.
      *     Decisive when present: any type/method/field under such a
-     *     root is test-scope by construction.
+     *     root is test-scope by construction. For Maven/Gradle
+     *     projects — the overwhelming majority — this branch is
+     *     authoritative and fires first.
      *
      *  2. Annotation fallback — PDE fragments and hand-rolled test
      *     layouts may keep a single source root unflagged yet still
      *     host test code. A type declaring any method annotated
-     *     with a JUnit/TestNG `@*Test*` qualifies the whole type
-     *     (and every member of it). The containing-type scan result
-     *     is memoized per request.
+     *     with a JUnit/TestNG `@*Test*` qualifies the whole type.
+     *     Cost: a single getMethods() walk per invocation; a type
+     *     visited N times from a fan-out pipeline scans N times.
+     *     We accept the repetition rather than carry a cache —
+     *     fan-out on PDE-fragment types is a narrow scenario and
+     *     the walk is milliseconds on realistic method counts.
      *
      * Short-circuits on the first positive signal. Defaults to false
      * — production-scope unless proven otherwise.
@@ -300,20 +272,12 @@ class NodeBuilder {
         IType type = (element instanceof IType t) ? t
                 : (IType) element.getAncestor(IJavaElement.TYPE);
         if (type == null) return false;
-        var cache = TEST_ANNOTATION_CACHE.get();
-        Boolean cached = cache.get(type);
-        if (cached != null) return cached;
-        boolean result = false;
         try {
             for (IMethod m : type.getMethods()) {
-                if (hasTestAnnotation(m)) {
-                    result = true;
-                    break;
-                }
+                if (hasTestAnnotation(m)) return true;
             }
         } catch (JavaModelException ignored) { /* unreadable */ }
-        cache.put(type, result);
-        return result;
+        return false;
     }
 
     /**
