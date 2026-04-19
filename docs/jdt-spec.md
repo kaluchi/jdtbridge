@@ -112,8 +112,11 @@ status -f --json` for per-event real-time feeds.
    emit server shapes unchanged.
 3. **Stable contract.** Plain-JSON field names are the API. Don't
    rename or remove without a major version bump.
-4. **Paths use `toSandboxPath()`.** File paths go through path
-   remapping for Docker sandbox compatibility.
+4. **Paths go through the remote-instance cache.** Every
+   path-keyed response field is rewritten via
+   `path-translate.mjs` before reaching output, using the project
+   root map from `jdt setup remote`. See
+   [jdt-setup-remote-spec](jdt-setup-remote-spec.md).
 
 ### Commands with `--json`
 

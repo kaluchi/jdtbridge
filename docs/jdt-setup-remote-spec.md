@@ -492,15 +492,28 @@ workspace hash in `Activator.workspaceHash()`.
 
 ## Project path cache
 
-Eclipse returns workspace-relative paths (`/myapp-core/src/Foo.java`),
-but the jdt host sees projects at mount-point paths
-(`/mnt/projects/myapp-core/src/Foo.java`). The project path cache maps
-Eclipse project names to their jdt-host absolute paths so the CLI
-can translate between the two.
+The plugin emits absolute paths on the **Eclipse host** — Windows
+drive letters on a Windows-run Eclipse, Linux filesystem paths on
+a Linux-run Eclipse. The jdt-host (where the CLI runs, typically
+a Docker sandbox) sees the same projects at **mount-point paths**.
+The project path cache records both roots per project so the CLI
+can rewrite Eclipse-host paths in responses into the jdt-host
+paths the agent can actually open.
 
-Built by scanning `mount-points` directories for `.project` files
-and reading `<name>` from each. Stored in a dedicated subdirectory,
-one file per remote instance (same hash as the instance file):
+Built in two steps:
+
+1. **Local scan** — recurse through `mount-points` (limited
+   depth), find every `.project` file, read `<name>`, record the
+   directory path as `localRoot`.
+2. **Remote enrichment** — query the bridge's `/projects`
+   endpoint once; for each scanned project look up its Eclipse-
+   host `:rootPath` and record it as `eclipseRoot`. When the
+   plugin is unreachable (CLI run without live Eclipse), the
+   cache still writes with `eclipseRoot: null` — translation
+   stays a no-op for that project until a later scan enriches it.
+
+Stored in a dedicated subdirectory, one file per remote instance
+(same hash as the instance file):
 
 `~/.jdtbridge/remote-instances/project-paths/<hash>.json`
 
@@ -510,10 +523,18 @@ one file per remote instance (same hash as the instance file):
   "scannedAt": 1775367354940,
   "mount-points": ["/mnt/workspace", "/mnt/projects"],
   "projects": {
-    "myapp-core": "/mnt/projects/myapp-core",
-    "myapp-server": "/mnt/projects/myapp-server",
-    "inside": "/mnt/workspace/inside",
-    "automation": "/mnt/automation"
+    "myapp-core": {
+      "eclipseRoot": "C:\\Users\\dev\\projects\\myapp-core",
+      "localRoot":   "/mnt/projects/myapp-core"
+    },
+    "myapp-server": {
+      "eclipseRoot": "C:\\Users\\dev\\projects\\myapp-server",
+      "localRoot":   "/mnt/projects/myapp-server"
+    },
+    "automation": {
+      "eclipseRoot": "D:\\automation",
+      "localRoot":   "/mnt/automation"
+    }
   }
 }
 ```
@@ -521,42 +542,48 @@ one file per remote instance (same hash as the instance file):
 ### Cache lifecycle
 
 **Populate:** on `--add-mount-point` — scan the added directory
-recursively (limited depth), find `.project` files, parse `<name>`,
-record directory path. Atomic write (temp file + rename).
+recursively, fetch `/projects` from the bridge, write the cache
+atomically (temp file + rename).
 
 **Invalidate and rescan on:**
 - `--add-mount-point` or `--remove-mount-point`
 - `--check` requested
-- Cache miss (path doesn't match any cached project)
 - Cache file doesn't exist (first run)
 
 **No TTL.** Invalidation is event-driven only.
 
 ### Path resolution
 
-**Eclipse path → jdt-host path** (output translation):
+**Eclipse path → jdt-host path** (output translation — the only
+direction the CLI needs, since FQN / FQMN inputs never carry a
+filesystem path):
 
-For each path in Eclipse response (refs, source, projects):
-1. Extract project name (first segment of workspace-relative path)
-2. Lookup in cache → replace Eclipse project root with local path
-3. Miss → rescan mount-points → retry
-4. Second miss → leave path untranslated
+For each path-keyed field (`:path`, `:file`, `:rootPath`,
+`:outputLocation`) in an API response:
 
-**jdt-host path → workspace-relative path** (input translation):
+1. Load the remote-instance cache and sort its rows by
+   `eclipseRoot` length descending.
+2. Longest-prefix match of the response path against
+   `eclipseRoot`. Equality and `/` / `\` boundary checks avoid
+   matching a sibling project whose name starts with the same
+   characters.
+3. Strip the `eclipseRoot` prefix, join the suffix onto
+   `localRoot`, normalising separators to the `localRoot`'s
+   convention (`/` for POSIX roots, `\` for `X:\…` roots).
+4. No match → path stays as-is. The agent sees the raw Eclipse
+   path — a signal the resource lives outside the mount tree
+   (JRE JARs, `.m2` cache, Eclipse install-dir bundles) and must
+   be fetched via `@source` / `@type` rather than read as a file.
 
-When `jdt refresh /mnt/projects/myapp-core/src/Foo.java`:
-1. Lookup cache by longest prefix match → project `myapp-core`
-   at `/mnt/projects/myapp-core`
-2. Strip prefix → `src/Foo.java`
-3. Send workspace-relative `/myapp-core/src/Foo.java` to server
-4. Server resolves via `IWorkspaceRoot.findMember()`
-5. Cache miss → rescan → retry → second miss → error
+`:fqn` is never remapped — it is an identifier the model
+round-trips back to the plugin verbatim.
 
 ### Concurrency
 
 Multiple agents calling `jdt` commands in parallel:
 - Read cache: always consistent (atomic write guarantees)
-- Write cache: last writer wins, same data (same `.project` files)
+- Write cache: last writer wins, same data (same `.project`
+  files + same `/projects` response)
 - Simultaneous rescan: redundant work, not incorrect
 
 ### Performance
@@ -564,7 +591,10 @@ Multiple agents calling `jdt` commands in parallel:
 Scan cost depends on mount point type:
 - Local SSD: ~60ms for 30 projects (measured)
 - Network mount / Docker bind over network: may be seconds
-- Cache eliminates repeated scans — one scan per new/changed project
+- `/projects` enrichment: single HTTP round-trip regardless of
+  project count
+- Cache eliminates repeated work — one scan + one HTTP fetch
+  per mount-point change
 
 ## Multiple remote instances
 
@@ -610,8 +640,10 @@ bridge-socket.
 
 CLI:
   commands/setup.mjs         — `remote` subcommand
+  commands/setup-remote.mjs  — scan, enrich (`/projects` fetch), write cache
   discovery.mjs              — reads instance files (local + remote-instances)
-  paths.mjs                  — path translation using project path cache
+  path-translate.mjs         — longest-prefix path rewrite via the cache
+  json-output.mjs            — applies translation at the plugin-response boundary
 
 Plugin:
   HttpServer.java            — dual socket, auth

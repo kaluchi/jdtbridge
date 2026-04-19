@@ -445,6 +445,9 @@ be aware of `--skip-build` and skip the Maven requirement.
 4. **Console buffer limits.** LaunchTracker uses unbounded StringBuilders.
    Very long-running processes (hours of output) may consume significant memory.
 
-5. **Path conversion.** In Docker sandbox mode, Windows paths from Eclipse
-   are converted to Linux paths via `toSandboxPath()`. This applies to
-   `file` fields in JSON output.
+5. **Path conversion.** In Docker sandbox mode, paths returned by
+   Eclipse are rewritten via the per-remote-instance project path
+   cache (`path-translate.mjs`) before they reach the output. See
+   [jdt-setup-remote-spec](jdt-setup-remote-spec.md). Applies to
+   every path-keyed response field (`:file`, `:path`, `:rootPath`,
+   `:outputLocation`).

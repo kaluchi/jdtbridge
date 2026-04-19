@@ -109,6 +109,42 @@ function scanAllMountPoints(mountPoints) {
   return allProjects;
 }
 
+/**
+ * Query the remote plugin's {@code /projects} endpoint to learn
+ * each project's Eclipse-host absolute path. The result is merged
+ * into the scanned-projects list as {@code eclipseRoot}. When the
+ * plugin is unreachable (CLI was invoked without Eclipse live),
+ * the scan still succeeds and the cache is written with
+ * {@code eclipseRoot: null} — translation stays a no-op until a
+ * subsequent --check fetches the data.
+ */
+async function enrichWithEclipseRoots(bridgeSocket, token,
+    scannedProjects) {
+  const colonIdx = bridgeSocket.lastIndexOf(":");
+  const host = bridgeSocket.substring(0, colonIdx);
+  const port = parseInt(bridgeSocket.substring(colonIdx + 1), 10);
+  const inst = { host, port, token };
+
+  const rootByName = new Map();
+  try {
+    const projects = await directGet(inst, "/projects", 5000);
+    if (Array.isArray(projects)) {
+      for (const p of projects) {
+        if (p && typeof p === "object"
+            && typeof p.fqn === "string"
+            && typeof p.rootPath === "string") {
+          rootByName.set(p.fqn, p.rootPath);
+        }
+      }
+    }
+  } catch { /* plugin unreachable — eclipseRoot stays null */ }
+
+  return scannedProjects.map((sp) => ({
+    ...sp,
+    eclipseRoot: rootByName.get(sp.projectName) || null,
+  }));
+}
+
 function writeCacheFile(bridgeSocket, mountPoints, scannedProjects) {
   const cacheData = {
     "bridge-socket": bridgeSocket,
@@ -117,8 +153,10 @@ function writeCacheFile(bridgeSocket, mountPoints, scannedProjects) {
     projects: {},
   };
   for (const scannedProject of scannedProjects) {
-    cacheData.projects[scannedProject.projectName] =
-      scannedProject.localPath;
+    cacheData.projects[scannedProject.projectName] = {
+      eclipseRoot: scannedProject.eclipseRoot || null,
+      localRoot:   scannedProject.localPath,
+    };
   }
   const filePath = cacheFilePath(bridgeSocket);
   const tmpPath = filePath + ".tmp";
@@ -331,7 +369,7 @@ async function checkRemote(remoteInstance) {
       const cachedNames = cacheData?.projects
         ? new Set(Object.keys(cacheData.projects)) : new Set();
       result.unmapped = projects
-        .map(p => p.name || p)
+        .map(p => p.fqn || p.name || p)
         .filter(name => !cachedNames.has(name));
     }
   } catch (checkError) {
@@ -486,7 +524,9 @@ async function handleConfigure(bridgeSocket, flags, addMountPoints,
     const oldCacheData = readInstanceFile(cacheFilePath(bridgeSocket));
     const oldProjects = oldCacheData?.projects || {};
 
-    const scannedProjects = scanAllMountPoints(mountPoints);
+    const localScan = scanAllMountPoints(mountPoints);
+    const scannedProjects = await enrichWithEclipseRoots(
+        bridgeSocket, resolvedToken, localScan);
     writeCacheFile(bridgeSocket, mountPoints, scannedProjects);
 
     if (!jsonOutput) {
@@ -499,7 +539,10 @@ async function handleConfigure(bridgeSocket, flags, addMountPoints,
           console.log("Removed from cache:");
           console.log();
           const removedRows = removedProjects.map(
-            ([projectName, localPath]) => {
+            ([projectName, oldEntry]) => {
+              const localPath = typeof oldEntry === "string"
+                  ? oldEntry
+                  : (oldEntry && oldEntry.localRoot) || "";
               const mp = removeMountPoints.find(
                 rmp => normalizePath(localPath).startsWith(
                   normalizePath(rmp)));
@@ -589,9 +632,13 @@ function printRemoteStatus(remoteInstance) {
   if (cacheData && cacheData.projects
       && Object.keys(cacheData.projects).length > 0) {
     const projectRows = Object.entries(cacheData.projects).map(
-      ([projectName, localPath]) => {
+      ([projectName, entry]) => {
+        const localPath = typeof entry === "string"
+            ? entry
+            : (entry && entry.localRoot) || "";
         const matchingMountPoint = mountPoints.find(
-          mountPoint => normalizePath(localPath).startsWith(normalizePath(mountPoint)));
+          mountPoint => normalizePath(localPath).startsWith(
+              normalizePath(mountPoint)));
         return [projectName, localPath, matchingMountPoint || ""];
       });
     console.log(formatTable(
@@ -615,10 +662,17 @@ function buildInstanceJson(remoteInstance) {
     "mount-points": mountPoints,
     projects: cacheData?.projects
       ? Object.entries(cacheData.projects).map(
-          ([projectName, localPath]) => {
+          ([projectName, entry]) => {
+            const localPath = typeof entry === "string"
+                ? entry
+                : (entry && entry.localRoot) || "";
+            const eclipseRoot = typeof entry === "string"
+                ? null
+                : (entry && entry.eclipseRoot) || null;
             const mountPoint = mountPoints.find(
-              mp => normalizePath(localPath).startsWith(normalizePath(mp)));
-            return { project: projectName, localPath,
+              mp => normalizePath(localPath).startsWith(
+                  normalizePath(mp)));
+            return { project: projectName, localPath, eclipseRoot,
               mountPoint: mountPoint || null };
           })
       : [],
