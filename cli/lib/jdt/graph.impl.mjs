@@ -300,13 +300,13 @@ const problemsImpl = overloadedOp('@problems', 2, {
         if (scope === null || scope === 'workspace') {
             return getEndpoint('/problems');
         }
-        const of = fqnOf(subject);
-        if (of === null) return missingSubject('@problems', subject);
+        const subjectFqn = fqnOf(subject);
+        if (subjectFqn === null) return missingSubject('@problems', subject);
         if (scope === 'project') {
-            return getEndpoint(`/problems?project=${enc(of)}`);
+            return getEndpoint(`/problems?project=${enc(subjectFqn)}`);
         }
         if (scope === 'file') {
-            return getEndpoint(`/problems?file=${enc(of)}`);
+            return getEndpoint(`/problems?file=${enc(subjectFqn)}`);
         }
         return getEndpoint('/problems');
     }

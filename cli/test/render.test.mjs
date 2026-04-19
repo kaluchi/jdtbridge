@@ -250,4 +250,59 @@ describe("mdRefs", () => {
     const md = await runWithBundle("mdRefs", []);
     expect(md).toBe("");
   });
+
+  it("auto-picks :from side for incoming refs (same :to across Vec)", async () => {
+    // Simulates `"Foo" | @refs` — every record points at Foo on
+    // :to, callers vary on :from. mdRefs should surface callers,
+    // not repeat the subject.
+    const subject = map([["fqn", "pkg.Foo"], ["kind", "type"],
+                         ["typeKind", "class"]]);
+    const caller1 = map([["fqn", "pkg.Caller1"], ["kind", "type"],
+                         ["typeKind", "class"]]);
+    const caller2 = map([["fqn", "pkg.Caller2"], ["kind", "type"],
+                         ["typeKind", "class"]]);
+    const ref1 = map([
+      ["kind", "reference"],
+      ["refKind", "typeUse"],
+      ["from", caller1],
+      ["to", subject],
+    ]);
+    const ref2 = map([
+      ["kind", "reference"],
+      ["refKind", "typeUse"],
+      ["from", caller2],
+      ["to", subject],
+    ]);
+    const md = await runWithBundle("mdRefs", [ref1, ref2]);
+    expect(md).toContain("pkg.Caller1");
+    expect(md).toContain("pkg.Caller2");
+    // Subject should appear zero times — we're not repeating it
+    // on every row.
+    const subjectHits = md.match(/pkg\.Foo/g) ?? [];
+    expect(subjectHits.length).toBe(0);
+  });
+
+  it("auto-picks :to side for outgoing refs (same :from across Vec)", async () => {
+    // Simulates `"pkg.Foo#bar()" | @outgoingRefs` — every record
+    // originates at Foo#bar on :from; targets vary on :to.
+    const subject = map([["fqn", "pkg.Foo#bar()"], ["kind", "method"]]);
+    const target1 = map([["fqn", "pkg.Target1#a()"], ["kind", "method"]]);
+    const target2 = map([["fqn", "pkg.Target2#b()"], ["kind", "method"]]);
+    const ref1 = map([
+      ["kind", "reference"],
+      ["refKind", "call"],
+      ["from", subject],
+      ["to", target1],
+    ]);
+    const ref2 = map([
+      ["kind", "reference"],
+      ["refKind", "call"],
+      ["from", subject],
+      ["to", target2],
+    ]);
+    const md = await runWithBundle("mdRefs", [ref1, ref2]);
+    expect(md).toContain("pkg.Target1#a()");
+    expect(md).toContain("pkg.Target2#b()");
+    expect(md).not.toContain("pkg.Foo#bar()");
+  });
 });

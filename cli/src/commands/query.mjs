@@ -74,6 +74,22 @@ function parseErrorToValue(err, uri) {
   return makeErrorValue(descriptor);
 }
 
+/**
+ * Drain stdin into a String. The interactive shell (TTY-attached
+ * stdin) returns '' immediately so `jdt q '...'` at a prompt
+ * doesn't hang; a piped invocation (`echo '{"x":1}' | jdt q
+ * '@in | parseJson | /x'`) reads to EOF.
+ */
+async function readStdin() {
+  if (process.stdin.isTTY) return '';
+  let data = '';
+  process.stdin.setEncoding('utf8');
+  for await (const chunk of process.stdin) {
+    data += chunk;
+  }
+  return data;
+}
+
 function usageErrorValue(message, usage) {
   const descriptor = new Map([
     [keyword('kind'),    keyword('usage-error')],
@@ -114,7 +130,7 @@ export async function query(args) {
   //   parseJson / parseTjson       string → value parsers
   let didExplicitStdoutEffect = false;
   bindIoOperands(session, {
-    stdinReader: () => Promise.resolve(''),
+    stdinReader: readStdin,
     stdoutWrite: (text) => process.stdout.write(text),
     stderrWrite: (text) => process.stderr.write(text),
     recordStdoutEffect: () => { didExplicitStdoutEffect = true; },

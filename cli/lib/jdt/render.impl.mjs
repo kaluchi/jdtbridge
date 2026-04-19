@@ -322,6 +322,13 @@ function formatMdHierarchy(bundle) {
  * @outgoingRefs). Output: flat markdown list one line per ref,
  * `[badge] fqmn → returnType — javadoc`, grouped by refKind when
  * the Vec spans multiple kinds.
+ *
+ * Auto-detects which side to render: if every record carries the
+ * same `:to/:fqn` the Vec is @refs output (incoming, target is
+ * the query subject) so `:from` is the interesting side. If every
+ * record carries the same `:from/:fqn` the Vec is @outgoingRefs
+ * output so `:to` is interesting. Mixed Vecs fall back to `:to`
+ * — there's no single subject to hide behind.
  */
 function formatMdRefs(refs) {
     if (!Array.isArray(refs)) {
@@ -330,6 +337,8 @@ function formatMdRefs(refs) {
             + describe(refs));
     }
     if (refs.length === 0) return '';
+
+    const sideKey = pickRefSide(refs);
 
     const byKind = new Map();
     for (const ref of refs) {
@@ -351,14 +360,56 @@ function formatMdRefs(refs) {
             if (out.length > 0) out.push('');
             out.push('#### ' + kindHeader(kind) + ':');
         }
-        // Both :from and :to may be interesting; show the "other"
-        // end relative to refKind semantics — incoming-style refs
-        // carry :from, outgoing-style :to. When both are present
-        // (canonical reference shape) prefer :to for call/read/
-        // write/typeUse (target), fall back to :from.
-        out.push(...renderRefGroup(byKind.get(kind), 'to'));
+        out.push(...renderRefGroup(byKind.get(kind), sideKey));
     }
     return out.join('\n');
+}
+
+/**
+ * Decide which side of every reference record is the "other end"
+ * relative to the query subject. @refs output pins :to (every
+ * record points at the same target — the subject); @outgoingRefs
+ * pins :from (every record originates at the same subject body).
+ *
+ * Sides that are uniformly absent from the Vec cannot hide a
+ * subject — we must fall back to the other side or the render
+ * will be empty. A Vec with :to only gets rendered through :to,
+ * :from only through :from, both present and varying → :to.
+ */
+function pickRefSide(refs) {
+    let toFqn = null;
+    let fromFqn = null;
+    let first = true;
+    let toFixed = true;
+    let fromFixed = true;
+    let hasAnyTo = false;
+    let hasAnyFrom = false;
+    for (const ref of refs) {
+        if (!(ref instanceof Map)) continue;
+        const toSide = mapGet(ref, K_TO);
+        const fromSide = mapGet(ref, K_FROM);
+        if (toSide instanceof Map) hasAnyTo = true;
+        if (fromSide instanceof Map) hasAnyFrom = true;
+        const to = mapGet(toSide, K_FQN);
+        const from = mapGet(fromSide, K_FQN);
+        if (first) {
+            toFqn = to;
+            fromFqn = from;
+            first = false;
+            continue;
+        }
+        if (to !== toFqn) toFixed = false;
+        if (from !== fromFqn) fromFixed = false;
+    }
+    // If only one side is present in the Vec, render through it.
+    if (hasAnyTo && !hasAnyFrom) return 'to';
+    if (hasAnyFrom && !hasAnyTo) return 'from';
+    // Both sides present: the fixed side is the subject, the
+    // varying side is the "other end" a reader wants to see.
+    if (toFixed && !fromFixed) return 'from';
+    if (fromFixed && !toFixed) return 'to';
+    // Both fixed (self-refs?) or both varying — default to :to.
+    return 'to';
 }
 
 function kindHeader(kind) {
