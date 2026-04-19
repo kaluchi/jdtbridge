@@ -112,21 +112,70 @@ function printQueryResult(value) {
   }
 }
 
+// Discovery sugar — each flag rewrites the query into a canonical
+// pipeline so model-agents learning the surface get a shorter,
+// well-named spelling than the reify incantation. Syntax:
+//
+//   --describe <name>    reify(:<name>)
+//   --examples <name>    reify(:<name>) | runExamples | table
+//
+// The `<name>` is the operand identifier verbatim (e.g. @callers,
+// filter, sortWith) — no leading colon.
+const DISCOVERY_FLAGS = {
+  '--describe': (name) => `reify(:${name})`,
+  '--examples': (name) => `reify(:${name}) | runExamples | table`
+};
+
+function rewriteDiscoveryFlags(args) {
+  const rest = [];
+  let discovery = null;
+  for (let i = 0; i < args.length; i++) {
+    const rewriter = DISCOVERY_FLAGS[args[i]];
+    if (!rewriter) { rest.push(args[i]); continue; }
+    const name = args[i + 1];
+    if (!name || name.startsWith('--')) {
+      return { error: usageErrorValue(
+        `${args[i]} requires an operand name.`,
+        `jdt q ${args[i]} <operand-name>`) };
+    }
+    if (discovery !== null) {
+      return { error: usageErrorValue(
+        'jdt q accepts only one --describe/--examples at a time.',
+        'jdt q --describe <name> OR jdt q --examples <name>') };
+    }
+    discovery = rewriter(name);
+    i++;
+  }
+  return { rest, discovery };
+}
+
 export async function query(args) {
-  const flags = args.filter(a => a.startsWith('--'));
-  if (flags.length > 0) {
+  const parsed = rewriteDiscoveryFlags(args);
+  if (parsed.error) {
+    printQueryResult(parsed.error);
+    return;
+  }
+  const { rest, discovery } = parsed;
+  const positional = rest.filter(a => !a.startsWith('--'));
+  const unknownFlags = rest.filter(a => a.startsWith('--'));
+  if (unknownFlags.length > 0) {
     process.stderr.write(
         `jdt q: ignoring unrecognised flag${
-            flags.length > 1 ? 's' : ''} ${flags.join(' ')}\n`
-        + 'jdt q takes no flags — pass the qlang pipeline as the '
-        + 'single positional argument.\n');
+            unknownFlags.length > 1 ? 's' : ''} ${unknownFlags.join(' ')}\n`
+        + 'jdt q takes --describe <name> / --examples <name> / '
+        + 'a single positional qlang pipeline.\n');
   }
-  const queryParts = args.filter(a => !a.startsWith('--'));
-  const querySource = queryParts[0];
+  if (discovery !== null && positional.length > 0) {
+    process.stderr.write(
+        `jdt q: --describe/--examples supersede the positional query; `
+        + `ignoring "${positional[0]}"\n`);
+  }
+  const querySource = discovery ?? positional[0];
   if (!querySource) {
     printQueryResult(usageErrorValue(
-      'jdt q requires a qlang pipeline as its first positional argument.',
-      'jdt q <qlang-query>'
+      'jdt q requires a qlang pipeline as its first positional argument, '
+      + 'or --describe/--examples <name> for discovery.',
+      'jdt q <qlang-query> | jdt q --describe <name> | jdt q --examples <name>'
     ));
     return;
   }
@@ -167,6 +216,9 @@ export async function query(args) {
 export const help = `Evaluate a qlang pipeline against the Eclipse JDT graph.
 
 Usage:  jdt q <qlang-query>
+        jdt q --describe <operand-name>   shortcut for reify(:name)
+        jdt q --examples <operand-name>   shortcut for reify(:name)
+                                          | runExamples | table
 
 The :jdt/graph module is pre-loaded. Every @-operand is NULLARY —
 it takes its subject from pipeValue, never from a captured arg.
@@ -287,8 +339,8 @@ Cookbook — copy-paste audits:
 Discovery — the catalog is data:
   jdt q 'manifest | count'
   jdt q 'manifest | filter(/name | startsWith("@")) * /name'
-  jdt q 'reify(:@incomingRefs)'               docs + examples + throws
-  jdt q 'reify(:filter) | runExamples | table'  run built-in examples
+  jdt q --describe @incomingRefs              docs + examples + throws
+  jdt q --examples filter                     run built-in examples
   jdt q 'reify(:@callers) | /source'          read a conduit's body
 
 Debug — errors are data:
