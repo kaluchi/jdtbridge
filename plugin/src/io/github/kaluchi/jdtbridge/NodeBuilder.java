@@ -18,7 +18,6 @@ import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IMember;
 import org.eclipse.jdt.core.IMethod;
-import org.eclipse.jdt.core.IModuleDescription;
 import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.ISourceRange;
@@ -786,37 +785,6 @@ class NodeBuilder {
             typeCount += cu.getTypes().length;
         }
         obj.addProperty("typeCount", typeCount);
-        return obj;
-    }
-
-    // ── :module ─────────────────────────────────────────────────────
-
-    static JsonObject moduleSkeleton(IModuleDescription module)
-            throws JavaModelException {
-        String name = module.getElementName();
-        String origin = module.isBinary() ? "binary" : "source";
-        var obj = baseHeader(name, "module", origin);
-        obj.addProperty("containingProject",
-                module.getJavaProject().getElementName());
-        return obj;
-    }
-
-    static JsonObject moduleDetail(IModuleDescription module)
-            throws JavaModelException {
-        var obj = moduleSkeleton(module);
-
-        var requires = new JsonArray();
-        for (String required : module.getRequiredModuleNames()) {
-            var r = new JsonObject();
-            r.addProperty("name", required);
-            requires.add(r);
-        }
-        obj.add("requires", requires);
-
-        // JPMS exports/opens/uses/provides — JDT API for these
-        // varies across Eclipse versions and may require AST-level
-        // inspection. Deferred — the bulk of consumers care about
-        // requires and module identity, which are stable.
         return obj;
     }
 

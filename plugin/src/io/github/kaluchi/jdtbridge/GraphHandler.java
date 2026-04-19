@@ -19,7 +19,6 @@ import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IMember;
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IMethod;
-import org.eclipse.jdt.core.IModuleDescription;
 import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.IType;
@@ -463,25 +462,6 @@ class GraphHandler {
         return NodeBuilder.fileDetail(file).toString();
     }
 
-    String handleModule(Map<String, String> params) {
-        String name = params.get("of");
-        if (name == null || name.isBlank()) {
-            return ErrorDescriptor.missingParameter("of").toJsonString();
-        }
-        try {
-            IModuleDescription module = findModule(name);
-            if (module == null) {
-                return ErrorDescriptor.moduleNotFound(name)
-                        .toJsonString();
-            }
-            return NodeBuilder.moduleDetail(module).toString();
-        } catch (Exception e) {
-            Log.warn("/module failed for " + name, e);
-            return ErrorDescriptor.jdtInternalError(
-                    "Failed /module " + name, e).toJsonString();
-        }
-    }
-
     String handleTypesInPackage(Map<String, String> params) {
         String fqn = params.get("of");
         if (fqn == null || fqn.isBlank()) {
@@ -621,18 +601,6 @@ class GraphHandler {
         IFile[] matches = root.findFilesForLocationURI(
                 Path.fromOSString(absPath).toFile().toURI());
         return matches.length > 0 ? matches[0] : null;
-    }
-
-    private static IModuleDescription findModule(String name)
-            throws JavaModelException {
-        for (IJavaProject jp : allJavaProjects()) {
-            IModuleDescription module = jp.getModuleDescription();
-            if (module != null
-                    && name.equals(module.getElementName())) {
-                return module;
-            }
-        }
-        return null;
     }
 
     // ── Source text ───────────────────────────────────────────────
@@ -1162,48 +1130,4 @@ class GraphHandler {
         }
     }
 
-    /**
-     * Polymorphic point-lookup. Routes to {@link #handleType},
-     * {@link #handleMethod}, or {@link #handleField} based on
-     * the identifier shape: contains {@code (} → method,
-     * contains {@code #} → field or method (heuristic by parens),
-     * otherwise → type.
-     */
-    String handleDetail(Map<String, String> params) {
-        String identifier = params.get("of");
-        if (identifier == null || identifier.isBlank()) {
-            return ErrorDescriptor.missingParameter("of").toJsonString();
-        }
-        if (identifier.contains("(")) {
-            return handleMethod(params);
-        }
-        int hash = identifier.indexOf('#');
-        if (hash < 0) {
-            return handleType(params);
-        }
-        // Member without parens: try field first, fall back to
-        // method (zero-arg). The choice is unambiguous because
-        // fields and methods can't share names in Java (modulo
-        // unusual cases the bridge doesn't model).
-        String typeFqn = identifier.substring(0, hash);
-        String memberName = identifier.substring(hash + 1);
-        try {
-            IType type = JdtUtils.findType(typeFqn);
-            if (type == null) {
-                return ErrorDescriptor.typeNotFound(typeFqn)
-                        .with("identifier", identifier)
-                        .toJsonString();
-            }
-            IField field = type.getField(memberName);
-            if (field != null && field.exists()) {
-                return NodeBuilder.fieldDetail(field).toString();
-            }
-            return handleMethod(params);
-        } catch (Exception e) {
-            Log.warn("/detail failed for " + identifier, e);
-            return ErrorDescriptor.jdtInternalError(
-                    "Failed to resolve: " + identifier, e)
-                    .toJsonString();
-        }
-    }
 }

@@ -84,23 +84,6 @@ public class ErrorDescriptorTest {
     }
 
     @Test
-    void readonlyNodeCarriesReason() {
-        var d = ErrorDescriptor.readonlyNode(
-                "java.util.List", "binary");
-        assertEquals("java.util.List",
-                ctx(d).get("fqn").getAsString());
-        assertEquals("binary", ctx(d).get("reason").getAsString());
-    }
-
-    @Test
-    void planStaleCarriesReason() {
-        var d = ErrorDescriptor.planStale("workspace changed");
-        assertEquals("plan-stale", inner(d).get("kind").getAsString());
-        assertEquals("workspace changed",
-                ctx(d).get("reason").getAsString());
-    }
-
-    @Test
     void ioErrorHasNoMandatoryContext() {
         var d = ErrorDescriptor.ioError("disk full");
         assertEquals("io-error", inner(d).get("kind").getAsString());
@@ -167,15 +150,12 @@ public class ErrorDescriptorTest {
             ErrorDescriptor.packageNotFound("p"),
             ErrorDescriptor.projectNotFound("p"),
             ErrorDescriptor.fileNotFound("/x"),
-            ErrorDescriptor.moduleNotFound("m"),
             ErrorDescriptor.invalidFqn("x"),
             ErrorDescriptor.invalidFqmn("x"),
             ErrorDescriptor.missingParameter("name"),
             ErrorDescriptor.ambiguousMatch("X#m",
                     List.of("X#m(int)", "X#m(String)")),
             ErrorDescriptor.wrongSubjectKind("@op", "type", "method"),
-            ErrorDescriptor.readonlyNode("X", "binary"),
-            ErrorDescriptor.planStale("changed"),
             ErrorDescriptor.ioError("boom"),
             ErrorDescriptor.jdtInternalError("oops",
                     new RuntimeException("c")),
@@ -198,7 +178,7 @@ public class ErrorDescriptorTest {
             ErrorDescriptor.typeNotFound("X"),
             ErrorDescriptor.invalidFqn("x"),
             ErrorDescriptor.wrongSubjectKind("@op", "t", "m"),
-            ErrorDescriptor.planStale("x"),
+            ErrorDescriptor.ioError("x"),
             ErrorDescriptor.jdtInternalError("x", null),
         };
         for (var d : cases) {

@@ -95,13 +95,14 @@ async function renderEditors() {
 }
 
 async function renderProblems() {
-  const cmd = `jdt q "@problems | table"`;
+  const cmd = `jdt q "@problems * {:severity /severity :file /location/file :line /location/startLine :message /message} | table"`;
   return {
     title: "Problems", cmd,
     body: cliCmd(cmd),
     description:
       "Eclipse Problems view — IMarker.PROBLEM markers (errors, warnings).\n"
-      + "Updated on every build. (empty) = clean workspace.",
+      + "Updated on every build. (empty) = clean workspace.\n"
+      + "The `* {…}` reshape flattens the :location sub-Map into file/line columns.",
   };
 }
 
@@ -176,14 +177,18 @@ let). Examples:
   jdt q '"com.example.MyService" | @ancestors * /fqn'
   -- full supertype chain
 
-  jdt q '"com.example.Foo" | @type | @detail'
-  -- full type descriptor (modifiers, interfaces, javadoc)
+  jdt q '"com.example.Foo" | @detail'
+  -- detail-node for a fqn/fqmn (routes via kind)
 
-  jdt q 'manifest | filter(/category | eq(:jdt/graph)) * /name'
-  -- list all graph operands
+  jdt q 'manifest | filter(/name | startsWith("@")) * /name'
+  -- every @-operand (axes, conduits, render, IO) — the full vocab
 
-Reify an operand's descriptor for docs + examples + throws:
-  jdt q 'reify(:@subtypes)'
+Discover any operand:
+  jdt q 'reify(:@subtypes)'               -- docs + examples + throws
+  jdt q 'reify(:@subtypes) | runExamples' -- run the doc snippets
+  jdt help q                              -- grammar + host ops + debug
+
+Full qlang grammar: https://github.com/kaluchi/qlang/blob/master/docs/qlang-spec.md
 
 The sections below are live output from the running Eclipse instance.
 Each section is produced by a command shown in its header.

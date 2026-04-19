@@ -234,39 +234,6 @@ public class GraphHandlerTest {
         assertTrue(result.get("isConstant").getAsBoolean());
     }
 
-    // ── /detail (polymorphic) ───────────────────────────────────────
-
-    @Test
-    void detailRoutesToTypeForPlainFqn() {
-        JsonObject result = parse(handler.handleDetail(
-                params("of", "test.model.Dog")));
-        assertEquals("type", result.get("kind").getAsString());
-    }
-
-    @Test
-    void detailRoutesToMethodForFqmnWithParens() {
-        JsonObject result = parse(handler.handleDetail(
-                params("of", "test.model.Dog#bark()")));
-        assertEquals("method", result.get("kind").getAsString());
-        assertEquals("bark", result.get("name").getAsString());
-    }
-
-    @Test
-    void detailRoutesToFieldForFqmnWithoutParens() {
-        JsonObject result = parse(handler.handleDetail(
-                params("of", "test.model.Dog#age")));
-        assertEquals("field", result.get("kind").getAsString());
-        assertEquals("age", result.get("name").getAsString());
-    }
-
-    @Test
-    void detailRoutesToMethodFallbackForBareFqmnWhenFieldAbsent() {
-        // bark is a method; no field 'bark' exists
-        JsonObject result = parse(handler.handleDetail(
-                params("of", "test.model.Dog#bark")));
-        assertEquals("method", result.get("kind").getAsString());
-    }
-
     // ── /members /methods /fields /innerTypes ───────────────────────
 
     @Test
@@ -1152,8 +1119,6 @@ public class GraphHandlerTest {
                 handler.handleField(Map.of())),
             JsonParser.parseString(
                 handler.handleField(params("of", "no.such#x"))),
-            JsonParser.parseString(
-                handler.handleDetail(Map.of())),
         };
         for (var je : errors) {
             JsonObject obj = je.getAsJsonObject();

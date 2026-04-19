@@ -548,8 +548,6 @@ public class HttpServer {
                         graph.handleMethod(params));
                 case "/field" -> Response.json(
                         graph.handleField(params));
-                case "/detail" -> Response.json(
-                        graph.handleDetail(params));
                 case "/members" -> Response.json(
                         graph.handleMembers(params));
                 case "/methods" -> Response.json(
@@ -588,8 +586,6 @@ public class HttpServer {
                         graph.handlePackage(params));
                 case "/file" -> Response.json(
                         graph.handleFile(params));
-                case "/module" -> Response.json(
-                        graph.handleModule(params));
                 case "/typesInPackage" -> Response.json(
                         graph.handleTypesInPackage(params));
                 case "/typesInFile" -> Response.json(

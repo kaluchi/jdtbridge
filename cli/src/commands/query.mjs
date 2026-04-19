@@ -181,6 +181,20 @@ parse + evalQuery and composes as \`jdt q '…' | jdt q '…'\`. Raw
 Strings print unquoted so \`jdt q '"Foo" | @source' > Foo.java\`
 writes the file byte-faithful.
 
+qlang cheatsheet (full spec: https://github.com/kaluchi/qlang/blob/master/docs/qlang-spec.md):
+  a | b         apply: evaluate a, pipe result into b
+  a * b         distribute: apply b to each element of Vec a
+  a >> b        merge: a | flat | b (flatten one level, then apply)
+  a !| b        fail-track: fire b only when a is an error value
+  /key          Map projection; nested /a/b = /a | /b
+  [e1 e2]       Vec literal (each element is a sub-pipeline)
+  {:k e}        Map literal — reshape
+  #{a b}        Set literal
+  !{:kind …}    Error literal
+  as(:name)     snapshot pipeValue into env
+  let(:name, body) | let(:name, [:p1 :p2], body)
+                declare a conduit (named pipeline fragment)
+
 Pattern search:
   "*Service" | @types                type-name wildcard (workspace-wide)
   "*Handler" | @types | @sourceOnly  exclude binary dependencies
@@ -219,19 +233,78 @@ Sugar conduits:
   member | @calls      member | @typeUses
   skeleton | @detail   -> detail-node
   project | @classpath -> resolved classpath entries, absolute paths
+  element  | @annotated(fqn)   declares the given annotation FQN
+  method   | @testCallers | @productionCallers
+  element  | @deprecated | @testMethods | @untested | @publicOrphans
 
-Reify a descriptor (docs + examples for an operand or conduit):
-  reify(:@incomingRefs)
-  manifest | filter(/category | eq(:jdt/graph)) * /name
-  -- enumerate the full graph axis + conduit catalog
+Markdown cards (host-bound render operands):
+  "pkg.Type#m()" | @sourceCard    -> markdown: header + code + refs
+  "pkg.Type"     | @hierarchyCard -> markdown: ↑ supers / ↓ subtypes
+  "pkg.Type"     | @outlineCard   -> markdown: fields/methods/inner
+  Vec of :reference | mdRefs      -> markdown: grouped by refKind
+  Each card returns a String. Pipe to '> out.md' for a file.
+
+Host-bound IO + format (available in every jdt q session):
+  @in                stdin → String (piped invocations only)
+  @out | @err        write pipeValue as text; passthrough
+  @tap               debug-print pipeValue; passthrough
+  parseJson          String → qlang value (plain JSON codec)
+  parseTjson         String → qlang value (tagged-JSON codec)
+  pretty             value → pretty-printed String
+  tjson              value → tagged-JSON String (round-trip safe)
+  template(t)        apply a template String to the current value
+
+Tabular rendering:
+  vec | table                         plain qlang builtin
+  vec * inter(#{:fqn :kind :name}) | table     pick columns per element
+  vec * {:fqn /fqn :line /location/startLine} | table   flatten sub-Maps
+
+Cookbook — copy-paste audits:
+  -- compilation state right after an edit
+  jdt q '@problems * {:severity /severity :file /location/file :line /location/startLine :message /message} | table'
+
+  -- deletion candidates: public methods no one calls
+  jdt q '"pkg.Foo" | @publicOrphans * /fqn'
+
+  -- every test that exercises a type (methods + fields + type itself)
+  jdt q '"pkg.Foo" | @tests * /fqn'
+
+  -- hotspots: largest methods by line count
+  jdt q '"pkg.Foo" | @methods | sortWith(desc(/location/lineCount)) | take(10) * {:fqn /fqn :lines /location/lineCount} | table'
+
+  -- who calls a method (production vs test split)
+  jdt q '"pkg.Foo#bar(String)" | as(:m) | {:prod m | @productionCallers * /fqn :test m | @testCallers * /fqn}'
+
+  -- full type card as markdown (header + source + callers + hierarchy)
+  jdt q '"pkg.Foo" | @sourceCard' > Foo.md
+
+  -- type-dependency audit: every type Foo touches outside its own project
+  jdt q '"pkg.Foo" | @typeUses | filter(/containingProject | eq("foo-core") | not) * /fqn'
+
+  -- every @Test method in the workspace
+  jdt q '@projects * @packagesInProject | flat * @typesInPackage | flat * @methods | flat | @testMethods * /fqn'
+
+Discovery — the catalog is data:
+  jdt q 'manifest | count'
+  jdt q 'manifest | filter(/name | startsWith("@")) * /name'
+  jdt q 'reify(:@incomingRefs)'               docs + examples + throws
+  jdt q 'reify(:filter) | runExamples | table'  run built-in examples
+  jdt q 'reify(:@callers) | /source'          read a conduit's body
+
+Debug — errors are data:
+  expr !| /kind                     broad category (:type-error, …)
+  expr !| /thrown                   per-site class (:TypeNotFound, …)
+  expr !| /message                  human-readable
+  expr !| /context/candidates       AmbiguousMatch: resolve + retry
+  expr !| /trail * /text            which steps were deflected
 
 Exit code is always 0 — errors (parse, usage, fail-track) travel
 on stdout as qlang error values (\`!{:kind … :message …}\`). Use
 \`!|\` inside the pipeline to route around errors.
 
 Paths in responses (:path, :file, :rootPath, :outputLocation) are
-absolute filesystem paths on the Eclipse host. The CLI remaps them
-to the runtime's filesystem convention via toSandboxPath before
-they reach the pipeline, so a Linux-sandboxed agent sees its own
-mount paths, not host Windows paths. :fqn is an identifier, never
-remapped — round-trip it back to the API verbatim.`;
+absolute filesystem paths on the Eclipse host. When connected to a
+remote instance via \`jdt setup remote\`, the CLI rewrites each
+host path into the matching local mount-point path via the per-
+instance project cache (see jdt-setup-remote-spec.md). :fqn is an
+identifier and is never remapped — round-trip it to the API as-is.`;

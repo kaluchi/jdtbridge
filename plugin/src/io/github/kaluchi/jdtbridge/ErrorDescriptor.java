@@ -76,11 +76,6 @@ class ErrorDescriptor {
                 "File not found: " + path).with("path", path);
     }
 
-    static ErrorDescriptor moduleNotFound(String name) {
-        return new ErrorDescriptor("module-not-found", "ModuleNotFound",
-                "Module not found: " + name).with("module", name);
-    }
-
     static ErrorDescriptor invalidFqn(String value) {
         return new ErrorDescriptor("invalid-fqn", "InvalidFqn",
                 "Invalid fully qualified name: " + value).with("value", value);
@@ -133,18 +128,6 @@ class ErrorDescriptor {
                 .with("operand", operand)
                 .with("expected", expected)
                 .with("actual", actual);
-    }
-
-    static ErrorDescriptor readonlyNode(String fqn, String reason) {
-        return new ErrorDescriptor("readonly-node", "ReadonlyNode",
-                "Cannot modify " + fqn + ": " + reason)
-                .with("fqn", fqn).with("reason", reason);
-    }
-
-    static ErrorDescriptor planStale(String reason) {
-        return new ErrorDescriptor("plan-stale", "PlanStale",
-                "Refactoring plan is stale: " + reason)
-                .with("reason", reason);
     }
 
     static ErrorDescriptor ioError(String message) {

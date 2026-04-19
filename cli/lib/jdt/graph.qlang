@@ -230,9 +230,9 @@
                  :returns :vec
                  :docs ["Subtypes (for :type subject) or override-methods (for :method subject)."]
                  :examples [{:doc "Classes implementing an interface"
-                             :snippet "\"org.eclipse.core.runtime.IStartup\" | @implementors * /fqn"}
+                             :snippet "\"org.eclipse.ui.IStartup\" | @implementors * /fqn"}
                             {:doc "Concrete overrides of an interface method"
-                             :snippet "\"org.eclipse.core.runtime.IStartup#earlyStartup()\" | @implementors * /fqn"}]
+                             :snippet "\"org.eclipse.ui.IStartup#earlyStartup()\" | @implementors * /fqn"}]
                  :throws [:TypeNotFound :MethodNotFound]}
 
  :@overrides {:qlang/kind :builtin
@@ -322,7 +322,7 @@
            :examples [{:doc "Method body as source text"
                        :snippet "\"io.github.kaluchi.jdtbridge.HttpServer#start()\" | @source"}
                       {:doc "Full compilation unit of a type"
-                       :snippet "\"io.github.kaluchi.jdtbridge.Json\" | @source"}]
+                       :snippet "\"io.github.kaluchi.jdtbridge.ErrorDescriptor\" | @source"}]
            :throws [:TypeNotFound :MethodNotFound :FieldNotFound]}
 
  :@problems {:qlang/kind :builtin

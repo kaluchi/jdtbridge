@@ -17,7 +17,7 @@ into a single output with markdown headers.
 | `intro` | `jdt status intro` | Context paragraph for AI agents |
 | `git` | `jdt git list --no-files` | Repos, branches, dirty state |
 | `editors` | `jdt editors` | Open editor tabs (active first) |
-| `problems` | `jdt q "@problems \| table"` | IMarker.PROBLEM markers |
+| `problems` | `jdt q "@problems * {:severity /severity :file /location/file :line /location/startLine :message /message} \| table"` | IMarker.PROBLEM markers |
 | `launch-configs` | `jdt launch configs` | Saved launch configurations (configId, type, project, target) |
 | `launches` | `jdt launch list` | Running/terminated launches |
 | `tests` | `jdt test runs` | Recent test runs with results |
@@ -45,15 +45,13 @@ The order follows a workflow narrative:
 `launch-configs` precedes `launches` because configs are the "what can run"
 and launches are the "what is running" — definition before state.
 
-## Output modes
+## Output
 
-### Text (default)
-
-Multiple sections: each wrapped in `## Title` + `` ```bash `` code block.
-Each data section includes a description before the code fence — Eclipse-
-specific context (view names, key concepts). Descriptions are suppressed
-by `-q`. Single section (`jdt status problems`): bare output, no header,
-description, or fence.
+Markdown only. Multiple sections: each wrapped in `## Title` + `` ```bash ``
+code block. Each data section includes a description before the code fence —
+Eclipse-specific context (view names, key concepts). Descriptions are
+suppressed by `-q`. Single section (`jdt status problems`): bare output, no
+header, description, or fence.
 
 ```
 ## Git
@@ -74,23 +72,10 @@ ObjectMapperTest  JUnit             my-server  com.example.ObjectMapperTest
 \`\`\`
 ```
 
-### JSON (`--json`)
-
-Composite JSON object with section names as keys. Each key maps to the
-raw JSON from the standalone command. Meta-sections (intro, guide) are
-excluded — they have no data representation.
-
-```json
-{
-  "git": [...],
-  "editors": [...],
-  "problems": [...],
-  "launch-configs": [...],
-  "launches": [...],
-  "tests": [...],
-  "projects": [...]
-}
-```
+Machine-readable access goes through the underlying command directly
+— `jdt git --json`, `jdt launch configs --json`, `jdt q '@problems'`,
+`jdt q '@projects'`, `jdt test runs --json`. `jdt status` has no
+`--json` flag; the dashboard is a view, not a transport.
 
 ## Architecture
 
@@ -99,7 +84,6 @@ excluded — they have no data representation.
 ```
 SECTION_NAMES          ordered list of 10 section identifiers
 RENDERERS              section name → async renderer function
-JSON_COMMANDS          section name → "jdt <cmd> --json" string
 formatSection()        wraps { title, cmd, body, description } into markdown
 ```
 
@@ -120,10 +104,9 @@ it literally runs them and composites the output.
 
 1. Add name to `SECTION_NAMES` array (position = display order)
 2. Add renderer to `RENDERERS` map (async fn → `{ title, cmd, body, description }`)
-3. Add JSON command to `JSON_COMMANDS` map
-4. Add description with Eclipse-specific terms (view name, key identifiers)
-5. Update `help` string — section list
-6. Update test — section count
+3. Add description with Eclipse-specific terms (view name, key identifiers)
+4. Update `help` string — section list
+5. Update test — section count
 
 ## Design principles
 
@@ -192,9 +175,13 @@ independently refreshable.
   problems output, no `##` header or code fence. This makes single-section
   calls drop-in replacements for the standalone command.
 
-- **Problems use JSON.** Unlike other sections that show text tables,
-  problems renders `--json` output. An empty `[]` is clearer than
-  "(no problems)" for programmatic consumption and agent context.
+- **Problems section uses a reshape + table.** `@problems` returns
+  node-Maps whose `:location` is a sub-Map `{file,startLine,endLine}`.
+  A bare `| table` renders the column as `[object Object]`, so the
+  renderer uses a reshape — `@problems * {:severity /severity :file
+  /location/file :line /location/startLine :message /message} | table`
+  — which also acts as an idiom example for every other section that
+  wants file/line columns.
 
 ## Constraints
 
