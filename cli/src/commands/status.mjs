@@ -202,9 +202,9 @@ function guideSection() {
 
 Debug a stuck query — errors are data on stdout:
 
-  jdt q '"no.such" | @type !| /kind'      :type-not-found
-  jdt q '"Foo#bar" | @method !| /context/candidates'
-                                          pick an overload and retry
+  jdt q 'expr !| /kind'        broad category (:type-not-found …)
+  jdt q 'expr !| /message'     human-readable text
+  jdt q 'expr !| /context'     structured fields (:fqn, :candidates …)
 
 Dashboard controls:
 
