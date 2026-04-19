@@ -298,7 +298,6 @@ class SearchHandler {
                 IType sub = m.getDeclaringType();
                 if (sub.isAnonymous()) continue;
                 var e = typeEntry(sub);
-                e.addProperty("fqn", entry.getKey());
                 int[] implRange = getLinesOfMember(m);
                 e.addProperty("startLine", implRange[0]);
                 e.addProperty("endLine", implRange[1]);
