@@ -57,7 +57,7 @@ describe("cli dispatcher", () => {
 
   it("resolves alias in help", async () => {
     await run(["help", "q"]);
-    expect(logs.some((l) => l.includes("qlang pipeline"))).toBe(true);
+    expect(logs.some((l) => l.includes("qlang-pipeline"))).toBe(true);
   });
 
   it("shows aliases in overview", async () => {

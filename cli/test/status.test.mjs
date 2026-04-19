@@ -114,11 +114,12 @@ describe("guideSection", () => {
     expect(g.body).toContain("jdt build --project X");
   });
 
-  it("body contains dashboard refresh hints and graph-query patterns", () => {
+  it("body contains dashboard refresh hints and debug patterns", () => {
     const g = guideSection();
     expect(g.body).toContain("jdt status -q");
     expect(g.body).toContain("jdt q");
-    expect(g.body).toContain("manifest");
+    expect(g.body).toContain("!|");
+    expect(g.body).toContain("jdt help q");
   });
 });
 

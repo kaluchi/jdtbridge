@@ -151,48 +151,34 @@ function introSection() {
   return {
     title: "Intro",
     cmd: "jdt status intro",
-    body: `Eclipse IDE is running and connected to this terminal via jdt CLI.
-jdt exposes the IDE's semantic Java graph as a pipeline query surface.
-grep sees text. jdt q sees structure — types, methods, call sites,
-hierarchies, annotations, classpaths — and composes them.
+    body: `Eclipse is running and wired to this terminal. jdt q sees
+structure — types, methods, call sites, hierarchies, annotations,
+classpaths — and composes them as a pipeline. grep sees text;
+\`jdt q\` sees the semantic graph.
 
-Query the graph with jdt q '<qlang-pipeline>'. Pipelines start
-with a SEED (literal string, nullary operand) and chain operands
-that take their subject from pipeValue. Operands never receive
-identifiers as captured arguments — that's RPC. Filtering and
-composition is done with core qlang (filter, *, >>, |, !|, as,
-let). Examples:
+Three queries that cover most Java-review tasks — swap the FQN:
 
-  jdt q '@projects * @members * @methods
-        | filter(/modifiers | any(eq("public")))
-        | filter(@callers | empty) * /fqn'
-  -- public methods with no callers (deletion candidates)
+  jdt q '"com.example.Foo#bar()" | @sourceCard' > bar.md
+  -- full card: header, source, outgoing + incoming refs, hierarchy
 
-  jdt q '"com.example.Repository" | @subtypes * /fqn'
-  -- all subtypes of an interface
+  jdt q '"com.example.Foo#bar" | @callers * /fqn | distinct'
+  -- every caller of a method
 
-  jdt q '"com.example.Foo#bar()" | @callers * /fqn'
-  -- who calls this method
-
-  jdt q '"com.example.MyService" | @ancestors * /fqn'
+  jdt q '"com.example.Foo" | @ancestors * /fqn'
   -- full supertype chain
 
-  jdt q '"com.example.Foo" | @detail'
-  -- detail-node for a fqn/fqmn (routes via kind)
+One command for the rest of the surface:
 
-  jdt q 'manifest | filter(/name | startsWith("@")) * /name'
-  -- every @-operand (axes, conduits, render, IO) — the full vocab
+  jdt help q    grammar + axes + cookbook + discovery + debug
 
-Discover any operand:
-  jdt q 'reify(:@subtypes)'               -- docs + examples + throws
-  jdt q 'reify(:@subtypes) | runExamples' -- run the doc snippets
-  jdt help q                              -- grammar + host ops + debug
+The catalog is itself qlang data — \`jdt q 'reify(:@sourceCard)'\` gives
+docs + examples + throws, \`jdt q 'manifest * /name'\` lists every
+operand. Full language reference:
+https://github.com/kaluchi/qlang/blob/master/docs/qlang-spec.md
 
-Full qlang grammar: https://github.com/kaluchi/qlang/blob/master/docs/qlang-spec.md
-
-The sections below are live output from the running Eclipse instance.
-Each section is produced by a command shown in its header.
--q suppresses intro, help, guide, and section descriptions.`,
+Sections below are live output from the running Eclipse. Each
+section's header shows the command that produced it. -q suppresses
+intro, help, guide, and per-section descriptions.`,
   };
 }
 
@@ -208,31 +194,24 @@ function guideSection() {
   return {
     title: "Guide",
     cmd: "jdt status guide",
-    body: `Graph query — jdt q:
-
-  jdt q '<qlang-pipeline>'   evaluate against the JDT graph
-  jdt q '@operand'           bare-name reify = descriptor
-  jdt q 'manifest'           full operand catalog
-
-  Pipelines start with a SEED (string literal, @projects, etc.).
-  Operands never take FQN/FQMN as captured args — that's RPC.
-
-  as(:name) snapshots any value — reuse without re-fetching:
-    jdt q '"*" | @types | as(:all) | all | count'
-
-  !| catches errors on the fail-track:
-    jdt q '"no.such" | @type !| /thrown'
-
-After editing code:
+    body: `After editing code:
 
   jdt q '@problems'           check compilation after edit
   jdt test run FQN -f -q      run one test, stream result
   jdt build --project X       trigger build if auto-build is off
 
-Dashboard:
+Debug a stuck query — errors are data on stdout:
 
-  jdt status -q               all sections, no intro/help/guide
-  jdt status editors problems   selective refresh`,
+  jdt q '"no.such" | @type !| /kind'      :type-not-found
+  jdt q '"Foo#bar" | @method !| /context/candidates'
+                                          pick an overload and retry
+
+Dashboard controls:
+
+  jdt status -q               all data sections, no prose
+  jdt status editors problems   refresh only these
+
+Deep reference (axes, grammar, cookbook):  jdt help q`,
   };
 }
 
