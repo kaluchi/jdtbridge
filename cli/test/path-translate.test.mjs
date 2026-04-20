@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
@@ -13,8 +13,7 @@ async function loadModuleWithHome(home) {
 
 function writeCache(home, bridgeSocket, projects) {
   const dir = join(home, "remote-instances", "project-paths");
-  const fs = require("node:fs");
-  fs.mkdirSync(dir, { recursive: true });
+  mkdirSync(dir, { recursive: true });
   const hash = createHash("sha256").update(bridgeSocket)
       .digest("hex").slice(0, 12);
   const file = join(dir, hash + ".json");

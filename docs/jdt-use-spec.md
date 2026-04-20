@@ -361,7 +361,7 @@ Step 4 is the existing behavior — unchanged for single-instance users.
 When resolution reaches step 4 and finds 2+ instances:
 
 ```
-⚠ Multiple Eclipse instances found. Using first.
+⚠ Multiple running Eclipse instances found. Using first.
   Run `jdt use` to see all and pin one.
 ```
 

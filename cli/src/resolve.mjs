@@ -69,7 +69,7 @@ export async function resolveInstance() {
 
   // Multiple live instances — warn
   process.stderr.write(
-    "\u26A0 Multiple Eclipse instances found. Using first.\n" +
+    "\u26A0 Multiple running Eclipse instances found. Using first.\n" +
     "  Run `jdt use` to see all and pin one.\n",
   );
   return live[0];

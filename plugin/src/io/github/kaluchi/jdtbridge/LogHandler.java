@@ -99,12 +99,10 @@ class LogHandler {
 
     /**
      * Resolve the current workspace's {@code .metadata/.log} path.
-     * Uses {@link Platform#getLogFileLocation()} which is
-     * deprecated but stable across 4.x, with a fallback via
-     * Platform.getInstanceLocation() for the corner case where the
-     * system property is unset.
+     * Uses {@link Platform#getLogFileLocation()} with a fallback via
+     * {@link Platform#getInstanceLocation()} for the corner case where
+     * the system property is unset.
      */
-    @SuppressWarnings("deprecation")
     private static Path resolveLogPath() {
         try {
             var path = Platform.getLogFileLocation();

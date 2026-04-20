@@ -58,7 +58,7 @@
           :returns :map
           :docs ["Single :field detail by FQN (pkg.Type#fieldName)."]
           :examples [{:doc "Field detail — type, modifiers, annotations"
-                      :snippet "\"io.github.kaluchi.jdtbridge.HttpServer#search\" | @field"}]
+                      :snippet "\"io.github.kaluchi.jdtbridge.HttpServer#token\" | @field"}]
           :throws [:FieldNotFound :InvalidFqn]}
 
  :@project {:qlang/kind :builtin
@@ -275,7 +275,7 @@
                             {:doc "Union of every refKind the server recognizes"
                              :snippet "\"io.github.kaluchi.jdtbridge.HttpServer\" | @incomingRefs(:all) * /refKind | distinct"}
                             {:doc "Field writes only"
-                             :snippet "\"io.github.kaluchi.jdtbridge.HttpServer#search\" | @incomingRefs(:write) * /from/fqn"}]
+                             :snippet "\"io.github.kaluchi.jdtbridge.HttpServer#running\" | @incomingRefs(:write) * /from/fqn"}]
                  :throws [:TypeNotFound :MethodNotFound :FieldNotFound]}
 
  :@outgoingRefs {:qlang/kind :builtin
@@ -417,17 +417,19 @@ let(:@typeUses, @outgoingRefs | filter(/refKind | eq("typeUse")) * /to
    primitive operands above. Each conduit carries :docs for
    reify/manifest self-documentation. ~|
 
-|~~ Transitive supertypes, distinct. Walks @supers recursively
-    until the supertype chain terminates (Object or top interface). ~~|
+|~~ Transitive supertypes, flat Vec of :type skeletons. Walks
+    @supers recursively until the chain terminates. Two `flat`
+    passes spread `[direct_vec, vec_of_ancestor_vecs]` into a
+    uniform flat sequence of node-Maps; `distinct` then collapses
+    diamond reachability by structural equality. ~~|
 let(:@ancestors, @supers | as(:direct)
-    | [direct, direct * @ancestors] | flat
-    | filter(empty | not) | distinct)
+    | [direct, direct * @ancestors] | flat | flat | distinct)
 
-|~~ Transitive subtypes, distinct. Walks @subtypes recursively
-    until no further subtypes exist. ~~|
+|~~ Transitive subtypes, flat Vec of :type skeletons. Walks
+    @subtypes recursively until no further subtypes exist. Same
+    two-flat + `distinct` pattern as @ancestors. ~~|
 let(:@descendants, @subtypes | as(:direct)
-    | [direct, direct * @descendants] | flat
-    | filter(empty | not) | distinct)
+    | [direct, direct * @descendants] | flat | flat | distinct)
 
 |~~ Public methods of a type with zero incoming callers.
     Deletion candidates — methods no code references. ~~|

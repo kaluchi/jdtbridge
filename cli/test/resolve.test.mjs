@@ -206,7 +206,7 @@ describe("resolve", () => {
 
       process.stderr.write = origWrite;
       expect(inst).not.toBeNull();
-      expect(stderrOutput).toContain("Multiple Eclipse instances");
+      expect(stderrOutput).toContain("Multiple running Eclipse instances");
       expect(stderrOutput).toContain("jdt use");
     });
 
@@ -229,7 +229,7 @@ describe("resolve", () => {
 
       process.stderr.write = origWrite;
       expect(inst.port).toBe(58800);
-      expect(stderrOutput).not.toContain("Multiple Eclipse instances");
+      expect(stderrOutput).not.toContain("Multiple running Eclipse instances");
     });
   });
 

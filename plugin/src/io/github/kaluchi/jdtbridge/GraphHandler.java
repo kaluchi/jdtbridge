@@ -39,18 +39,21 @@ import org.eclipse.jdt.core.search.SearchRequestor;
  * {@link NodeBuilder}. Errors come back as
  * {@link ErrorDescriptor} JSON.
  * <p>
- * Endpoint surface (point lookups + polymorphic detail):
+ * Endpoint surface (one primitive per HTTP path). Polymorphic
+ * routing by kind is done on the qlang side via the {@code @detail}
+ * conduit in {@code graph.qlang}; there is no server-side
+ * {@code /detail} endpoint.
  * <ul>
  *   <li>{@code /type?of=<fqn>}     — single :type detail</li>
- *   <li>{@code /method?of=<fqn>}  — single :method detail; supports
- *       paramTypes for overload disambiguation</li>
- *   <li>{@code /field?of=<fqn>}   — single :field detail</li>
- *   <li>{@code /detail?of=<fqn-or-fqn>} — polymorphic; routes by
- *       {@code #}-presence in the identifier</li>
+ *   <li>{@code /method?of=<fqn>}   — single :method detail; supports
+ *       {@code paramTypes} for overload disambiguation</li>
+ *   <li>{@code /field?of=<fqn>}    — single :field detail</li>
+ *   <li>{@code /members /methods /fields /innerTypes} — containment down</li>
+ *   <li>{@code /supers /subtypes /implementors /overrides /overloads} — hierarchy</li>
+ *   <li>{@code /refs /outgoingRefs} — references</li>
+ *   <li>{@code /types /projects /project /package /file /classpath} — search &amp; resources</li>
+ *   <li>{@code /source /problems} — text &amp; diagnostics</li>
  * </ul>
- * Subsequent batches add bulk-search ({@code /types}), navigation
- * ({@code /members /supers /subtypes}), references, annotations,
- * source/AST, and resources.
  */
 class GraphHandler {
 
