@@ -21,6 +21,7 @@ import { nullaryOp, overloadedOp } from '@kaluchi/qlang-core/dispatch';
 import { keyword, isKeyword, makeErrorValue } from '@kaluchi/qlang-core';
 import { get } from '../../src/client.mjs';
 import { remapJsonPaths } from '../../src/json-output.mjs';
+import { translateHostPathFromLocal } from '../../src/path-translate.mjs';
 
 // ── Conversion helpers ──────────────────────────────────────────
 
@@ -156,6 +157,25 @@ function axisOp(name, endpointPath) {
     });
 }
 
+/**
+ * Axis factory for endpoints whose {@code of=} parameter is a
+ * filesystem path (i.e. {@code @file}, {@code @typesInFile}). The
+ * plugin only accepts Eclipse-host paths, but a subject that rides
+ * in from a prior node's `:location/:file` has already been
+ * translated to CLI-local form by {@code remapJsonPaths}. Reverse-
+ * translate here before the RPC so the pipeline chain
+ * {@code node | /location/file | @file} works in remote mode.
+ * No-op on local instances.
+ */
+function pathAxisOp(name, endpointPath) {
+    return nullaryOp(name, async (subject) => {
+        const fqn = fqnOf(subject);
+        if (fqn === null) return missingSubject(name, subject);
+        const hostPath = translateHostPathFromLocal(fqn);
+        return getEndpoint(`${endpointPath}?of=${enc(hostPath)}`);
+    });
+}
+
 // ── Nullary entry-points (no subject, no captured) ──────────────
 
 const projectsImpl = nullaryOp('@projects',
@@ -177,7 +197,7 @@ const methodImpl  = axisOp('@method',  '/method');
 const fieldImpl   = axisOp('@field',   '/field');
 const projectImpl = axisOp('@project', '/project');
 const packageImpl = axisOp('@package', '/package');
-const fileImpl    = axisOp('@file',    '/file');
+const fileImpl    = pathAxisOp('@file', '/file');
 
 // ── Down-navigation ─────────────────────────────────────────────
 
@@ -186,7 +206,7 @@ const methodsImpl     = axisOp('@methods',    '/methods');
 const fieldsImpl      = axisOp('@fields',     '/fields');
 const innerTypesImpl      = axisOp('@innerTypes',      '/innerTypes');
 const typesInPackageImpl  = axisOp('@typesInPackage',  '/typesInPackage');
-const typesInFileImpl     = axisOp('@typesInFile',     '/typesInFile');
+const typesInFileImpl     = pathAxisOp('@typesInFile', '/typesInFile');
 const packagesInProjectImpl = axisOp('@packagesInProject', '/packagesInProject');
 const supersImpl       = axisOp('@supers',       '/supers');
 const subtypesImpl     = axisOp('@subtypes',     '/subtypes');

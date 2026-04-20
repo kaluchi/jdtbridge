@@ -4,30 +4,36 @@ import { request } from "node:http";
 import { discoverInstances, probe } from "./discovery.mjs";
 import { resolveInstance } from "./resolve.mjs";
 import { proxyAwareOptions } from "./proxy.mjs";
-import { red, bold } from "./color.mjs";
 
 /** @type {import('./discovery.mjs').Instance|null} */
 let _instance;
 
 /**
+ * Thrown by {@link connect} when no live JDT Bridge instance is
+ * reachable. Callers decide how to surface it — a user-facing CLI
+ * command prints the troubleshooting list and exits non-zero; a
+ * contract-bound command like `jdt q` wraps it into a qlang `!{}`
+ * value so its always-exit-0 discipline holds.
+ */
+export class BridgeNotRunningError extends Error {
+  constructor() {
+    super("Eclipse JDT Bridge not running.");
+    this.name = "BridgeNotRunningError";
+  }
+}
+
+/**
  * Ensure we have a connected instance. Call before any HTTP request.
  * Instant — resolves via env vars, pins, or discovery without probing.
+ * Throws {@link BridgeNotRunningError} when no live instance is
+ * reachable.
  * @returns {import('./discovery.mjs').Instance}
  */
 export async function connect() {
   if (_instance) return _instance;
 
   _instance = await resolveInstance();
-  if (!_instance) {
-    console.error(
-      bold(red("Eclipse JDT Bridge not running.")) +
-        "\n\nNo live instances found. Check that:" +
-        "\n  1. Eclipse is running" +
-        "\n  2. The jdtbridge plugin is installed (io.github.kaluchi.jdtbridge)" +
-        "\n  3. Instance files exist in ~/.jdtbridge/instances/",
-    );
-    process.exit(1);
-  }
+  if (!_instance) throw new BridgeNotRunningError();
   return _instance;
 }
 

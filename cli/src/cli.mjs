@@ -60,7 +60,7 @@ import {
 import { setup, help as setupHelp } from "./commands/setup.mjs";
 import { use, help as useHelp } from "./commands/use.mjs";
 import { query, help as queryHelp } from "./commands/query.mjs";
-import { isConnectionError } from "./client.mjs";
+import { isConnectionError, BridgeNotRunningError } from "./client.mjs";
 import { bold, red, dim } from "./color.mjs";
 import { installTelemetry } from "./telemetry.mjs";
 import { createRequire } from "node:module";
@@ -369,7 +369,15 @@ export async function run(argv) {
   try {
     await commands[resolved].fn(rest);
   } catch (e) {
-    if (isConnectionError(e)) {
+    if (e instanceof BridgeNotRunningError) {
+      console.error(
+        bold(red("Eclipse JDT Bridge not running.")) +
+          "\n\nNo live instances found. Check that:" +
+          "\n  1. Eclipse is running" +
+          "\n  2. The jdtbridge plugin is installed (io.github.kaluchi.jdtbridge)" +
+          "\n  3. Instance files exist in ~/.jdtbridge/instances/",
+      );
+    } else if (isConnectionError(e)) {
       console.error(
         bold(red("Eclipse JDT Bridge not responding.")) +
           "\nCheck that Eclipse is running with the jdtbridge plugin.\n",

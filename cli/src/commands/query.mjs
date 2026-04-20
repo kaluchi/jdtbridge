@@ -24,6 +24,7 @@ import { bindFormatOperands } from '@kaluchi/qlang-cli/format-operands';
 import { bindParseOperands } from '@kaluchi/qlang-cli/parse-operands';
 import { createImpls as createGraphImpls } from '../../lib/jdt/graph.impl.mjs';
 import { bindJdtRenderOperands } from '../../lib/jdt/render.impl.mjs';
+import { BridgeNotRunningError, isConnectionError } from '../client.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MODULE_LIB = join(__dirname, '..', '..', 'lib');
@@ -101,6 +102,30 @@ function usageErrorValue(message, usage) {
   return makeErrorValue(descriptor);
 }
 
+/**
+ * Wrap a runtime transport failure into a qlang error value. The
+ * always-exit-0 contract of `jdt q` requires every terminal
+ * outcome — including a dead Eclipse or a dropped socket mid-RPC —
+ * to travel on stdout as an `!{}` value, so sibling parallel tool
+ * calls in an agent harness are never cancelled by a non-zero exit.
+ */
+function runtimeErrorToValue(err) {
+  const kind = err instanceof BridgeNotRunningError
+    ? 'bridge-not-running'
+    : isConnectionError(err)
+      ? 'bridge-not-responding'
+      : 'jdt-cli-error';
+  const thrown = err.name || 'Error';
+  const descriptor = new Map([
+    [keyword('kind'),    keyword(kind)],
+    [keyword('origin'),  keyword('jdt/cli')],
+    [keyword('thrown'),  keyword(thrown)],
+    [keyword('message'), err.message || String(err)],
+  ]);
+  if (err.code) descriptor.set(keyword('code'), err.code);
+  return makeErrorValue(descriptor);
+}
+
 function printQueryResult(value) {
   if (typeof value === 'string' && !isErrorValue(value)) {
     // Raw string results (e.g. `@source` returning a file's contents)
@@ -131,38 +156,53 @@ export async function query(args) {
     ));
     return;
   }
-  const session = await createSession({ locator: createLocator() });
-  // Bind qlang-cli's standard host operands so jdt q has the same
-  // composable I/O + format toolkit as plain `qlang`:
-  //   @in / @out / @err / @tap     stdio
-  //   pretty / tjson / template    value → string formatters
-  //   parseJson / parseTjson       string → value parsers
+  // Everything from session bootstrap onward runs inside the
+  // always-exit-0 envelope: any failure — bridge not running,
+  // socket dropped mid-RPC, locator throw, operand binding
+  // mishap — surfaces as a qlang `!{}` value on stdout so sibling
+  // parallel tool calls in an agent harness never see a non-zero
+  // exit.
   let didExplicitStdoutEffect = false;
-  bindIoOperands(session, {
-    stdinReader: readStdin,
-    stdoutWrite: (text) => process.stdout.write(text),
-    stderrWrite: (text) => process.stderr.write(text),
-    recordStdoutEffect: () => { didExplicitStdoutEffect = true; },
-  });
-  bindFormatOperands(session);
-  bindParseOperands(session);
-  bindJdtRenderOperands(session);
-  const cellEntry = await session.evalCell(`use(:jdt/graph) | ${querySource}`);
+  try {
+    const session = await createSession({ locator: createLocator() });
+    // Bind qlang-cli's standard host operands so jdt q has the same
+    // composable I/O + format toolkit as plain `qlang`:
+    //   @in / @out / @err / @tap     stdio
+    //   pretty / tjson / template    value → string formatters
+    //   parseJson / parseTjson       string → value parsers
+    bindIoOperands(session, {
+      stdinReader: readStdin,
+      stdoutWrite: (text) => process.stdout.write(text),
+      stderrWrite: (text) => process.stderr.write(text),
+      recordStdoutEffect: () => { didExplicitStdoutEffect = true; },
+    });
+    bindFormatOperands(session);
+    bindParseOperands(session);
+    bindJdtRenderOperands(session);
+    const cellEntry = await session.evalCell(`use(:jdt/graph) | ${querySource}`);
 
-  if (cellEntry.error) {
-    printQueryResult(parseErrorToValue(cellEntry.error, cellEntry.uri));
-    return;
-  }
-
-  if (didExplicitStdoutEffect) {
-    // Error values route to stderr so they survive alongside an
-    // @out redirect without contaminating its stdout.
-    if (isErrorValue(cellEntry.result)) {
-      process.stderr.write(printValue(cellEntry.result) + '\n');
+    if (cellEntry.error) {
+      printQueryResult(parseErrorToValue(cellEntry.error, cellEntry.uri));
+      return;
     }
-    return;
+
+    if (didExplicitStdoutEffect) {
+      // Error values route to stderr so they survive alongside an
+      // @out redirect without contaminating its stdout.
+      if (isErrorValue(cellEntry.result)) {
+        process.stderr.write(printValue(cellEntry.result) + '\n');
+      }
+      return;
+    }
+    printQueryResult(cellEntry.result);
+  } catch (err) {
+    const errorValue = runtimeErrorToValue(err);
+    if (didExplicitStdoutEffect) {
+      process.stderr.write(printValue(errorValue) + '\n');
+    } else {
+      printQueryResult(errorValue);
+    }
   }
-  printQueryResult(cellEntry.result);
 }
 
 export const help = `jdt q — pipeline query over the Eclipse JDT semantic graph.

@@ -128,3 +128,42 @@ export function translateHostPath(hostPath) {
   const socket = inst.bridgeSocket || (inst.host + ":" + inst.port);
   return translatePath(hostPath, loadTranslationTable(socket));
 }
+
+/**
+ * Reverse of {@link translatePath}: local path → host path. Swaps
+ * {@code localRoot} for {@code eclipseRoot} on longest-prefix match.
+ * Needed when a pipeline carries a path field into an outbound
+ * axis (e.g. `@containingFile` piping {@code :location/file} back
+ * into `@file`). Without this, the outbound request hands the
+ * server a CLI-local path it cannot resolve.
+ */
+export function translateLocalPath(localPath, table) {
+  if (typeof localPath !== "string" || table.length === 0) return localPath;
+  const canon = canonicalize(localPath);
+  const rows = [...table].sort(
+    (a, b) => b.localRoot.length - a.localRoot.length);
+  for (const { eclipseRoot, localRoot } of rows) {
+    const localCanon = canonicalize(localRoot);
+    if (canon === localCanon) return eclipseRoot;
+    if (canon.startsWith(localCanon + "/")) {
+      const suffix = canon.slice(localCanon.length);
+      return eclipseRoot + normaliseSeparators(suffix, separatorOf(eclipseRoot));
+    }
+  }
+  return localPath;
+}
+
+/**
+ * High-level reverse translator: a path already in CLI-local form
+ * (e.g. projected from a previous response's {@code :location/file}
+ * or typed by the user after a {@code jdt editors} listing) is
+ * converted back to the shape the plugin accepts. No-op on local
+ * instances or on paths that match no mount-point prefix.
+ */
+export function translateHostPathFromLocal(localPath) {
+  const inst = typeof currentInstance === "function"
+    ? currentInstance() : null;
+  if (!inst || !inst.remote) return localPath;
+  const socket = inst.bridgeSocket || (inst.host + ":" + inst.port);
+  return translateLocalPath(localPath, loadTranslationTable(socket));
+}

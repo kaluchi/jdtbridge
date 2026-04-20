@@ -166,15 +166,21 @@ describe("graph.impl — concurrency semaphore", () => {
 describe("graph.impl — path remapping at the plugin boundary", () => {
   // Stub translateHostPath with a deterministic D:\→/d/ mapping
   // so these tests don't depend on per-instance cache fixtures.
+  // translateHostPathFromLocal stays identity — the outbound path
+  // a test hands to `@file` is already the shape the plugin
+  // expects, no reverse swap needed for these fixtures.
   function mockTranslator() {
     vi.doMock("../src/path-translate.mjs",
         async (importOriginal) => {
           const orig = await importOriginal();
-          return { ...orig, translateHostPath: (p) =>
-              typeof p === "string" && /^[A-Z]:[\\/]/.test(p)
-                  ? "/" + p[0].toLowerCase()
-                      + p.slice(2).replace(/\\/g, "/")
-                  : p };
+          return { ...orig,
+            translateHostPath: (p) =>
+                typeof p === "string" && /^[A-Z]:[\\/]/.test(p)
+                    ? "/" + p[0].toLowerCase()
+                        + p.slice(2).replace(/\\/g, "/")
+                    : p,
+            translateHostPathFromLocal: (p) => p,
+          };
         });
   }
 
