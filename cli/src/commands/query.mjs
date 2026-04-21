@@ -272,8 +272,7 @@ value so the next step composes. A Vec of 10k node-Maps followed by
 ───── Axes (seeds + navigation) ─────
 
 Seeds (string → node, or nullary):
-  "fqn"                | @type  @package  @project  @file
-  "fqn"               | @method  @field
+  "fqn"                | @type  @method  @field  @package  @project  @file
   "*pattern*"          | @types
   @projects            @problems            @problems(:project|:file)
 

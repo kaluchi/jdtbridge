@@ -11,10 +11,18 @@
 import { execSync } from "node:child_process";
 import { basename } from "node:path";
 import { normalizePath } from "../paths.mjs";
+import { resolveInstance } from "../resolve.mjs";
 
 // ---- Public API ----
 
-const SECTION_NAMES = ["intro", "git", "editors", "problems", "launch-configs", "launches", "tests", "projects", "help", "guide"];
+const SECTION_NAMES = ["intro", "git", "editors", "problems", "launch-configs", "launches", "tests", "projects", "help", "query", "guide"];
+
+// Env vars passed to every subprocess cliCmd() spawns. Populated
+// once at the start of status() from resolveInstance() so that all
+// section subprocesses hit step 1 of resolution (env) and skip
+// discovery + cwd-match. Without this every subprocess re-resolves,
+// hammering /projects N times per section in multi-instance cases.
+let _resolvedEnv = {};
 
 export async function status(args) {
   const quiet = args.includes("-q") || args.includes("--quiet");
@@ -23,8 +31,16 @@ export async function status(args) {
     ? requested.filter((s) => SECTION_NAMES.includes(s))
     : SECTION_NAMES.filter((s) => s !== "guide" && s !== "help");
 
-  const META_SECTIONS = new Set(["intro", "guide", "help"]);
+  const META_SECTIONS = new Set(["intro", "query", "guide", "help"]);
   const results = [];
+
+  // Resolve target instance once; propagate to subprocesses via env.
+  const inst = await resolveInstance();
+  _resolvedEnv = inst ? {
+    JDT_BRIDGE_PORT: String(inst.port),
+    JDT_BRIDGE_TOKEN: inst.token || "",
+    JDT_BRIDGE_HOST: inst.host || "127.0.0.1",
+  } : {};
 
   const showExtras = !quiet && requested.length === 0;
   // Intro first — context for agents seeing this for the first time
@@ -36,8 +52,9 @@ export async function status(args) {
     if (renderer) results.push(await renderer());
   }
 
-  // Help before guide
+  // Help and query before guide
   if (showExtras || sections.includes("help")) results.push(helpSection());
+  if (showExtras || sections.includes("query")) results.push(querySection());
   // Guide last
   if (showExtras) results.push(guideSection());
   if (sections.includes("guide") && !showExtras) results.push(guideSection());
@@ -95,14 +112,14 @@ async function renderEditors() {
 }
 
 async function renderProblems() {
-  const cmd = `jdt q "@problems * {:severity /severity :file /location/file :line /location/startLine :message /message} | table"`;
+  const cmd = `jdt q "@problems | filter(/severity | eq(\\"error\\")) | take(20) * {:message /message :file /location/file :severity /severity :line /location/startLine}"`;
   return {
     title: "Problems", cmd,
     body: cliCmd(cmd),
     description:
-      "Eclipse Problems view — IMarker.PROBLEM markers (errors, warnings).\n"
-      + "Updated on every build. (empty) = clean workspace.\n"
-      + "The `* {…}` reshape flattens the :location sub-Map into file/line columns.",
+      "Eclipse Problems view — errors only, first 20. Updated on every build.\n"
+      + "[] = no compilation errors. For warnings or the full list, drop the\n"
+      + "filter and take: jdt q '@problems'.",
   };
 }
 
@@ -151,34 +168,18 @@ function introSection() {
   return {
     title: "Intro",
     cmd: "jdt status intro",
-    body: `Eclipse is running and wired to this terminal. jdt q sees
-structure — types, methods, call sites, hierarchies, annotations,
-classpaths — and composes them as a pipeline. grep sees text;
-\`jdt q\` sees the semantic graph.
+    body: `Eclipse IDE for Java Developers is running and wired to this terminal via the jdt CLI.
+jdt exposes the IDE's functions as terminal commands — Java search,
+compilation, testing, refactoring, editor control. Everything the
+developer sees and does in Eclipse GUI is reachable from here
+against the same running instance.
 
-Three queries that cover most Java-review tasks — swap the FQN:
+Sections below are live output from that instance. Each section's
+header shows the command that produced it, and that command can be
+run standalone for a fresh snapshot of just that section. Several
+can be combined: jdt status git editors problems.
 
-  jdt q '"com.example.Foo#bar()" | @sourceCard' > bar.md
-  -- full card: header, source, outgoing + incoming refs, hierarchy
-
-  jdt q '"com.example.Foo#bar" | @callers * /fqn | distinct'
-  -- every caller of a method
-
-  jdt q '"com.example.Foo" | @ancestors * /fqn'
-  -- full supertype chain
-
-One command for the rest of the surface:
-
-  jdt help q    grammar + axes + cookbook + discovery + debug
-
-The catalog is itself qlang data — \`jdt q 'reify(:@sourceCard)'\` gives
-docs + examples + throws, \`jdt q 'manifest * /name'\` lists every
-operand. Full language reference:
-https://github.com/kaluchi/qlang/blob/master/docs/qlang-spec.md
-
-Sections below are live output from the running Eclipse. Each
-section's header shows the command that produced it. -q suppresses
-intro, help, guide, and per-section descriptions.`,
+-q suppresses intro, query, help, guide, and per-section descriptions.`,
   };
 }
 
@@ -187,6 +188,14 @@ function helpSection() {
     title: "Help",
     cmd: "jdt help",
     body: cliCmd("jdt help"),
+  };
+}
+
+function querySection() {
+  return {
+    title: "Query",
+    cmd: "jdt help q",
+    body: cliCmd("jdt help q"),
   };
 }
 
@@ -248,7 +257,7 @@ export function cliCmd(cmd) {
   try {
     return execSync(cmd, {
       encoding: "utf8", timeout: 30_000,
-      env: { ...process.env, FORCE_COLOR: "1" },
+      env: { ...process.env, ..._resolvedEnv, FORCE_COLOR: "1" },
     }).replace(/\n+$/, "");
   } catch { return "(error)"; }
 }
@@ -275,8 +284,8 @@ export const help = `CLI screenshot of Eclipse — composite view of IDE state.
 
 Usage:  jdt status [sections...] [-q]
 
-Sections (default: all):
-  intro           context for AI agents (shown by default, suppressed by -q)
+Sections (default: all data + intro + help + guide):
+  intro           what jdt is, how to read the dashboard
   git             git repos, branches, modified files
   editors         open editor tabs (active first)
   problems        IMarker.PROBLEM (errors, warnings)
@@ -284,8 +293,9 @@ Sections (default: all):
   launches        running launches
   tests           recent test sessions
   projects        workspace projects with repo mapping
-  help            full jdt command reference (shown by default, suppressed by -q)
-  guide           hints and patterns (shown by default, suppressed by -q)
+  help            full jdt command reference
+  query           graph-query onboarding: jdt q, axes, pipelines (opt-in)
+  guide           hints and patterns after editing code
 
 Options:
   -q, --quiet  suppress meta-sections (intro, help, guide) and descriptions
@@ -295,6 +305,7 @@ Examples:
   jdt status -q                 full dashboard, no intro/help/guide
   jdt status editors problems   editors + problems
   jdt status help               command reference
+  jdt status query              graph-query onboarding
 
 Machine-readable access to any single section goes through the
 underlying command directly: jdt git --json, jdt editors --json,
