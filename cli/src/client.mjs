@@ -4,6 +4,7 @@ import { request } from "node:http";
 import { discoverInstances, probe } from "./discovery.mjs";
 import { resolveInstance } from "./resolve.mjs";
 import { proxyAwareOptions } from "./proxy.mjs";
+import { httpRequest } from "./http.mjs";
 
 /** @type {import('./discovery.mjs').Instance|null} */
 let _instance;
@@ -137,33 +138,12 @@ export function directGet(inst, path, timeoutMs = 5000) {
   return doGet(inst, path, timeoutMs);
 }
 
-function doGet(inst, path, timeoutMs) {
-  return new Promise((resolve, reject) => {
-    const req = request(
-      requestOpts(inst, path, "GET", timeoutMs),
-      (res) => {
-        let data = "";
-        res.on("data", (chunk) => (data += chunk));
-        res.on("end", () => {
-          if (res.statusCode !== 200) {
-            reject(new Error(`HTTP ${res.statusCode}: ${data}`));
-            return;
-          }
-          try {
-            resolve(parseJson(data));
-          } catch (e) {
-            reject(e);
-          }
-        });
-      },
-    );
-    req.on("timeout", () => {
-      req.destroy();
-      reject(new Error("Request timed out"));
-    });
-    req.on("error", reject);
-    req.end();
-  });
+async function doGet(inst, path, timeoutMs) {
+  const { status, body, error } = await httpRequest(
+    inst, path, "GET", timeoutMs);
+  if (error) throw error;
+  if (status !== 200) throw new Error(`HTTP ${status}: ${body}`);
+  return parseJson(body);
 }
 
 /**
