@@ -27,7 +27,7 @@ jdt q '"*Pat*" | @types * /fqn'              # find types by name pattern
 jdt q '"<FQN>" | @implementors'              # type or method implementors
 jdt q '"<FQN>" | @supers | @ancestors'       # transitive supertypes
 jdt q '"<FQN>" | @subtypes | @descendants'   # transitive subtypes
-jdt q '"<project>" | @problems(:project)'    # compilation errors in scope
+jdt q '"<project>" | @problems'              # compilation errors in project
 ```
 
 FQN format: `pkg.Class#method` or `pkg.Class#method(ParamType)`.

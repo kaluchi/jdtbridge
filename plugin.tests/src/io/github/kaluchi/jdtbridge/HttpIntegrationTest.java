@@ -163,7 +163,7 @@ public class HttpIntegrationTest {
 
     @Test
     public void problemsEndpoint() throws Exception {
-        String body = authedGet("/problems?project="
+        String body = authedGet("/problems?of="
                 + TestFixture.PROJECT_NAME);
         assertTrue(body.contains("BrokenClass"),
                 "Should contain BrokenClass error: " + body);

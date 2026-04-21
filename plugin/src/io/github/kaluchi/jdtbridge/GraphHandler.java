@@ -639,32 +639,36 @@ class GraphHandler {
     // ── Problems ────────────────────────────────────────────────────
 
     /**
-     * Compilation problems in canonical :problem shape.
-     * Scope: {@code &file=}, {@code &project=}, or workspace (default).
+     * Compilation problems in canonical :problem shape. Minimal
+     * server surface: {@code ?of=<identifier>} where identifier is
+     * either a file path (absolute, path-separator-containing) or a
+     * project name. Empty / missing {@code of} → workspace scope.
+     * Type / method / field / package scopes are composed on the
+     * qlang side via {@code @containingFile} + {@code @typesInPackage}
+     * navigation, so the server never resolves those kinds here.
      */
     String handleProblems(Map<String, String> params, ProjectScope scope) {
         try {
             var root = org.eclipse.core.resources.ResourcesPlugin
                     .getWorkspace().getRoot();
-            String filePath = params.get("file");
-            String projectName = params.get("project");
+            String of = params.get("of");
 
             org.eclipse.core.resources.IResource resource;
-            if (filePath != null && !filePath.isBlank()) {
+            if (of == null || of.isBlank()) {
+                resource = root;
+            } else if (looksLikePath(of)) {
                 var absolute = org.eclipse.core.runtime.Path
-                        .fromOSString(filePath);
+                        .fromOSString(of);
                 resource = root.getFileForLocation(absolute);
                 if (resource == null || !resource.exists()) {
-                    return ErrorDescriptor.fileNotFound(filePath).toJsonString();
+                    return ErrorDescriptor.fileNotFound(of).toJsonString();
                 }
-            } else if (projectName != null && !projectName.isBlank()) {
-                var project = root.getProject(projectName);
+            } else {
+                var project = root.getProject(of);
                 if (!project.exists()) {
-                    return ErrorDescriptor.projectNotFound(projectName).toJsonString();
+                    return ErrorDescriptor.projectNotFound(of).toJsonString();
                 }
                 resource = project;
-            } else {
-                resource = root;
             }
 
             int depth = (resource instanceof org.eclipse.core.resources.IFile)
@@ -716,6 +720,24 @@ class GraphHandler {
             Log.warn("/problems failed", e);
             return ErrorDescriptor.jdtInternalError("Failed /problems", e).toJsonString();
         }
+    }
+
+    /**
+     * Rough shape test: subject looks like a filesystem path. Matches
+     * Unix absolute ({@code /…}), Windows drive ({@code X:\…} /
+     * {@code X:/…}), or any string containing a path separator.
+     * Eclipse project names cannot contain {@code /} or {@code \},
+     * so presence of either is a reliable disambiguator against a
+     * project-name subject. The rule is symmetric with the CLI-side
+     * {@code PATH_SHAPE} detection in {@code graph.impl.mjs}.
+     */
+    private static boolean looksLikePath(String s) {
+        if (s.isEmpty()) return false;
+        char c0 = s.charAt(0);
+        if (c0 == '/' || c0 == '\\') return true;
+        if (s.length() >= 2 && s.charAt(1) == ':'
+                && Character.isLetter(c0)) return true;
+        return s.indexOf('/') >= 0 || s.indexOf('\\') >= 0;
     }
 
     // ── Bulk search ─────────────────────────────────────────────────

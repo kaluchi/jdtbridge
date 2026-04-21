@@ -254,8 +254,7 @@ pass a modifier, to get less I filter".
 ### Admissible modifier shapes
 
 - **Scope widening** — `@incomingRefs(:all)` widens beyond the `:call`
-  default to every refKind. `@problems(:workspace)` widens past
-  the narrower `:project` / `:file` scopes.
+  default to every refKind.
 - **Payload widening** — a modifier attaches extra fields to the
   returned node. Defaults return the minimum useful payload.
 - **Inclusion widening** — a modifier includes additional members

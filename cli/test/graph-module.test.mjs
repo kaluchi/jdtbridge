@@ -155,11 +155,20 @@ describe(":jdt/graph descriptor consistency", () => {
     expect(field(d, "modifiers")).toEqual([]);
   });
 
-  it("@problems :modifiers carries :keyword "
-      + "(optional scope)", async () => {
+  it("@problems is a conduit (no :modifiers, no captured)",
+      async () => {
+    // @problems was rebuilt as a polymorphic qlang conduit over
+    // the @problemMarkers primitive and existing navigation
+    // axes. The captured-arg (:scope) modifier is gone.
     const d = await descriptor("@problems");
-    expect(field(d, "modifiers"))
-        .toEqual([keyword("keyword")]);
+    expect(field(d, "kind")).toBe(keyword("conduit"));
+    expect(field(d, "params")).toEqual([]);
+  });
+
+  it("@problemMarkers primitive carries no modifiers", async () => {
+    const d = await descriptor("@problemMarkers");
+    expect(field(d, "kind")).toBe(keyword("builtin"));
+    expect(field(d, "modifiers")).toEqual([]);
   });
 
   it("@type / @method / @field — nullary modifiers, :map return",

@@ -325,21 +325,18 @@
                        :snippet "\"io.github.kaluchi.jdtbridge.ErrorDescriptor\" | @source"}]
            :throws [:TypeNotFound :MethodNotFound :FieldNotFound]}
 
- :@problems {:qlang/kind :builtin
-             :qlang/impl null
-             :category :jdt/graph
-             :subject :any
-             :modifiers [:keyword]
-             :returns :vec
-             :docs ["Compilation problems in the given scope."
-                    "Optional modifier: :file, :project, or :workspace."]
-             :examples [{:doc "Workspace-wide compilation problems"
-                         :snippet "@problems | table"}
-                        {:doc "Single project scope — subject is the project fqn"
-                         :snippet "\"io.github.kaluchi.jdtbridge\" | @problems(:project) | table"}
-                        {:doc "Errors only (filter after the widened scope)"
-                         :snippet "@problems | filter(/severity | eq(\"error\"))"}]
-             :throws [:FileNotFound :ProjectNotFound]}}
+ :@problemMarkers {:qlang/kind :builtin
+                   :qlang/impl null
+                   :category :jdt/graph
+                   :subject :any
+                   :modifiers []
+                   :returns :vec
+                   :docs ["Primitive IResource-scope compile-problem marker fetch. Public polymorphism lives in the @problems conduit below."
+                          "Accepts: nothing → workspace; String with path-separator / drive letter → IFile by absolute path; String without → IProject by name; Map with :kind \"project\" or \"file\" → same, via :fqn."
+                          "Type / method / field / package subjects pass through the @problems conduit which navigates to a file or project first — they never reach this primitive unresolved."]
+                   :examples [{:doc "Workspace-wide problem markers"
+                               :snippet "@problemMarkers | count"}]
+                   :throws [:FileNotFound :ProjectNotFound]}}
 | use
 
 |~~ Polymorphic seed lift. Map subjects (skeleton/detail) pass
@@ -391,6 +388,89 @@ let(:@detail, @asNode | as(:n) | /kind | as(:k)
              :origin :jdt/graph
              :message "@detail cannot route subject — :kind is not one of type/method/field/project/package/file"
              :context {:subjectKind k :subject n}}))
+
+|~~ Retain markers whose :location/startLine falls inside the
+    captured node's [startLine, endLine]. Used by @problemsVia to
+    narrow whole-file marker Vecs to an inner-type / method / field
+    source range. ~~|
+let(:problemsInRangeOf, [:node],
+    filter(and(/location/startLine | gte(node | /location/startLine),
+               /location/startLine | lte(node | /location/endLine))))
+
+|~~ Member (method/field) subject → file markers from `fetcher`
+    filtered to the member's source range. Pure over its fetcher
+    param — no @-operand references. ~~|
+let(:@problemsForMemberVia, [:fetcher],
+    as(:m) | /location/file | fetcher | problemsInRangeOf(m))
+
+|~~ Node subject → kind-dispatched scope navigation.
+    Dependencies enter as params:
+      - fetcher       — primitive IResource-scope marker fetch
+      - fileLocation  — node → file node (e.g. @containingFile)
+      - packageTypes  — package → Vec<type> (e.g. @typesInPackage)
+    Kindless Map → workspace. Project / file → fetcher on :fqn.
+    Package → fan-out via packageTypes + fileLocation + fetcher.
+    Type → file scope; top-level stays homogeneous with @source
+    (no range filter), inner narrows to source range. Method /
+    field → file + range filter. Other :kinds → structured error. ~~|
+let(:@problemsForNodeVia, [:fetcher, :fileLocation, :packageTypes],
+    as(:n) | /kind | as(:k)
+    | cond(isNull,        fetcher,
+           eq("project"), n | fetcher,
+           eq("file"),    n | fetcher,
+           eq("package"), n | packageTypes * fileLocation
+                            | flat | distinct * fetcher | flat,
+           eq("type"),    n | /location/file | fetcher
+                            | unless(n | /declaringType | isNull,
+                                     problemsInRangeOf(n)),
+           eq("method"),  n | @problemsForMemberVia(fetcher),
+           eq("field"),   n | @problemsForMemberVia(fetcher),
+           !{:kind :unsupported-scope-kind
+             :thrown :UnsupportedScopeKind
+             :origin :jdt/graph
+             :message "@problems: subject :kind is not a scope (expected one of workspace/project/package/file/type/method/field)"
+             :context {:subjectKind k :subject n}}))
+
+|~~ String subject dispatch.
+    Dependencies:
+      - fetcher  — primitive IResource-scope marker fetch
+      - liftNode — String → member node for '#'-bearing fqns
+                   (e.g. @asNode)
+    '#' → liftNode → member branch. Otherwise fetcher direct (server
+    resolves as project name; :ProjectNotFound on miss). ~~|
+let(:@problemsForStringVia, [:fetcher, :liftNode],
+    as(:s) | cond(contains("#"), liftNode | @problemsForMemberVia(fetcher),
+                  fetcher))
+
+|~~ Polymorphic compile-problem scope factory.
+    All effectful dependencies are params so the conduit is
+    fully mockable in tests:
+      - fetcher       — IResource-scope marker primitive
+      - liftNode      — String → member node (for '#' fqns)
+      - fileLocation  — node → file node
+      - packageTypes  — package node → Vec<type>
+    The public @problems binding below plugs in the real
+    @problemMarkers / @asNode / @containingFile / @typesInPackage. ~~|
+let(:@problemsVia, [:fetcher, :liftNode, :fileLocation, :packageTypes],
+    as(:subj)
+    | cond(isNull,   fetcher,
+           isString, @problemsForStringVia(fetcher, liftNode),
+           isMap,    @problemsForNodeVia(fetcher, fileLocation, packageTypes),
+           !{:kind :unsupported-subject-type
+             :thrown :UnsupportedSubjectType
+             :origin :jdt/graph
+             :message "@problems: subject must be absent, String, or Map"
+             :context {:subject subj}}))
+
+|~~ @problems — polymorphic compile-problem scope. Subject dispatch
+    (homogeneous with @source for top-level types, narrowing for
+    inner / method / field, aggregation for package, direct
+    IResource call for project / file / workspace). Public binding
+    of @problemsVia — the single top-level point where the real
+    @problemMarkers / @asNode / @containingFile / @typesInPackage
+    operands plug into the conduit. ~~|
+let(:@problems, @problemsVia(@problemMarkers, @asNode,
+                              @containingFile, @typesInPackage))
 
 |~~ Incoming call sites of a method — :from skeleton nodes
     from each :call reference. ~~|

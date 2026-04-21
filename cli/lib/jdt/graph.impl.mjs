@@ -246,22 +246,25 @@ const outgoingRefsImpl = axisOp('@outgoingRefs', '/outgoingRefs');
 const classpathImpl = axisOp('@classpath', '/classpath');
 const sourceImpl    = axisOp('@source',    '/source');
 
-// @problems(:scope?) — :workspace (default) / :project / :file.
-const PROBLEMS_SCOPE_PARAM = { project: 'project', file: 'file' };
+// @problemMarkers — primitive IResource-scope marker fetch. Accepts
+// only the three scopes Eclipse findMarkers supports natively:
+// workspace (no subject), IProject (project-name String / Map
+// :kind "project"), IFile (absolute path / Map :kind "file"). The
+// public @problems conduit (graph.qlang) funnels every other kind
+// (type / method / field / package) through existing navigation
+// (@containingFile / @typesInPackage / @containingProject) before
+// reaching here. Path-shape fqns go through
+// translateHostPathFromLocal for remote bridges.
+const PATH_SHAPE = /^[A-Za-z]:[/\\]|^[/\\]|[/\\]/;
 
-async function fetchProblems(subject, scope) {
-    const param = PROBLEMS_SCOPE_PARAM[scope];
-    if (!param) return getEndpoint('/problems');
-    const subjectFqn = fqnOf(subject);
-    if (subjectFqn === null) return missingSubject('@problems', subject);
-    return getEndpoint(`/problems?${param}=${enc(subjectFqn)}`);
-}
-
-const problemsImpl = overloadedOp('@problems', 2, {
-    0: () => getEndpoint('/problems'),
-    1: async (subject, scopeLambda) =>
-        fetchProblems(subject,
-            await modifierName(scopeLambda, subject))
+const problemMarkersImpl = nullaryOp('@problemMarkers', async (subject) => {
+    if (subject === undefined || subject === null) {
+        return getEndpoint('/problems');
+    }
+    const fqn = fqnOf(subject);
+    if (fqn === null) return missingSubject('@problemMarkers', subject);
+    const of = PATH_SHAPE.test(fqn) ? translateHostPathFromLocal(fqn) : fqn;
+    return getEndpoint(`/problems?of=${enc(of)}`);
 });
 
 // ── Locator factory ─────────────────────────────────────────────
@@ -292,6 +295,6 @@ export function createImpls() {
         '@outgoingRefs': outgoingRefsImpl,
         '@source':      sourceImpl,
         '@classpath':   classpathImpl,
-        '@problems':    problemsImpl
+        '@problemMarkers': problemMarkersImpl
     };
 }

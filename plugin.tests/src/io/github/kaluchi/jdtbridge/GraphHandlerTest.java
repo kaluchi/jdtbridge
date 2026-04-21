@@ -1023,7 +1023,7 @@ public class GraphHandlerTest {
     void problemsReturnsCompilationErrors() {
         // test.broken.BrokenClass has an intentional compile error
         var arr = JsonParser.parseString(handler.handleProblems(
-                params("project", "jdtbridge-test"),
+                params("of", "jdtbridge-test"),
                 ProjectScope.ALL)).getAsJsonArray();
         assertTrue(arr.size() >= 1,
                 "fixture has BrokenClass with compile error");
@@ -1040,7 +1040,7 @@ public class GraphHandlerTest {
         // silently dropped every warning and made the "warning" label
         // dead code. Filter is now severity >= SEVERITY_WARNING.
         var arr = JsonParser.parseString(handler.handleProblems(
-                params("project", "jdtbridge-test"),
+                params("of", "jdtbridge-test"),
                 ProjectScope.ALL)).getAsJsonArray();
         for (var entry : arr) {
             String sev = entry.getAsJsonObject()
@@ -1055,13 +1055,63 @@ public class GraphHandlerTest {
         // /jdtbridge-test/src/... is workspace-relative — not a real
         // filesystem path. The handler must fail with file-not-found
         // rather than silently matching through findMember.
+        // (The of=-param resolver sees the leading slash, classifies
+        // as path-shape, and calls getFileForLocation on the IPath —
+        // workspace-relative paths do not resolve there.)
         JsonObject result = parse(handler.handleProblems(
-                params("file", "/jdtbridge-test/src/test/broken/BrokenClass.java"),
+                params("of", "/jdtbridge-test/src/test/broken/BrokenClass.java"),
                 ProjectScope.ALL));
         assertTrue(isError(result),
                 "workspace-relative paths must not be accepted as :file");
         assertEquals("file-not-found",
                 errorOf(result).get("kind").getAsString());
+    }
+
+    @Test
+    void problemsOfUnknownFqnReturnsProjectNotFound() {
+        // Non-path fqn that isn't a project name → primitive resolves
+        // as IProject → getProject("no-such-project").exists() == false.
+        JsonObject result = parse(handler.handleProblems(
+                params("of", "no-such-project-xyz"),
+                ProjectScope.ALL));
+        assertTrue(isError(result));
+        assertEquals("project-not-found",
+                errorOf(result).get("kind").getAsString());
+    }
+
+    @Test
+    void problemsNoOfParamReturnsWorkspace() {
+        // Empty params → workspace scope (root.findMarkers).
+        // Always a JSON array (possibly empty), never an error.
+        var arr = JsonParser.parseString(handler.handleProblems(
+                new java.util.HashMap<>(),
+                ProjectScope.ALL)).getAsJsonArray();
+        // The fixture has BrokenClass so workspace scope must
+        // contain at least one marker.
+        assertTrue(arr.size() >= 1,
+                "workspace scope sees the fixture's BrokenClass");
+    }
+
+    @Test
+    void problemsOfAbsoluteFilePathNarrowsToFile() throws Exception {
+        // Compute the actual host path to BrokenClass.java and pass
+        // it as of=<absolute-path>. Scope must narrow to that file —
+        // the fixture has exactly one compile error in BrokenClass,
+        // zero in the other test files.
+        var root = org.eclipse.core.resources.ResourcesPlugin
+                .getWorkspace().getRoot();
+        var brokenFile = root.getProject("jdtbridge-test")
+                .getFile("src/test/broken/BrokenClass.java");
+        String absPath = brokenFile.getLocation().toOSString();
+
+        var arr = JsonParser.parseString(handler.handleProblems(
+                params("of", absPath),
+                ProjectScope.ALL)).getAsJsonArray();
+        assertEquals(1, arr.size(),
+                "file scope returns exactly BrokenClass's one error");
+        assertEquals("error",
+                arr.get(0).getAsJsonObject()
+                    .get("severity").getAsString());
     }
 
     @Test

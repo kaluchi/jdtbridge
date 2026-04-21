@@ -18,15 +18,15 @@ This is a READ-ONLY planning task. You CANNOT edit, write, or create files.
 ## JDT Commands (prefer over grep for Java)
 
 ```
-jdt q '"<FQN>" | @source'              # source text of type/method/field
-jdt q '"<FQN>" | @members | table'      # class overview without reading 600 lines
-jdt q '"<FQN>" | @callers'             # who calls this method
-jdt q '"<FQN>" | @calls'               # what this method invokes
-jdt q '"<FQN>" | @implementors'        # implementations of an interface method
-jdt q '"<FQN>" | @supers | @ancestors'  # full supertype chain
-jdt q '"<FQN>" | @subtypes | @descendants' # full subtype tree
-jdt q '"*Pat*" | @types * /fqn'         # find types by name pattern
-jdt q '"<project>" | @problems(:project)' # compilation state of a project
+jdt q '"<FQN>" | @source'                   # source text of type/method/field
+jdt q '"<FQN>" | @members | table'          # class overview without reading 600 lines
+jdt q '"<FQN>" | @callers'                  # who calls this method
+jdt q '"<FQN>" | @calls'                    # what this method invokes
+jdt q '"<FQN>" | @implementors'             # implementations of an interface method
+jdt q '"<FQN>" | @supers | @ancestors'      # full supertype chain
+jdt q '"<FQN>" | @subtypes | @descendants'  # full subtype tree
+jdt q '"*Pat*" | @types * /fqn'             # find types by name pattern
+jdt q '"<project>" | @problems'             # compilation state of a project
 ```
 
 ## Process

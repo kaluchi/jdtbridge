@@ -272,7 +272,7 @@ one HTTP round-trip. No wc / head / tail.
 Seeds (string → node, or nullary):
   "fqn"                | @type  @method  @field  @package  @project  @file
   "*pattern*"          | @types
-  @projects            @problems            @problems(:project|:file)
+  @projects            @problems
 
 Containment:
   type    | @members  @methods  @fields  @innerTypes

@@ -23,7 +23,7 @@ jdt q '"org.springframework.transaction.support.TransactionTemplate#execute" | @
 
 # "Did my edit compile?" — Maven takes 30-90 seconds for a module build.
 # Eclipse's incremental compiler already knows the answer. Sub-second response.
-jdt q '"my-app-server" | @problems(:project)'
+jdt q '"my-app-server" | @problems'
 
 # "What classes implement this interface method?" — grep for a common name
 # like "save" or "onInit" returns every class that has that method name.
@@ -86,7 +86,7 @@ jdt q '"io.github.kaluchi.jdtbridge.SearchHandler" | @methods * /name' | grep ha
 jdt q '"io.github.kaluchi.jdtbridge.JdtUtils#findMethod" | @callers | count'
 
 # First 5 compilation errors — fix one at a time.
-jdt q '"my-server" | @problems(:project) | take(5)'
+jdt q '"my-server" | @problems | take(5)'
 
 # Where does this Spring method throw or catch?
 jdt q '"org.springframework.jdbc.core.JdbcTemplate#query" | @source' | grep -n 'throw\|catch'
