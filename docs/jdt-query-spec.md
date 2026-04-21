@@ -50,7 +50,6 @@ and filter predicates.
 | `:refKind` | `"call"`, `"read"`, `"write"`, `"typeUse"`, `"all"` | `@incomingRefs` modifier and `/refKind` on reference records |
 | `:typeKind` | `"class"`, `"interface"`, `"enum"`, `"annotation"`, `"record"` | `:type` detail |
 | `:severity` | `"error"`, `"warning"`, `"info"` | `:problem` detail |
-| `:problems` scope modifier | `:workspace`, `:project`, `:file` | `@problems` keyword modifier |
 
 ### Location
 
