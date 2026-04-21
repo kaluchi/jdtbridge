@@ -1052,32 +1052,116 @@ class NodeBuilder {
 
     /**
      * Polymorphic skeleton dispatcher. Resolves the right per-kind
-     * builder based on the element's runtime type. Falls back to the
-     * containing member when given an initializer or anonymous type
-     * — those have no FQN-addressable identity but their host does.
+     * builder based on the element's runtime type. Collapses
+     * FQN-unaddressable hosts (anonymous classes, lambda types,
+     * initializer blocks) onto their nearest resolvable enclosing
+     * member, so every skeleton emitted carries a fqn the caller
+     * can feed back into @type / @method / @field / @source for
+     * round-trip navigation.
+     * <p>
+     * For example, a reference from inside a Runnable lambda body
+     * declared in {@code HttpServer#acceptLoop(ServerSocket)}
+     * previously surfaced as {@code HttpServer.1#run()}, which
+     * {@code JdtUtils.findType} cannot resolve (the {@code .N}
+     * anonymous suffix is a compilation-unit label, not a Java
+     * Model FQN). The collapsed skeleton of the enclosing method
+     * — {@code HttpServer#acceptLoop(ServerSocket)} — is what the
+     * caller can navigate.
      */
     static JsonObject memberSkeleton(IJavaElement element)
             throws JavaModelException {
         if (element == null) return null;
         if (element instanceof IType type) {
-            if (type.isAnonymous()) {
-                IJavaElement parent = type.getParent();
-                if (parent != null) return memberSkeleton(parent);
-                return null;
+            if (isSyntheticType(type)) {
+                return collapseSynthetic(
+                        memberSkeleton(type.getParent()), type);
             }
             return typeSkeleton(type);
         }
         if (element instanceof IMethod method) {
+            IType declaring = method.getDeclaringType();
+            if (isSyntheticType(declaring)) {
+                return collapseSynthetic(
+                        memberSkeleton(declaring.getParent()), declaring);
+            }
             return methodSkeleton(method);
         }
         if (element instanceof IField field) {
+            IType declaring = field.getDeclaringType();
+            if (isSyntheticType(declaring)) {
+                return collapseSynthetic(
+                        memberSkeleton(declaring.getParent()), declaring);
+            }
             return fieldSkeleton(field);
         }
         // Initializers and other element kinds without their own
         // skeleton fall back to the enclosing type — references from
         // a static block attribute to the type that declared the block.
         IType enclosing = (IType) element.getAncestor(IJavaElement.TYPE);
+        if (isSyntheticType(enclosing)) {
+            return collapseSynthetic(
+                    memberSkeleton(enclosing.getParent()), enclosing);
+        }
         return enclosing != null ? typeSkeleton(enclosing) : null;
+    }
+
+    /**
+     * FQN-unaddressable IType: anonymous class ({@code Outer.N})
+     * or lambda expression (synthetic SAM type). Neither resolves
+     * through {@code IJavaProject.findType(fqn)} — the {@code .N}
+     * suffix is a compilation-unit label, not a Java Model FQN.
+     * Callers walk up to the nearest addressable enclosing member
+     * so every skeleton emitted carries a fqn the caller can feed
+     * back into @type / @method / @field / @source.
+     */
+    private static boolean isSyntheticType(IType type)
+            throws JavaModelException {
+        return type != null && (type.isAnonymous() || type.isLambda());
+    }
+
+    /**
+     * Annotate a collapsed skeleton with the synthetic-type context
+     * lost during walk-up. Adds {@code :enclosingSynthetic} sub-Map:
+     * <pre>
+     *   {:kind       "lambda" | "anonymous"
+     *    :interface  FQN of the SAM / first super-interface (if any)
+     *    :super      FQN of the superclass (anonymous-only, when no
+     *                super-interface)}
+     * </pre>
+     * Shape mirrors Eclipse's {@code appendTypeLabel}:
+     * <ul>
+     *   <li>lambda → {@code () -> {...} Runnable} → {:kind "lambda" :interface "Runnable"}</li>
+     *   <li>{@code new Runnable() {...}} → {:kind "anonymous" :interface "Runnable"}</li>
+     *   <li>{@code new Base() {...}} (no iface) → {:kind "anonymous" :super "Base"}</li>
+     * </ul>
+     * Downstream renderers can surface the context as a suffix
+     * without breaking the skeleton-fqn-is-addressable invariant.
+     * Returns {@code null} when {@code skeleton} is already null
+     * (parent chain had no addressable ancestor).
+     */
+    private static JsonObject collapseSynthetic(JsonObject skeleton,
+            IType syntheticType) throws JavaModelException {
+        if (skeleton == null) return null;
+        var ctx = new JsonObject();
+        ctx.addProperty("kind",
+                syntheticType.isLambda() ? "lambda" : "anonymous");
+        String[] superIfaces = syntheticType.getSuperInterfaceNames();
+        if (superIfaces.length > 0) {
+            ctx.addProperty("interface",
+                    resolveTypeName(
+                            syntheticType.getSuperInterfaceTypeSignatures()[0],
+                            syntheticType));
+        } else if (!syntheticType.isLambda()) {
+            String superName = syntheticType.getSuperclassName();
+            if (superName != null) {
+                ctx.addProperty("super",
+                        resolveTypeName(
+                                syntheticType.getSuperclassTypeSignature(),
+                                syntheticType));
+            }
+        }
+        skeleton.add("enclosingSynthetic", ctx);
+        return skeleton;
     }
 
     /**
