@@ -96,28 +96,34 @@ class JdtUtils {
 
     /**
      * Locate a synthetic IType (anonymous class or lambda) inside
-     * an enclosing member. Anonymous classes are accessible via
-     * {@link IParent#getChildren()} on the enclosing IMethod /
-     * IField. Lambda ITypes, however, are materialized only
-     * through AST binding resolution — {@code getChildren()} does
-     * not surface them. This method tries the cheap Java Model
-     * path first and falls back to an AST walk when the suffix
-     * indicates a lambda.
+     * an enclosing member. Dispatch by suffix shape — each shape
+     * has one authoritative strategy:
+     * <ul>
+     *   <li>{@code () -> {...}} suffix → lambda, resolved via AST
+     *       binding walk; lambdas do not appear in
+     *       {@link IParent#getChildren()}.</li>
+     *   <li>{@code new …() {...}} suffix → anonymous class,
+     *       resolved via {@code getChildren()} on the enclosing
+     *       member.</li>
+     * </ul>
      */
     private static IType findSyntheticChild(
             IJavaElement enclosing, String suffix)
             throws JavaModelException {
-        if (enclosing instanceof IParent parent) {
-            for (IJavaElement child : parent.getChildren()) {
-                if (child instanceof IType t && matchesSuffix(t, suffix)) {
-                    return t;
-                }
-            }
-        }
-        // Java Model did not surface a match — try AST (required for
-        // lambdas, cheap fallback for anonymous edge cases).
         if (suffix.startsWith("() -> {...}")) {
             return findLambdaViaAst(enclosing, suffix);
+        }
+        return findAnonymousChild(enclosing, suffix);
+    }
+
+    private static IType findAnonymousChild(
+            IJavaElement enclosing, String suffix)
+            throws JavaModelException {
+        if (!(enclosing instanceof IParent parent)) return null;
+        for (IJavaElement child : parent.getChildren()) {
+            if (child instanceof IType t && matchesSuffix(t, suffix)) {
+                return t;
+            }
         }
         return null;
     }

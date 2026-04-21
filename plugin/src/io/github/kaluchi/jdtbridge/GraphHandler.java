@@ -86,40 +86,34 @@ class GraphHandler {
         if (fqn == null || fqn.isBlank()) {
             return ErrorDescriptor.missingParameter("of").toJsonString();
         }
-        // Composite synthetic fqns (lambda / anonymous) carry the
-        // enclosing method's `(` in their suffix, so the first-#
-        // split below is not safe. Route through the unified parser.
-        if (JdtUtils.isCompositeFqn(fqn)) {
-            try {
-                IJavaElement resolved = JdtUtils.resolveElement(fqn);
-                if (resolved instanceof IMethod m) {
-                    return NodeBuilder.methodDetail(m).toString();
-                }
-                return ErrorDescriptor.methodNotFound(fqn).toJsonString();
-            } catch (Exception e) {
-                Log.warn("/method failed for " + fqn, e);
-                return ErrorDescriptor.jdtInternalError(
-                        "Failed to resolve method: " + fqn, e).toJsonString();
-            }
-        }
-        int hash = fqn.indexOf('#');
-        if (hash < 0) {
-            return ErrorDescriptor.invalidFqn(fqn).toJsonString();
-        }
-        String typeFqn = fqn.substring(0, hash);
-        String memberPart = fqn.substring(hash + 1);
-        int paren = memberPart.indexOf('(');
-        String methodName = paren < 0
-                ? memberPart : memberPart.substring(0, paren);
-        String paramTypesParam = params.get("paramTypes");
-        if (paramTypesParam == null && paren >= 0) {
-            int closeParen = memberPart.lastIndexOf(')');
-            String inner = closeParen > paren
-                    ? memberPart.substring(paren + 1, closeParen)
-                    : memberPart.substring(paren + 1);
-            paramTypesParam = inner;
-        }
         try {
+            // Composite synthetic fqns (lambda / anonymous) carry the
+            // enclosing method's `(` in their suffix; the first-# split
+            // in the regular branch is unsafe. Route through the
+            // unified parser which skips the overload-ambiguity check —
+            // SAM method names inside synthetic types are unambiguous.
+            if (JdtUtils.isCompositeFqn(fqn)) {
+                IJavaElement resolved = JdtUtils.resolveElement(fqn);
+                return resolved instanceof IMethod m
+                        ? NodeBuilder.methodDetail(m).toString()
+                        : ErrorDescriptor.methodNotFound(fqn).toJsonString();
+            }
+            int hash = fqn.indexOf('#');
+            if (hash < 0) {
+                return ErrorDescriptor.invalidFqn(fqn).toJsonString();
+            }
+            String typeFqn = fqn.substring(0, hash);
+            String memberPart = fqn.substring(hash + 1);
+            int paren = memberPart.indexOf('(');
+            String methodName = paren < 0
+                    ? memberPart : memberPart.substring(0, paren);
+            String paramTypesParam = params.get("paramTypes");
+            if (paramTypesParam == null && paren >= 0) {
+                int closeParen = memberPart.lastIndexOf(')');
+                paramTypesParam = closeParen > paren
+                        ? memberPart.substring(paren + 1, closeParen)
+                        : memberPart.substring(paren + 1);
+            }
             IType type = JdtUtils.findType(typeFqn);
             if (type == null) {
                 return ErrorDescriptor.typeNotFound(typeFqn).toJsonString();
@@ -147,19 +141,23 @@ class GraphHandler {
         if (fqn == null || fqn.isBlank()) {
             return ErrorDescriptor.missingParameter("of").toJsonString();
         }
-        if (JdtUtils.isCompositeFqn(fqn)) {
-            try {
+        try {
+            if (JdtUtils.isCompositeFqn(fqn)) {
                 IJavaElement resolved = JdtUtils.resolveElement(fqn);
-                if (resolved instanceof IField f) {
-                    return NodeBuilder.fieldDetail(f).toString();
-                }
-                return ErrorDescriptor.fieldNotFound(fqn).toJsonString();
-            } catch (Exception e) {
-                Log.warn("/field failed for " + fqn, e);
-                return ErrorDescriptor.jdtInternalError(
-                        "Failed to resolve field: " + fqn, e).toJsonString();
+                return resolved instanceof IField f
+                        ? NodeBuilder.fieldDetail(f).toString()
+                        : ErrorDescriptor.fieldNotFound(fqn).toJsonString();
             }
+            return handleFieldRegular(fqn);
+        } catch (Exception e) {
+            Log.warn("/field failed for " + fqn, e);
+            return ErrorDescriptor.jdtInternalError(
+                    "Failed to resolve field: " + fqn, e).toJsonString();
         }
+    }
+
+    private String handleFieldRegular(String fqn)
+            throws JavaModelException {
         int hash = fqn.indexOf('#');
         if (hash < 0) {
             return ErrorDescriptor.invalidFqn(fqn).toJsonString();
@@ -171,21 +169,15 @@ class GraphHandler {
                     .with("reason", "field FQN must not contain parens")
                     .toJsonString();
         }
-        try {
-            IType type = JdtUtils.findType(typeFqn);
-            if (type == null) {
-                return ErrorDescriptor.typeNotFound(typeFqn).toJsonString();
-            }
-            IField field = type.getField(fieldName);
-            if (field == null || !field.exists()) {
-                return ErrorDescriptor.fieldNotFound(fqn).toJsonString();
-            }
-            return NodeBuilder.fieldDetail(field).toString();
-        } catch (Exception e) {
-            Log.warn("/field failed for " + fqn, e);
-            return ErrorDescriptor.jdtInternalError(
-                    "Failed to resolve field: " + fqn, e).toJsonString();
+        IType type = JdtUtils.findType(typeFqn);
+        if (type == null) {
+            return ErrorDescriptor.typeNotFound(typeFqn).toJsonString();
         }
+        IField field = type.getField(fieldName);
+        if (field == null || !field.exists()) {
+            return ErrorDescriptor.fieldNotFound(fqn).toJsonString();
+        }
+        return NodeBuilder.fieldDetail(field).toString();
     }
 
     // ── Down-navigation: direct contents of a type ──────────────────

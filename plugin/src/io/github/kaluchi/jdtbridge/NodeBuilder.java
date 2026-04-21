@@ -76,10 +76,15 @@ class NodeBuilder {
                 return fqnOfEnclosing(type.getParent())
                         + "." + syntheticSuffix(type);
             }
+            return type.getFullyQualifiedName('.');
         } catch (JavaModelException e) {
-            // fall through to the regular naming
+            // isAnonymous / isLambda / the suffix builders throw only
+            // when the IType handle is invalid (not elaborated). Loud
+            // failure — the skeleton serialization cannot recover
+            // from a type whose own model refuses to answer.
+            throw new IllegalStateException(
+                    "fqnOf(IType) failed: " + type.getElementName(), e);
         }
-        return type.getFullyQualifiedName('.');
     }
 
     /**

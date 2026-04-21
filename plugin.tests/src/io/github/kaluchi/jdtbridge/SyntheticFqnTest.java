@@ -5,10 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IMethod;
-import org.eclipse.jdt.core.IParent;
 import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.core.JavaModelException;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -58,6 +59,30 @@ public class SyntheticFqnTest {
         return null;
     }
 
+    /**
+     * Resolve {@code fqn} via {@link JdtUtils#resolveElement} and
+     * assert the returned element is of the expected kind. Round-
+     * trip helper — every resolveElement test follows the shape:
+     * resolve → verify kind → rebuild fqn → assertEquals.
+     */
+    private static <T extends IJavaElement> T assertResolves(
+            String fqn, Class<T> kind) throws Exception {
+        IJavaElement resolved = JdtUtils.resolveElement(fqn);
+        assertTrue(kind.isInstance(resolved),
+                "expected " + kind.getSimpleName() + " for " + fqn
+                + ", got " + (resolved == null ? "null"
+                        : resolved.getClass().getSimpleName()));
+        return kind.cast(resolved);
+    }
+
+    private static String fqnOf(IJavaElement e) throws JavaModelException {
+        if (e instanceof IType t) return NodeBuilder.fqnOf(t);
+        if (e instanceof IMethod m) return NodeBuilder.fqnOf(m);
+        if (e instanceof IField f) return NodeBuilder.fqnOf(f);
+        throw new IllegalArgumentException(
+                "unsupported kind: " + e.getClass().getSimpleName());
+    }
+
     // ── NodeBuilder.fqnOf emits composite FQNs ──────────────────────
 
     @Test
@@ -80,93 +105,45 @@ public class SyntheticFqnTest {
     @Test
     void fqnOfLambdaTypeEmitsCompositeForm() throws Exception {
         // Lambdas aren't accessible through IParent.getChildren() —
-        // their ITypes materialise only through AST binding.
-        // Round-trip: resolve expected fqn → IType → rebuild fqn.
+        // their ITypes materialise only through AST binding. Round-
+        // trip anchors every lambda-side test: resolve the expected
+        // fqn and verify the rebuilt fqn equals the input.
         String expected = "test.service.LambdaCallerService"
                 + "#createLambda().() -> {...} Runnable";
-        IJavaElement resolved = JdtUtils.resolveElement(expected);
-        assertTrue(resolved instanceof IType,
-                "expected a lambda IType, got "
-                + (resolved == null ? "null"
-                        : resolved.getClass().getSimpleName()));
-        IType lambda = (IType) resolved;
+        IType lambda = assertResolves(expected, IType.class);
         assertTrue(lambda.isLambda());
-        assertEquals(expected, NodeBuilder.fqnOf(lambda));
+        assertEquals(expected, fqnOf(lambda));
     }
 
     @Test
     void methodInsideLambdaCarriesCompositeFqn() throws Exception {
-        // The SAM method on a lambda IType is accessible via
-        // resolveElement on the composite method fqn — go through
-        // the same entry users rely on, not via IType.getMethod
-        // which does not populate on AST-materialised lambdas.
         String expected = "test.service.LambdaCallerService"
                 + "#createLambda().() -> {...} Runnable#run()";
-        IJavaElement resolved = JdtUtils.resolveElement(expected);
-        assertTrue(resolved instanceof IMethod,
-                "expected IMethod, got "
-                + (resolved == null ? "null"
-                        : resolved.getClass().getSimpleName()));
-        IMethod run = (IMethod) resolved;
+        IMethod run = assertResolves(expected, IMethod.class);
         assertEquals("run", run.getElementName());
         assertTrue(run.getDeclaringType().isLambda());
-        assertEquals(expected, NodeBuilder.fqnOf(run));
+        assertEquals(expected, fqnOf(run));
     }
 
     // ── JdtUtils.resolveElement round-trips every composite form ────
 
     @Test
-    void resolveElementRoundTripsLambdaType() throws Exception {
-        String fqn = "test.service.LambdaCallerService"
-                + "#createLambda().() -> {...} Runnable";
-        IJavaElement resolved = JdtUtils.resolveElement(fqn);
-        assertTrue(resolved instanceof IType,
-                "expected IType, got "
-                + (resolved == null ? "null"
-                        : resolved.getClass().getSimpleName()));
-        IType type = (IType) resolved;
-        assertTrue(type.isLambda());
-        // Round-trip identity: rebuilt fqn equals input.
-        assertEquals(fqn, NodeBuilder.fqnOf(type));
-    }
-
-    @Test
     void resolveElementRoundTripsAnonymousType() throws Exception {
         String fqn = "test.service.AnonymousCallerService"
                 + "#createAnonymous().new Animal() {...}";
-        IJavaElement resolved = JdtUtils.resolveElement(fqn);
-        assertTrue(resolved instanceof IType);
-        IType type = (IType) resolved;
+        IType type = assertResolves(fqn, IType.class);
         assertTrue(type.isAnonymous());
-        assertEquals(fqn, NodeBuilder.fqnOf(type));
-    }
-
-    @Test
-    void resolveElementRoundTripsLambdaMethod() throws Exception {
-        String fqn = "test.service.LambdaCallerService"
-                + "#createLambda().() -> {...} Runnable#run()";
-        IJavaElement resolved = JdtUtils.resolveElement(fqn);
-        assertTrue(resolved instanceof IMethod,
-                "expected IMethod, got "
-                + (resolved == null ? "null"
-                        : resolved.getClass().getSimpleName()));
-        IMethod method = (IMethod) resolved;
-        assertEquals("run", method.getElementName());
-        assertTrue(method.getDeclaringType().isLambda());
-        // Round-trip through fqnOf keeps the full composite form.
-        assertEquals(fqn, NodeBuilder.fqnOf(method));
+        assertEquals(fqn, fqnOf(type));
     }
 
     @Test
     void resolveElementRoundTripsAnonymousMethod() throws Exception {
         String fqn = "test.service.AnonymousCallerService"
                 + "#createAnonymous().new Animal() {...}#name()";
-        IJavaElement resolved = JdtUtils.resolveElement(fqn);
-        assertTrue(resolved instanceof IMethod);
-        IMethod method = (IMethod) resolved;
+        IMethod method = assertResolves(fqn, IMethod.class);
         assertEquals("name", method.getElementName());
         assertTrue(method.getDeclaringType().isAnonymous());
-        assertEquals(fqn, NodeBuilder.fqnOf(method));
+        assertEquals(fqn, fqnOf(method));
     }
 
     // ── Error paths ─────────────────────────────────────────────────
@@ -197,17 +174,15 @@ public class SyntheticFqnTest {
 
     @Test
     void resolveElementHandlesRegularTypeFqn() throws Exception {
-        IJavaElement resolved = JdtUtils.resolveElement(
-                "test.model.Dog");
-        assertTrue(resolved instanceof IType);
-        assertEquals("Dog", resolved.getElementName());
+        assertEquals("Dog",
+                assertResolves("test.model.Dog", IType.class)
+                        .getElementName());
     }
 
     @Test
     void resolveElementHandlesRegularMethodFqn() throws Exception {
-        IJavaElement resolved = JdtUtils.resolveElement(
-                "test.model.Dog#bark()");
-        assertTrue(resolved instanceof IMethod);
-        assertEquals("bark", resolved.getElementName());
+        assertEquals("bark",
+                assertResolves("test.model.Dog#bark()", IMethod.class)
+                        .getElementName());
     }
 }
