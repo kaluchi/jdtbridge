@@ -209,11 +209,10 @@ export const help = `jdt q — pipeline query over the Eclipse JDT semantic grap
 
 Usage:  jdt q <qlang-pipeline>
 
-A pipeline is SEED | step | step … . The seed is either a String
-(an fqn, or a wildcard like "*Service") or a nullary axis (@projects,
-@problems). Every step reads pipeValue from the step before and
-returns a new value. Exit code is always 0; errors travel on
-stdout as \`!{:kind … :message …}\` values — route them with \`!|\`.
+Pipeline = SEED | step | step … . Seed is a String (fqn, or
+wildcard like "*Service") or a nullary axis (@projects, @problems).
+Exit is always 0; errors land on stdout as \`!{:kind … :message …}\`
+values — route with \`!|\`.
 
 ───── Cookbook — copy, swap the FQN, run ─────
 
@@ -250,11 +249,10 @@ stdout as \`!{:kind … :message …}\` values — route them with \`!|\`.
   Vec | @overview                          {:count N :head[5] :tail[5]}
   Vec | as(:v) | {:n v | count :fqns v * /fqn}
                                            count + every fqn, inline
-  String | split("\\n") | count            line count of @source output
+  String | split("\\n") | count             line count of @source output
 
-Stay native — no wc / head / tail pipes. Each step returns a qlang
-value so the next step composes. A Vec of 10k node-Maps followed by
-\`| count\` costs one HTTP round-trip, same as the full fetch.
+Each step returns a qlang value; \`| count\` on a 10k-node Vec is
+one HTTP round-trip. No wc / head / tail.
 
 ───── qlang grammar ─────
 
@@ -263,8 +261,8 @@ value so the next step composes. A Vec of 10k node-Maps followed by
   a >> b       flatten one level, then apply b
   a !| b       fail-track: fire b only on error value
   /key         Map projection; /a/b = /a | /b
-  [a b]        Vec literal         {:k v}  Map literal
-  #{a b}       Set literal         !{:k v} Error literal
+  [a b]        Vec literal         {:k v}    Map literal
+  #{a b}       Set literal         !{:k v}   Error literal
   "text"       String              :keyword  Keyword
   as(:name)    snapshot pipeValue under :name
   let(:name, body) | let(:name, [:p], body)   conduit
@@ -278,30 +276,31 @@ Seeds (string → node, or nullary):
 
 Containment:
   type    | @members  @methods  @fields  @innerTypes
-  package | @typesInPackage       file | @typesInFile
-  project | @packagesInProject  @typesInProject    node | @classpath
-  node    | @containingType  @containingPackage  @containingFile
-                              @containingProject
+  package | @typesInPackage
+  file    | @typesInFile
+  project | @packagesInProject  @typesInProject
+  node    | @classpath  @containingType  @containingPackage
+            @containingFile  @containingProject
 
 Hierarchy:
   type   | @supers  @subtypes  @ancestors  @descendants  @implementors
   method | @overrides  @overloads
 
-References (every axis is nullary, subject from pipeValue):
+References (nullary, subject from pipeValue):
   node   | @incomingRefs          default refKind by subject kind
   node   | @incomingRefs(:all)    modifier WIDENS — every refKind
   field  | @incomingRefs(:read|:write)
   member | @outgoingRefs          what the body touches
 
 Sugar conduits:
-  method | @callers  @testCallers  @productionCallers
-  field  | @readers  @writers
-  member | @calls  @typeUses  @dependsOn  @usedBy
-  type   | @tests                 test-scope callers across type + members
-  node   | @detail                lift skeleton → detail
-  element| @annotated(fqn)  @deprecated  @testMethods
-  element| @untested  @publicOrphans  @deadCode
-  Vec    | @sourceOnly  @overview  |  @inProject(projName)
+  method  | @callers  @testCallers  @productionCallers
+  field   | @readers  @writers
+  member  | @calls  @typeUses  @dependsOn  @usedBy
+  type    | @tests                  test-scope callers across type + members
+  node    | @detail                 lift skeleton → detail
+  element | @annotated(fqn)  @deprecated  @testMethods
+            @untested  @publicOrphans  @deadCode
+  Vec     | @sourceOnly  @overview  @inProject(projName)
 
 Markdown cards (return a String — pipe to a file):
   "pkg.Foo#bar()" | @sourceCard      header + code + refs + hierarchy
@@ -316,11 +315,11 @@ Host-bound I/O + format (from qlang-cli):
 
 ───── Discovery — the catalog is itself qlang data ─────
 
-  jdt q 'manifest | count'                          all ops
-  jdt q 'manifest | filter(/name | startsWith("@")) * /name'
-  jdt q 'reify(:@members)'                          descriptor
-  jdt q 'reify(:@members) | runExamples | table'    verify docs
-  jdt q 'reify(:@callers) | /source'                read a conduit's body
+  manifest | count                              all ops
+  manifest | filter(/effectful) * /name         every axis name
+  reify(:@members)                              descriptor
+  reify(:@members) | runExamples | table        verify docs
+  reify(:@callers) | /source                    read a conduit's body
 
 ───── Debug — errors are data ─────
 
