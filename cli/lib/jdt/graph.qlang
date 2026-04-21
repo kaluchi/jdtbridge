@@ -472,15 +472,24 @@ let(:@problemsVia, [:fetcher, :liftNode, :fileLocation, :packageTypes],
 let(:@problems, @problemsVia(@problemMarkers, @asNode,
                               @containingFile, @typesInPackage))
 
-|~~ Incoming call sites of a method — :from skeleton nodes
-    from each :call reference. ~~|
-let(:@callers, @incomingRefs | filter(/refKind | eq("call"))  * /from)
+|~~ Incoming call sites of a method — distinct :from skeletons
+    of every :call reference. Eclipse SearchEngine emits one
+    SearchMatch per source occurrence, so a method that calls the
+    subject three times surfaces the same :from thrice — distinct
+    collapses to unique callers. Symmetric with @calls on the
+    outgoing side. ~~|
+let(:@callers, @incomingRefs | filter(/refKind | eq("call"))
+    * /from | distinct)
 
-|~~ Read-access call sites of a field. ~~|
-let(:@readers, @incomingRefs | filter(/refKind | eq("read"))  * /from)
+|~~ Distinct :from skeletons of every :read access of a field.
+    Same dedup contract as @callers. ~~|
+let(:@readers, @incomingRefs | filter(/refKind | eq("read"))
+    * /from | distinct)
 
-|~~ Write-access call sites of a field. ~~|
-let(:@writers, @incomingRefs | filter(/refKind | eq("write")) * /from)
+|~~ Distinct :from skeletons of every :write access of a field.
+    Same dedup contract as @callers. ~~|
+let(:@writers, @incomingRefs | filter(/refKind | eq("write"))
+    * /from | distinct)
 
 |~~ Methods the subject body invokes. Outgoing-side companion
     to @callers. Returns distinct :to skeletons. ~~|

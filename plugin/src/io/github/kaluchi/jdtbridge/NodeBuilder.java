@@ -1155,7 +1155,20 @@ class NodeBuilder {
         // skeleton fall back to the enclosing type — references from
         // a static block attribute to the type that declared the block.
         IType enclosing = (IType) element.getAncestor(IJavaElement.TYPE);
-        return enclosing != null ? typeSkeleton(enclosing) : null;
+        if (enclosing != null) return typeSkeleton(enclosing);
+        // File-level elements (IImportDeclaration, IPackageDeclaration)
+        // have no IType ancestor — SearchMatch gives them as the host
+        // for import-statement / package-level refs. Resolve them to
+        // the compilation unit's primary type so every emitted ref
+        // carries a :from skeleton whose fqn round-trips through
+        // @type / @source.
+        ICompilationUnit cu = (ICompilationUnit) element.getAncestor(
+                IJavaElement.COMPILATION_UNIT);
+        if (cu != null) {
+            IType primary = cu.findPrimaryType();
+            if (primary != null) return typeSkeleton(primary);
+        }
+        return null;
     }
 
     /**
