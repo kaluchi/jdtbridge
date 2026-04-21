@@ -10,6 +10,254 @@ running processes, test results, and project list.
 Each section maps to a standalone command. The dashboard composes them
 into a single output with markdown headers.
 
+## Requirements
+
+This chapter defines what `jdt status` must satisfy as the sole
+onboarding surface for LLM agents working with jdt against an
+Eclipse workspace. Each requirement names a property the output
+must hold for the artifact to be considered correct. Together
+they form the contract the rest of this spec implements.
+
+Framing principle: any knowledge an LLM needs in order to use
+jdt must be obtainable from a single read of `jdt status` output.
+No external prose (CLAUDE.md, AGENTS.md, README, docs/) participates
+in agent onboarding. When a fact is needed by agents but absent
+from `jdt status`, the gap is in `jdt status`, not in the agent.
+
+### R1. Purpose
+
+`jdt status` exists to bootstrap a cold LLM into productive pair
+work with a developer who is using Eclipse on a Java project,
+via the jdt CLI.
+
+### R2. Cold-start assumption
+
+The model has no prior knowledge of Eclipse, of the workspace's
+contents, of the developer's project, or of jdt itself before
+this read. The artifact carries the full informational burden
+of bootstrap on its own. Onboarding content previously placed
+in CLAUDE.md, AGENTS.md, README, or any other file does not
+participate in agent onboarding.
+
+### R3. Pair-work orientation
+
+The model is configured for pair programming with a present
+developer, not for autonomous operation. The developer is at
+the keyboard, looking at the same workspace, and remains the
+primary decision-maker. The agent augments the developer's
+work, it does not substitute for the developer's judgment.
+Signals about what the developer is currently doing — open
+editors, uncommitted changes, recently active projects, current
+branch — are therefore as load-bearing as information about
+the codebase itself, because they ground the agent in the
+developer's present focus.
+
+### R4. Active artifact, not passive snapshot
+
+`jdt status` is a system prompt, not a dashboard. Its content
+is selected to shape what the model does next. A line is
+included not because it might be informative, but because its
+presence changes what the model would otherwise do. Lines that
+do not change agent behavior are noise and must be removed
+even if they are factually true about the IDE.
+
+### R5. The agent acts as a developer in this IDE, not as a CLI generalist
+
+The model behaves like a developer who has joined this project in
+this IDE. It uses the IDE's capabilities to the degree the
+developer does, and does not retreat to the lowest-common-denominator
+shell tooling that would work in any unfamiliar codebase. The
+workspace arrives already configured; the agent's job is to use
+that configuration, not to ignore it or recreate it.
+
+### R6. Do not bypass the IDE when jdt routes the same operation
+
+Build, test, format, refactor, navigate, open in editor — these
+have jdt equivalents that route through the running Eclipse. The
+model uses the jdt path. It does not invoke `mvn`, `npm`,
+`gradle`, `javac`, language servers, or similar tools directly
+when their jdt equivalent exists. Going through the IDE keeps the
+developer's view — open editors, problem markers, console output,
+test results, debug sessions — synchronized with the agent's
+actions; bypassing the IDE splits state and breaks pair work.
+
+### R7. Reuse existing launch configurations
+
+The workspace's launch configurations encode operations the
+developer has already set up — full project builds, focused
+test runs, application launches, build-tool goals (Maven,
+Gradle, npm), debug configurations. When such a configuration
+fits the task, the model invokes it via `jdt launch run` or
+`jdt test run`, not by synthesizing an equivalent shell command
+or creating a new one-off configuration. The default disposition
+is *use what is there*; new configurations are created only when
+nothing existing fits the task.
+
+### R8. Non-destructive operations on the developer's environment
+
+The agent does not invoke commands that destroy Eclipse's
+incrementally-maintained state or modify the developer's
+working environment. `mvn clean`, `mvn clean verify`,
+`gradle clean`, and similar whole-world rebuilds invalidate
+Eclipse's caches and force minutes of recomputation that
+Eclipse has already done incrementally. `git stash`,
+`git stash pop`, `git checkout` of files, `git reset`, and
+similar tree-modifying operations alter the developer's
+working state and may conflict with their in-progress work.
+The agent uses Eclipse's incremental builds and operations
+via jdt; when a destructive operation appears genuinely
+necessary, it asks the developer first.
+
+### R9. Efficient participation, not observation
+
+The agent is invited to do programming work — editing code,
+running tests, navigating the codebase, refactoring — not to
+observe or repeatedly re-orient itself. Each action it takes
+must be economical along three axes: wall-clock time, tokens
+spent, and inference iterations consumed.
+
+Economy comes from reusing what Eclipse has already computed:
+the resolved type system, the cross-reference index, the
+parsed ASTs, the resolved classpaths, the source-bundle
+attachments, the marker cache, the launch configurations. A
+single jdt query that returns the answer is preferred over
+multiple Read/Grep iterations that reconstruct it. Eclipse's
+resolved type is consulted rather than re-parsed from source.
+An existing launch configuration is invoked rather than its
+shell equivalent reassembled. Re-deriving information Eclipse
+already maintains is the opposite of programming work — it is
+wasted motion the developer would not accept from a teammate.
+
+### R10. Information that exists only in the running Eclipse
+
+Eclipse maintains, through dozens of orchestrated processes
+(compiler, validators, indexers, plugin analyzers, debugger,
+test runner), a live incremental model of the workspace and
+its execution — updates ordered, computations parallelized,
+caches kept warm. The artifact must convey to the model the
+categories of information held in that model that bash either
+cannot reach at all (live process state) or can only reach by
+invoking whole-world rebuild tools that wipe Eclipse's
+incremental caches and force minutes of wasted recomputation.
+
+- **Resolved cross-references** — for any method, field, or
+  type, the exact set of code locations that call, read,
+  write, or otherwise reference it; resolution accounts for
+  overloads, generics, shadowing, and inheritance, across
+  both source and binary deps.
+- **Resolved type hierarchy** — supertypes, transitive
+  subtypes, implementors of interfaces, override chains;
+  across source and binary deps.
+- **Symbol resolution at use-site** — for any expression in
+  source, the type it has and the exact declaration it binds
+  to, accounting for imports, generics, and inheritance.
+- **Live marker cache** — Eclipse's current Problems and
+  Coverage view contents: compilation diagnostics with
+  in-progress unsaved-edit reflection, plugin analyzer
+  findings (Checkstyle, SpotBugs, SonarLint), EclEmma coverage
+  gaps. Maintained incrementally as files change.
+- **Quick fix proposals** — the resolutions Eclipse computes
+  for each current marker (add import, implement abstract
+  methods, unboxing, narrowing or widening conversions,
+  convert to lambda).
+- **Code completion candidates** — valid symbols at the
+  cursor with their signatures and Javadoc, ranked by
+  context.
+- **Live editor state** — open tabs, active tab, selection
+  (offset, range, FQN of element under cursor), cursor
+  positions in inactive tabs, dirty state per tab, recent
+  type and file opens within this session.
+- **Live launch runtime** — running launches with their PIDs
+  and accumulated console output as it streams; exit codes of
+  recently terminated launches; build state per project
+  (whether a build is running, queued, or up-to-date).
+- **Live debug runtime** — active debug sessions, threads,
+  current stack frames, variable values at the current frame,
+  breakpoint hit states.
+- **In-memory test runner state** — JUnit view contents:
+  per-method pass/fail of the most recent runs with full
+  stack traces, live progress of any in-flight run, ordered
+  run history within this Eclipse session.
+- **Recent navigation queries** — Search view, Type Hierarchy
+  view, Call Hierarchy view — last queries the developer ran
+  and their results.
+
+### R11. qlang is mechanism, not capability
+
+The onboarding goal is not qlang fluency. The goal is for the
+model to know which questions about the Java codebase and the
+IDE state can be answered through jdt, and to use qlang as the
+means of asking. qlang is the mechanism; question-to-answer
+translation is the capability. A model that recites qlang
+grammar but cannot pose useful questions about the codebase
+has not been onboarded; a model that poses the right questions
+and reaches the right axes through trial and error has been
+onboarded, even if its qlang is rough.
+
+### R12. Model-agnostic artifact
+
+The artifact and its generation make no assumptions about the
+specific LLM consuming it. No optimization for any one vendor's
+prompt cache, context format, tool-use schema, or training-
+specific behavior. The same artifact serves Claude, GPT, Gemini,
+local models, and any other LLM capable of reading text on
+equal terms.
+
+### R13. No shadow state
+
+The generation of `jdt status` reads from Eclipse's runtime and
+the filesystem; it writes no persistent state of its own. No
+bespoke metadata files, no per-session caches, no pinning
+records, no "last computed" breadcrumbs. If data must be stable
+across calls, stability comes from determinism against state
+that already exists — not from a new state store introduced for
+the purpose.
+
+### R14. Intent-driven instance resolution
+
+`jdt status` selects its target Eclipse instance by a chain of
+explicit developer-intent signals — environment variables,
+per-terminal pin, current working directory inside a workspace's
+project root, single live instance. Silent fallback to the "first
+available" instance is forbidden.
+
+When no signal resolves the selection (multiple instances, no
+pin, cwd outside any workspace's project tree), the artifact
+embeds the output of `jdt use` as the instance picker, and
+instructs the developer to pin via `jdt use <N> && jdt status`.
+Data sections are omitted in this state; the artifact still
+carries the instance-agnostic onboarding (intro, help, guide) so
+the model is not left in the dark. Any additional columns the
+picker should expose (last-active timestamp, project count, cwd
+match indicator) are added to `jdt use` itself, not duplicated
+here.
+
+When resolution succeeds, the selected workspace and the signal
+that resolved it are reported in the artifact's opening content
+(Intro section) — so the model's first read establishes where it
+is and how it got there.
+
+### R15. Output is valid Markdown
+
+The artifact is a valid Markdown document — headings properly
+nested, code fences balanced, tables well-formed, lists
+consistently indented. A standard Markdown renderer produces a
+rendering faithful to the authored structure. This makes the
+artifact legible both as raw text (for LLM consumption) and as
+rendered Markdown (for human inspection in a terminal pager,
+IDE preview, or web view).
+
+### R16. Impersonal voice
+
+The artifact speaks of entities and actions, not to readers.
+No second-person pronouns ("you", "your", "yourself"), no
+first-person pronouns ("I", "we", "us", "our"). When a party
+needs to be named, it is named explicitly — "the developer",
+"the agent", "the workspace", "jdt CLI" — so the text reads
+identically whether the consumer is the LLM agent, the
+developer at the terminal, or a third party reviewing the
+output.
+
 ## Sections
 
 | Section | Standalone command | What it shows |
