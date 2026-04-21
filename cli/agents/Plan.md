@@ -26,7 +26,7 @@ jdt q '"<FQN>" | @implementors'        # implementations of an interface method
 jdt q '"<FQN>" | @supers | @ancestors'  # full supertype chain
 jdt q '"<FQN>" | @subtypes | @descendants' # full subtype tree
 jdt q '"*Pat*" | @types * /fqn'         # find types by name pattern
-jdt q '@problems(:project) | filter(/containingProject | eq("<name>"))' # current compilation state
+jdt q '"<project>" | @problems(:project)' # compilation state of a project
 ```
 
 ## Process

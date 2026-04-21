@@ -399,16 +399,31 @@ Key lifecycle facts:
 
 ## Launch history and ordering
 
-`jdt launch configs` uses Eclipse's internal launch history API
-(`DebugUIPlugin.getLaunchConfigurationManager()`) to sort results:
+`jdt launch configs` reads
+`<workspace>/.metadata/.plugins/org.eclipse.debug.ui/launchConfigurationHistory.xml`
+(persisted by Eclipse on workspace save) to sort results. Group
+order: run → debug → coverage (EclEmma group, present when the
+plugin is installed). Per group, section order:
 
-1. **Favorites** (Run favorites, then Debug favorites)
-2. **Recent history** (Run history, then Debug history)
-3. **Remaining configs** (alphabetical)
+1. **Favorites** (run favorites → debug favorites → coverage favorites)
+2. **Recent history** (run mruHistory → debug mruHistory → coverage mruHistory,
+   most-recent-first)
+3. **Remaining configs** (alphabetical from `ILaunchManager.getLaunchConfigurations()`)
 
-This matches the order in Eclipse's Run > Run History menu.
-The API is `@SuppressWarnings("restriction")` — internal Eclipse API,
-but stable across versions.
+Dedup by name across the whole sequence — each config appears once,
+at its earliest position. This matches the order in Eclipse's
+Run > Run History menu.
+
+The XML path was chosen over `DebugUIPlugin.getLaunchConfigurationManager()`
+because the latter pulls in `org.eclipse.ui.workbench` which fails to
+activate in PDE headless test runtimes. The tradeoff: the XML file
+is updated on workspace save (typically on shutdown or periodic
+snapshot), so this sort order lags in-memory state by up to a
+workspace save interval.
+
+`--limit N` trims the result to the first N entries (applied CLI-side
+after ordering). `jdt status` uses `--limit 20` to keep the dashboard
+bounded; drop the flag for the full list.
 
 ## Relationship to `jdt test`
 

@@ -125,11 +125,13 @@ async function renderProblems() {
 
 async function renderLaunchConfigs() {
   return {
-    title: "Launch Configs", cmd: "jdt launch configs",
-    body: cliCmd("jdt launch configs"),
+    title: "Launch Configs", cmd: "jdt launch configs --limit 20",
+    body: cliCmd("jdt launch configs --limit 20"),
     description:
       "Eclipse Run Configurations dialog (Run > Run Configurations...).\n"
-      + "CONFIGTYPE = ILaunchConfigurationType. CONFIGID = launch config name.",
+      + "CONFIGTYPE = ILaunchConfigurationType. CONFIGID = launch config name.\n"
+      + "Order: favorites (run/debug/coverage), then launch history\n"
+      + "(most-recent first), then remaining configs. Drop --limit for all.",
   };
 }
 
@@ -179,7 +181,7 @@ header shows the command that produced it, and that command can be
 run standalone for a fresh snapshot of just that section. Several
 can be combined: jdt status git editors problems.
 
--q suppresses intro, query, help, guide, and per-section descriptions.`,
+-q suppresses intro, guide, and per-section descriptions.`,
   };
 }
 
@@ -319,28 +321,25 @@ export const help = `CLI screenshot of Eclipse — composite view of IDE state.
 
 Usage:  jdt status [sections...] [-q]
 
-Sections (default: all data + intro + help + guide):
+Sections (default: all data + intro + guide):
   intro           what jdt is, how to read the dashboard
   git             git repos, branches, modified files
   editors         open editor tabs (active first)
-  problems        IMarker.PROBLEM (errors, warnings)
+  problems        IMarker.PROBLEM (errors only, first 20)
   launch-configs  saved launch configurations (name, type, project, target)
   launches        running launches
   tests           recent test sessions
   projects        workspace projects with repo mapping
-  help            full jdt command reference
-  query           graph-query onboarding: jdt q, axes, pipelines (opt-in)
-  guide           hints and patterns after editing code
+  guide           post-edit workflow + jdt help q + jdt help
 
 Options:
-  -q, --quiet  suppress meta-sections (intro, help, guide) and descriptions
+  -q, --quiet  suppress meta-sections (intro, guide) and descriptions
 
 Examples:
   jdt status                    full dashboard
-  jdt status -q                 full dashboard, no intro/help/guide
+  jdt status -q                 full dashboard, no intro/guide
   jdt status editors problems   editors + problems
-  jdt status help               command reference
-  jdt status query              graph-query onboarding
+  jdt status guide              qlang reference + CLI catalog
 
 Machine-readable access to any single section goes through the
 underlying command directly: jdt git --json, jdt editors --json,

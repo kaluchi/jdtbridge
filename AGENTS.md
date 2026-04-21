@@ -87,35 +87,8 @@ that consume a node-Map (skeleton or detail) OR a fqn string
 from `pipeValue`. Output is qlang-literal; fqn strings in the result
 are ready subjects for the next step.
 
-Axes (see `docs/jdt-query-spec.md` for the full catalog):
-
-```
-@types("*Pattern")  @type(fqn)  @method(fqn)  @field(fqn)
-@project(name)  @projects  @package(fqn)  @file(absPath)
-@members  @methods  @fields  @innerTypes
-@typesInPackage  @typesInFile  @packagesInProject
-@supers  @subtypes  @ancestors  @descendants  @implementors
-@incomingRefs(:kind?)  @outgoingRefs
-@callers  @readers  @writers  @calls  @typeUses
-@overrides  @overloads
-@source  @detail  @classpath  @problems(:scope?)
-```
-
-Sugar conduits for common audits:
-
-```
-@publicOrphans           public methods with zero incoming callers
-@testCallers             @callers filtered by /isTestScope
-@productionCallers       @callers where /isTestScope is false
-@untested                filter(@callers | filter(/isTestScope) | empty)
-@tests                   test-scope callers across a type's members
-@annotated(fqn)          filter(/annotations | any(eq(fqn)))
-@deprecated              @annotated("java.lang.Deprecated")
-@testMethods             @annotated("org.junit.jupiter.api.Test")
-@sourceOnly              filter(/origin | eq("source"))
-@inProject(projName)     filter(/containingProject | eq(projName))
-@asNode                  lift fqn String → point-looked-up node
-```
+Full axis catalog, sugar conduits, and modifier syntax live in
+`jdt help q` (runtime truth) and `docs/jdt-query-spec.md`.
 
 ### FQN — member form
 
@@ -143,7 +116,7 @@ pipe-chaining with standard shell tools or further `jdt q` calls.
 ```bash
 jdt q '"io.github.kaluchi.jdtbridge.SearchHandler" | @members * /name'
 jdt q '"io.github.kaluchi.jdtbridge.JdtUtils#findMethod" | @callers | count'
-jdt q '@problems(:project) | filter(/containingProject | eq("my-server"))'
+jdt q '"my-server" | @problems * /message'
 jdt q '"org.springframework.jdbc.core.JdbcTemplate#query" | @source' | grep -n throw
 jdt q '"io.github.kaluchi.jdtbridge.HttpServer" | @methods | @untested * /fqn'
 ```
