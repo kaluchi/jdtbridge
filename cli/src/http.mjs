@@ -11,9 +11,25 @@ import { proxyAwareOptions } from "./proxy.mjs";
 
 /**
  * Execute an HTTP request against a bridge instance. Resolves with
- * { status, body, error? } — never rejects. Callers inspect
+ * {@code { status, body, error? }} — never rejects. Callers inspect
  * {@code error} for network/timeout failures and {@code status} for
  * HTTP-level outcomes.
+ *
+ * Callers layer their own error-handling policy on top:
+ *
+ *   // Throw on anything non-200 (runtime CLI client):
+ *   const { status, body, error } = await httpRequest(inst, path);
+ *   if (error) throw error;
+ *   if (status !== 200) throw new Error(`HTTP ${status}: ${body}`);
+ *
+ *   // Rethrow network error, treat non-200 as "alive enough" (probe):
+ *   const res = await httpRequest(inst, "/status");
+ *   if (res.error) throw res.error;
+ *
+ *   // Swallow everything to empty (resolution-time, fall-through):
+ *   const { status, body } = await httpRequest(inst, "/projects");
+ *   if (status !== 200) return [];
+ *   try { return JSON.parse(body); } catch { return []; }
  *
  * @param {{host: string, port: number, token?: string, session?: string}} inst
  * @param {string} path

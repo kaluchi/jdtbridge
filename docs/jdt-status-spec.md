@@ -216,26 +216,18 @@ the purpose.
 ### R14. Intent-driven instance resolution
 
 `jdt status` selects its target Eclipse instance by a chain of
-explicit developer-intent signals — environment variables,
-per-terminal pin, current working directory inside a workspace's
-project root, single live instance. Silent fallback to the "first
-available" instance is forbidden.
-
-When no signal resolves the selection (multiple instances, no
-pin, cwd outside any workspace's project tree), the artifact
-embeds the output of `jdt use` as the instance picker, and
-instructs the developer to pin via `jdt use <N> && jdt status`.
-Data sections are omitted in this state; the artifact still
-carries the instance-agnostic onboarding (intro, help, guide) so
-the model is not left in the dark. Any additional columns the
-picker should expose (last-active timestamp, project count, cwd
-match indicator) are added to `jdt use` itself, not duplicated
-here.
-
-When resolution succeeds, the selected workspace and the signal
-that resolved it are reported in the artifact's opening content
-(Intro section) — so the model's first read establishes where it
-is and how it got there.
+explicit developer-intent signals — environment variables, ppid
+pin, per-terminal pin, current working directory inside a
+workspace's project root, single live instance. When more than
+one live local instance remains after these signals have been
+tried and no pin is set, a single stderr warning names the
+ambiguity and `jdt use` is the manual-disambiguation surface.
+The warning is emitted once per user-invoked command, not once
+per internal subprocess: `jdt status` resolves at the outermost
+level and passes the choice to section subprocesses through
+`JDT_BRIDGE_PORT` / `JDT_BRIDGE_TOKEN` / `JDT_BRIDGE_HOST` env
+vars so they hit the env-vars step and skip resolution
+altogether.
 
 ### R15. Output is valid Markdown
 
@@ -262,24 +254,23 @@ output.
 
 | Section | Standalone command | What it shows |
 |---|---|---|
-| `intro` | `jdt status intro` | Context paragraph for AI agents |
+| `intro` | `jdt status intro` | Context paragraph for agents reading the artifact first time |
 | `git` | `jdt git list --no-files` | Repos, branches, dirty state |
 | `editors` | `jdt editors` | Open editor tabs (active first) |
-| `problems` | `jdt q "@problems * {:severity /severity :file /location/file :line /location/startLine :message /message} \| table"` | IMarker.PROBLEM markers |
+| `problems` | `jdt q "@problems \| filter(/severity \| eq(\"error\")) \| take(20) * {…} \| table"` | IMarker.PROBLEM markers, errors only, first 20 |
 | `launch-configs` | `jdt launch configs` | Saved launch configurations (configId, type, project, target) |
 | `launches` | `jdt launch list` | Running/terminated launches |
 | `tests` | `jdt test runs` | Recent test runs with results |
 | `projects` | `jdt q "@projects * inter(#{:fqn :rootPath :repo :branch}) \| table"` | Workspace projects with repo mapping |
-| `help` | `jdt help` | Full command reference (dynamic) |
-| `guide` | `jdt status guide` | Hints and patterns |
+| `guide` | `jdt status guide` | Post-edit workflow + pair-work norms + embedded `jdt help q` and `jdt help` fences |
 
-`intro`, `help`, and `guide` are meta-sections — shown by default but
-suppressed by `-q` or when specific sections are requested.
+`intro` and `guide` are meta-sections — shown by default, suppressed
+by `-q` or when specific sections are requested.
 
 ## Section order
 
 ```
-intro → git → editors → problems → launch-configs → launches → tests → projects → help → guide
+intro → git → editors → problems → launch-configs → launches → tests → projects → guide
 ```
 
 The order follows a workflow narrative:
@@ -287,8 +278,7 @@ The order follows a workflow narrative:
 2. **Code state** (git, editors, problems) — what's being worked on?
 3. **Execution** (launch-configs, launches, tests) — what's configured, running, tested?
 4. **Structure** (projects) — what exists in the workspace?
-5. **Reference** (help) — full command list
-6. **Patterns** (guide) — how to use effectively?
+5. **Reference + patterns** (guide) — qlang reference, CLI catalog, post-edit workflow
 
 `launch-configs` precedes `launches` because configs are the "what can run"
 and launches are the "what is running" — definition before state.
@@ -330,9 +320,9 @@ Machine-readable access goes through the underlying command directly
 ### Compositor pattern
 
 ```
-SECTION_NAMES          ordered list of 10 section identifiers
+SECTION_NAMES          ordered list of 9 section identifiers
 RENDERERS              section name → async renderer function
-formatSection()        wraps { title, cmd, body, description } into markdown
+formatSection()        wraps { title, cmd, body, description, raw } into markdown
 ```
 
 Each renderer calls the standalone CLI command via `execSync` and returns
@@ -340,6 +330,9 @@ Each renderer calls the standalone CLI command via `execSync` and returns
 `formatSection(section, { bare, quiet })`:
 - `bare` = single section: body only, no header/fence/description
 - `quiet` = suppress description text
+- `raw` = body is pre-formatted markdown (own fences); skip the
+  automatic code-fence wrap. Used by `guide` to embed `$ jdt help q`
+  and `$ jdt help` as separate runnable blocks under one section.
 
 Descriptions provide Eclipse-specific context: view names, shortcuts,
 domain identifiers (CONFIGID, TestRunId, FQN). They anchor agents
@@ -348,13 +341,22 @@ to high-entropy Eclipse terms so they connect CLI output to IDE concepts.
 This means `jdt status` is always consistent with standalone commands —
 it literally runs them and composites the output.
 
+### Resolution-once and env propagation
+
+`status()` calls `resolveInstance()` once at the top and populates
+a module-local `_resolvedEnv` ({`JDT_BRIDGE_PORT`, `JDT_BRIDGE_TOKEN`,
+`JDT_BRIDGE_HOST`}). `cliCmd()` merges this object into
+`process.env` for each subprocess it spawns. Section subprocesses
+therefore hit step 1 of `resolveInstance`'s chain (env vars present)
+and skip discovery + cwd-match entirely — one `/projects` probe
+instead of one per section in the multi-instance-ambiguous path.
+
 ### Adding a new section
 
 1. Add name to `SECTION_NAMES` array (position = display order)
 2. Add renderer to `RENDERERS` map (async fn → `{ title, cmd, body, description }`)
 3. Add description with Eclipse-specific terms (view name, key identifiers)
-4. Update `help` string — section list
-5. Update test — section count
+4. Update tests — section count and new section's body shape
 
 ## Design principles
 
@@ -367,12 +369,13 @@ it literally runs them and composites the output.
   It must teach the agent what jdt is, what it can do, and how to
   discover more — all within the output of a single command.
 
-The intro section explains the tool's purpose. The help section
-embeds the full `jdt help` output — always current, zero drift.
-The guide section shows patterns and hints. Section headers contain
-the standalone command (`$ jdt git list --no-files`). The agent
-learns the CLI vocabulary by reading the dashboard — no external
-documentation needed.
+The intro section explains the tool's purpose. The guide section
+at the end carries the post-edit workflow + pair-work norms + two
+runnable fences for `jdt help q` (qlang reference) and `jdt help`
+(full command catalog) — both captured live at generation time,
+zero drift. Section headers contain the standalone command
+(`$ jdt git list --no-files`). The agent learns the CLI vocabulary
+by reading the dashboard — no external documentation needed.
 
 ### 2. Self-documenting over static docs
 
@@ -382,17 +385,18 @@ of truth — it always reflects the current state of the tool. The
 developer should not need to maintain agent instructions that describe
 how to use jdt commands; the commands describe themselves.
 
-The intro teaches what jdt is. The help section provides the full
-command reference (dynamically generated via `jdt help`). The guide
-teaches patterns. `jdt help <command>` provides per-command details.
-The agent self-discovers capabilities through the CLI itself, not
-through documentation files that may be stale.
+The intro teaches what jdt is. The guide section embeds
+`jdt help q` and `jdt help` outputs live, so the qlang reference
+and the command catalog are always current. `jdt help <command>`
+provides per-command details. The agent self-discovers capabilities
+through the CLI itself, not through documentation files that may
+be stale.
 
 ### 3. Token budget awareness
 
 The output goes into an agent's context window. Every irrelevant
 token displaces reasoning. This drives several decisions:
-- `-q` suppresses intro/help/guide and section descriptions
+- `-q` suppresses intro / guide and section descriptions
 - Sections can be selected individually for focused refresh
 - Git uses `--no-files` (summary, not full file list)
 - Data is tabular and dense, not verbose prose
@@ -400,7 +404,7 @@ token displaces reasoning. This drives several decisions:
 ### 4. Narrative section order
 
 Sections follow a workflow story, not alphabetical order:
-context → code state → execution → structure → help.
+context → code state → execution → structure → guide.
 This gives agents a mental model of the workspace in reading order.
 Users control which sections appear, not where they appear.
 
@@ -423,13 +427,17 @@ independently refreshable.
   problems output, no `##` header or code fence. This makes single-section
   calls drop-in replacements for the standalone command.
 
-- **Problems section uses a reshape + table.** `@problems` returns
-  node-Maps whose `:location` is a sub-Map `{file,startLine,endLine}`.
-  A bare `| table` renders the column as `[object Object]`, so the
-  renderer uses a reshape — `@problems * {:severity /severity :file
-  /location/file :line /location/startLine :message /message} | table`
-  — which also acts as an idiom example for every other section that
-  wants file/line columns.
+- **Problems section filters to errors, takes first 20, then reshapes.**
+  `@problems` returns node-Maps whose `:location` is a sub-Map
+  `{file,startLine,endLine}`, and includes both errors and warnings
+  workspace-wide. The renderer narrows the stream before projection
+  to keep the section compact and action-relevant:
+  `@problems | filter(/severity | eq("error")) | take(20) *
+  {:message /message :file /location/file :severity /severity
+  :line /location/startLine} | table`. Readers who want warnings or
+  the full list drop the filter and take — see the section's
+  inline hint. The reshape itself doubles as an idiom example for
+  any other section that wants file/line columns from node-Maps.
 
 ## Constraints
 
@@ -446,5 +454,11 @@ independently refreshable.
 - **[jdt-launch-spec.md](jdt-launch-spec.md)** — `launch-configs` section
   shows the same data as `jdt launch configs`. TARGET column uses the
   FQN synthesis described in the launch spec.
+- **[jdt-use-spec.md](jdt-use-spec.md)** — instance resolution chain
+  (step 5 cwd-match included); `jdt use` is the manual-disambiguation
+  surface referenced by R14.
+- **[jdt-query-spec.md](jdt-query-spec.md)** — qlang module `:jdt/graph`
+  whose axes + operators are embedded live as the `jdt help q` fence
+  inside the guide section.
 - **[jdt-spec](jdt-spec.md)** — `--json` output principles and
   per-command JSON shapes.

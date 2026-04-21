@@ -121,6 +121,12 @@ export async function probe(inst) {
  * failure (network error, non-200 status, invalid JSON). Used by
  * cwd-match resolution (resolve.mjs), where "can't tell" should
  * simply fall through to the next resolution step rather than break.
+ *
+ * Default timeout is tighter than {@link probe} (3s vs 5s) because
+ * this fires on every jdt command in the multi-instance-ambiguous
+ * path; the extra 2s of head-of-line latency on an unresponsive
+ * bridge is not worth paying when the caller's fallback (warn +
+ * use first) is cheap.
  */
 export async function fetchProjects(inst, timeoutMs = 3000) {
   const { status, body } = await httpRequest(inst, "/projects", "GET", timeoutMs);

@@ -327,3 +327,131 @@ describe("integration", () => {
     expect(descIdx).toBeLessThan(fenceIdx);
   });
 });
+
+// ---- Env-passthrough ----
+//
+// status() resolves the target instance once at the top and passes
+// JDT_BRIDGE_PORT / JDT_BRIDGE_TOKEN / JDT_BRIDGE_HOST into every
+// subprocess it spawns via cliCmd. Section subprocesses then hit
+// step 1 of resolveInstance's chain (env vars) and skip discovery
+// + cwd-match. Without this, every one of N sections re-resolves,
+// and the multi-instance-ambiguous path re-hits /projects N times.
+
+describe("env-passthrough", () => {
+  let origLog;
+
+  beforeEach(() => {
+    origLog = console.log;
+    console.log = () => {};
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    console.log = origLog;
+    vi.doUnmock("../src/resolve.mjs");
+    vi.doUnmock("node:child_process");
+    vi.resetModules();
+  });
+
+  it("resolveInstance runs once; subprocess env has JDT_BRIDGE_*", async () => {
+    const capturedEnvs = [];
+    let resolveCalls = 0;
+
+    vi.doMock("../src/resolve.mjs", () => ({
+      resolveInstance: async () => {
+        resolveCalls++;
+        return {
+          port: 54321, token: "tok-xyz", host: "127.0.0.1",
+          workspace: "/test/ws", pid: process.pid, file: "",
+        };
+      },
+    }));
+    vi.doMock("node:child_process", () => ({
+      execSync: (_cmd, opts) => {
+        capturedEnvs.push(opts?.env);
+        return "";
+      },
+    }));
+
+    const { status } = await import("../src/commands/status.mjs");
+    await status(["git"]);
+
+    expect(resolveCalls).toBe(1);
+    expect(capturedEnvs.length).toBeGreaterThan(0);
+    for (const env of capturedEnvs) {
+      expect(env.JDT_BRIDGE_PORT).toBe("54321");
+      expect(env.JDT_BRIDGE_TOKEN).toBe("tok-xyz");
+      expect(env.JDT_BRIDGE_HOST).toBe("127.0.0.1");
+    }
+  });
+
+  it("resolveInstance returning null leaves subprocess env untouched", async () => {
+    const capturedEnvs = [];
+
+    // Ensure no stale JDT_BRIDGE_* bleeding from the host process
+    const origPort = process.env.JDT_BRIDGE_PORT;
+    const origToken = process.env.JDT_BRIDGE_TOKEN;
+    const origHost = process.env.JDT_BRIDGE_HOST;
+    delete process.env.JDT_BRIDGE_PORT;
+    delete process.env.JDT_BRIDGE_TOKEN;
+    delete process.env.JDT_BRIDGE_HOST;
+
+    vi.doMock("../src/resolve.mjs", () => ({
+      resolveInstance: async () => null,
+    }));
+    vi.doMock("node:child_process", () => ({
+      execSync: (_cmd, opts) => {
+        capturedEnvs.push(opts?.env);
+        return "";
+      },
+    }));
+
+    try {
+      const { status } = await import("../src/commands/status.mjs");
+      await status(["git"]);
+      for (const env of capturedEnvs) {
+        expect(env.JDT_BRIDGE_PORT).toBeUndefined();
+        expect(env.JDT_BRIDGE_TOKEN).toBeUndefined();
+        expect(env.JDT_BRIDGE_HOST).toBeUndefined();
+      }
+    } finally {
+      if (origPort !== undefined) process.env.JDT_BRIDGE_PORT = origPort;
+      if (origToken !== undefined) process.env.JDT_BRIDGE_TOKEN = origToken;
+      if (origHost !== undefined) process.env.JDT_BRIDGE_HOST = origHost;
+    }
+  });
+
+  it("subprocess env preserves FORCE_COLOR and inherits process.env", async () => {
+    const capturedEnvs = [];
+    const origSentinel = process.env.__JDT_TEST_SENTINEL__;
+    process.env.__JDT_TEST_SENTINEL__ = "preserved";
+
+    vi.doMock("../src/resolve.mjs", () => ({
+      resolveInstance: async () => ({
+        port: 12345, token: "t", host: "127.0.0.1",
+        workspace: "/ws", pid: process.pid, file: "",
+      }),
+    }));
+    vi.doMock("node:child_process", () => ({
+      execSync: (_cmd, opts) => {
+        capturedEnvs.push(opts?.env);
+        return "";
+      },
+    }));
+
+    try {
+      const { status } = await import("../src/commands/status.mjs");
+      await status(["git"]);
+      for (const env of capturedEnvs) {
+        expect(env.FORCE_COLOR).toBe("1");
+        expect(env.__JDT_TEST_SENTINEL__).toBe("preserved");
+      }
+    } finally {
+      if (origSentinel !== undefined) {
+        process.env.__JDT_TEST_SENTINEL__ = origSentinel;
+      } else {
+        delete process.env.__JDT_TEST_SENTINEL__;
+      }
+    }
+  });
+});
