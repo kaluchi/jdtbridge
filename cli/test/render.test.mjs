@@ -98,6 +98,92 @@ describe("mdSource", () => {
     expect(md).toContain("[M] `pkg.Caller#invoke()`");
   });
 
+  it("renders field refs with ': <type>' suffix (erased type)",
+        async () => {
+    // Method refs carry :returnType and render `→ void`. Field refs
+    // carry :type (erased — generics stripped per JDT convention)
+    // and render `: java.util.Map`. Both suffixes visible at once
+    // when the outgoing Vec mixes methods and fields.
+    const methodRef = map([
+      ["kind", "reference"],
+      ["refKind", "call"],
+      ["to", map([
+        ["fqn", "pkg.Other#doStuff(int)"],
+        ["kind", "method"],
+        ["returnType", "int"],
+      ])],
+    ]);
+    const fieldRef = map([
+      ["kind", "reference"],
+      ["refKind", "read"],
+      ["to", map([
+        ["fqn", "pkg.Foo#queues"],
+        ["kind", "field"],
+        ["type", "java.util.Map"],
+      ])],
+    ]);
+    const md = await runWithBundle("mdSource", map([
+      ["node", map([
+        ["fqn", "pkg.Foo#bar()"],
+        ["kind", "method"],
+      ])],
+      ["outgoing", [methodRef, fieldRef]],
+    ]));
+    expect(md).toContain("[M] `pkg.Other#doStuff(int)` → `int`");
+    expect(md).toContain("[F] `pkg.Foo#queues` : `java.util.Map`");
+  });
+
+  it("field ref without :type renders bare fqn line", async () => {
+    // Degenerate skeleton — no :type on the field. Line is just
+    // badge + fqn, no type-suffix noise.
+    const fieldRef = map([
+      ["kind", "reference"],
+      ["refKind", "read"],
+      ["to", map([
+        ["fqn", "pkg.Foo#count"],
+        ["kind", "field"],
+      ])],
+    ]);
+    const md = await runWithBundle("mdSource", map([
+      ["node", map([
+        ["fqn", "pkg.Foo#bar()"],
+        ["kind", "method"],
+      ])],
+      ["outgoing", [fieldRef]],
+    ]));
+    expect(md).toContain("[F] `pkg.Foo#count`");
+    expect(md).not.toContain("[F] `pkg.Foo#count` :");
+    expect(md).not.toContain("[F] `pkg.Foo#count` →");
+  });
+
+  it("type refs get no type suffix (neither :returnType nor :type)",
+        async () => {
+    // Type skeletons don't carry either field — the suffix stays
+    // empty so the line is just `[C] fqn`. Verifies field-type
+    // rendering doesn't leak into type kinds through attribute
+    // coincidence.
+    const typeRef = map([
+      ["kind", "reference"],
+      ["refKind", "typeUse"],
+      ["to", map([
+        ["fqn", "pkg.Target"],
+        ["kind", "type"],
+        ["typeKind", "class"],
+      ])],
+    ]);
+    const md = await runWithBundle("mdSource", map([
+      ["node", map([
+        ["fqn", "pkg.Foo"],
+        ["kind", "type"],
+        ["typeKind", "class"],
+      ])],
+      ["outgoing", [typeRef]],
+    ]));
+    expect(md).toContain("[C] `pkg.Target`");
+    expect(md).not.toContain("[C] `pkg.Target` :");
+    expect(md).not.toContain("[C] `pkg.Target` →");
+  });
+
   it("labels refs by subject kind — type subject → references", async () => {
     const typeUseRef = map([
       ["kind", "reference"],

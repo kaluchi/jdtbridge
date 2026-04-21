@@ -237,11 +237,17 @@ function renderRefGroup(refs, sideKey) {
         const fqn = mapGet(other, K_FQN);
         if (typeof fqn !== 'string' || seen.has(fqn)) continue;
         seen.add(fqn);
+        // Method skeletons carry :returnType; field skeletons carry
+        // :type (erased). Render `→ ReturnType` for methods, `: Type`
+        // for fields. Types and other kinds leave the suffix empty.
         const returnType = mapGet(other, K_RETURN_TYPE);
+        const fieldType  = mapGet(other, K_TYPE);
         const javadoc = mapGet(other, K_JAVADOC);
         let line = badgeOf(other) + ' `' + fqn + '`';
         if (typeof returnType === 'string') {
             line += ' → `' + returnType + '`';
+        } else if (typeof fieldType === 'string') {
+            line += ' : `' + fieldType + '`';
         }
         if (typeof javadoc === 'string' && javadoc.length > 0) {
             line += ' — ' + javadoc;
