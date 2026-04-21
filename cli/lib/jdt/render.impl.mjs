@@ -48,9 +48,6 @@ const K_FROM          = keyword('from');
 const K_TO            = keyword('to');
 const K_REF_KIND      = keyword('refKind');
 const K_DIRECTION     = keyword('direction');
-const K_ENCL_SYNTH    = keyword('enclosingSynthetic');
-const K_INTERFACE     = keyword('interface');
-const K_SUPER         = keyword('super');
 
 function mapGet(m, key) {
     return m instanceof Map ? m.get(key) : undefined;
@@ -252,38 +249,12 @@ function renderRefGroup(refs, sideKey) {
         } else if (typeof fieldType === 'string') {
             line += ' : `' + fieldType + '`';
         }
-        // :enclosingSynthetic annotates refs whose true origin was a
-        // lambda / anonymous-class body — the skeleton fqn collapses
-        // onto the nearest addressable enclosing member (so it
-        // round-trips through @method / @source), while this suffix
-        // surfaces the synthetic context that Eclipse shows in Copy
-        // Qualified Name (e.g. `(lambda: Runnable)`).
-        const synth = mapGet(other, K_ENCL_SYNTH);
-        if (synth instanceof Map) {
-            line += ' ' + renderSyntheticContext(synth);
-        }
         if (typeof javadoc === 'string' && javadoc.length > 0) {
             line += ' — ' + javadoc;
         }
         lines.push(line);
     }
     return lines;
-}
-
-function renderSyntheticContext(ctx) {
-    const kind = mapGet(ctx, K_KIND);
-    const iface = mapGet(ctx, K_INTERFACE);
-    const sup = mapGet(ctx, K_SUPER);
-    if (kind === 'lambda') {
-        return typeof iface === 'string'
-                ? '(lambda: `' + iface + '`)' : '(lambda)';
-    }
-    if (kind === 'anonymous') {
-        if (typeof iface === 'string') return '(anon: `' + iface + '`)';
-        if (typeof sup === 'string')   return '(anon: `' + sup + '`)';
-        return '(anon)';
-    }
-    return '';
 }
 
 // ── mdHierarchy: ↑/↓ tree for a type ───────────────────────────

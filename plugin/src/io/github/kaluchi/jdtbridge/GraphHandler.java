@@ -86,6 +86,22 @@ class GraphHandler {
         if (fqn == null || fqn.isBlank()) {
             return ErrorDescriptor.missingParameter("of").toJsonString();
         }
+        // Composite synthetic fqns (lambda / anonymous) carry the
+        // enclosing method's `(` in their suffix, so the first-#
+        // split below is not safe. Route through the unified parser.
+        if (JdtUtils.isCompositeFqn(fqn)) {
+            try {
+                IJavaElement resolved = JdtUtils.resolveElement(fqn);
+                if (resolved instanceof IMethod m) {
+                    return NodeBuilder.methodDetail(m).toString();
+                }
+                return ErrorDescriptor.methodNotFound(fqn).toJsonString();
+            } catch (Exception e) {
+                Log.warn("/method failed for " + fqn, e);
+                return ErrorDescriptor.jdtInternalError(
+                        "Failed to resolve method: " + fqn, e).toJsonString();
+            }
+        }
         int hash = fqn.indexOf('#');
         if (hash < 0) {
             return ErrorDescriptor.invalidFqn(fqn).toJsonString();
@@ -130,6 +146,19 @@ class GraphHandler {
         String fqn = params.get("of");
         if (fqn == null || fqn.isBlank()) {
             return ErrorDescriptor.missingParameter("of").toJsonString();
+        }
+        if (JdtUtils.isCompositeFqn(fqn)) {
+            try {
+                IJavaElement resolved = JdtUtils.resolveElement(fqn);
+                if (resolved instanceof IField f) {
+                    return NodeBuilder.fieldDetail(f).toString();
+                }
+                return ErrorDescriptor.fieldNotFound(fqn).toJsonString();
+            } catch (Exception e) {
+                Log.warn("/field failed for " + fqn, e);
+                return ErrorDescriptor.jdtInternalError(
+                        "Failed to resolve field: " + fqn, e).toJsonString();
+            }
         }
         int hash = fqn.indexOf('#');
         if (hash < 0) {
@@ -1038,6 +1067,35 @@ class GraphHandler {
 
     private ResolvedTarget resolveTarget(String identifier,
             Map<String, String> params) throws JavaModelException {
+        // Composite synthetic FQNs (lambda / anonymous, with or
+        // without a member tail) route through the unified parser
+        // in JdtUtils. The plain-FQN branch below only splits on
+        // the first '#' — fine for regular types but ambiguous
+        // when a composite FQN also embeds '#' for the enclosing
+        // method's signature separator.
+        if (JdtUtils.isCompositeFqn(identifier)) {
+            IJavaElement resolved = JdtUtils.resolveElement(identifier);
+            if (resolved == null) {
+                return ResolvedTarget.err(
+                        ErrorDescriptor.typeNotFound(identifier)
+                                .toJsonString());
+            }
+            if (resolved instanceof IType type) {
+                return ResolvedTarget.ok(type,
+                        NodeBuilder.typeSkeleton(type));
+            }
+            if (resolved instanceof IMethod method) {
+                return ResolvedTarget.ok(method,
+                        NodeBuilder.methodSkeleton(method));
+            }
+            if (resolved instanceof IField field) {
+                return ResolvedTarget.ok(field,
+                        NodeBuilder.fieldSkeleton(field));
+            }
+            return ResolvedTarget.err(
+                    ErrorDescriptor.typeNotFound(identifier)
+                            .toJsonString());
+        }
         int hash = identifier.indexOf('#');
         if (hash < 0) {
             IType type = JdtUtils.findType(identifier);

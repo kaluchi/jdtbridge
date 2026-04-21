@@ -56,9 +56,81 @@ class NodeBuilder {
 
     // ── Identity helpers ────────────────────────────────────────────
 
-    /** FQN of a type: dotted form, inner classes use {@code .} not {@code $}. */
+    /**
+     * FQN of a type: dotted form, inner classes use {@code .}
+     * not {@code $}. Anonymous and lambda types emit a composite
+     * suffix matching Eclipse's Copy Qualified Name format so the
+     * result round-trips through {@link JdtUtils#findType}:
+     * <pre>
+     *   lambda    : pkg.Outer#enclose(Args).() -> {...} Iface
+     *   anonymous : pkg.Outer#enclose(Args).new Iface() {...}
+     *   anonymous : pkg.Outer#enclose(Args).new Super() {...}  (no iface)
+     * </pre>
+     * The suffix separator is {@code '.'} — consistent with Eclipse
+     * {@code appendTypeLabel}. Simple names (not FQN) of the
+     * interface / superclass follow Eclipse's label composition.
+     */
     static String fqnOf(IType type) {
+        try {
+            if (type.isAnonymous() || type.isLambda()) {
+                return fqnOfEnclosing(type.getParent())
+                        + "." + syntheticSuffix(type);
+            }
+        } catch (JavaModelException e) {
+            // fall through to the regular naming
+        }
         return type.getFullyQualifiedName('.');
+    }
+
+    /**
+     * FQN of a type's enclosing IJavaElement — the host member of
+     * an anonymous / lambda type. Parents are IMethod (most
+     * common), IField, IInitializer, or another IType.
+     */
+    private static String fqnOfEnclosing(IJavaElement parent)
+            throws JavaModelException {
+        if (parent instanceof IMethod m) return fqnOf(m);
+        if (parent instanceof IField f)  return fqnOf(f);
+        if (parent instanceof IType t)   return fqnOf(t);
+        IType ancestor = parent != null
+                ? (IType) parent.getAncestor(IJavaElement.TYPE) : null;
+        return ancestor != null ? fqnOf(ancestor) : "";
+    }
+
+    /**
+     * Eclipse-compatible suffix for a synthetic type. Mirrors
+     * {@code JavaElementLabelComposerCore.appendTypeLabel}'s
+     * lambda / anonymous rendering — simple super-interface name
+     * (when present) or superclass name for a class-only anonymous.
+     */
+    private static String syntheticSuffix(IType type)
+            throws JavaModelException {
+        String iface = firstSuperInterfaceSimpleName(type);
+        if (type.isLambda()) {
+            return iface != null
+                    ? "() -> {...} " + iface
+                    : "() -> {...}";
+        }
+        if (iface != null) return "new " + iface + "() {...}";
+        String superName = simpleNameOfSignature(
+                type, type.getSuperclassTypeSignature());
+        if (superName != null) return "new " + superName + "() {...}";
+        return "new {...}";
+    }
+
+    private static String firstSuperInterfaceSimpleName(IType type)
+            throws JavaModelException {
+        String[] sigs = type.getSuperInterfaceTypeSignatures();
+        return sigs.length > 0
+                ? simpleNameOfSignature(type, sigs[0]) : null;
+    }
+
+    private static String simpleNameOfSignature(IType context,
+            String signature) throws JavaModelException {
+        if (signature == null) return null;
+        String fqName = resolveTypeName(signature, context);
+        int lastDot = fqName.lastIndexOf('.');
+        return lastDot >= 0 ? fqName.substring(lastDot + 1) : fqName;
     }
 
     /**
@@ -1071,97 +1143,14 @@ class NodeBuilder {
     static JsonObject memberSkeleton(IJavaElement element)
             throws JavaModelException {
         if (element == null) return null;
-        if (element instanceof IType type) {
-            if (isSyntheticType(type)) {
-                return collapseSynthetic(
-                        memberSkeleton(type.getParent()), type);
-            }
-            return typeSkeleton(type);
-        }
-        if (element instanceof IMethod method) {
-            IType declaring = method.getDeclaringType();
-            if (isSyntheticType(declaring)) {
-                return collapseSynthetic(
-                        memberSkeleton(declaring.getParent()), declaring);
-            }
-            return methodSkeleton(method);
-        }
-        if (element instanceof IField field) {
-            IType declaring = field.getDeclaringType();
-            if (isSyntheticType(declaring)) {
-                return collapseSynthetic(
-                        memberSkeleton(declaring.getParent()), declaring);
-            }
-            return fieldSkeleton(field);
-        }
+        if (element instanceof IType type) return typeSkeleton(type);
+        if (element instanceof IMethod method) return methodSkeleton(method);
+        if (element instanceof IField field) return fieldSkeleton(field);
         // Initializers and other element kinds without their own
         // skeleton fall back to the enclosing type — references from
         // a static block attribute to the type that declared the block.
         IType enclosing = (IType) element.getAncestor(IJavaElement.TYPE);
-        if (isSyntheticType(enclosing)) {
-            return collapseSynthetic(
-                    memberSkeleton(enclosing.getParent()), enclosing);
-        }
         return enclosing != null ? typeSkeleton(enclosing) : null;
-    }
-
-    /**
-     * FQN-unaddressable IType: anonymous class ({@code Outer.N})
-     * or lambda expression (synthetic SAM type). Neither resolves
-     * through {@code IJavaProject.findType(fqn)} — the {@code .N}
-     * suffix is a compilation-unit label, not a Java Model FQN.
-     * Callers walk up to the nearest addressable enclosing member
-     * so every skeleton emitted carries a fqn the caller can feed
-     * back into @type / @method / @field / @source.
-     */
-    private static boolean isSyntheticType(IType type)
-            throws JavaModelException {
-        return type != null && (type.isAnonymous() || type.isLambda());
-    }
-
-    /**
-     * Annotate a collapsed skeleton with the synthetic-type context
-     * lost during walk-up. Adds {@code :enclosingSynthetic} sub-Map:
-     * <pre>
-     *   {:kind       "lambda" | "anonymous"
-     *    :interface  FQN of the SAM / first super-interface (if any)
-     *    :super      FQN of the superclass (anonymous-only, when no
-     *                super-interface)}
-     * </pre>
-     * Shape mirrors Eclipse's {@code appendTypeLabel}:
-     * <ul>
-     *   <li>lambda → {@code () -> {...} Runnable} → {:kind "lambda" :interface "Runnable"}</li>
-     *   <li>{@code new Runnable() {...}} → {:kind "anonymous" :interface "Runnable"}</li>
-     *   <li>{@code new Base() {...}} (no iface) → {:kind "anonymous" :super "Base"}</li>
-     * </ul>
-     * Downstream renderers can surface the context as a suffix
-     * without breaking the skeleton-fqn-is-addressable invariant.
-     * Returns {@code null} when {@code skeleton} is already null
-     * (parent chain had no addressable ancestor).
-     */
-    private static JsonObject collapseSynthetic(JsonObject skeleton,
-            IType syntheticType) throws JavaModelException {
-        if (skeleton == null) return null;
-        var ctx = new JsonObject();
-        ctx.addProperty("kind",
-                syntheticType.isLambda() ? "lambda" : "anonymous");
-        String[] superIfaces = syntheticType.getSuperInterfaceNames();
-        if (superIfaces.length > 0) {
-            ctx.addProperty("interface",
-                    resolveTypeName(
-                            syntheticType.getSuperInterfaceTypeSignatures()[0],
-                            syntheticType));
-        } else if (!syntheticType.isLambda()) {
-            String superName = syntheticType.getSuperclassName();
-            if (superName != null) {
-                ctx.addProperty("super",
-                        resolveTypeName(
-                                syntheticType.getSuperclassTypeSignature(),
-                                syntheticType));
-            }
-        }
-        skeleton.add("enclosingSynthetic", ctx);
-        return skeleton;
     }
 
     /**

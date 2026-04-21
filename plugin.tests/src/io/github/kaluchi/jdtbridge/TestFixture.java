@@ -350,6 +350,21 @@ class TestFixture {
             }
             """;
 
+    // ---- Lambda caller for synthetic-FQN round-trip tests ----
+
+    private static final String LAMBDA_CALLER_SRC = """
+            package test.service;
+
+            public class LambdaCallerService {
+                public Runnable createLambda() {
+                    return () -> {
+                        String local = "hi";
+                        System.out.println(local);
+                    };
+                }
+            }
+            """;
+
     // ---- Refactoring targets (separate classes that can be renamed/moved) ----
 
     // ---- Generic erasure testing ----
@@ -503,6 +518,9 @@ class TestFixture {
         servicePkg.createCompilationUnit(
                 "AnonymousCallerService.java",
                 ANONYMOUS_CALLER_SRC, true, null);
+        servicePkg.createCompilationUnit(
+                "LambdaCallerService.java",
+                LAMBDA_CALLER_SRC, true, null);
 
         IPackageFragment brokenPkg =
                 srcRoot.createPackageFragment("test.broken", true, null);
