@@ -107,20 +107,13 @@ describe("guideSection", () => {
     expect(typeof g.body).toBe("string");
   });
 
-  it("body contains build/test/refactor command references", () => {
+  it("body contains jdt help q fence and jdt help fence", () => {
     const g = guideSection();
-    expect(g.body).toContain("jdt q '@problems'");
-    expect(g.body).toContain("jdt test run FQN");
-    expect(g.body).toContain("jdt build --project X");
+    expect(g.body).toContain("$ jdt help q");
+    expect(g.body).toContain("$ jdt help");
+    expect(g.raw).toBe(true);
   });
 
-  it("body contains dashboard refresh hints and debug patterns", () => {
-    const g = guideSection();
-    expect(g.body).toContain("jdt status -q");
-    expect(g.body).toContain("jdt q");
-    expect(g.body).toContain("!|");
-    expect(g.body).toContain("jdt help q");
-  });
 });
 
 // ---- SECTION_NAMES ----
@@ -135,20 +128,15 @@ describe("SECTION_NAMES", () => {
     expect(SECTION_NAMES).toContain("launches");
     expect(SECTION_NAMES).toContain("tests");
     expect(SECTION_NAMES).toContain("projects");
-    expect(SECTION_NAMES).toContain("help");
     expect(SECTION_NAMES).toContain("guide");
   });
 
-  it("has 10 sections", () => {
-    expect(SECTION_NAMES.length).toBe(10);
+  it("has 9 sections", () => {
+    expect(SECTION_NAMES.length).toBe(9);
   });
 
-  it("help comes after projects and before guide", () => {
-    const helpIdx = SECTION_NAMES.indexOf("help");
-    const projectsIdx = SECTION_NAMES.indexOf("projects");
-    const guideIdx = SECTION_NAMES.indexOf("guide");
-    expect(helpIdx).toBeGreaterThan(projectsIdx);
-    expect(helpIdx).toBeLessThan(guideIdx);
+  it("guide is last section", () => {
+    expect(SECTION_NAMES[SECTION_NAMES.length - 1]).toBe("guide");
   });
 });
 
@@ -291,11 +279,11 @@ describe("cliCmd", () => {
 // ---- Integration: formatSection + sections ----
 
 describe("integration", () => {
-  it("guide as bare: body only", () => {
+  it("guide as bare: body only, no header", () => {
     const out = formatSection(guideSection(), { bare: true, quiet: false });
     expect(out).not.toContain("## Guide");
-    expect(out).not.toContain("```");
-    expect(out).toContain("jdt status");
+    expect(out).toContain("$ jdt help q");
+    expect(out).toContain("$ jdt help");
   });
 
   it("guide as multi has header", () => {

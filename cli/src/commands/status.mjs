@@ -15,7 +15,7 @@ import { resolveInstance } from "../resolve.mjs";
 
 // ---- Public API ----
 
-const SECTION_NAMES = ["intro", "git", "editors", "problems", "launch-configs", "launches", "tests", "projects", "help", "query", "guide"];
+const SECTION_NAMES = ["intro", "git", "editors", "problems", "launch-configs", "launches", "tests", "projects", "guide"];
 
 // Env vars passed to every subprocess cliCmd() spawns. Populated
 // once at the start of status() from resolveInstance() so that all
@@ -29,9 +29,9 @@ export async function status(args) {
   const requested = args.filter((a) => !a.startsWith("-"));
   const sections = requested.length > 0
     ? requested.filter((s) => SECTION_NAMES.includes(s))
-    : SECTION_NAMES.filter((s) => s !== "guide" && s !== "help");
+    : SECTION_NAMES.filter((s) => s !== "guide");
 
-  const META_SECTIONS = new Set(["intro", "query", "guide", "help"]);
+  const META_SECTIONS = new Set(["intro", "guide"]);
   const results = [];
 
   // Resolve target instance once; propagate to subprocesses via env.
@@ -52,12 +52,11 @@ export async function status(args) {
     if (renderer) results.push(await renderer());
   }
 
-  // Help and query before guide
-  if (showExtras || sections.includes("help")) results.push(helpSection());
-  if (showExtras || sections.includes("query")) results.push(querySection());
-  // Guide last
-  if (showExtras) results.push(guideSection());
-  if (sections.includes("guide") && !showExtras) results.push(guideSection());
+  // Guide = qlang reference + CLI catalog, collapsed under one
+  // section. Same in default and explicit (`jdt status guide`).
+  if (showExtras || sections.includes("guide")) {
+    results.push(guideSection());
+  }
 
   const bare = results.length === 1;
   console.log(results.map((s) => formatSection(s, { bare, quiet })).join("\n\n"));
@@ -73,9 +72,10 @@ export async function status(args) {
  * @param {boolean} opts.bare  - single section: body only, no header/fence
  * @param {boolean} opts.quiet - suppress description
  */
-function formatSection({ title, cmd, body, description }, { bare, quiet }) {
+function formatSection({ title, cmd, body, description, raw }, { bare, quiet }) {
   if (bare) return body;
   const desc = (!quiet && description) ? description + "\n\n" : "";
+  if (raw) return `## ${title}\n\n${desc}${body}`;
   return `## ${title}\n\n${desc}\`\`\`bash\n$ ${cmd}\n${body}\n\`\`\``;
 }
 
@@ -200,27 +200,62 @@ function querySection() {
 }
 
 function guideSection() {
+  const q = querySection();
+  const h = helpSection();
+  const fence = (cmd, body) =>
+    `\`\`\`bash\n$ ${cmd}\n${body}\n\`\`\``;
+  const preamble = `After an edit:
+
+  jdt q '@problems'             errors + warnings workspace-wide
+  jdt test run <FQN> -f -q      affected test, streaming result
+
+\`@problems\` on the plugin side calls \`refreshLocal(DEPTH_INFINITE)\`
+and then waits for auto-build to finish before reading markers, so
+a single invocation covers edits to existing files and
+compile-dependent warnings. \`jdt build --project <name>\` (default
+= clean + full rebuild, \`--incremental\` for incremental only) is
+reserved for the cases auto-build does not cover:
+
+- auto-build turned off in Eclipse preferences;
+- a new \`.java\` file not yet visible via \`@problems\` or \`jdt test run\` (auto-build indexing sometimes lags a fresh \`refreshLocal\`);
+- \`pom.xml\` / \`build.gradle\` / \`.classpath\` changes that need project config re-read;
+- when the incremental state is suspect (stale cached errors after major branch switch) and a clean rebuild is the known-good reset.
+
+Exit code: 0 if the build finished with no compile errors, 1 if any.
+
+The workspace has launch configurations for every run, build, and
+test. \`jdt launch configs\` lists them; \`jdt launch run <id>\` picks
+up the VM args, classpath, profiles, and environment a hand-rolled
+\`mvn\` or \`npm\` line cannot replicate. \`mvn clean\` on top of that
+wipes Eclipse's incremental build cache — the next compile then
+takes minutes instead of seconds.
+
+A single jdt query that returns the answer beats multiple \`Read\`
+and \`Grep\` iterations reconstructing what Eclipse already holds
+resolved.
+
+Edits to workspace files go through the Edit and Write tools, not
+\`sed\`, \`cat >\`, or shell redirects: only the former trigger the
+PostToolUse \`jdt refresh\` hook. A bypassed edit stays invisible to
+Eclipse until the next jdt query does its own \`refreshLocal\`; if
+the file is open in the Eclipse editor, the editor will show stale
+content and overwrite the on-disk change on save.
+
+Git operations that rewrite the working tree — \`git stash\`,
+\`git checkout <file>\`, \`git reset\` — stay out of scope; the
+developer owns that state. \`git worktree\` is also off-limits:
+Eclipse and EGit do not support worktrees cleanly (projects bind
+to a fixed path, the worktree-mode \`.git\` file confuses parts of
+the tooling), so the workspace stays on a single checkout.`;
   return {
     title: "Guide",
     cmd: "jdt status guide",
-    body: `After editing code:
-
-  jdt q '@problems'           check compilation after edit
-  jdt test run FQN -f -q      run one test, stream result
-  jdt build --project X       trigger build if auto-build is off
-
-Debug a stuck query — errors are data on stdout:
-
-  jdt q 'expr !| /kind'        broad category (:type-not-found …)
-  jdt q 'expr !| /message'     human-readable text
-  jdt q 'expr !| /context'     structured fields (:fqn, :candidates …)
-
-Dashboard controls:
-
-  jdt status -q               all data sections, no prose
-  jdt status editors problems   refresh only these
-
-Deep reference (axes, grammar, cookbook):  jdt help q`,
+    raw: true,
+    body: [
+      preamble,
+      fence(q.cmd, q.body),
+      fence(h.cmd, h.body),
+    ].join("\n\n"),
   };
 }
 
