@@ -459,6 +459,33 @@ export async function setup(args) {
     return setupRemote(args.slice(1));
   }
 
+  // Validate args: default mode installs the plugin (stops Eclipse, runs mvn
+  // verify) — must not run on typos or unknown flags. Reject anything not in
+  // the allowlist so the user gets help instead of a destructive side effect.
+  // `jdt help setup` is the way to read the help, consistent with other commands.
+  const booleanFlags = new Set([
+    "--check", "--remove", "--claude", "--remove-claude",
+    "--skip-build", "--clean",
+  ]);
+  const valueFlags = new Set(["--eclipse"]);
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (!a.startsWith("--")) {
+      console.error(`Unexpected argument: ${a}\n`);
+      console.log(help);
+      process.exit(1);
+    }
+    if (valueFlags.has(a)) {
+      if (i + 1 < args.length && !args[i + 1].startsWith("--")) i++;
+      continue;
+    }
+    if (!booleanFlags.has(a)) {
+      console.error(`Unknown option: ${a}\n`);
+      console.log(help);
+      process.exit(1);
+    }
+  }
+
   const flags = parseFlags(args);
   const config = readConfig();
   if (flags.eclipse) config.eclipse = flags.eclipse;

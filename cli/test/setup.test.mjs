@@ -391,4 +391,52 @@ describe("setup command", () => {
       expect(help).toContain("--eclipse");
     });
   });
+
+  // ---- argument validation ----
+  //
+  // Regression: `jdt setup --help` used to fall through into the default
+  // install branch, which stops Eclipse and runs `mvn verify`. Any
+  // unrecognized input must print the problem + help and exit, not install.
+
+  describe("argument validation", () => {
+    it("exits on --help and does not run install (regression)", async () => {
+      const p2InstallFn = vi.fn();
+      const stopEclipseFn = vi.fn(() => true);
+      const execSyncFn = vi.fn(() => "BUILD SUCCESS");
+      mockDeps({
+        eclipse: {
+          isEclipseRunning: () => true,
+          stopEclipse: stopEclipseFn,
+          p2Install: p2InstallFn,
+        },
+        execSync: execSyncFn,
+      });
+      const { setup } = await importSetup();
+      await expect(setup(["--help"])).rejects.toThrow("exit(1)");
+      expect(p2InstallFn).not.toHaveBeenCalled();
+      expect(stopEclipseFn).not.toHaveBeenCalled();
+      const mvnCalls = execSyncFn.mock.calls.filter(
+        ([cmd]) => typeof cmd === "string" && cmd.startsWith("mvn ") && !cmd.includes("--version")
+      );
+      expect(mvnCalls).toEqual([]);
+      expect(io.errors.some((l) => l.includes("Unknown option: --help"))).toBe(true);
+      expect(io.logs.some((l) => l.includes("jdt setup"))).toBe(true);
+    });
+
+    it("exits with error on unknown --flag", async () => {
+      mockDeps();
+      const { setup } = await importSetup();
+      await expect(setup(["--bogus"])).rejects.toThrow("exit(1)");
+      expect(io.errors.some((l) => l.includes("Unknown option: --bogus"))).toBe(true);
+      expect(io.logs.some((l) => l.includes("jdt setup"))).toBe(true);
+    });
+
+    it("exits with error on unexpected positional argument", async () => {
+      mockDeps();
+      const { setup } = await importSetup();
+      await expect(setup(["garbage"])).rejects.toThrow("exit(1)");
+      expect(io.errors.some((l) => l.includes("Unexpected argument: garbage"))).toBe(true);
+      expect(io.logs.some((l) => l.includes("jdt setup"))).toBe(true);
+    });
+  });
 });
