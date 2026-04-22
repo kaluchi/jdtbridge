@@ -287,24 +287,24 @@ bash calls within the same tab.
 
 ppid covers parallel subagents. `ppid` here means the parent PID
 of the `jdt` CLI process — i.e. the bash process that runs the `&&`
-chain. Within `jdt use 1 && jdt find Foo`, both `jdt` invocations
+chain. Within `jdt use 1 && jdt q '@projects'`, both `jdt` invocations
 are children of the same bash (same ppid). Different `&&` chains
 (parallel subagents) have different bash PIDs → different ppid pins
 → no race.
 
 | Scenario | Terminal ID | ppid |
 |---|---|---|
-| Human: `jdt use 2` then `jdt find` | same ✓ | same ✓ |
-| Sequential agent: bash1 `jdt use 2`, bash2 `jdt find` | same ✓ | different (dead) |
-| Parallel: `jdt use 1 && jdt find` / `jdt use 2 && jdt refs` | same (race) | different ✓ |
+| Human: `jdt use 2` then `jdt q ...` | same ✓ | same ✓ |
+| Sequential agent: bash1 `jdt use 2`, bash2 `jdt q ...` | same ✓ | different (dead) |
+| Parallel: `jdt use 1 && jdt q '@projects'` / `jdt use 2 && jdt q '@problems'` | same (race) | different ✓ |
 
 ### Race analysis (parallel subagents)
 
 Two parallel subagents in the same terminal tab:
 
 ```
-Subagent A (bash PID 1234):  jdt use 1 && jdt find Foo
-Subagent B (bash PID 5678):  jdt use 2 && jdt refs Bar
+Subagent A (bash PID 1234):  jdt use 1 && jdt q '"Foo" | @callers'
+Subagent B (bash PID 5678):  jdt use 2 && jdt q '"Bar" | @incomingRefs'
 ```
 
 Both write `term-<WT_SESSION>.json` — last writer wins (race).
@@ -317,9 +317,9 @@ consulted (ppid pin has priority).
 If subagents do NOT call `jdt use` (main agent pinned earlier):
 
 ```
-Main agent bash1:  jdt use 1           → term pin = ws1
-Subagent A bash2:  jdt find Foo        → ppid pin not found → term pin = ws1 ✓
-Subagent B bash3:  jdt refs Bar        → ppid pin not found → term pin = ws1 ✓
+Main agent bash1:  jdt use 1                   → term pin = ws1
+Subagent A bash2:  jdt q '"Foo" | @callers'    → ppid pin not found → term pin = ws1 ✓
+Subagent B bash3:  jdt q '"Bar" | @incomingRefs'       → ppid pin not found → term pin = ws1 ✓
 ```
 
 All subagents inherit the main agent's choice via terminal pin.
@@ -337,9 +337,13 @@ Every `jdt` command resolves its target Eclipse instance:
    → resolve workspace from instance files → use it
    → workspace offline? delete pin, continue
 4. discovery (scan instance files)
-   └─ 1 instance                          → use it
-   └─ 2+ instances                        → warn, use first
-   └─ 0 instances                         → error
+   └─ 0 live instances                    → error
+   └─ 1 live instance                     → use it
+   └─ 2+ live instances                   → step 5
+5. cwd-match across local live instances
+   (fetch /projects from each, longest-prefix match vs cwd)
+   └─ unique winner                       → use it silently
+   └─ tie or no match                     → warn, use first
 ```
 
 At steps 2-3, the pin contains a workspace path. Resolution finds
@@ -354,18 +358,52 @@ Step 2 covers parallel subagents using `jdt use N && jdt cmd`.
 
 Step 3 covers humans and sequential agents after `jdt use N`.
 
-Step 4 is the existing behavior — unchanged for single-instance users.
+Step 4 is the short-circuit for zero or one live instance —
+unchanged for single-instance users.
+
+Step 5 is the intent-driven step: when multiple Eclipse instances
+are running and no pin or env selected one, the instance whose
+project tree contains the current working directory wins. This
+matches the developer's implicit context: running jdt from inside
+`D:/git/foo` when Eclipse-A has `foo` as a project and Eclipse-B
+does not is unambiguous — pick Eclipse-A without asking.
+
+Cwd-match only considers **local** live instances. Remote instances
+(from `jdt setup remote`) operate on a different filesystem
+namespace than the CLI's cwd and are skipped — they stay resolvable
+through steps 1-3.
+
+### Cwd-match algorithm
+
+1. Normalize cwd and every project `rootPath` to
+   lowercase + forward slashes (`workspacePathsMatch` convention).
+2. For each (instance, projectRootPath) pair, check whether cwd is
+   a descendant of `rootPath` at a path boundary (exact match or
+   followed by `/`; never a partial segment like `/projA-extra`
+   matching `/projA`).
+3. Among matches, find the maximum `rootPath` length.
+4. If exactly one instance owns a match at the maximum length →
+   unique winner, resolve silently.
+5. Otherwise → ambiguous, fall through to the warning.
+
+Property: the decision depends only on cwd and the union of project
+`rootPath`s across live local instances. Adding pins (steps 2-3) or
+env vars (step 1) short-circuits before step 5 is reached.
 
 ### Multi-instance warning
 
-When resolution reaches step 4 and finds 2+ instances:
+When resolution reaches step 5 and finds no unique cwd match:
 
 ```
-⚠ Multiple Eclipse instances found. Using first.
+⚠ Multiple running Eclipse instances found. Using first.
   Run `jdt use` to see all and pin one.
 ```
 
-Single line to stderr. Does not block the command.
+Single line to stderr. Does not block the command. Compound commands
+(like `jdt status`, which spawns one subprocess per section) resolve
+the instance once at the outermost level and propagate the choice
+to subprocesses via env vars — so the warning appears at most once
+per user-invoked command, never per internal subprocess.
 
 ## Workspaces file
 
@@ -495,10 +533,11 @@ before use and cleans up on the fly.
 CLI:
   commands/use.mjs           — jdt use command implementation
   terminal-id.mjs            — resolveTerminalId()
-  resolve.mjs                — connection resolution (env → ppid pin → term pin → discovery)
+  resolve.mjs                — connection resolution (env → ppid pin → term pin → discovery → cwd-match)
   home.mjs                   — workspaces.json read/write, pins directory management
   bridge-env.mjs             — getPinnedBridge()
-  discovery.mjs              — discoverInstances() reads local + remote-instances
+  discovery.mjs              — discoverInstances() + fetchProjects() for cwd-match
+  http.mjs                   — httpRequest() shared by client / discovery
 
 Data:
   ~/.jdtbridge/use/workspaces.json         — workspace list with aliases

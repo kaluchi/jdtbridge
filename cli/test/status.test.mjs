@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   formatSection, helpSection, guideSection, reposFromServer,
-  buildDirtyMap, ago, cliCmd, SECTION_NAMES, JSON_COMMANDS,
+  buildDirtyMap, ago, cliCmd, SECTION_NAMES,
 } from "../src/commands/status.mjs";
 
 // ---- formatSection ----
 
 describe("formatSection", () => {
-  const s = { title: "Problems", cmd: "jdt problems --json", body: "[]" };
+  const s = { title: "Problems", cmd: `jdt q "@problems * {:severity /severity :file /location/file :line /location/startLine :message /message} | table"`, body: "[]" };
 
   it("bare: body only, no header, no fence", () => {
     const out = formatSection(s, { bare: true, quiet: false });
@@ -23,7 +23,7 @@ describe("formatSection", () => {
     const out = formatSection(s, { bare: false, quiet: false });
     expect(out).toContain("## Problems");
     expect(out).toContain("```bash");
-    expect(out).toContain("$ jdt problems --json");
+    expect(out).toContain(`$ jdt q "@problems * {:severity /severity :file /location/file :line /location/startLine :message /message} | table"`);
   });
 
   it("multi: code fence wraps body", () => {
@@ -56,7 +56,8 @@ describe("formatSection", () => {
 
   it("no description field: no extra blank lines", () => {
     const out = formatSection(s, { bare: false, quiet: false });
-    expect(out).toBe("## Problems\n\n```bash\n$ jdt problems --json\n[]\n```");
+    expect(out).toBe(
+      `## Problems\n\n\`\`\`bash\n$ ${s.cmd}\n[]\n\`\`\``);
   });
 
   it("multiline body preserved", () => {
@@ -106,18 +107,13 @@ describe("guideSection", () => {
     expect(typeof g.body).toBe("string");
   });
 
-  it("body contains specialized refresh", () => {
+  it("body contains jdt help q fence and jdt help fence", () => {
     const g = guideSection();
-    expect(g.body).toContain("jdt problems --project X");
-    expect(g.body).toContain("jdt test run FQN");
-    expect(g.body).toContain("jdt build --project X");
+    expect(g.body).toContain("$ jdt help q");
+    expect(g.body).toContain("$ jdt help");
+    expect(g.raw).toBe(true);
   });
 
-  it("body contains dashboard refresh hints", () => {
-    const g = guideSection();
-    expect(g.body).toContain("jdt status -q");
-    expect(g.body).toContain("jdt help <command>");
-  });
 });
 
 // ---- SECTION_NAMES ----
@@ -132,46 +128,15 @@ describe("SECTION_NAMES", () => {
     expect(SECTION_NAMES).toContain("launches");
     expect(SECTION_NAMES).toContain("tests");
     expect(SECTION_NAMES).toContain("projects");
-    expect(SECTION_NAMES).toContain("help");
     expect(SECTION_NAMES).toContain("guide");
   });
 
-  it("has 10 sections", () => {
-    expect(SECTION_NAMES.length).toBe(10);
+  it("has 9 sections", () => {
+    expect(SECTION_NAMES.length).toBe(9);
   });
 
-  it("help comes after projects and before guide", () => {
-    const helpIdx = SECTION_NAMES.indexOf("help");
-    const projectsIdx = SECTION_NAMES.indexOf("projects");
-    const guideIdx = SECTION_NAMES.indexOf("guide");
-    expect(helpIdx).toBeGreaterThan(projectsIdx);
-    expect(helpIdx).toBeLessThan(guideIdx);
-  });
-});
-
-// ---- JSON_COMMANDS ----
-
-describe("JSON_COMMANDS", () => {
-  const metaSections = new Set(["intro", "guide", "help"]);
-  const dataSections = SECTION_NAMES.filter((s) => !metaSections.has(s));
-
-  it("covers all data sections", () => {
-    for (const name of dataSections) {
-      expect(JSON_COMMANDS[name]).toBeDefined();
-      expect(JSON_COMMANDS[name]).toContain("--json");
-    }
-  });
-
-  it("excludes meta sections", () => {
-    for (const name of metaSections) {
-      expect(JSON_COMMANDS[name]).toBeUndefined();
-    }
-  });
-
-  it("each command starts with jdt", () => {
-    for (const cmd of Object.values(JSON_COMMANDS)) {
-      expect(cmd).toMatch(/^jdt /);
-    }
+  it("guide is last section", () => {
+    expect(SECTION_NAMES[SECTION_NAMES.length - 1]).toBe("guide");
   });
 });
 
@@ -314,11 +279,11 @@ describe("cliCmd", () => {
 // ---- Integration: formatSection + sections ----
 
 describe("integration", () => {
-  it("guide as bare: body only", () => {
+  it("guide as bare: body only, no header", () => {
     const out = formatSection(guideSection(), { bare: true, quiet: false });
     expect(out).not.toContain("## Guide");
-    expect(out).not.toContain("```");
-    expect(out).toContain("jdt status");
+    expect(out).toContain("$ jdt help q");
+    expect(out).toContain("$ jdt help");
   });
 
   it("guide as multi has header", () => {
@@ -360,5 +325,133 @@ describe("integration", () => {
     const fenceIdx = out.indexOf("```bash");
     expect(descIdx).toBeGreaterThan(headerIdx);
     expect(descIdx).toBeLessThan(fenceIdx);
+  });
+});
+
+// ---- Env-passthrough ----
+//
+// status() resolves the target instance once at the top and passes
+// JDT_BRIDGE_PORT / JDT_BRIDGE_TOKEN / JDT_BRIDGE_HOST into every
+// subprocess it spawns via cliCmd. Section subprocesses then hit
+// step 1 of resolveInstance's chain (env vars) and skip discovery
+// + cwd-match. Without this, every one of N sections re-resolves,
+// and the multi-instance-ambiguous path re-hits /projects N times.
+
+describe("env-passthrough", () => {
+  let origLog;
+
+  beforeEach(() => {
+    origLog = console.log;
+    console.log = () => {};
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    console.log = origLog;
+    vi.doUnmock("../src/resolve.mjs");
+    vi.doUnmock("node:child_process");
+    vi.resetModules();
+  });
+
+  it("resolveInstance runs once; subprocess env has JDT_BRIDGE_*", async () => {
+    const capturedEnvs = [];
+    let resolveCalls = 0;
+
+    vi.doMock("../src/resolve.mjs", () => ({
+      resolveInstance: async () => {
+        resolveCalls++;
+        return {
+          port: 54321, token: "tok-xyz", host: "127.0.0.1",
+          workspace: "/test/ws", pid: process.pid, file: "",
+        };
+      },
+    }));
+    vi.doMock("node:child_process", () => ({
+      execSync: (_cmd, opts) => {
+        capturedEnvs.push(opts?.env);
+        return "";
+      },
+    }));
+
+    const { status } = await import("../src/commands/status.mjs");
+    await status(["git"]);
+
+    expect(resolveCalls).toBe(1);
+    expect(capturedEnvs.length).toBeGreaterThan(0);
+    for (const env of capturedEnvs) {
+      expect(env.JDT_BRIDGE_PORT).toBe("54321");
+      expect(env.JDT_BRIDGE_TOKEN).toBe("tok-xyz");
+      expect(env.JDT_BRIDGE_HOST).toBe("127.0.0.1");
+    }
+  });
+
+  it("resolveInstance returning null leaves subprocess env untouched", async () => {
+    const capturedEnvs = [];
+
+    // Ensure no stale JDT_BRIDGE_* bleeding from the host process
+    const origPort = process.env.JDT_BRIDGE_PORT;
+    const origToken = process.env.JDT_BRIDGE_TOKEN;
+    const origHost = process.env.JDT_BRIDGE_HOST;
+    delete process.env.JDT_BRIDGE_PORT;
+    delete process.env.JDT_BRIDGE_TOKEN;
+    delete process.env.JDT_BRIDGE_HOST;
+
+    vi.doMock("../src/resolve.mjs", () => ({
+      resolveInstance: async () => null,
+    }));
+    vi.doMock("node:child_process", () => ({
+      execSync: (_cmd, opts) => {
+        capturedEnvs.push(opts?.env);
+        return "";
+      },
+    }));
+
+    try {
+      const { status } = await import("../src/commands/status.mjs");
+      await status(["git"]);
+      for (const env of capturedEnvs) {
+        expect(env.JDT_BRIDGE_PORT).toBeUndefined();
+        expect(env.JDT_BRIDGE_TOKEN).toBeUndefined();
+        expect(env.JDT_BRIDGE_HOST).toBeUndefined();
+      }
+    } finally {
+      if (origPort !== undefined) process.env.JDT_BRIDGE_PORT = origPort;
+      if (origToken !== undefined) process.env.JDT_BRIDGE_TOKEN = origToken;
+      if (origHost !== undefined) process.env.JDT_BRIDGE_HOST = origHost;
+    }
+  });
+
+  it("subprocess env preserves FORCE_COLOR and inherits process.env", async () => {
+    const capturedEnvs = [];
+    const origSentinel = process.env.__JDT_TEST_SENTINEL__;
+    process.env.__JDT_TEST_SENTINEL__ = "preserved";
+
+    vi.doMock("../src/resolve.mjs", () => ({
+      resolveInstance: async () => ({
+        port: 12345, token: "t", host: "127.0.0.1",
+        workspace: "/ws", pid: process.pid, file: "",
+      }),
+    }));
+    vi.doMock("node:child_process", () => ({
+      execSync: (_cmd, opts) => {
+        capturedEnvs.push(opts?.env);
+        return "";
+      },
+    }));
+
+    try {
+      const { status } = await import("../src/commands/status.mjs");
+      await status(["git"]);
+      for (const env of capturedEnvs) {
+        expect(env.FORCE_COLOR).toBe("1");
+        expect(env.__JDT_TEST_SENTINEL__).toBe("preserved");
+      }
+    } finally {
+      if (origSentinel !== undefined) {
+        process.env.__JDT_TEST_SENTINEL__ = origSentinel;
+      } else {
+        delete process.env.__JDT_TEST_SENTINEL__;
+      }
+    }
   });
 });

@@ -44,6 +44,8 @@
     "vitest": "^3.0.0"
   },
   "dependencies": {
+    "@kaluchi/qlang-core": "^0.4.0",
+    "@kaluchi/qlang-cli": "^0.4.0",
     "picocolors": "^1.1.0",
     "tree-kill": "^1.2.2"
   }

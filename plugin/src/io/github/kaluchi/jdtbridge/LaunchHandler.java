@@ -4,15 +4,27 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.xml.sax.SAXException;
+
+import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.debug.core.DebugPlugin;
 import org.eclipse.debug.core.ILaunch;
@@ -170,17 +182,14 @@ class LaunchHandler {
         try {
             var allConfigs =
                     launchManager().getLaunchConfigurations();
-            ILaunchConfiguration[] recent =
-                    getRecentConfigs();
+            ILaunchConfiguration[] recent = getRecentConfigs();
 
             // Recent first, then remaining — deduplicated
             var seen = new LinkedHashSet<String>();
             var arr = new JsonArray();
 
             Stream.concat(
-                    recent != null
-                            ? Arrays.stream(recent)
-                            : Stream.empty(),
+                    Arrays.stream(recent),
                     Arrays.stream(allConfigs))
                     .filter(scope::containsConfig)
                     .filter(c -> seen.add(c.getName()))
@@ -488,46 +497,86 @@ class LaunchHandler {
         return new JsonPrimitive(value.toString());
     }
 
-    @SuppressWarnings("restriction")
-    private ILaunchConfiguration[] getRecentConfigs() {
-        try {
-            var mgr = org.eclipse.debug.internal.ui.DebugUIPlugin
-                    .getDefault().getLaunchConfigurationManager();
-            var runHistory = mgr.getLaunchHistory(
-                    "org.eclipse.debug.ui.launchGroup.run");
-            var debugHistory = mgr.getLaunchHistory(
-                    "org.eclipse.debug.ui.launchGroup.debug");
+    /** Launch groups queried for recency, in fixed priority order.
+     *  Coverage group belongs to EclEmma — absent from history XML
+     *  when the plugin is not installed (section simply missing). */
+    private static final List<String> LAUNCH_GROUPS = List.of(
+            "org.eclipse.debug.ui.launchGroup.run",
+            "org.eclipse.debug.ui.launchGroup.debug",
+            "org.eclipse.eclemma.ui.launchGroup.coverage");
 
-            var result = new java.util.ArrayList<
-                    ILaunchConfiguration>();
-            var seen = new java.util.HashSet<String>();
+    /**
+     * Recent-used launch configurations, ordered:
+     *   1. favorites (by LAUNCH_GROUPS priority)
+     *   2. mruHistory (by LAUNCH_GROUPS priority, most-recent first)
+     * dedup by name across the whole sequence.
+     *
+     * Source: workspace-local <code>launchConfigurationHistory.xml</code>,
+     * persisted by Eclipse on workspace save (not on each launch — so
+     * this lags in-memory state by up to a workspace save interval).
+     * Read directly instead of via DebugUIPlugin so the code works in
+     * headless PDE test runtimes where UI bundles can't activate.
+     *
+     * Returns empty array when history file is absent (fresh workspace).
+     */
+    private ILaunchConfiguration[] getRecentConfigs()
+            throws IOException, ParserConfigurationException,
+                   SAXException, CoreException {
+        File historyFile = historyFile();
+        if (!historyFile.exists()) return new ILaunchConfiguration[0];
 
-            if (runHistory != null) {
-                for (var c : runHistory.getFavorites()) {
-                    if (seen.add(c.getName())) result.add(c);
-                }
-            }
-            if (debugHistory != null) {
-                for (var c : debugHistory.getFavorites()) {
-                    if (seen.add(c.getName())) result.add(c);
-                }
-            }
-            if (runHistory != null) {
-                for (var c : runHistory.getHistory()) {
-                    if (seen.add(c.getName())) result.add(c);
-                }
-            }
-            if (debugHistory != null) {
-                for (var c : debugHistory.getHistory()) {
-                    if (seen.add(c.getName())) result.add(c);
-                }
-            }
+        Document doc = DocumentBuilderFactory.newInstance()
+                .newDocumentBuilder().parse(historyFile);
+        ILaunchManager lm = launchManager();
+        List<ILaunchConfiguration> out = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
 
-            if (!result.isEmpty()) {
-                return result.toArray(
-                        new ILaunchConfiguration[0]);
-            }
-        } catch (Throwable e) {
+        for (String section : List.of("favorites", "mruHistory"))
+            for (String groupId : LAUNCH_GROUPS)
+                collectSection(doc, groupId, section, lm, out, seen);
+        return out.toArray(new ILaunchConfiguration[0]);
+    }
+
+    private static File historyFile() {
+        return ResourcesPlugin.getWorkspace().getRoot().getLocation()
+                .append(".metadata/.plugins/org.eclipse.debug.ui"
+                        + "/launchConfigurationHistory.xml")
+                .toFile();
+    }
+
+    private static void collectSection(Document doc, String groupId,
+            String sectionName, ILaunchManager lm,
+            List<ILaunchConfiguration> out, Set<String> seen)
+            throws CoreException {
+        Element group = findLaunchGroup(doc, groupId);
+        if (group == null) return;
+        Element section = childElement(group, sectionName);
+        if (section == null) return;
+        var launches = section.getElementsByTagName("launch");
+        for (int i = 0; i < launches.getLength(); i++) {
+            String memento = ((Element) launches.item(i))
+                    .getAttribute("memento");
+            ILaunchConfiguration c = lm.getLaunchConfiguration(memento);
+            if (c != null && c.exists() && seen.add(c.getName()))
+                out.add(c);
+        }
+    }
+
+    private static Element findLaunchGroup(Document doc, String id) {
+        var groups = doc.getElementsByTagName("launchGroup");
+        for (int i = 0; i < groups.getLength(); i++) {
+            Element g = (Element) groups.item(i);
+            if (id.equals(g.getAttribute("id"))) return g;
+        }
+        return null;
+    }
+
+    private static Element childElement(Element parent, String name) {
+        var children = parent.getChildNodes();
+        for (int i = 0; i < children.getLength(); i++) {
+            Node n = children.item(i);
+            if (n instanceof Element e && name.equals(e.getTagName()))
+                return e;
         }
         return null;
     }

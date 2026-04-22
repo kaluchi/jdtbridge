@@ -48,13 +48,13 @@ describe("formatTestStatus", () => {
     expect(logs[0]).toContain("(stopped)");
   });
 
-  it("shows FAIL with FQMN # format and [M] badge", () => {
+  it("shows FAIL with FQN # format and [M] badge", () => {
     formatTestStatus({
       session: "test-1", label: "FooTest", state: "finished",
       total: 2, completed: 2, passed: 1, failed: 1, errors: 0, ignored: 0,
       time: 1.0,
       entries: [{
-        fqmn: "com.example.FooTest#testBar", status: "FAIL", time: 0.1, trace: "AssertionError",
+        fqn: "com.example.FooTest#testBar", status: "FAIL", time: 0.1, trace: "AssertionError",
       }],
     });
     expect(logs.some((l) => l.includes("FAIL"))).toBe(true);
@@ -68,7 +68,7 @@ describe("formatTestStatus", () => {
       total: 1, completed: 1, passed: 0, failed: 0, errors: 1, ignored: 0,
       time: 0.1,
       entries: [{
-        fqmn: "com.example.FooTest#testBoom", status: "ERROR", time: 0.05, trace: "NPE",
+        fqn: "com.example.FooTest#testBoom", status: "ERROR", time: 0.05, trace: "NPE",
       }],
     });
     expect(logs.some((l) => l.includes("ERROR"))).toBe(true);
@@ -81,7 +81,7 @@ describe("formatTestStatus", () => {
       total: 1, completed: 1, passed: 0, failed: 0, errors: 0, ignored: 1,
       time: 0.1,
       entries: [{
-        fqmn: "com.example.FooTest#testSkipped", status: "IGNORED",
+        fqn: "com.example.FooTest#testSkipped", status: "IGNORED",
       }],
     });
     expect(logs.some((l) => l.includes("IGNORED"))).toBe(true);
@@ -113,9 +113,9 @@ describe("formatTestEvent", () => {
     console.log = origLog;
   });
 
-  it("PASS: logs line containing PASS, [M], backtick-wrapped FQMN with #, time", () => {
+  it("PASS: logs line containing PASS, [M], backtick-wrapped FQN with #, time", () => {
     const result = formatTestEvent(JSON.stringify({
-      event: "case", fqmn: "com.example.FooTest#testBar", status: "PASS", time: 0.123,
+      event: "case", fqn: "com.example.FooTest#testBar", status: "PASS", time: 0.123,
     }));
     expect(result).toBe(true);
     expect(logs[0]).toContain("PASS");
@@ -124,9 +124,9 @@ describe("formatTestEvent", () => {
     expect(logs[0]).toContain("0.123s");
   });
 
-  it("FAIL: logs FAIL, FQMN, trace lines", () => {
+  it("FAIL: logs FAIL, FQN, trace lines", () => {
     const result = formatTestEvent(JSON.stringify({
-      event: "case", fqmn: "com.example.FooTest#testBar", status: "FAIL", time: 0.1,
+      event: "case", fqn: "com.example.FooTest#testBar", status: "FAIL", time: 0.1,
       trace: "AssertionError: expected 1 but was 2\n  at FooTest.testBar(FooTest.java:10)",
     }));
     expect(result).toBe(true);
@@ -135,9 +135,9 @@ describe("formatTestEvent", () => {
     expect(logs.some((l) => l.includes("AssertionError"))).toBe(true);
   });
 
-  it("ERROR: logs ERROR, FQMN", () => {
+  it("ERROR: logs ERROR, FQN", () => {
     const result = formatTestEvent(JSON.stringify({
-      event: "case", fqmn: "com.example.FooTest#testBoom", status: "ERROR", time: 0.05,
+      event: "case", fqn: "com.example.FooTest#testBoom", status: "ERROR", time: 0.05,
       trace: "NullPointerException",
     }));
     expect(result).toBe(true);
@@ -145,9 +145,9 @@ describe("formatTestEvent", () => {
     expect(logs[0]).toContain("com.example.FooTest#testBoom");
   });
 
-  it("IGNORED: logs IGNORED, FQMN", () => {
+  it("IGNORED: logs IGNORED, FQN", () => {
     const result = formatTestEvent(JSON.stringify({
-      event: "case", fqmn: "com.example.FooTest#testSkipped", status: "IGNORED",
+      event: "case", fqn: "com.example.FooTest#testSkipped", status: "IGNORED",
     }));
     expect(result).toBe(true);
     expect(logs[0]).toContain("IGNORED");
@@ -156,7 +156,7 @@ describe("formatTestEvent", () => {
 
   it("includes expected/actual when present", () => {
     formatTestEvent(JSON.stringify({
-      event: "case", fqmn: "com.example.FooTest#testBar", status: "FAIL", time: 0.1,
+      event: "case", fqn: "com.example.FooTest#testBar", status: "FAIL", time: 0.1,
       expected: "42", actual: "99", trace: "AssertionError",
     }));
     expect(logs.some((l) => l.includes("Expected: 42"))).toBe(true);
@@ -166,7 +166,7 @@ describe("formatTestEvent", () => {
   it("truncates trace at 10 lines", () => {
     const longTrace = Array.from({ length: 20 }, (_, i) => `  at line ${i}`).join("\n");
     formatTestEvent(JSON.stringify({
-      event: "case", fqmn: "T#m", status: "FAIL", time: 0.1, trace: longTrace,
+      event: "case", fqn: "T#m", status: "FAIL", time: 0.1, trace: longTrace,
     }));
     expect(logs.some((l) => l.includes("..."))).toBe(true);
     expect(logs.some((l) => l.includes("at line 15"))).toBe(false);
@@ -250,9 +250,9 @@ describe("testRunGuide", () => {
     expect(guide).toContain("jdt launch stop FooTest:123");
   });
 
-  it("includes 'jdt source' hint", () => {
+  it("includes '@source' navigation hint", () => {
     const guide = testRunGuide("FooTest:1775000", "FooTest:123");
-    expect(guide).toContain("jdt source");
+    expect(guide).toContain("@source");
   });
 
   it("includes --all flag explanation", () => {
@@ -279,7 +279,7 @@ describe("testRunGuide", () => {
 
   it("includes jdt test run rerun command", () => {
     const guide = testRunGuide("FooTest:1775000", "FooTest:123");
-    expect(guide).toContain("jdt test run <FQMN> -f");
+    expect(guide).toContain("jdt test run <FQN> -f");
   });
 
   it("includes -q suppression note", () => {

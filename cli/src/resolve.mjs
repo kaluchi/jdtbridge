@@ -3,7 +3,7 @@
 
 import { execSync } from "node:child_process";
 import { getPinnedBridge } from "./bridge-env.mjs";
-import { discoverInstances } from "./discovery.mjs";
+import { discoverInstances, fetchProjects } from "./discovery.mjs";
 import { resolveTerminalId } from "./terminal-id.mjs";
 import { readPin, writePin, deletePin, listPins } from "./home.mjs";
 import { normalizePath } from "./paths.mjs";
@@ -33,15 +33,18 @@ export async function resolveInstance() {
     };
   }
 
-  // Discover once, reuse across steps 2-4
+  // Discover once, reuse across steps 2-4. Filter to live
+  // instances up front — remote instances have no PID to check.
   const instances = await discoverInstances();
+  const live = instances.filter(
+      i => i.remote || !i.pid || isPidAlive(i.pid));
 
   // Step 2: ppid pin
   const ppidFile = `ppid-${process.ppid}.json`;
   const ppidPin = readPin(ppidFile);
   if (ppidPin) {
     if (isPidAlive(process.ppid)) {
-      const match = findByWorkspace(instances, ppidPin.workspace);
+      const match = findByWorkspace(live, ppidPin.workspace);
       if (match) return match;
     }
     deletePin(ppidFile);
@@ -53,7 +56,7 @@ export async function resolveInstance() {
     const termFile = `term-${termId}.json`;
     const termPin = readPin(termFile);
     if (termPin) {
-      const match = findByWorkspace(instances, termPin.workspace);
+      const match = findByWorkspace(live, termPin.workspace);
       if (match) return match;
       // Workspace offline — stale pin
       deletePin(termFile);
@@ -61,15 +64,70 @@ export async function resolveInstance() {
   }
 
   // Step 4: discovery fallback
-  if (instances.length === 0) return null;
-  if (instances.length === 1) return instances[0];
+  if (live.length === 0) return null;
+  if (live.length === 1) return live[0];
 
-  // Multiple instances — warn
+  // Step 5: cwd-match across local live instances.
+  // Fires only in multi-instance ambiguity. Picks the instance whose
+  // project tree contains cwd (longest-prefix match). Unique winner
+  // wins silently; ties or no match fall through to the warning.
+  const cwdMatch = await findInstanceByCwd(live);
+  if (cwdMatch) return cwdMatch;
+
+  // Multiple live instances, no pin, no cwd match — warn
   process.stderr.write(
-    "\u26A0 Multiple Eclipse instances found. Using first.\n" +
+    "\u26A0 Multiple running Eclipse instances found. Using first.\n" +
     "  Run `jdt use` to see all and pin one.\n",
   );
-  return instances[0];
+  return live[0];
+}
+
+/**
+ * cwd-match: for multi-instance ambiguity, find the instance whose
+ * projects contain cwd. Returns the instance or null.
+ *
+ * Longest-prefix match across (instance, projectRootPath) pairs.
+ * Remote instances are skipped — their project rootPaths live in a
+ * different filesystem namespace than the CLI's cwd.
+ *
+ * @param {import('./discovery.mjs').Instance[]} liveInstances
+ * @returns {Promise<import('./discovery.mjs').Instance|null>}
+ */
+async function findInstanceByCwd(liveInstances) {
+  const cwd = normalizeWorkspacePath(process.cwd());
+  const localLive = liveInstances.filter((i) => !i.remote);
+  if (localLive.length === 0) return null;
+
+  const projectsByInstance = await Promise.all(
+    localLive.map((inst) => fetchProjects(inst)),
+  );
+
+  let winner = null;
+  let longest = 0;
+  let tied = false;
+  for (let i = 0; i < localLive.length; i++) {
+    const inst = localLive[i];
+    const projects = projectsByInstance[i];
+    for (const p of projects) {
+      if (!p || typeof p.rootPath !== "string") continue;
+      const root = normalizeWorkspacePath(p.rootPath);
+      if (!cwdStartsWith(cwd, root)) continue;
+      if (root.length > longest) {
+        longest = root.length;
+        winner = inst;
+        tied = false;
+      } else if (root.length === longest && inst !== winner) {
+        tied = true;
+      }
+    }
+  }
+  return tied ? null : winner;
+}
+
+/** cwd starts with root at a path boundary (exact or followed by /). */
+function cwdStartsWith(cwd, root) {
+  if (!cwd.startsWith(root)) return false;
+  return cwd.length === root.length || cwd[root.length] === "/";
 }
 
 /**

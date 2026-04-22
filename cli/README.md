@@ -37,16 +37,37 @@ All data-returning commands support `--json` for structured output (JSON snapsho
 jdt status [sections...] [-q]                          # workspace overview (start here)
 ```
 
-### Search & navigation
+### Graph query
+
+`jdt q '<qlang-pipeline>'` (alias: `q`) evaluates a qlang pipeline
+against the Eclipse JDT graph. Every navigation composes through
+axis operands.
+
+Pipelines start with a SEED (literal string or nullary operand) and
+chain operands that read their subject from pipeValue. Identifiers
+are never captured arguments — that's RPC. Filtering and composition
+uses core qlang (filter, *, >>, |, !|, as, let).
 
 ```bash
-jdt find <Name|*Pattern*|pkg> [--source-only]          # find types by name, wildcard, or package
-jdt references <FQMN> [--field <name>]                 # (alias: refs) references to type/method/field
-jdt implementors <FQN>[#method]                        # (alias: impl) type or method implementors
-jdt hierarchy <FQN>                                    # (alias: hier) supers + interfaces + subtypes
-jdt outline <FQN>                                      # Eclipse Outline View (fields, methods, types)
-jdt source <FQMN> [<FQMN> ...]                         # (alias: src) source code (project + libraries)
+jdt query '<qlang>'                                    # eval qlang pipeline
+jdt q '"*Service" | @types * /fqn'                     # pattern search
+jdt q '"com.example.Foo" | @type | @members'           # type detail then members
+jdt q '"com.example.Animal" | @subtypes * /fqn'        # direct subtypes
+jdt q '"com.example.Foo" | @ancestors * /fqn'          # transitive supertypes
+jdt q '"com.example.Foo#bar()" | @callers * /fqn'      # incoming call sites
+jdt q '"com.example.Foo" | @source'                    # source text
+jdt q '@projects * /fqn'                               # workspace projects
+jdt q '@problems'                                      # compilation problems
 ```
+
+Bare-name reify shows operand descriptors:
+
+```bash
+jdt q '@subtypes'                                      # :docs / :examples / :throws
+jdt q 'manifest * /name'                               # full operand catalog
+```
+
+See `jdt status intro` for the canonical sell-through pipelines.
 
 ### Testing & building
 
@@ -66,18 +87,16 @@ All commands auto-refresh from disk. `build` is the only command that triggers e
 ### Diagnostics
 
 ```bash
-jdt problems [--file <path>] [--project <name>]        # (alias: err) IMarker.PROBLEM markers
-jdt problems --warnings --all                          # include warnings and all marker types
+jdt q '@problems'                                      # workspace-wide problems
+jdt q '@problems | filter(/containingProject | eq("p"))' # filter
 jdt refresh <file> [<file> ...] [-q]                   # (alias: r) notify Eclipse of file changes
 jdt refresh --project <name>                           # refresh entire project
 jdt refresh                                            # refresh entire workspace
 ```
 
-`problems` file paths are workspace-relative: `my-app/src/main/java/.../Foo.java`.
 `refresh` accepts absolute paths (converted to workspace resources automatically).
-
-A PostToolUse hook (`jdt setup --claude`) calls `jdt refresh` automatically
-after every Edit/Write — Eclipse stays in sync without manual intervention.
+A PostToolUse hook (`jdt setup --claude`) calls `jdt refresh` automatically after
+every Edit/Write — Eclipse stays in sync without manual intervention.
 
 ### Maven
 
@@ -95,8 +114,7 @@ jdt maven up -q                                        # quiet mode, suppress gu
 ```bash
 jdt organize-imports <file>                            # (alias: oi) organize imports
 jdt format <file>                                      # (alias: fmt) format code (Eclipse settings)
-jdt rename <FQN> <newName>                             # rename type
-jdt rename <FQMN> <newName>                            # rename method (FQMN includes method)
+jdt rename <FQN> <newName>                             # rename type or method (FQN = pkg.T or pkg.T#m(A))
 jdt rename <FQN> <newName> --field <old>               # rename field
 jdt move <FQN> <target.package>                        # move type to another package
 ```
@@ -123,14 +141,14 @@ Console output persists in Eclipse and is available via `launch logs` at any tim
 ### Editor
 
 ```bash
-jdt open <FQMN>                                        # open in Eclipse editor
+jdt open <FQN>                                         # open in Eclipse editor
 ```
 
 ### Workspace detail
 
 ```bash
-jdt projects                                           # list workspace projects (name, location, repo)
-jdt project-info <name> [--lines N]                    # (alias: pi) project overview (adaptive detail)
+jdt q '@projects * /fqn'                               # workspace project FQNs
+jdt q '"my-server" | @project'                         # full project detail (natures, classpath, deps)
 jdt editors                                            # (alias: ed) open editors (FQN, project, path)
 jdt git [list] [repo...] [--no-files] [--limit N]      # git repos, branches, dirty state
 ```

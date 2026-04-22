@@ -75,9 +75,9 @@ Runner:    JUnit 6
   `jdt launch stop HttpServerBindTest:6408`            abort
   `jdt launch clear HttpServerBindTest:6408`           remove
 
-**Navigate** — FQMNs from status output are copy-pasteable:
-  `jdt source <FQMN>`                     view test source
-  `jdt test run <FQMN> -f`                re-run single test
+**Navigate** — FQNs from status output are copy-pasteable:
+  `jdt q '"<FQN>" | @source'`            view test source
+  `jdt test run <FQN> -f`                re-run single test
 
 Add `-q` to suppress this guide.
 ```
@@ -181,13 +181,13 @@ my-project:1774554000000          my-project          150    running (87/150)   
 | Eclipse UI element | CLI equivalent |
 |---|---|
 | Progress bar + `Runs: 3/11` | Summary line: `87/150 (running)` |
-| Test tree with pass/fail icons | Flat list: `PASS/FAIL [M]` + FQMN |
+| Test tree with pass/fail icons | Flat list: `PASS/FAIL [M]` + FQN |
 | Failure Trace panel | Inline trace after FAIL/ERROR entry |
 | Console output | `jdt launch logs <launchId>` |
 | "Show Failures Only" toggle | Default mode (no flag) |
 | "Show Skipped Tests Only" toggle | `--ignored` flag |
 | History dropdown | `jdt test runs` |
-| Re-run / Re-run failures | `jdt test run <FQMN> -f` |
+| Re-run / Re-run failures | `jdt test run <FQN> -f` |
 | Timing per test | `(0.005s)` after each entry |
 
 ## Filtering
@@ -203,23 +203,24 @@ Maps Eclipse JUnit View toolbar toggles:
 Summary line always shown regardless of filter.
 Filters apply to both snapshot and `-f` stream modes.
 
-## FQMN format conventions
+## FQN format conventions
 
-Test output follows `jdt source` conventions
-(see [jdt-source-spec](jdt-source-spec.md)):
+Test output follows the repo-wide FQN conventions
+(see [jdt-query-spec § Identity](jdt-query-spec.md#identity)):
 
-1. **Zero-Modification Navigation** — every FQMN is a valid argument
-   for `jdt source` and `jdt test run`
-2. **Badge-Link Separation** — `[M]` prefix is visual, not part of FQMN
-3. **Full Qualification** — never truncate packages
-4. **`#` separator** — `Class#method`
+1. **Zero-Modification Navigation** — every FQN is a valid subject
+   for `jdt q` axes (`@method`, `@source`, `@callers`, …) and for
+   `jdt test run`.
+2. **Badge-Link Separation** — `[M]` prefix is visual, not part of FQN.
+3. **Full Qualification** — never truncate packages.
+4. **`#` separator** — `Class#method`.
 
 Example:
 ```
 FAIL [M] `com.example.OrderServiceTest#testCalculateTotal` (0.3s)
 ```
-- Copy FQMN → `jdt source com.example.OrderServiceTest#testCalculateTotal`
-- Copy FQMN → `jdt test run com.example.OrderServiceTest#testCalculateTotal -f`
+- Copy FQN → `jdt q '"com.example.OrderServiceTest#testCalculateTotal" | @source'`
+- Copy FQN → `jdt test run com.example.OrderServiceTest#testCalculateTotal -f`
 
 Nested test classes use `.` for class nesting, `#` for method:
 ```
@@ -241,8 +242,8 @@ PASS [M] `pkg.OuterTest.InnerSuite#testMethod` (0.001s)
 
 - **Flat output, not tree.** Eclipse JUnit view shows a tree
   (session → suite → class → method → parameterized instance, up to
-  4 levels). CLI flattens to `FQMN` per test case. The tree hierarchy
-  is encoded in the FQMN itself (`OuterClass.InnerClass#method`).
+  4 levels). CLI flattens to `FQN` per test case. The tree hierarchy
+  is encoded in the FQN itself (`OuterClass.InnerClass#method`).
 
 - **Failures by default.** In test output, what matters is what broke.
   `--all` is opt-in for verification. Same philosophy as Eclipse's

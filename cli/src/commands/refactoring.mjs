@@ -1,5 +1,5 @@
 import { get } from "../client.mjs";
-import { extractPositional, parseFlags, parseFqmn } from "../args.mjs";
+import { extractPositional, parseFlags, parseFqn } from "../args.mjs";
 import { toWsPath } from "../paths.mjs";
 import { green, yellow } from "../color.mjs";
 
@@ -46,7 +46,7 @@ export async function format(args) {
 export async function rename(args) {
   const pos = extractPositional(args);
   const flags = parseFlags(args);
-  const parsed = parseFqmn(pos[0]);
+  const parsed = parseFqn(pos[0]);
   const fqn = parsed.className;
   const newName = pos[1];
   if (!fqn || !newName) {

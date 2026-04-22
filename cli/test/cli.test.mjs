@@ -38,8 +38,8 @@ describe("cli dispatcher", () => {
   });
 
   it("shows command help for known command", async () => {
-    await run(["help", "find"]);
-    expect(logs.some((l) => l.includes("find"))).toBe(true);
+    await run(["help", "build"]);
+    expect(logs.some((l) => l.includes("incremental"))).toBe(true);
   });
 
   it("exits with error for unknown command", async () => {
@@ -56,19 +56,18 @@ describe("cli dispatcher", () => {
   });
 
   it("resolves alias in help", async () => {
-    await run(["help", "refs"]);
-    expect(logs.some((l) => l.includes("references"))).toBe(true);
+    await run(["help", "q"]);
+    expect(logs.some((l) => l.includes("qlang-pipeline"))).toBe(true);
   });
 
   it("shows aliases in overview", async () => {
     await run(["--help"]);
     const output = logs.join("\n");
-    expect(output).toContain("refs");
-    expect(output).toContain("impl");
-    expect(output).toContain("impl");
-    expect(output).toContain("hier");
-    expect(output).toContain("src");
-    expect(output).toContain("err");
+    expect(output).toContain("q");
+    expect(output).toContain("oi");
+    expect(output).toContain("ed");
+    expect(output).toContain("b");
+    expect(output).toContain("r");
     expect(output).toContain("fmt");
   });
 

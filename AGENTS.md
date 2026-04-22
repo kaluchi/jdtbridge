@@ -10,9 +10,10 @@ Required tools (verified by `jdt setup --check`):
 
 ### Eclipse source bundles (recommended)
 
-`jdt source` needs source bundles to read Eclipse Platform/JDT API source
-and javadoc. Without them, `jdt source org.eclipse.core.runtime.CoreException`
-returns "Source not available". Install all Eclipse source bundles once
+The `@source` axis needs source bundles to read Eclipse Platform/JDT API
+source and javadoc. Without them,
+`jdt q '"org.eclipse.core.runtime.CoreException" | @source'` returns
+"Source not available". Install all Eclipse source bundles once
 (Eclipse must NOT be running):
 
 ```bash
@@ -78,39 +79,46 @@ string matches; `jdt` returns semantic results from Eclipse's compiler index.
 with the full command reference. `jdt help <command>` for detailed usage
 of any command.
 
-### `jdt source` — hypertext navigation
+### `jdt q` — graph query language
 
-`jdt source` returns markdown with source code and resolved references.
-Each reference is a ready FQMN for the next `jdt source` call.
+`jdt q '<qlang-pipeline>'` evaluates a qlang pipeline against the
+Eclipse semantic graph. The graph is navigated through operand axes
+that consume a node-Map (skeleton or detail) OR a fqn string
+from `pipeValue`. Output is qlang-literal; fqn strings in the result
+are ready subjects for the next step.
 
-References are grouped by:
-- **Same-class members** — with javadoc (saves a hop)
-- **Project source** — with absolute paths and javadoc
-- **Dependencies** — bare FQMNs
+Full axis catalog, sugar conduits, and modifier syntax live in
+`jdt help q` (runtime truth) and `docs/jdt-query-spec.md`.
 
-All paths are absolute OS paths (converted via `toSandboxPath` in Docker sandbox).
+### FQN — member form
 
-### FQMN (Fully Qualified Method Name)
-
-Commands that accept methods support FQMN — class and method in one argument:
+Every node carries one identifier field, `:fqn`. Per kind:
 
 ```
-pkg.Class#method              any overload
-pkg.Class#method()            zero-arg overload
-pkg.Class#method(String)      specific signature
-pkg.Class.method(String)      Eclipse Copy Qualified Name style
+pkg.Class                     type
+pkg.Class#fieldName           field or unambiguous method by name
+pkg.Class#method()            zero-arg method
+pkg.Class#method(String)      method with erased parameter signature
+pkg.Class.method(String)      Eclipse Copy Qualified Name — also accepted
 ```
 
-Types can be simple (`String`) or FQN (`java.lang.String`).
-Generics are stripped: `List<String>` matches `List`.
+A bare `pkg.Class#method` without parens is ambiguous when the
+type has multiple overloads; the error descriptor carries
+`:candidates` so the caller can pick and retry. Types can be
+simple (`String`) or qualified (`java.lang.String`); generics
+are stripped — `List<String>` matches `List`.
 
-### Pipe composability
+### Pipeline composability
+
+All of the below return a single qlang-literal value — ready for
+pipe-chaining with standard shell tools or further `jdt q` calls.
 
 ```bash
-jdt outline io.github.kaluchi.jdtbridge.SearchHandler -q | grep handle   # find members by name
-jdt refs io.github.kaluchi.jdtbridge.JdtUtils#findMethod | wc -l # count, not 51 lines
-jdt problems --project my-server | head -5                       # one problem at a time
-jdt src org.springframework.jdbc.core.JdbcTemplate#query | grep -n throw  # throws in library code
+jdt q '"io.github.kaluchi.jdtbridge.SearchHandler" | @members * /name'
+jdt q '"io.github.kaluchi.jdtbridge.JdtUtils#findMethod" | @callers | count'
+jdt q '"my-server" | @problems * /message'
+jdt q '"org.springframework.jdbc.core.JdbcTemplate#query" | @source' | grep -n throw
+jdt q '"io.github.kaluchi.jdtbridge.HttpServer" | @methods | @untested * /fqn'
 ```
 
 ### Subagents (Explore, Plan)
@@ -129,7 +137,7 @@ and auto-allow hooks — no setup needed.
 **When NOT to use subagents:**
 - Writing code, editing files — do it yourself, not subagents.
 - Simple `jdt` queries (one command) — call `jdt` directly, don't
-  spawn a subagent for `jdt refs Foo#bar`.
+  spawn a subagent for `jdt q '"Foo#bar" | @callers'`.
 - Non-Java exploration — subagents add jdt overhead, use plain
   Grep/Glob for config files, scripts, docs.
 
@@ -272,8 +280,9 @@ Important:
 - **Plugin tests run in a PDE test runtime** with workspace bundles
   (not the installed plugin). `jdt build` is enough — no `jdt setup`
   needed before running tests.
-- **But `jdt setup` IS needed** to test live behavior (e.g. `jdt find`,
-  `jdt hier`) because those go through the installed plugin's HTTP server.
+- **But `jdt setup` IS needed** to test live behavior (`jdt q` axes,
+  `jdt launch`, `jdt open`, etc.) because those go through the
+  installed plugin's HTTP server.
 - **Build before testing:** `jdt build --project io.github.kaluchi.jdtbridge.tests`
   — otherwise new test classes won't be found.
 - **TestFixture lifecycle:** each test class needs `@BeforeAll static void
@@ -298,9 +307,9 @@ Windows and Linux (CI). Path conversion tests mock `process.platform`.
 ### Plugin changes → live testing
 
 Plugin tests run in a PDE test runtime (workspace bundles) — `jdt build`
-is enough. But live commands (`jdt find`, `jdt refs`, `jdt launch config
---delete`) go through the **installed** plugin's HTTP server. After
-changing plugin code:
+is enough. But live commands (`jdt q`, `jdt launch config --delete`,
+`jdt refactor`, `jdt open`, `jdt test run`) go through the **installed**
+plugin's HTTP server. After changing plugin code:
 
 ```bash
 jdt build --project io.github.kaluchi.jdtbridge        # compile

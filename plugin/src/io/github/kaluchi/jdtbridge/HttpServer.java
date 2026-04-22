@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class HttpServer {
 
-    private final SearchHandler search = new SearchHandler();
+    private final GraphHandler graph = new GraphHandler();
     private final DiagnosticsHandler diagnostics =
             new DiagnosticsHandler();
     private final MavenHandler maven = new MavenHandler();
@@ -39,9 +39,30 @@ public class HttpServer {
             new TestSessionHandler();
     private final TestHandler testHandler =
             new TestHandler();
-    private final ProjectHandler projectInfo = new ProjectHandler();
+    private final LogHandler logHandler = new LogHandler();
     private final SessionScope sessionScope = new SessionScope();
     private final RequestTracker requestTracker = new RequestTracker();
+
+    /**
+     * Diagnostic: log every request handler that takes longer than
+     * this (in ms) to the Eclipse .log at INFO. Read from env var
+     * {@code JDT_LOG_SLOW_REQUESTS_MS}; absent / non-positive →
+     * {@link Long#MAX_VALUE} (nothing logged). Set to {@code 0} to
+     * log every request, set to {@code 5000} to see only stragglers.
+     * Undocumented knob — meant for diagnosing locks and queues.
+     */
+    private static final long SLOW_REQUEST_THRESHOLD_MS = resolveSlowThreshold();
+
+    private static long resolveSlowThreshold() {
+        String raw = System.getenv("JDT_LOG_SLOW_REQUESTS_MS");
+        if (raw == null) return Long.MAX_VALUE;
+        try {
+            long parsed = Long.parseLong(raw.trim());
+            return parsed >= 0 ? parsed : Long.MAX_VALUE;
+        } catch (NumberFormatException e) {
+            return Long.MAX_VALUE;
+        }
+    }
     private final ConfigService configService =
             new ConfigService(Activator.getHome());
     private final WelcomeHandler welcome =
@@ -163,6 +184,10 @@ public class HttpServer {
     }
 
     private void handle(Socket socket) {
+        long startNs = System.nanoTime();
+        String method = null;
+        String path = null;
+        String sessionHeader = null;
         try (socket) {
             socket.setSoTimeout(30_000);
             BufferedReader reader = new BufferedReader(
@@ -175,11 +200,10 @@ public class HttpServer {
             String[] parts = requestLine.split(" ");
             if (parts.length < 2) return;
 
-            String method = parts[0];
+            method = parts[0];
 
             // Read headers
             String authHeader = null;
-            String sessionHeader = null;
             int contentLength = 0;
             String line;
             while ((line = reader.readLine()) != null
@@ -212,7 +236,6 @@ public class HttpServer {
             }
 
             String fullPath = parts[1];
-            String path;
             Map<String, String> params;
             int q = fullPath.indexOf('?');
             if (q >= 0) {
@@ -272,16 +295,87 @@ public class HttpServer {
             ProjectScope scope = sessionScope.resolve(
                     sessionHeader);
 
-            long startNs = System.nanoTime();
             Response resp = dispatch(path, params, body, scope);
             long durationMs = (System.nanoTime() - startNs) / 1_000_000;
             sendResponse(socket, resp);
 
             requestTracker.logRequest(sessionHeader, method, path,
                     200, durationMs);
+            if (durationMs >= SLOW_REQUEST_THRESHOLD_MS) {
+                Log.info("slow " + method + " " + path + " "
+                        + durationMs + "ms");
+            }
         } catch (Exception e) {
-            Log.error("Request error", e);
+            long durationMs = (System.nanoTime() - startNs) / 1_000_000;
+            if (method != null && path != null) {
+                requestTracker.logRequest(sessionHeader, method,
+                        path, 500, durationMs);
+                if (durationMs >= SLOW_REQUEST_THRESHOLD_MS) {
+                    Log.info("slow-failed " + method + " " + path
+                            + " " + durationMs + "ms");
+                }
+            }
+            if (isClientDisconnect(e)) {
+                Log.info("client disconnected after " + durationMs
+                        + "ms: " + e.getMessage());
+            } else {
+                Log.error("Request error after " + durationMs
+                        + "ms", e);
+            }
         }
+    }
+
+    /**
+     * Recognize the socket-level conditions that surface when the
+     * client bailed before the response finished writing. Primary
+     * signal is the exception class — SocketException or
+     * EOFException anywhere in the cause chain means the peer's
+     * gone. The message-substring list catches the same class of
+     * failure when it's been wrapped in a generic IOException
+     * whose cause doesn't reify as SocketException.
+     */
+    static boolean isClientDisconnect(Throwable t) {
+        for (Throwable cursor = t; cursor != null;
+                cursor = cursor.getCause()) {
+            if (cursor instanceof java.net.SocketException
+                    || cursor instanceof java.io.EOFException) {
+                return true;
+            }
+            String msg = cursor.getMessage();
+            if (msg != null && containsDisconnectSignature(msg)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Message-substring match for wrapped disconnects. */
+    private static boolean containsDisconnectSignature(String msg) {
+        // POSIX / generic
+        if (msg.contains("Broken pipe")) return true;
+        if (msg.contains("Connection reset")) return true;
+        // Windows English — WSAECONNABORTED
+        if (msg.contains("connection was aborted")) return true;
+        if (msg.contains("established connection was aborted"))
+            return true;
+        if (msg.contains("existing connection was forcibly closed"))
+            return true;
+        // Windows Russian (ru_RU locale)
+        if (msg.contains("разорвала")) return true;
+        if (msg.contains("разорвано")) return true;
+        if (msg.contains("прервано")) return true;
+        // Windows German (de_DE)
+        if (msg.contains("Verbindung wurde")
+                && msg.contains("abgebrochen")) return true;
+        if (msg.contains("bestehende Verbindung wurde")) return true;
+        // Windows French (fr_FR)
+        if (msg.contains("connexion existante a")
+                && msg.contains("interrompue")) return true;
+        if (msg.contains("connexion a été abandonnée")) return true;
+        // Windows Spanish (es_ES)
+        if (msg.contains("conexión existente")
+                && msg.contains("forzosamente")) return true;
+        return false;
     }
 
     /**
@@ -446,32 +540,64 @@ public class HttpServer {
             ProjectScope scope) {
         try {
             return switch (path) {
-                case "/projects" -> Response.json(
-                        search.handleProjects(scope));
-                case "/project-info" -> Response.json(
-                        projectInfo.handleProjectInfo(params));
-                case "/find" -> Response.json(
-                        search.handleFind(params, scope));
-                case "/references" -> Response.json(
-                        search.handleReferences(params, scope));
+                case "/type" -> Response.json(
+                        graph.handleType(params));
+                case "/method" -> Response.json(
+                        graph.handleMethod(params));
+                case "/field" -> Response.json(
+                        graph.handleField(params));
+                case "/members" -> Response.json(
+                        graph.handleMembers(params));
+                case "/methods" -> Response.json(
+                        graph.handleMethods(params));
+                case "/fields" -> Response.json(
+                        graph.handleFields(params));
+                case "/innerTypes" -> Response.json(
+                        graph.handleInnerTypes(params));
+                case "/supers" -> Response.json(
+                        graph.handleSupers(params));
+                case "/subtypes" -> Response.json(
+                        graph.handleSubtypes(params));
                 case "/implementors" -> Response.json(
-                        search.handleImplementors(params, scope));
-                case "/hierarchy" -> Response.json(
-                        search.handleHierarchy(params, scope));
+                        graph.handleImplementors(params));
+                case "/overrides" -> Response.json(
+                        graph.handleOverrides(params));
+                case "/overloads" -> Response.json(
+                        graph.handleOverloads(params));
+                case "/refs" -> Response.json(
+                        graph.handleRefsTo(params, scope));
+                case "/outgoingRefs" -> Response.json(
+                        graph.handleOutgoingRefs(params, scope));
+                case "/types" -> Response.json(
+                        graph.handleTypes(params, scope));
+                case "/source" -> Response.json(
+                        graph.handleSource(params));
                 case "/problems" -> Response.json(
-                        diagnostics.handleProblems(params, scope));
+                        graph.handleProblems(params, scope));
+                case "/projects" -> Response.json(
+                        graph.handleProjects(scope));
+                case "/project" -> Response.json(
+                        graph.handleProject(params));
+                case "/classpath" -> Response.json(
+                        graph.handleClasspath(params));
+                case "/package" -> Response.json(
+                        graph.handlePackage(params));
+                case "/file" -> Response.json(
+                        graph.handleFile(params));
+                case "/typesInPackage" -> Response.json(
+                        graph.handleTypesInPackage(params));
+                case "/typesInFile" -> Response.json(
+                        graph.handleTypesInFile(params));
+                case "/packagesInProject" -> Response.json(
+                        graph.handlePackagesInProject(params));
+                case "/log" -> Response.json(
+                        logHandler.handleLog(params));
                 case "/build" -> Response.json(
                         diagnostics.handleBuild(params));
                 case "/refresh" -> Response.json(
                         diagnostics.handleRefresh(params));
                 case "/maven/update" -> Response.json(
                         maven.handleUpdate(params));
-                case "/type-info" -> Response.json(
-                        search.handleTypeInfo(params));
-                case "/outline" -> Response.json(
-                        search.handleOutline(params));
-                case "/source" -> search.handleSource(params,
-                        scope);
                 case "/organize-imports" -> Response.json(
                         refactoring.handleOrganizeImports(params));
                 case "/format" -> Response.json(

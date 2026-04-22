@@ -309,31 +309,17 @@ describe("client", () => {
 
   // --- connect() ---
 
-  it("connect() exits when no instance found", async () => {
+  it("connect() throws BridgeNotRunningError when no instance found", async () => {
     vi.doMock("../src/resolve.mjs", () => ({
       resolveInstance: async () => null,
     }));
-    const origExit = process.exit;
-    const origError = console.error;
-    let exitCode;
-    let errorMsg = "";
-    process.exit = (code) => {
-      exitCode = code;
-      throw new Error(`exit(${code})`);
-    };
-    console.error = (msg) => {
-      errorMsg += msg;
-    };
-    try {
-      const { connect } = await import("../src/client.mjs");
-      await connect();
-    } catch {
-      // expected
-    }
-    process.exit = origExit;
-    console.error = origError;
-    expect(exitCode).toBe(1);
-    expect(errorMsg).toContain("not running");
+    const { connect, BridgeNotRunningError } =
+        await import("../src/client.mjs");
+    await expect(connect()).rejects.toBeInstanceOf(BridgeNotRunningError);
+    // Library code throws; the outer CLI dispatcher prints the
+    // troubleshooting list, and `jdt q` wraps the error into a
+    // qlang value to honour its always-exit-0 contract. Neither
+    // responsibility belongs in connect() itself.
   });
 
   // --- requestOptions() ---

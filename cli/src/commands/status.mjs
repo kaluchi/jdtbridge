@@ -11,37 +11,36 @@
 import { execSync } from "node:child_process";
 import { basename } from "node:path";
 import { normalizePath } from "../paths.mjs";
+import { resolveInstance } from "../resolve.mjs";
 
 // ---- Public API ----
 
-const SECTION_NAMES = ["intro", "git", "editors", "problems", "launch-configs", "launches", "tests", "projects", "help", "guide"];
+const SECTION_NAMES = ["intro", "git", "editors", "problems", "launch-configs", "launches", "tests", "projects", "guide"];
+
+// Env vars passed to every subprocess cliCmd() spawns. Populated
+// once at the start of status() from resolveInstance() so that all
+// section subprocesses hit step 1 of resolution (env) and skip
+// discovery + cwd-match. Without this every subprocess re-resolves,
+// hammering /projects N times per section in multi-instance cases.
+let _resolvedEnv = {};
 
 export async function status(args) {
-  const jsonFlag = args.includes("--json");
   const quiet = args.includes("-q") || args.includes("--quiet");
   const requested = args.filter((a) => !a.startsWith("-"));
   const sections = requested.length > 0
     ? requested.filter((s) => SECTION_NAMES.includes(s))
-    : SECTION_NAMES.filter((s) => s !== "guide" && s !== "help");
+    : SECTION_NAMES.filter((s) => s !== "guide");
 
-  if (jsonFlag) {
-    const dataSections = sections.filter((s) => !new Set(["intro", "guide", "help"]).has(s));
-    const result = {};
-    for (const name of dataSections) {
-      const cmd = JSON_COMMANDS[name];
-      if (!cmd) continue;
-      try {
-        result[name] = JSON.parse(cliCmd(cmd));
-      } catch {
-        result[name] = null;
-      }
-    }
-    console.log(JSON.stringify(result, null, 2));
-    return;
-  }
-
-  const META_SECTIONS = new Set(["intro", "guide", "help"]);
+  const META_SECTIONS = new Set(["intro", "guide"]);
   const results = [];
+
+  // Resolve target instance once; propagate to subprocesses via env.
+  const inst = await resolveInstance();
+  _resolvedEnv = inst ? {
+    JDT_BRIDGE_PORT: String(inst.port),
+    JDT_BRIDGE_TOKEN: inst.token || "",
+    JDT_BRIDGE_HOST: inst.host || "127.0.0.1",
+  } : {};
 
   const showExtras = !quiet && requested.length === 0;
   // Intro first — context for agents seeing this for the first time
@@ -53,11 +52,11 @@ export async function status(args) {
     if (renderer) results.push(await renderer());
   }
 
-  // Help before guide
-  if (showExtras || sections.includes("help")) results.push(helpSection());
-  // Guide last
-  if (showExtras) results.push(guideSection());
-  if (sections.includes("guide") && !showExtras) results.push(guideSection());
+  // Guide = qlang reference + CLI catalog, collapsed under one
+  // section. Same in default and explicit (`jdt status guide`).
+  if (showExtras || sections.includes("guide")) {
+    results.push(guideSection());
+  }
 
   const bare = results.length === 1;
   console.log(results.map((s) => formatSection(s, { bare, quiet })).join("\n\n"));
@@ -73,22 +72,12 @@ export async function status(args) {
  * @param {boolean} opts.bare  - single section: body only, no header/fence
  * @param {boolean} opts.quiet - suppress description
  */
-function formatSection({ title, cmd, body, description }, { bare, quiet }) {
+function formatSection({ title, cmd, body, description, raw }, { bare, quiet }) {
   if (bare) return body;
   const desc = (!quiet && description) ? description + "\n\n" : "";
+  if (raw) return `## ${title}\n\n${desc}${body}`;
   return `## ${title}\n\n${desc}\`\`\`bash\n$ ${cmd}\n${body}\n\`\`\``;
 }
-
-/** JSON commands for --json composite output. */
-const JSON_COMMANDS = {
-  git: "jdt git --json",
-  editors: "jdt editors --json",
-  problems: "jdt problems --json",
-  "launch-configs": "jdt launch configs --json",
-  launches: "jdt launch list --json",
-  tests: "jdt test runs --json",
-  projects: "jdt projects --json",
-};
 
 // ---- Renderers (return { title, cmd, body }) ----
 
@@ -118,27 +107,31 @@ async function renderEditors() {
     body: cliCmd("jdt editors"),
     description:
       "Eclipse editor area — open tabs. Active tab marked >.\n"
-      + "jdt open <FQMN> opens a type in the Java Editor (F3 equivalent).",
+      + "jdt open <FQN> opens a type in the Java Editor (F3 equivalent).",
   };
 }
 
 async function renderProblems() {
+  const cmd = `jdt q "@problems | filter(/severity | eq(\\"error\\")) | take(20) * {:message /message :file /location/file :severity /severity :line /location/startLine}"`;
   return {
-    title: "Problems", cmd: "jdt problems --json",
-    body: cliCmd("jdt problems --json"),
+    title: "Problems", cmd,
+    body: cliCmd(cmd),
     description:
-      "Eclipse Problems view — IMarker.PROBLEM markers (errors, warnings).\n"
-      + "Updated on every build. [] = clean workspace.",
+      "Eclipse Problems view — errors only, first 20. Updated on every build.\n"
+      + "[] = no compilation errors. For warnings or the full list, drop the\n"
+      + "filter and take: jdt q '@problems'.",
   };
 }
 
 async function renderLaunchConfigs() {
   return {
-    title: "Launch Configs", cmd: "jdt launch configs",
-    body: cliCmd("jdt launch configs"),
+    title: "Launch Configs", cmd: "jdt launch configs --limit 20",
+    body: cliCmd("jdt launch configs --limit 20"),
     description:
       "Eclipse Run Configurations dialog (Run > Run Configurations...).\n"
-      + "CONFIGTYPE = ILaunchConfigurationType. CONFIGID = launch config name.",
+      + "CONFIGTYPE = ILaunchConfigurationType. CONFIGID = launch config name.\n"
+      + "Order: favorites (run/debug/coverage), then launch history\n"
+      + "(most-recent first), then remaining configs. Drop --limit for all.",
   };
 }
 
@@ -163,12 +156,13 @@ async function renderTests() {
 }
 
 async function renderProjects() {
+  const cmd = `jdt q "@projects * inter(#{:fqn :rootPath :repo :branch}) | table"`;
   return {
-    title: "Projects", cmd: "jdt projects",
-    body: cliCmd("jdt projects"),
+    title: "Projects", cmd,
+    body: cliCmd(cmd),
     description:
       "Eclipse Package Explorer / Project Explorer.\n"
-      + "LOCATION = filesystem path. REPO = git root if EGit-managed.",
+      + "rootPath = filesystem path. repo = git root if EGit-managed.",
   };
 }
 
@@ -176,21 +170,18 @@ function introSection() {
   return {
     title: "Intro",
     cmd: "jdt status intro",
-    body: `Eclipse IDE is running and connected to this terminal via jdt CLI.
-jdt is a bridge that exposes the IDE's functions as terminal commands.
-Commands cover Java search, compilation, testing, and refactoring.
-Everything the developer sees and does in Eclipse GUI
-the AI assistant can access through jdt CLI against the same
-running instance. Same IDE, different interface.
+    body: `Eclipse IDE for Java Developers is running and wired to this terminal via the jdt CLI.
+jdt exposes the IDE's functions as terminal commands — Java search,
+compilation, testing, refactoring, editor control. Everything the
+developer sees and does in Eclipse GUI is reachable from here
+against the same running instance.
 
-The sections below are live output from that instance.
-Each section is produced by a command shown in its header:
-  ## Git     -> jdt status git
-  ## Problems -> jdt status problems
-That command can be run standalone for a fresh snapshot.
-Several commands can be combined: jdt status git editors projects
+Sections below are live output from that instance. Each section's
+header shows the command that produced it, and that command can be
+run standalone for a fresh snapshot of just that section. Several
+can be combined: jdt status git editors problems.
 
--q suppresses intro, help, guide, and section descriptions.`,
+-q suppresses intro, guide, and per-section descriptions.`,
   };
 }
 
@@ -202,22 +193,71 @@ function helpSection() {
   };
 }
 
+function querySection() {
+  return {
+    title: "Query",
+    cmd: "jdt help q",
+    body: cliCmd("jdt help q"),
+  };
+}
+
 function guideSection() {
+  const q = querySection();
+  const h = helpSection();
+  const fence = (cmd, body) =>
+    `\`\`\`bash\n$ ${cmd}\n${body}\n\`\`\``;
+  const preamble = `After an edit:
+
+  jdt q '@problems'             errors + warnings workspace-wide
+  jdt test run <FQN> -f -q      affected test, streaming result
+
+\`@problems\` on the plugin side calls \`refreshLocal(DEPTH_INFINITE)\`
+and then waits for auto-build to finish before reading markers, so
+a single invocation covers edits to existing files and
+compile-dependent warnings. \`jdt build --project <name>\` (default
+= clean + full rebuild, \`--incremental\` for incremental only) is
+reserved for the cases auto-build does not cover:
+
+- auto-build turned off in Eclipse preferences;
+- a new \`.java\` file not yet visible via \`@problems\` or \`jdt test run\` (auto-build indexing sometimes lags a fresh \`refreshLocal\`);
+- \`pom.xml\` / \`build.gradle\` / \`.classpath\` changes that need project config re-read;
+- when the incremental state is suspect (stale cached errors after major branch switch) and a clean rebuild is the known-good reset.
+
+Exit code: 0 if the build finished with no compile errors, 1 if any.
+
+The workspace has launch configurations for every run, build, and
+test. \`jdt launch configs\` lists them; \`jdt launch run <id>\` picks
+up the VM args, classpath, profiles, and environment a hand-rolled
+\`mvn\` or \`npm\` line cannot replicate. \`mvn clean\` on top of that
+wipes Eclipse's incremental build cache — the next compile then
+takes minutes instead of seconds.
+
+A single jdt query that returns the answer beats multiple \`Read\`
+and \`Grep\` iterations reconstructing what Eclipse already holds
+resolved.
+
+Edits to workspace files go through the Edit and Write tools, not
+\`sed\`, \`cat >\`, or shell redirects: only the former trigger the
+PostToolUse \`jdt refresh\` hook. A bypassed edit stays invisible to
+Eclipse until the next jdt query does its own \`refreshLocal\`; if
+the file is open in the Eclipse editor, the editor will show stale
+content and overwrite the on-disk change on save.
+
+Git operations that rewrite the working tree — \`git stash\`,
+\`git checkout <file>\`, \`git reset\` — stay out of scope; the
+developer owns that state. \`git worktree\` is also off-limits:
+Eclipse and EGit do not support worktrees cleanly (projects bind
+to a fixed path, the worktree-mode \`.git\` file confuses parts of
+the tooling), so the workspace stays on a single checkout.`;
   return {
     title: "Guide",
     cmd: "jdt status guide",
-    body: `After editing code:
-
-  jdt problems                check compilation after edit
-  jdt problems --project X    check one project only (faster)
-  jdt test run FQN -f -q      run one test, stream result
-  jdt build --project X       trigger build if auto-build is off
-
-Refreshing the dashboard:
-
-  jdt status -q               all sections, no intro/help/guide
-  jdt status editors problems   combine specific sections
-  jdt help <command>          detailed usage for any command`,
+    raw: true,
+    body: [
+      preamble,
+      fence(q.cmd, q.body),
+      fence(h.cmd, h.body),
+    ].join("\n\n"),
   };
 }
 
@@ -254,7 +294,7 @@ export function cliCmd(cmd) {
   try {
     return execSync(cmd, {
       encoding: "utf8", timeout: 30_000,
-      env: { ...process.env, FORCE_COLOR: "1" },
+      env: { ...process.env, ..._resolvedEnv, FORCE_COLOR: "1" },
     }).replace(/\n+$/, "");
   } catch { return "(error)"; }
 }
@@ -275,31 +315,33 @@ export function ago(ms) {
 }
 
 // Exported for compositor testing
-export { formatSection, helpSection, guideSection, SECTION_NAMES, JSON_COMMANDS };
+export { formatSection, helpSection, guideSection, SECTION_NAMES };
 
 export const help = `CLI screenshot of Eclipse — composite view of IDE state.
 
-Usage:  jdt status [sections...] [-q] [--json]
+Usage:  jdt status [sections...] [-q]
 
-Sections (default: all):
-  intro           context for AI agents (shown by default, suppressed by -q)
+Sections (default: all data + intro + guide):
+  intro           what jdt is, how to read the dashboard
   git             git repos, branches, modified files
   editors         open editor tabs (active first)
-  problems        IMarker.PROBLEM (errors, warnings)
+  problems        IMarker.PROBLEM (errors only, first 20)
   launch-configs  saved launch configurations (name, type, project, target)
   launches        running launches
   tests           recent test sessions
   projects        workspace projects with repo mapping
-  help            full jdt command reference (shown by default, suppressed by -q)
-  guide           hints and patterns (shown by default, suppressed by -q)
+  guide           post-edit workflow + jdt help q + jdt help
 
 Options:
-  -q, --quiet  suppress meta-sections (intro, help, guide) and descriptions
-  --json       composite JSON of all data sections
+  -q, --quiet  suppress meta-sections (intro, guide) and descriptions
 
 Examples:
   jdt status                    full dashboard
-  jdt status -q                 full dashboard, no intro/help/guide
+  jdt status -q                 full dashboard, no intro/guide
   jdt status editors problems   editors + problems
-  jdt status help               command reference
-  jdt status --json             all sections as JSON`;
+  jdt status guide              qlang reference + CLI catalog
+
+Machine-readable access to any single section goes through the
+underlying command directly: jdt git --json, jdt editors --json,
+jdt launch configs --json, jdt test runs --json, jdt q '@problems',
+jdt q '@projects'.`;

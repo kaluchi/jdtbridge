@@ -4,30 +4,37 @@ import { request } from "node:http";
 import { discoverInstances, probe } from "./discovery.mjs";
 import { resolveInstance } from "./resolve.mjs";
 import { proxyAwareOptions } from "./proxy.mjs";
-import { red, bold } from "./color.mjs";
+import { httpRequest } from "./http.mjs";
 
 /** @type {import('./discovery.mjs').Instance|null} */
 let _instance;
 
 /**
+ * Thrown by {@link connect} when no live JDT Bridge instance is
+ * reachable. Callers decide how to surface it — a user-facing CLI
+ * command prints the troubleshooting list and exits non-zero; a
+ * contract-bound command like `jdt q` wraps it into a qlang `!{}`
+ * value so its always-exit-0 discipline holds.
+ */
+export class BridgeNotRunningError extends Error {
+  constructor() {
+    super("Eclipse JDT Bridge not running.");
+    this.name = "BridgeNotRunningError";
+  }
+}
+
+/**
  * Ensure we have a connected instance. Call before any HTTP request.
  * Instant — resolves via env vars, pins, or discovery without probing.
+ * Throws {@link BridgeNotRunningError} when no live instance is
+ * reachable.
  * @returns {import('./discovery.mjs').Instance}
  */
 export async function connect() {
   if (_instance) return _instance;
 
   _instance = await resolveInstance();
-  if (!_instance) {
-    console.error(
-      bold(red("Eclipse JDT Bridge not running.")) +
-        "\n\nNo live instances found. Check that:" +
-        "\n  1. Eclipse is running" +
-        "\n  2. The jdtbridge plugin is installed (io.github.kaluchi.jdtbridge)" +
-        "\n  3. Instance files exist in ~/.jdtbridge/instances/",
-    );
-    process.exit(1);
-  }
+  if (!_instance) throw new BridgeNotRunningError();
   return _instance;
 }
 
@@ -53,6 +60,16 @@ async function reconnect() {
 /** Reset cached instance (for testing). */
 export function resetClient() {
   _instance = null;
+}
+
+/**
+ * Instance that resolved the current request — populated by
+ * {@link connect}. Null before the first `get` / `post` call or
+ * right after `resetClient`. Used by path translation to pick
+ * the right per-instance mount cache.
+ */
+export function currentInstance() {
+  return _instance;
 }
 
 function authHeaders(inst) {
@@ -121,33 +138,12 @@ export function directGet(inst, path, timeoutMs = 5000) {
   return doGet(inst, path, timeoutMs);
 }
 
-function doGet(inst, path, timeoutMs) {
-  return new Promise((resolve, reject) => {
-    const req = request(
-      requestOpts(inst, path, "GET", timeoutMs),
-      (res) => {
-        let data = "";
-        res.on("data", (chunk) => (data += chunk));
-        res.on("end", () => {
-          if (res.statusCode !== 200) {
-            reject(new Error(`HTTP ${res.statusCode}: ${data}`));
-            return;
-          }
-          try {
-            resolve(parseJson(data));
-          } catch (e) {
-            reject(e);
-          }
-        });
-      },
-    );
-    req.on("timeout", () => {
-      req.destroy();
-      reject(new Error("Request timed out"));
-    });
-    req.on("error", reject);
-    req.end();
-  });
+async function doGet(inst, path, timeoutMs) {
+  const { status, body, error } = await httpRequest(
+    inst, path, "GET", timeoutMs);
+  if (error) throw error;
+  if (status !== 200) throw new Error(`HTTP ${status}: ${body}`);
+  return parseJson(body);
 }
 
 /**

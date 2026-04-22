@@ -9,7 +9,7 @@ const cliSrc = readFileSync(resolve(__dirname, "../src/cli.mjs"), "utf8");
 
 /**
  * Parse the commands map and subcommand maps from cli.mjs source.
- * Returns a Set of command strings like "jdt find", "jdt launch config", etc.
+ * Returns a Set of command strings like "jdt q", "jdt launch config", etc.
  *
  * Maps use the pattern:  name: { fn: ..., help: ... }
  * We extract only keys that have a { fn: value.
@@ -49,7 +49,7 @@ function parseCommands(src) {
 /**
  * Extract "jdt <command>" names from README code blocks.
  * Strips arguments/flags — keeps only the command name.
- * "jdt find <Name|*Pattern*|pkg> [--source-only]" → "jdt find"
+ * "jdt q '<pipeline>'" → "jdt q"
  * "jdt launch config <name> [--xml]" → "jdt launch config"
  */
 function parseReadmeCommands(content) {

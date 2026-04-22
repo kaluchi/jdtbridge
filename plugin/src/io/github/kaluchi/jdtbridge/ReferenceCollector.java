@@ -25,9 +25,10 @@ import org.eclipse.jdt.core.dom.MethodInvocation;
 import org.eclipse.jdt.core.dom.SimpleName;
 
 /**
- * Collects resolved references from a Java source member using
- * Eclipse AST with binding resolution. Each reference maps to
- * an {@link IJavaElement} that can be navigated with jdt source.
+ * Collects resolved outgoing references from a Java source member
+ * using Eclipse AST with binding resolution. Each reference maps
+ * to an {@link IJavaElement} that downstream axes (@source,
+ * @callers, @members) can navigate through the :jdt/graph module.
  */
 class ReferenceCollector {
 
@@ -37,7 +38,7 @@ class ReferenceCollector {
      * so SourceReport doesn't need the binding.
      */
     record Ref(
-            String fqmn,
+            String fqn,
             IJavaElement element,
             RefKind kind,
             String declaringTypeKind,
@@ -53,7 +54,7 @@ class ReferenceCollector {
 
         /** Return a copy with implementationOf set. */
         Ref withImplementationOf(String implOf) {
-            return new Ref(fqmn, element, kind,
+            return new Ref(fqn, element, kind,
                     declaringTypeKind, isStatic,
                     resolvedType, resolvedTypeFqn,
                     resolvedTypeKind, isTypeVariable,
@@ -66,7 +67,7 @@ class ReferenceCollector {
 
     /**
      * Collect all references within the given member's source range.
-     * Returns a deduped map keyed by FQMN.
+     * Returns a deduped map keyed by FQN.
      */
     static Map<String, Ref> collect(IMember member)
             throws JavaModelException {
@@ -157,10 +158,10 @@ class ReferenceCollector {
                         String subFqn =
                                 sub.getFullyQualifiedName();
                         if (isJdkType(subFqn)) continue;
-                        String implFqmn = subFqn + "#"
+                        String implFqn = subFqn + "#"
                                 + methodName + "("
                                 + paramSig(m) + ")";
-                        if (refs.containsKey(implFqmn)) break;
+                        if (refs.containsKey(implFqn)) break;
 
                         String typeKind = sub.isInterface()
                                 ? "interface"
@@ -168,18 +169,18 @@ class ReferenceCollector {
                                 : sub.isAnnotation()
                                 ? "annotation" : "class";
 
-                        implRefs.add(new Ref(implFqmn, m,
+                        implRefs.add(new Ref(implFqn, m,
                                 RefKind.METHOD, typeKind,
                                 false, null, null, null,
                                 false, null, false, null,
-                                ref.fqmn()));
+                                ref.fqn()));
                         break;
                     }
                 }
             } catch (Exception e) { /* skip */ }
         }
         for (Ref impl : implRefs) {
-            refs.put(impl.fqmn(), impl);
+            refs.put(impl.fqn(), impl);
         }
     }
 
@@ -222,7 +223,7 @@ class ReferenceCollector {
                         if (existing.implementationOf() == null) {
                             subtypeRefs.add(existing
                                     .withImplementationOf(
-                                            ref.fqmn()));
+                                            ref.fqn()));
                         }
                         continue;
                     }
@@ -237,12 +238,12 @@ class ReferenceCollector {
                             RefKind.TYPE, typeKind,
                             false, null, null, null,
                             false, null, false, null,
-                            ref.fqmn()));
+                            ref.fqn()));
                 }
             } catch (Exception e) { /* skip */ }
         }
         for (Ref st : subtypeRefs) {
-            refs.put(st.fqmn(), st);
+            refs.put(st.fqn(), st);
         }
     }
 
@@ -300,8 +301,8 @@ class ReferenceCollector {
         String typeFqn = stripGenerics(
                 declType.getQualifiedName());
         if (isJdkType(typeFqn)) return;
-        String fqmn = typeFqn + "#" + vb.getName();
-        if (refs.containsKey(fqmn)) return;
+        String fqn = typeFqn + "#" + vb.getName();
+        if (refs.containsKey(fqn)) return;
 
         IJavaElement elem = vb.getJavaElement();
         int mods = vb.getModifiers();
@@ -331,7 +332,7 @@ class ReferenceCollector {
             }
         }
 
-        refs.put(fqmn, new Ref(fqmn, elem,
+        refs.put(fqn, new Ref(fqn, elem,
                 isConst ? RefKind.CONSTANT : RefKind.FIELD,
                 declTypeKind, isStatic,
                 resolvedType, resolvedTypeFqn, resolvedTypeKind,
@@ -346,9 +347,9 @@ class ReferenceCollector {
         String typeFqn = stripGenerics(
                 declType.getQualifiedName());
         if (isJdkType(typeFqn)) return;
-        String fqmn = typeFqn + "#" + mb.getName()
+        String fqn = typeFqn + "#" + mb.getName()
                 + "(" + paramSignature(mb) + ")";
-        if (refs.containsKey(fqmn)) return;
+        if (refs.containsKey(fqn)) return;
 
         IJavaElement elem = mb.getJavaElement();
         boolean isStatic = java.lang.reflect.Modifier.isStatic(
@@ -385,7 +386,7 @@ class ReferenceCollector {
             inheritedFrom = typeFqn;
         }
 
-        refs.put(fqmn, new Ref(fqmn, elem, RefKind.METHOD,
+        refs.put(fqn, new Ref(fqn, elem, RefKind.METHOD,
                 declTypeKind, isStatic,
                 resolvedType, resolvedTypeFqn, resolvedTypeKind,
                 isTypeVariable, typeBound,

@@ -123,27 +123,34 @@ so multiple launches of the same configuration don't conflict.
 
 ## Filtered endpoints
 
-Endpoint            Filtering method
-/projects           scope.openProjects()
-/find               scope.searchScope()
-/references         scope.searchScope()
-/implementors       scope.searchScope()
-/hierarchy          scope.searchScope()
-/source             scope.searchScope() (incoming refs)
-/problems           scope.containsProject(marker project)
-/editors            scope.containsProject(file project)
-/launch/list        scope.containsLaunch(launch)
-/launch/configs     scope.containsConfig(config)
-/test/sessions      scope.containsLaunch(session launch)
+Endpoint              Filtering method
+/projects             scope.openProjects()
+/types                scope.searchScope()
+/refs                 scope.searchScope()
+/outgoingRefs         scope.containsProject(target project)
+/implementors         scope.searchScope()
+/supers, /subtypes    scope.searchScope()
+/source               scope.searchScope()
+/problems             scope.containsProject(marker project)
+/editors              scope.containsProject(file project)
+/launch/list          scope.containsLaunch(launch)
+/launch/configs       scope.containsConfig(config)
+/test/sessions        scope.containsLaunch(session launch)
 
 ## Unfiltered endpoints (explicit params)
 
-/build, /refresh, /maven/update, /type-info, /outline, /project-info,
-/test/run, /test/status, /organize-imports, /format, /rename,
-/move, /open, /launch/config, /launch/run, /launch/stop
+/type, /method, /field, /project, /package, /file, /module,
+/members, /methods, /fields, /innerTypes,
+/typesInPackage, /typesInFile, /packagesInProject,
+/overrides, /overloads, /classpath, /detail,
+/build, /refresh, /maven/update,
+/test/run, /test/status, /test/clear,
+/organize-imports, /format, /rename, /move, /open,
+/launch/config, /launch/config/delete, /launch/import,
+/launch/run, /launch/stop, /launch/clear, /launch/console
 
-These accept explicit project/file/class parameters.
-The agent specifies the target directly.
+These accept explicit project / file / type / method parameters.
+The caller specifies the target directly.
 
 ## Design principles
 
@@ -157,9 +164,10 @@ The agent specifies the target directly.
 - No caching: scope resolved fresh every request. Session file is
   tiny, path comparison is cheap. New projects visible immediately.
 
-- Zero CLI changes: the X-Bridge-Session header was already sent
-  for telemetry. Session file was already written by AgentLaunchDelegate.
-  Scope piggybacks on existing infrastructure.
+- Scope piggybacks on existing transport: the X-Bridge-Session
+  header rides every CLI request, the session file is written by
+  AgentLaunchDelegate. Scope reads them; it does not require CLI
+  changes.
 
 - Explicit params bypass scope: endpoints that accept explicit
   project/file/class don't need scope. The agent already knows

@@ -142,12 +142,12 @@ describe("installClaudeSettings", () => {
     installClaudeSettings(tmpDir);
     const explore = readFileSync(
       join(tmpDir, ".claude", "agents", "Explore.md"), "utf8");
-    expect(explore).toContain("jdt refs");
-    expect(explore).toContain("jdt src");
+    expect(explore).toContain("@callers");
+    expect(explore).toContain("@source");
     const plan = readFileSync(
       join(tmpDir, ".claude", "agents", "Plan.md"), "utf8");
-    expect(plan).toContain("jdt src");
-    expect(plan).toContain("jdt hierarchy");
+    expect(plan).toContain("@source");
+    expect(plan).toContain("@supers");
   });
 
   it("does not overwrite non-jdt agent", () => {
@@ -169,7 +169,7 @@ describe("installClaudeSettings", () => {
 
     installClaudeSettings(tmpDir);
     const content = readFileSync(agentFile, "utf8");
-    expect(content).toContain("jdt refs");
+    expect(content).toContain("@callers");
     expect(content).toContain("jdtbridge-managed");
   });
 

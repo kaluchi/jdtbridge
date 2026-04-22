@@ -1,19 +1,10 @@
 // Main CLI dispatcher.
 // Maps command names to handler functions and provides help.
 
-import { projects, help as projectsHelp } from "./commands/projects.mjs";
-import { projectInfo, help as projectInfoHelp } from "./commands/project-info.mjs";
-import { find, help as findHelp } from "./commands/find.mjs";
-import { references, help as referencesHelp } from "./commands/references.mjs";
-import { hierarchy, help as hierarchyHelp } from "./commands/hierarchy.mjs";
-import { implementors, help as implementorsHelp } from "./commands/implementors.mjs";
-import { outline, help as outlineHelp } from "./commands/outline.mjs";
-import { source, help as sourceHelp } from "./commands/source.mjs";
 import { build, help as buildHelp } from "./commands/build.mjs";
 import { testRun, help as testRunHelp } from "./commands/test-run.mjs";
 import { testStatus, help as testStatusHelp } from "./commands/test-status.mjs";
 import { testSessions, help as testSessionsHelp } from "./commands/test-sessions.mjs";
-import { problems, help as problemsHelp } from "./commands/problems.mjs";
 import { refresh, help as refreshHelp } from "./commands/refresh.mjs";
 import { maven, help as mavenHelp } from "./commands/maven.mjs";
 import {
@@ -68,7 +59,8 @@ import {
 } from "./commands/launch.mjs";
 import { setup, help as setupHelp } from "./commands/setup.mjs";
 import { use, help as useHelp } from "./commands/use.mjs";
-import { isConnectionError } from "./client.mjs";
+import { query, help as queryHelp } from "./commands/query.mjs";
+import { isConnectionError, BridgeNotRunningError } from "./client.mjs";
 import { bold, red, dim } from "./color.mjs";
 import { installTelemetry } from "./telemetry.mjs";
 import { createRequire } from "node:module";
@@ -187,17 +179,8 @@ async function agentDispatch(args) {
 }
 
 const commands = {
-  projects: { fn: projects, help: projectsHelp },
-  "project-info": { fn: projectInfo, help: projectInfoHelp },
-  find: { fn: find, help: findHelp },
-  references: { fn: references, help: referencesHelp },
-  implementors: { fn: implementors, help: implementorsHelp },
-  hierarchy: { fn: hierarchy, help: hierarchyHelp },
-  outline: { fn: outline, help: outlineHelp },
-  source: { fn: source, help: sourceHelp },
   build: { fn: build, help: buildHelp },
   test: { fn: testDispatch, help: testHelp },
-  problems: { fn: problems, help: problemsHelp },
   refresh: { fn: refresh, help: refreshHelp },
   maven: { fn: maven, help: mavenHelp },
   "organize-imports": { fn: organizeImports, help: organizeImportsHelp },
@@ -212,21 +195,17 @@ const commands = {
   agent: { fn: agentDispatch, help: agentHelp },
   setup: { fn: setup, help: setupHelp },
   use: { fn: use, help: useHelp },
+  query: { fn: query, help: queryHelp },
 };
 
 /** Short aliases for frequently used commands. */
 const aliases = {
-  refs: "references",
-  impl: "implementors",
-  hier: "hierarchy",
-  pi: "project-info",
   oi: "organize-imports",
   ed: "editors",
-  src: "source",
   b: "build",
-  err: "problems",
   r: "refresh",
   fmt: "format",
+  q: "query",
 };
 
 // Reverse map: command name → list of its aliases (for display).
@@ -282,13 +261,8 @@ function printOverview() {
     "Dashboard:",
     h("  status [sections...] [-q]",                       "CLI screenshot of Eclipse (start here)"),
     "",
-    "Search & navigation:",
-    h(`  find <Name|*Pattern*|pkg> [--source-only]`,       "table: type declarations by name/wildcard/package"),
-    h(`  references${fmtAliases("references")} <FQMN> [--field <name>]`, "markdown: call sites as code snippets"),
-    h(`  implementors${fmtAliases("implementors")} <FQN>[#method]`,    "list: type or method implementors"),
-    h(`  hierarchy${fmtAliases("hierarchy")} <FQN>`,                "markdown: supers + interfaces + subtypes"),
-    h(`  outline <FQN>`,                                             "tree: Eclipse Outline View (fields, methods, types)"),
-    h(`  source${fmtAliases("source")} <FQMN>`,                     "markdown: source + resolved references"),
+    "Graph query:",
+    h(`  q${fmtAliases("query")} '<qlang-pipeline>'`,     "pipeline query over the JDT graph"),
     "",
     "Testing & building:",
     h(`  build${fmtAliases("build")} [--project <name>] [--clean]`, "build project (incremental or clean)"),
@@ -297,7 +271,6 @@ function printOverview() {
     h("  test runs",                                       "table: recent test sessions"),
     "",
     "Diagnostics:",
-    h(`  problems${fmtAliases("problems")} [--file <path>] [--project <name>]`, "text: IMarker.PROBLEM (errors, warnings)"),
     h(`  refresh${fmtAliases("refresh")} [<file> ...] [--project <name>]`,  "notify Eclipse of external file changes"),
     "",
     "Maven:",
@@ -306,7 +279,7 @@ function printOverview() {
     "Refactoring:",
     h(`  organize-imports${fmtAliases("organize-imports")} <file>`,  "organize imports"),
     h(`  format${fmtAliases("format")} <file>`,                      "format with Eclipse project settings"),
-    h("  rename <FQMN> <newName> [--field <old>]",         "rename type/method/field"),
+    h("  rename <FQN> <newName> [--field <old>]",         "rename type/method/field"),
     h("  move <FQN> <target.package>",                     "move type to another package"),
     "",
     "Launches:",
@@ -321,11 +294,9 @@ function printOverview() {
     h("  launch config --import <path> [--configid <name>]", "import .launch file into workspace"),
     "",
     "Editor:",
-    h("  open <FQMN>",                                    "open in Eclipse editor"),
+    h("  open <FQN>",                                    "open in Eclipse editor"),
     "",
     "Workspace detail:",
-    h("  projects",                                        "table: workspace projects (name, location, repo)"),
-    h(`  project-info${fmtAliases("project-info")} <name> [--lines N]`, "text: project overview (adaptive detail)"),
     h(`  editors${fmtAliases("editors")}`,                          "table: open editor tabs (FQN, project, path)"),
     h("  git [list] [repo...] [--no-files]",               "table: git repos, branches, dirty state"),
     "",
@@ -398,7 +369,15 @@ export async function run(argv) {
   try {
     await commands[resolved].fn(rest);
   } catch (e) {
-    if (isConnectionError(e)) {
+    if (e instanceof BridgeNotRunningError) {
+      console.error(
+        bold(red("Eclipse JDT Bridge not running.")) +
+          "\n\nNo live instances found. Check that:" +
+          "\n  1. Eclipse is running" +
+          "\n  2. The jdtbridge plugin is installed (io.github.kaluchi.jdtbridge)" +
+          "\n  3. Instance files exist in ~/.jdtbridge/instances/",
+      );
+    } else if (isConnectionError(e)) {
       console.error(
         bold(red("Eclipse JDT Bridge not responding.")) +
           "\nCheck that Eclipse is running with the jdtbridge plugin.\n",

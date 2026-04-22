@@ -49,7 +49,7 @@ model endpoints — anything the agent command reads from env.
 
 `AgentLaunchDelegate` implements `ILaunchConfigurationDelegate2`.
 
-### Current flow (MVP)
+### Flow
 
 ```
 Eclipse Run button

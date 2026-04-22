@@ -23,9 +23,13 @@ export async function launchList(args = []) {
 }
 
 export async function launchConfigs(args = []) {
+  const flags = parseFlags(args);
   const data = await get("/launch/configs");
+  const limit = Number(flags.limit);
+  const sliced = Number.isFinite(limit) && limit > 0
+    ? data.slice(0, limit) : data;
 
-  output(args, data, {
+  output(args, sliced, {
     empty: "(no launch configurations)",
     text(data) {
       const rows = data.map((r) => [
@@ -425,16 +429,22 @@ Examples:
 
 export const launchConfigsHelp = `List saved launch configurations.
 
-Usage:  jdt launch configs [--json]
+Usage:  jdt launch configs [--limit N] [--json]
 
 Shows CONFIGID, CONFIGTYPE, PROJECT, and TARGET (class, method, main class, or goals).
 Use CONFIGID with launch run and launch config.
 
+Order: favorites first (run, debug, coverage groups), then launch
+history (most-recent first per group), then remaining configs.
+Dedup by name — each config appears once, at its earliest position.
+
 Options:
-  --json    output as JSON (includes runner for test configs)
+  --limit N  keep only first N entries (after order above)
+  --json     output as JSON (includes runner for test configs)
 
 Examples:
   jdt launch configs
+  jdt launch configs --limit 20
   jdt launch configs --json`;
 
 export const launchConfigHelp = `Show, import, or delete a launch configuration.

@@ -3,6 +3,10 @@ import {
   startServer, stopServer, captureConsole, errorServer, disableColor,
 } from "./helpers/mock-server.mjs";
 
+// Validation tests for non-graph CLI commands. Graph-axis input
+// validation lives in the qlang :jdt/graph operand impls (subject-
+// polymorphism + missing-fqn errors via fail-track).
+
 describe("command validation", () => {
   let server, port, io;
 
@@ -24,49 +28,12 @@ describe("command validation", () => {
     }));
   }
 
-  // --- Usage validation (missing args) ---
-
-  it("find exits on missing args", async () => {
-    await setupMock((req, res) => res.end());
-    const { find } = await import("../src/commands/find.mjs");
-    await expect(find([])).rejects.toThrow("exit(1)");
-    expect(io.errors[0]).toContain("Usage");
-  });
-
-  it("references exits on missing args", async () => {
-    await setupMock((req, res) => res.end());
-    const { references } = await import("../src/commands/references.mjs");
-    await expect(references([])).rejects.toThrow("exit(1)");
-  });
+  // ── Usage validation (missing args) ──
 
   it("rename exits on missing newName", async () => {
     await setupMock((req, res) => res.end());
     const { rename } = await import("../src/commands/refactoring.mjs");
     await expect(rename(["com.example.Foo"])).rejects.toThrow("exit(1)");
-  });
-
-  it("implementors exits on missing args", async () => {
-    await setupMock((req, res) => res.end());
-    const { implementors } = await import("../src/commands/implementors.mjs");
-    await expect(implementors([])).rejects.toThrow("exit(1)");
-  });
-
-  it("hierarchy exits on missing args", async () => {
-    await setupMock((req, res) => res.end());
-    const { hierarchy } = await import("../src/commands/hierarchy.mjs");
-    await expect(hierarchy([])).rejects.toThrow("exit(1)");
-  });
-
-  it("source exits on missing args", async () => {
-    await setupMock((req, res) => res.end());
-    const { source } = await import("../src/commands/source.mjs");
-    await expect(source([])).rejects.toThrow("exit(1)");
-  });
-
-  it("project-info exits on missing args", async () => {
-    await setupMock((req, res) => res.end());
-    const { projectInfo } = await import("../src/commands/project-info.mjs");
-    await expect(projectInfo([])).rejects.toThrow("exit(1)");
   });
 
   it("organize-imports exits on missing args", async () => {
@@ -93,61 +60,12 @@ describe("command validation", () => {
     await expect(open([])).rejects.toThrow("exit(1)");
   });
 
-  // --- Server error responses ---
-
-  it("projects exits on server error", async () => {
-    await setupMock(errorServer());
-    const { projects } = await import("../src/commands/projects.mjs");
-    await projects([]);
-    expect(io.errors[0]).toContain("Something went wrong");
-  });
-
-  it("find exits on server error", async () => {
-    await setupMock(errorServer());
-    const { find } = await import("../src/commands/find.mjs");
-    await find(["Foo"]);
-    expect(io.errors[0]).toContain("Something went wrong");
-  });
-
-  it("implementors exits on server error", async () => {
-    await setupMock(errorServer());
-    const { implementors } = await import("../src/commands/implementors.mjs");
-    await implementors(["app.Foo"]);
-    expect(io.errors[0]).toContain("Something went wrong");
-  });
-
-  it("hierarchy exits on server error", async () => {
-    await setupMock(errorServer());
-    const { hierarchy } = await import("../src/commands/hierarchy.mjs");
-    await hierarchy(["app.Foo"]);
-    expect(io.errors[0]).toContain("Something went wrong");
-  });
-
-  it("implementors exits on server error", async () => {
-    await setupMock(errorServer());
-    const { implementors } = await import("../src/commands/implementors.mjs");
-    await implementors(["app.Foo", "m"]);
-    expect(io.errors[0]).toContain("Something went wrong");
-  });
-
-  it("problems exits on server error", async () => {
-    await setupMock(errorServer());
-    const { problems } = await import("../src/commands/problems.mjs");
-    await problems([]);
-    expect(io.errors[0]).toContain("Something went wrong");
-  });
+  // ── Server error responses ──
 
   it("build exits on server error", async () => {
     await setupMock(errorServer());
     const { build } = await import("../src/commands/build.mjs");
     await build(["--project", "my-client"]);
-    expect(io.errors[0]).toContain("Something went wrong");
-  });
-
-  it("project-info exits on server error", async () => {
-    await setupMock(errorServer());
-    const { projectInfo } = await import("../src/commands/project-info.mjs");
-    await projectInfo(["proj"]);
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
@@ -190,13 +108,6 @@ describe("command validation", () => {
     await setupMock(errorServer());
     const { open } = await import("../src/commands/editor.mjs");
     await open(["app.Foo"]);
-    expect(io.errors[0]).toContain("Something went wrong");
-  });
-
-  it("references exits on server error", async () => {
-    await setupMock(errorServer());
-    const { references } = await import("../src/commands/references.mjs");
-    await references(["app.Foo"]);
     expect(io.errors[0]).toContain("Something went wrong");
   });
 });

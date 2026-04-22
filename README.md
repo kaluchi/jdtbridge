@@ -13,26 +13,26 @@ jdt status
 
 # "Who calls this method?" — grep returns 200 hits including comments,
 # identically-named methods in other classes, and string literals.
-# JDT returns only the 8 actual call sites, with file and line numbers.
-jdt refs "com.example.dao.OrderRepository#save(Order)"
+# JDT returns only the actual call sites, with file and line numbers.
+jdt q '"com.example.dao.OrderRepository#save(Order)" | @callers'
 
 # Read Spring/Hibernate/JDK source code by name.
 # Without JDT this is impossible — library sources live inside JARs.
 # The agent gets the same "go to definition" power a developer has in the IDE.
-jdt src org.springframework.transaction.support.TransactionTemplate#execute
+jdt q '"org.springframework.transaction.support.TransactionTemplate#execute" | @source'
 
 # "Did my edit compile?" — Maven takes 30-90 seconds for a module build.
 # Eclipse's incremental compiler already knows the answer. Sub-second response.
-jdt err --project my-app-server
+jdt q '"my-app-server" | @problems'
 
 # "What classes implement this interface method?" — grep for a common name
 # like "save" or "onInit" returns every class that has that method name.
 # JDT resolves the type hierarchy and returns only actual implementations.
-jdt impl "com.example.core.Repository#save(Order)"
+jdt q '"com.example.core.Repository#save(Order)" | @implementors'
 
 # Understand a 600-line class without reading it. Fields, method signatures,
-# supertypes, line numbers — structured overview, not raw source.
-jdt outline com.example.web.OrderController
+# supertypes — structured overview via @members / @supers / @subtypes.
+jdt q '"com.example.web.OrderController" | @members | table'
 
 # Run tests with real-time progress streaming.
 # Failures shown immediately — no waiting for full suite to finish.
@@ -79,20 +79,20 @@ MCP is the natural first thought for connecting an IDE to an AI agent. But JDT B
 
 ```bash
 # 26-method class — only the handler entry points.
-# MCP: all 26 methods enter context. CLI: just the 8 that matter.
-jdt outline io.github.kaluchi.jdtbridge.SearchHandler -q | grep handle
+# MCP: all 26 methods enter context. CLI: just the matching ones.
+jdt q '"io.github.kaluchi.jdtbridge.SearchHandler" | @methods * /name' | grep handle
 
 # "How many callers?" — a number, not 51 lines of references.
-jdt refs io.github.kaluchi.jdtbridge.JdtUtils#findMethod | wc -l
+jdt q '"io.github.kaluchi.jdtbridge.JdtUtils#findMethod" | @callers | count'
 
 # First 5 compilation errors — fix one at a time.
-jdt err --project my-server | head -5
+jdt q '"my-server" | @problems | take(5)'
 
 # Where does this Spring method throw or catch?
-jdt src org.springframework.jdbc.core.JdbcTemplate#query | grep -n 'throw\|catch'
+jdt q '"org.springframework.jdbc.core.JdbcTemplate#query" | @source' | grep -n 'throw\|catch'
 
 # All implementors of a Spring base class — including library internals.
-jdt impl org.springframework.jdbc.object.SqlOperation
+jdt q '"org.springframework.jdbc.object.SqlOperation" | @implementors'
 ```
 
 An agent's context window is finite. Every irrelevant token displaces useful reasoning. MCP's [own community recognizes this](https://github.com/modelcontextprotocol/modelcontextprotocol/issues/1576) — token bloat from tool schemas and unfiltered results is a known problem, with projects like [model-context-shell](https://github.com/StacklokLabs/model-context-shell) trying to retrofit Unix-style pipes onto MCP.
@@ -148,7 +148,7 @@ After pulling updates, run `jdt setup` again to rebuild and reinstall.
 
 - **Workspace must be fully built.** JDT search relies on the Eclipse index. If the workspace hasn't been fully indexed, results may be incomplete. Use `jdt build` or `jdt build --clean` to trigger builds.
 
-- **Claude Code prompts for `#` in arguments.** Commands like `jdt source "Class#method"` trigger a permission prompt because Claude Code treats `#` as a shell metacharacter ([issue #34061](https://github.com/anthropics/claude-code/issues/34061)). Allow rules don't help. Run `jdt setup --claude` to install the workaround hook, or add it manually to `.claude/settings.json`:
+- **Claude Code prompts for `#` in arguments.** Commands like `jdt q '"Class#method" | @source'` trigger a permission prompt because Claude Code treats `#` as a shell metacharacter ([issue #34061](https://github.com/anthropics/claude-code/issues/34061)). Allow rules don't help. Run `jdt setup --claude` to install the workaround hook, or add it manually to `.claude/settings.json`:
 
   ```json
   {

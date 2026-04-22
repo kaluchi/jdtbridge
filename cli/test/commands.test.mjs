@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createServer } from "node:http";
 import { setColorEnabled } from "../src/color.mjs";
-import { toSandboxPath } from "../src/paths.mjs";
+
+// Behavior tests for non-graph CLI commands. Graph-axis endpoint
+// coverage lives in GraphHandlerTest (plugin.tests).
 
 function startServer(handler) {
   return new Promise((resolve) => {
@@ -13,7 +15,6 @@ function stopServer(server) {
   return new Promise((resolve) => server.close(resolve));
 }
 
-// Helpers for capturing console output and preventing process.exit
 function captureConsole() {
   const logs = [];
   const errors = [];
@@ -44,14 +45,21 @@ describe("commands (integration)", () => {
   afterEach(async () => {
     io.restore();
     if (server) await stopServer(server);
-    vi.doUnmock("../src/paths.mjs");
+    vi.doUnmock("../src/path-translate.mjs");
     vi.resetModules();
   });
 
+  // Stand-in for the real per-instance mount cache: rewrites
+  // Windows drive letters to `/<drive>/…` without loading the
+  // JSON cache file. Lets editor/git tests assert remap behaviour
+  // without provisioning a full remote-instance fixture.
   function mockSandboxPaths() {
-    vi.doMock("../src/paths.mjs", async (importOriginal) => {
+    vi.doMock("../src/path-translate.mjs", async (importOriginal) => {
       const orig = await importOriginal();
-      return { ...orig, toSandboxPath: (p) => p && /^[A-Z]:[/\\]/.test(p) ? "/" + p[0].toLowerCase() + p.slice(2).replace(/\\/g, "/") : p };
+      return { ...orig, translateHostPath: (p) => p
+          && /^[A-Z]:[/\\]/.test(p)
+          ? "/" + p[0].toLowerCase() + p.slice(2).replace(/\\/g, "/")
+          : p };
     });
   }
 
@@ -62,172 +70,7 @@ describe("commands (integration)", () => {
     }));
   }
 
-  it("projects lists project names", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(["my-server", "my-client"]));
-    });
-    const { projects } = await import("../src/commands/projects.mjs");
-    await projects([]);
-    const out = io.logs.join("\n");
-    expect(out).toContain("2 projects");
-    expect(out).toContain("`my-server`");
-    expect(out).toContain("`my-client`");
-  });
-
-  it("find shows table with headers", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { fqn: "com.example.Foo", file: "/my-server/src/Foo.java", kind: "class" },
-      ]));
-    });
-    const { find } = await import("../src/commands/find.mjs");
-    await find(["Foo"]);
-    const out = io.logs[0];
-    expect(out).toContain("KIND");
-    expect(out).toContain("FQN");
-    expect(out).toContain("ORIGIN");
-    expect(out).toContain("[C]");
-    expect(out).toContain("`com.example.Foo`");
-    expect(out).toContain("my-server/src/Foo.java");
-  });
-
-  it("find deduplicates binary types", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { fqn: "javax.swing.JPanel", file: "D:/my-app/my-client", binary: true, origin: "rt.jar" },
-        { fqn: "javax.swing.JPanel", file: "D:/my-app/my-server", binary: true, origin: "rt.jar" },
-      ]));
-    });
-    const { find } = await import("../src/commands/find.mjs");
-    await find(["JPanel"]);
-    const out = io.logs[0];
-    expect(out.match(/javax\.swing\.JPanel/g).length).toBe(1);
-    expect(out).toContain("rt.jar");
-  });
-
-  it("find shows source path and binary origin", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { fqn: "com.example.Foo", file: "D:/git/project/src/Foo.java", kind: "class" },
-        { fqn: "javax.swing.JPanel", file: "D:/my-app/my-client", kind: "class", binary: true, origin: "rt.jar" },
-      ]));
-    });
-    const { find } = await import("../src/commands/find.mjs");
-    await find(["Foo"]);
-    const out = io.logs[0];
-    expect(out).toContain(toSandboxPath("D:/git/project/src/Foo.java"));
-    expect(out).toContain("rt.jar");
-  });
-
-  it("find shows interface badge", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { fqn: "com.example.Service", file: "/my-server/src/Service.java", kind: "interface" },
-      ]));
-    });
-    const { find } = await import("../src/commands/find.mjs");
-    await find(["Service"]);
-    const out = io.logs[0];
-    expect(out).toContain("[I]");
-  });
-
-  it("find shows annotation badge", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { fqn: "org.junit.Test", kind: "annotation", binary: true, origin: "junit-4.13.2.jar" },
-      ]));
-    });
-    const { find } = await import("../src/commands/find.mjs");
-    await find(["Test"]);
-    const out = io.logs[0];
-    expect(out).toContain("[A]");
-    expect(out).toContain("junit-4.13.2.jar");
-  });
-
-  it("find shows no results message", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end("[]");
-    });
-    const { find } = await import("../src/commands/find.mjs");
-    await find(["NonExistent"]);
-    expect(io.logs[0]).toBe("(no results)");
-  });
-
-  it("implementors shows FQN and file", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { fqn: "com.example.FooImpl", file: "/my-server/src/FooImpl.java", startLine: 5, endLine: 50 },
-      ]));
-    });
-    const { implementors } = await import("../src/commands/implementors.mjs");
-    await implementors(["com.example.Foo"]);
-    expect(io.logs[0]).toBe("`com.example.FooImpl`  my-server/src/FooImpl.java:5-50");
-  });
-
-  it("hierarchy shows all sections", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({
-        fqn: "com.example.Foo",
-        supertypes: [{ fqn: "com.example.Base", kind: "class", depth: 0 },
-                     { fqn: "com.example.HasId", kind: "interface", depth: 0 }],
-        subtypes: [{ fqn: "com.example.Bar", kind: "class", depth: 0 }],
-      }));
-    });
-    const { hierarchy } = await import("../src/commands/hierarchy.mjs");
-    await hierarchy(["com.example.Foo"]);
-    const out = io.logs.join("\n");
-    expect(out).toContain("Supertypes");
-    expect(out).toContain("com.example.Base");
-    expect(out).toContain("com.example.HasId");
-    expect(out).toContain("Subtypes");
-    expect(out).toContain("com.example.Bar");
-  });
-
-  it("implementors with method shows FQN, file, and line", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { fqn: "com.example.FooImpl", file: "/my-server/src/FooImpl.java", startLine: 25, endLine: 35 },
-      ]));
-    });
-    const { implementors } = await import("../src/commands/implementors.mjs");
-    await implementors(["com.example.Foo#doStuff"]);
-    expect(io.logs[0]).toBe("`com.example.FooImpl`  my-server/src/FooImpl.java:25-35");
-  });
-
-  it("errors shows formatted error lines", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { severity: "ERROR", source: "JDT", file: "D:/projects/my-server/src/Foo.java", line: 10, message: "cannot resolve symbol" },
-      ]));
-    });
-    const { problems } = await import("../src/commands/problems.mjs");
-    await problems([]);
-    expect(io.logs[0]).toContain("ERROR");
-    expect(io.logs[0]).toContain("[JDT]");
-    expect(io.logs[0]).toContain("cannot resolve symbol");
-    expect(io.logs[0]).toContain(toSandboxPath("D:/projects/my-server/src/Foo.java") + ":10");
-  });
-
-  it("problems shows no problems message", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end("[]");
-    });
-    const { problems } = await import("../src/commands/problems.mjs");
-    await problems([]);
-    expect(io.logs[0]).toBe("(no problems)");
-  });
+  // ── Refactoring (organize-imports / format / rename / move) ──
 
   it("organize-imports shows result", async () => {
     await setupMock((req, res) => {
@@ -270,6 +113,8 @@ describe("commands (integration)", () => {
     expect(io.logs[0]).toBe("Moved");
   });
 
+  // ── Editor / open ──
+
   it("editors shows table with headers and active marker", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
@@ -288,7 +133,10 @@ describe("commands (integration)", () => {
     expect(out).toContain("`com.example.Bar`");
     expect(out).toContain(">");
     expect(out).toContain("my-server");
-    expect(out).toContain(toSandboxPath("D:/projects/src/Foo.java"));
+    // Without a remote-instance mount cache, translateHostPath
+    // returns paths unchanged — the raw Eclipse path appears in
+    // the output.
+    expect(out).toContain("D:/projects/src/Foo.java");
   });
 
   it("editors shows basename for non-java files", async () => {
@@ -339,6 +187,8 @@ describe("commands (integration)", () => {
     expect(io.logs[0]).toBe("Opened");
   });
 
+  // ── Build ──
+
   it("build shows success with 0 errors", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
@@ -370,86 +220,4 @@ describe("commands (integration)", () => {
     await build(["--project", "my-client", "--clean"]);
     expect(io.logs[0]).toBe("Build complete (0 errors)");
   });
-
-  it("source prints markdown with refs", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({
-        fqmn: "com.example.Foo",
-        file: "D:/project/src/Foo.java",
-        startLine: 5, endLine: 15,
-        source: "public class Foo {\n}\n",
-        refs: [],
-      }));
-    });
-    const { source } = await import("../src/commands/source.mjs");
-    await source(["com.example.Foo"]);
-    const out = io.logs.join("\n");
-    expect(out).toContain("[C] com.example.Foo");
-    expect(out).toContain(`${toSandboxPath("D:/project/src/Foo.java")}:5-15`);
-    expect(out).toContain("public class Foo");
-  });
-
-  it("source converts paths in sandbox (Linux)", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({
-        fqmn: "com.example.Foo",
-        file: "D:/project/src/Foo.java",
-        startLine: 5, endLine: 15,
-        source: "public class Foo {}",
-        refs: [],
-      }));
-    });
-    mockSandboxPaths();
-    const { source } = await import("../src/commands/source.mjs");
-    await source(["com.example.Foo"]);
-    const out = io.logs.join("\n");
-    expect(out).toContain("/d/project/src/Foo.java:5-15");
-  });
-
-
-  it("project-info shows formatted output", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({
-        name: "test-proj", location: "/ws/test-proj",
-        natures: ["org.eclipse.jdt.core.javanature"],
-        dependencies: ["my-core"], totalTypes: 2, membersIncluded: false,
-        sourceRoots: [{
-          path: "src/main/java", typeCount: 2,
-          packages: [{ name: "app.test", types: [{ name: "A", kind: "class", fields: 0, methods: {} }] }],
-        }],
-      }));
-    });
-    const { projectInfo } = await import("../src/commands/project-info.mjs");
-    await projectInfo(["test-proj"]);
-    expect(io.logs[0]).toContain("test-proj");
-    expect(io.logs[0]).toContain("Total: 2 types");
-  });
-
-  it("references shows markdown snippets", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { file: "/my-server/src/Bar.java", line: 10, in: "Bar.init()", content: "new Foo();" },
-        { file: "/my-server/src/Bar.java", line: 20, in: "Bar.run()", content: "foo.go();" },
-      ]));
-    });
-    const { references } = await import("../src/commands/references.mjs");
-    await references(["com.example.Foo"]);
-    const out = io.logs[0];
-    expect(out).toContain("#### `Bar.init()`");
-    expect(out).toContain("`my-server/src/Bar.java:10`");
-    expect(out).toContain("```java");
-    expect(out).toContain("new Foo();");
-    expect(out).toContain("#### `Bar.run()`");
-    expect(out).toContain("foo.go();");
-    expect(out).toContain("---");
-  });
-
-
-  // validation tests → commands.validation.test.mjs
-  // edge case tests → commands.edge.test.mjs
-  // sandbox + bulk tests → commands.sandbox.test.mjs
 });

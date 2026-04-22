@@ -12,8 +12,8 @@ Four distinct consumers:
 
 | # | Stakeholder | Commands used | Examples |
 |---|-------------|--------------|---------|
-| 1 | **Agent process** | Working commands | `jdt refs`, `jdt find`, `jdt build`, `jdt test run` |
-| 2 | **User in terminal** | Same as agent | `jdt refs`, `jdt find`, `! jdt problems` |
+| 1 | **Agent process** | Working commands | `jdt q`, `jdt build`, `jdt test run`, `jdt launch` |
+| 2 | **User in terminal** | Same as agent | `jdt q`, `jdt status`, `! jdt q '@problems'` |
 | 3 | **Eclipse plugin** | Service/admin | `jdt setup --check`, `jdt agent run/stop/list` |
 | 4 | **User launching agents** | Agent lifecycle | `jdt agent run`, `jdt agent stop` |
 
@@ -50,10 +50,10 @@ UX differentiation only, not a security boundary.
 ┌───────────────────────────────────────────────────────────┐
 │  Agent + User in terminal (stakeholders 1+2)              │
 │                                                           │
-│  jdt refs com.example.Service      semantic search        │
-│  jdt test run com.example.MyTest   run tests              │
-│  jdt build --project my-server     compilation            │
-│  jdt launch run my-maven-build     Java app launches      │
+│  jdt q '"com.example.Service" | @callers'  semantic search│
+│  jdt test run com.example.MyTest           run tests      │
+│  jdt build --project my-server             compilation    │
+│  jdt launch run my-maven-build             Java launches  │
 └───────────────────────────────────────────────────────────┘
 ```
 
@@ -91,38 +91,38 @@ Step 1 covers Eclipse-launched agents and Docker sandboxes.
 Steps 2-3 cover `jdt use` pinning for multi-instance setups.
 Step 4 is the default single-instance behavior.
 
-## `--json` output
+## Output formats
 
-All query commands support `--json` for structured output.
-Default stays human-readable; agents opt in per invocation.
+`jdt q` emits qlang-literal — the native round-trippable form of
+the semantic graph. Every other read-only command emits either
+plain JSON (server-passthrough table commands such as `jdt git
+--json`, `jdt launch configs --json`, `jdt editors --json`) or a
+table rendering (the same commands without `--json`). JSONL
+streaming is used by `jdt test run -f --json` and `jdt test
+status -f --json` for per-event real-time feeds.
 
 ### Principles
 
-1. **Flag, not mode.** `--json` is per-invocation, not a config setting.
-2. **Server data, not rendered data.** Raw data structure, no ANSI
-   codes, no padding, no badges.
-3. **Early exit pattern.** Check `--json` before rendering, return
-   raw data, skip all formatting.
-4. **Stable contract.** JSON field names are the API. Don't rename
-   or remove without a major version bump.
-5. **Paths use `toSandboxPath()`.** File paths go through path
-   remapping for Docker sandbox compatibility.
-6. **Single object or array.** One result = object. Multiple = array.
+1. **qlang stays qlang.** `jdt q` has no `--json` flag; the
+   qlang-literal output round-trips through `parse + evalQuery`
+   and composes as `jdt X | jdt q '...'`.
+2. **Plain-JSON passthroughs keep `--json`.** Server-JSON
+   commands (git / editors / launch list|configs|config / test
+   runs / agent list / use / setup remote) accept `--json` and
+   emit server shapes unchanged.
+3. **Stable contract.** Plain-JSON field names are the API. Don't
+   rename or remove without a major version bump.
+4. **Paths go through the remote-instance cache.** Every
+   path-keyed response field is rewritten via
+   `path-translate.mjs` before reaching output, using the project
+   root map from `jdt setup remote`. See
+   [jdt-setup-remote-spec](jdt-setup-remote-spec.md).
 
 ### Commands with `--json`
 
 | Command | JSON shape |
 |---------|------------|
-| `find` | `[{kind, fqn, binary, file, origin}]` |
-| `references` | `[{file, line, in, content}]` |
-| `implementors` | `[{fqn, fqmn?, file, project, startLine, endLine}]` |
-| `hierarchy` | `{type, supertypes[], interfaces[], subtypes[]}` |
-| `outline` | `{fqn, file, kind, children: [{kind, name, ...}]}` |
-| `source` | raw server JSON (source + refs) |
-| `problems` | `[{file, line, col, severity, message}]` |
-| `projects` | `[{name, location, repo}]` |
 | `editors` | `[{fqn, project, path, active}]` |
-| `project-info` | raw server response |
 | `git` | structured repo objects |
 | `launch list` | `[{launchId, configId, configType, mode, terminated, pid}]` |
 | `launch configs` | `[{configId, type, project?, class?, goals?}]` |
@@ -130,33 +130,33 @@ Default stays human-readable; agents opt in per invocation.
 | `test run` | JSONL when streaming (`-f`), JSON snapshot otherwise |
 | `test status` | JSON snapshot or JSONL stream |
 | `test runs` | `[{configId, testRunId, state, total, passed, failed}]` |
-| `status` | composite JSON of all data sections |
 | `setup remote` | instance config + cached projects |
 | `use` | `[{index, alias, workspace, status, pinned, port}]` |
 | `agent list` | agent sessions with status |
 
-### Implementation pattern
+### Commands emitting qlang-literal
 
-```js
-const data = await get(url);
-if (flags.json) { console.log(JSON.stringify(data, null, 2)); return; }
-// ... render for humans
-```
+| Command | Shape |
+|---------|-------|
+| `q <pipeline>` | Any qlang value (Vec / Map / Set / scalar / `!{}` error) |
 
-Commands that transform server data (group, enrich, aggregate)
-return the **transformed** data in `--json`, not raw server response —
-the transformation is the command's value-add.
+### Dashboard
+
+`jdt status` emits a markdown dashboard only — machine-readable
+access to any single section goes through the underlying command
+(`jdt git --json`, `jdt launch configs --json`, `jdt q
+'@problems'`, `jdt q '@projects'`).
 
 Action commands (`build`, `refresh`, `setup`, `rename`, `move`,
-`organize-imports`, `format`, `open`, `agent run/stop`) do not
-support `--json` — they print status messages, not data.
+`organize-imports`, `format`, `open`, `agent run/stop`) print
+status messages; no structured output.
 
 ## Specs index
 
 | Area | Spec |
 |---|---|
 | Dashboard (`jdt status`) | [jdt-status-spec](jdt-status-spec.md) |
-| Source navigation (`jdt source`) | [jdt-source-spec](jdt-source-spec.md) |
+| Graph query (`jdt q`) | [jdt-query-spec](jdt-query-spec.md) |
 | Test commands (`jdt test`) | [jdt-test-spec](jdt-test-spec.md) |
 | Test server protocol | [bridge-test-spec](bridge-test-spec.md) |
 | Launch system (`jdt launch`) | [jdt-launch-spec](jdt-launch-spec.md) |

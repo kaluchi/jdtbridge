@@ -14,6 +14,9 @@ coverage/
 !jdtbridge-ci.target
 *.class
 
+# User-exported Eclipse workspace .log files
+/*.log
+
 # PDE JUnit test runtime workspace
 plugin.tests/workspace/
 

@@ -130,12 +130,12 @@ class TestSessionHandler {
                             continue;
                     }
 
-                    String fqmn = tc.getTestClassName()
+                    String fqn = tc.getTestClassName()
                             + "#" + tc.getTestMethodName();
                     double time = tc.getElapsedTimeInSeconds();
 
                     var entry = new JsonObject();
-                    entry.addProperty("fqmn", fqmn);
+                    entry.addProperty("fqn", fqn);
                     entry.addProperty("status", status);
                     entry.addProperty("time",
                             Double.isNaN(time) ? 0.0 : time);

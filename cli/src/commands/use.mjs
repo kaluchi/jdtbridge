@@ -312,7 +312,7 @@ The target argument resolves in order: number, alias, path substring.
 Pinning writes a file keyed by terminal session ID — all subsequent
 jdt commands in this terminal tab use the pinned workspace.
 
-For parallel subagents: jdt use N && jdt find Foo (ppid isolation).
+For parallel subagents: jdt use N && jdt q '...' (ppid isolation).
 
 Examples:
   jdt use                          show all workspaces

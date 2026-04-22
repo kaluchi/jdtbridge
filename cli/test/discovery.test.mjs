@@ -130,7 +130,7 @@ describe("discovery", () => {
       expect(instances[0].location).toBe("reference:file:plugins/io.github.kaluchi.jdtbridge_1.0.0.jar");
     });
 
-    it("works without version and location (backwards compat)", async () => {
+    it("handles instance file without version and location fields", async () => {
       const port = await startMock();
       writeInstance("old.json", {
         port, token: "t", pid: process.pid, workspace: "/ws",

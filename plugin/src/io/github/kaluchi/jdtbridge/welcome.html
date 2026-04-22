@@ -83,8 +83,9 @@
 
   <ol class="steps">
     <li>Run <code>jdt setup --check</code> to verify the connection</li>
-    <li>Run <code>jdt projects</code> to list workspace projects</li>
-    <li>Run <code>jdt find "*Test*"</code> to search for types</li>
+    <li>Run <code>jdt status</code> for the workspace dashboard</li>
+    <li>Run <code>jdt q '@projects'</code> to list workspace projects</li>
+    <li>Run <code>jdt q '"*Test" | @types * /fqn'</code> to search for types</li>
   </ol>
 
   <div class="links">

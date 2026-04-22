@@ -127,6 +127,38 @@ describe("launch commands", () => {
     expect(io.logs[0]).toBe("(no launch configurations)");
   });
 
+  it("launch configs --limit N slices server response", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(
+        Array.from({ length: 30 }, (_, i) => ({
+          configId: `config${i}`,
+          configType: "Java Application",
+        })),
+      ));
+    });
+    const { launchConfigs } = await import("../src/commands/launch.mjs");
+    await launchConfigs(["--limit", "5"]);
+    const out = io.logs[0];
+    expect(out).toContain("config0");
+    expect(out).toContain("config4");
+    expect(out).not.toContain("config5");
+  });
+
+  it("launch configs ignores invalid --limit", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify([
+        { configId: "a", configType: "Java Application" },
+        { configId: "b", configType: "Java Application" },
+      ]));
+    });
+    const { launchConfigs } = await import("../src/commands/launch.mjs");
+    await launchConfigs(["--limit", "abc"]);
+    expect(io.logs[0]).toContain("a");
+    expect(io.logs[0]).toContain("b");
+  });
+
   it("launch clear shows count", async () => {
     await setupMock((req, res) => {
       res.writeHead(200, { "Content-Type": "application/json" });
@@ -404,7 +436,7 @@ describe("launch commands", () => {
     expect(out).toContain("org.eclipse.jdt.junit.TEST_KIND");
   });
 
-  it("launch config text shows synthesized Target as FQMN", async () => {
+  it("launch config text shows synthesized Target as FQN", async () => {
     const detail = {
       configId: "FooTest", configType: "JUnit", configTypeId: "org.eclipse.jdt.junit.launchconfig",
       attributes: {

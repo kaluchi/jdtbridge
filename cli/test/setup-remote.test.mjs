@@ -1,9 +1,25 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { resetHome } from "../src/home.mjs";
 import { setColorEnabled } from "../src/color.mjs";
+
+// setup-remote calls `directGet` against the configured bridge to
+// fetch `/projects` (enrichment + --check). Tests run without a
+// live plugin; stub the client so every HTTP call rejects
+// immediately instead of waiting for DNS / connect timeout.
+vi.mock("../src/client.mjs", async (importOriginal) => {
+  const orig = await importOriginal();
+  return {
+    ...orig,
+    directGet: async () => {
+      const e = new Error("bridge not reachable in test");
+      e.code = "ECONNREFUSED";
+      throw e;
+    },
+  };
+});
 
 function captureConsole() {
   const logs = [];
@@ -641,9 +657,18 @@ describe("jdt setup remote", () => {
         .find(f => f.endsWith(".json"));
       const cachePath = join(cacheDir, cacheFile);
       const cache = JSON.parse(readFS(cachePath, "utf8"));
-      // Replace forward slashes with backslashes in project paths
+      // Replace forward slashes with backslashes in project paths.
+      // Cache entries are objects {eclipseRoot, localRoot} (new
+      // format) or plain strings (legacy). Normalise both shapes.
       for (const [k, v] of Object.entries(cache.projects)) {
-        cache.projects[k] = v.replace(/\//g, "\\");
+        if (typeof v === "string") {
+          cache.projects[k] = v.replace(/\//g, "\\");
+        } else if (v && typeof v === "object") {
+          cache.projects[k] = {
+            ...v,
+            localRoot: (v.localRoot || "").replace(/\//g, "\\"),
+          };
+        }
       }
       writeFS(cachePath, JSON.stringify(cache));
 

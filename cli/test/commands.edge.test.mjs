@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { startServer, stopServer, captureConsole, disableColor } from "./helpers/mock-server.mjs";
 
+// Edge cases for non-graph commands. Graph-axis edge cases live in
+// GraphHandlerTest (plugin.tests).
+
 describe("command edge cases", () => {
   let server, port, io;
 
@@ -21,36 +24,6 @@ describe("command edge cases", () => {
       resolveInstance: async () => ({ port, token: null, pid: process.pid, workspace: "/test", host: "127.0.0.1", file: "" }),
     }));
   }
-
-  it("implementors shows no implementors message", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end("[]");
-    });
-    const { implementors } = await import("../src/commands/implementors.mjs");
-    await implementors(["app.Foo"]);
-    expect(io.logs[0]).toBe("(no implementors)");
-  });
-
-  it("implementors with method shows no implementors message", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end("[]");
-    });
-    const { implementors } = await import("../src/commands/implementors.mjs");
-    await implementors(["app.Foo#m"]);
-    expect(io.logs[0]).toBe("(no implementors)");
-  });
-
-  it("references shows no references message", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end("[]");
-    });
-    const { references } = await import("../src/commands/references.mjs");
-    await references(["app.Foo"]);
-    expect(io.logs[0]).toBe("(no references)");
-  });
 
   it("format shows 'No changes' when not modified", async () => {
     await setupMock((req, res) => {
@@ -84,50 +57,4 @@ describe("command edge cases", () => {
     expect(io.logs[0]).toBe("Moved");
     expect(io.logs[1]).toContain("may break imports");
   });
-
-  it("hierarchy shows subtypes section", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({
-        supers: [],
-        interfaces: [],
-        subtypes: [{ fqn: "app.Sub", binary: false, file: "/my-app/src/Sub.java" }],
-      }));
-    });
-    const { hierarchy } = await import("../src/commands/hierarchy.mjs");
-    await hierarchy(["app.Foo"]);
-    expect(io.logs.some((l) => l.includes("Subtypes"))).toBe(true);
-    expect(io.logs.some((l) => l.includes("app.Sub"))).toBe(true);
-  });
-
-  it("source handles multiple overloads as array", async () => {
-    await setupMock((req, res) => {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { fqmn: "com.example.Foo#bar()", file: "D:/src/Foo.java", startLine: 10, endLine: 15, source: "void bar() {}", refs: [] },
-        { fqmn: "com.example.Foo#bar(int)", file: "D:/src/Foo.java", startLine: 20, endLine: 25, source: "void bar(int x) {}", refs: [] },
-      ]));
-    });
-    const { source } = await import("../src/commands/source.mjs");
-    await source(["com.example.Foo#bar"]);
-    const out = io.logs.join("\n");
-    expect(out).toContain("[M] com.example.Foo#bar()");
-    expect(out).toContain("[M] com.example.Foo#bar(int)");
-    expect(out).toContain("---");
-  });
-
-  it("errors with --warnings flag", async () => {
-    await setupMock((req, res) => {
-      expect(req.url).toContain("warnings");
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify([
-        { severity: "WARNING", source: null, file: "/my-app/src/A.java", line: 1, message: "unused" },
-      ]));
-    });
-    const { problems } = await import("../src/commands/problems.mjs");
-    await problems(["--warnings"]);
-    expect(io.logs[0]).toContain("WARN");
-  });
-
-  // source tests → commands.source.test.mjs
 });

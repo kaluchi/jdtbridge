@@ -2,11 +2,10 @@
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { request } from "node:http";
 import { instancesDir, remoteInstancesDir } from "./home.mjs";
-import { proxyAwareOptions } from "./proxy.mjs";
 import { getPinnedBridge } from "./bridge-env.mjs";
 import { normalizePath } from "./paths.mjs";
+import { httpRequest } from "./http.mjs";
 
 /**
  * @typedef {Object} Instance
@@ -111,19 +110,31 @@ export async function findInstance(workspaceHint) {
  * HTTP probe — check if bridge is alive.
  * Used only for diagnostics (setup --check), not for normal discovery.
  */
-export function probe(inst) {
-  return new Promise((resolve, reject) => {
-    const opts = proxyAwareOptions(
-      inst.host, inst.port, "/status", "GET", 5000);
-    const req = request(opts, (res) => {
-      res.resume();
-      resolve();
-    });
-    req.on("error", reject);
-    req.on("timeout", () => {
-      req.destroy();
-      reject(new Error("timeout"));
-    });
-    req.end();
-  });
+export async function probe(inst) {
+  const res = await httpRequest(inst, "/status");
+  if (res.error) throw res.error;
+}
+
+/**
+ * Fetch the /projects list from an instance.
+ * Returns an array of {fqn, rootPath, ...} objects or [] on any
+ * failure (network error, non-200 status, invalid JSON). Used by
+ * cwd-match resolution (resolve.mjs), where "can't tell" should
+ * simply fall through to the next resolution step rather than break.
+ *
+ * Default timeout is tighter than {@link probe} (3s vs 5s) because
+ * this fires on every jdt command in the multi-instance-ambiguous
+ * path; the extra 2s of head-of-line latency on an unresponsive
+ * bridge is not worth paying when the caller's fallback (warn +
+ * use first) is cheap.
+ */
+export async function fetchProjects(inst, timeoutMs = 3000) {
+  const { status, body } = await httpRequest(inst, "/projects", "GET", timeoutMs);
+  if (status !== 200) return [];
+  try {
+    const parsed = JSON.parse(body);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }

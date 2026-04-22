@@ -6,20 +6,228 @@ import java.util.List;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.jobs.Job;
+import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.IField;
+import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IJavaProject;
+import org.eclipse.jdt.core.IMember;
 import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.IParent;
 import org.eclipse.jdt.core.ITypeHierarchy;
 import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.Signature;
+import org.eclipse.jdt.core.dom.AST;
+import org.eclipse.jdt.core.dom.ASTNode;
+import org.eclipse.jdt.core.dom.ASTParser;
+import org.eclipse.jdt.core.dom.ASTVisitor;
+import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.IMethodBinding;
+import org.eclipse.jdt.core.dom.ITypeBinding;
+import org.eclipse.jdt.core.dom.LambdaExpression;
 
 /**
  * Shared JDT utilities used by multiple handlers.
  */
 class JdtUtils {
 
+    /** Lambda-suffix marker in a composite synthetic FQN. */
+    private static final String LAMBDA_SUFFIX_HEAD = ".() -> {...}";
+    /** Anonymous-suffix marker in a composite synthetic FQN. */
+    private static final String ANON_SUFFIX_HEAD = ".new ";
+    /** Anonymous-suffix tail (after the simple type name). */
+    private static final String ANON_SUFFIX_TAIL = "() {...}";
+
     static IType findType(String fqn) throws JavaModelException {
+        IJavaElement resolved = resolveElement(fqn);
+        return (resolved instanceof IType t) ? t : null;
+    }
+
+    /**
+     * Composite synthetic FQN — carries a lambda / anonymous suffix
+     * that requires {@link #resolveElement} rather than the plain
+     * {@code findType / first-# split} path. Callers guard their
+     * legacy resolution branches with this check.
+     */
+    static boolean isCompositeFqn(String fqn) {
+        return fqn.indexOf(LAMBDA_SUFFIX_HEAD) >= 0
+                || fqn.indexOf(ANON_SUFFIX_HEAD) >= 0;
+    }
+
+    /**
+     * Full composite-FQN → IJavaElement resolver. Handles every
+     * shape the JDT Bridge fqn convention produces:
+     * <ul>
+     *   <li>type — {@code pkg.Outer} or {@code pkg.Outer.Inner}</li>
+     *   <li>method — {@code pkg.Outer#name(erased,params)}</li>
+     *   <li>field — {@code pkg.Outer#name}</li>
+     *   <li>synthetic type — {@code pkg.Outer#enclose(Args).() -> {...} Iface}
+     *       or {@code pkg.Outer#enclose(Args).new Iface() {...}}</li>
+     *   <li>member within synthetic — either of the above with
+     *       {@code #name(params)} or {@code #name} appended</li>
+     * </ul>
+     * Synthetic resolution walks the enclosing member's children
+     * for an IType whose {@link #suffixOf synthetic suffix} equals
+     * the parsed one; first match wins when multiple identical
+     * synthetics share the enclosing method.
+     */
+    static IJavaElement resolveElement(String fqn)
+            throws JavaModelException {
+        int syntheticIdx = syntheticSuffixStart(fqn);
+        if (syntheticIdx < 0) return resolveRegular(fqn);
+
+        String enclosingFqn = fqn.substring(0, syntheticIdx);
+        String rest = fqn.substring(syntheticIdx + 1);
+        int memberHash = rest.indexOf('#');
+        String syntheticSuffix = memberHash < 0
+                ? rest : rest.substring(0, memberHash);
+        String memberPart = memberHash < 0
+                ? null : rest.substring(memberHash + 1);
+
+        IJavaElement enclosing = resolveElement(enclosingFqn);
+        if (enclosing == null) return null;
+        IType syntheticType = findSyntheticChild(
+                enclosing, syntheticSuffix);
+        if (syntheticType == null) return null;
+        if (memberPart == null) return syntheticType;
+        return resolveMemberInType(syntheticType, memberPart);
+    }
+
+    /**
+     * Locate a synthetic IType (anonymous class or lambda) inside
+     * an enclosing member. Dispatch by suffix shape — each shape
+     * has one authoritative strategy:
+     * <ul>
+     *   <li>{@code () -> {...}} suffix → lambda, resolved via AST
+     *       binding walk; lambdas do not appear in
+     *       {@link IParent#getChildren()}.</li>
+     *   <li>{@code new …() {...}} suffix → anonymous class,
+     *       resolved via {@code getChildren()} on the enclosing
+     *       member.</li>
+     * </ul>
+     */
+    private static IType findSyntheticChild(
+            IJavaElement enclosing, String suffix)
+            throws JavaModelException {
+        if (suffix.startsWith("() -> {...}")) {
+            return findLambdaViaAst(enclosing, suffix);
+        }
+        return findAnonymousChild(enclosing, suffix);
+    }
+
+    private static IType findAnonymousChild(
+            IJavaElement enclosing, String suffix)
+            throws JavaModelException {
+        if (!(enclosing instanceof IParent parent)) return null;
+        for (IJavaElement child : parent.getChildren()) {
+            if (child instanceof IType t && matchesSuffix(t, suffix)) {
+                return t;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Resolve a lambda IType inside an enclosing member by parsing
+     * its compilation unit and visiting {@link LambdaExpression}
+     * nodes. Each lambda's {@code resolveTypeBinding()} gives an
+     * {@link ITypeBinding} whose {@code getJavaElement()} is the
+     * lambda IType; the one whose host member equals the caller's
+     * {@code enclosing} and whose synthetic suffix equals the
+     * requested one wins.
+     */
+    private static IType findLambdaViaAst(
+            IJavaElement enclosing, String suffix)
+            throws JavaModelException {
+        ICompilationUnit cu = (ICompilationUnit) enclosing
+                .getAncestor(IJavaElement.COMPILATION_UNIT);
+        if (cu == null) return null;
+        ASTParser parser = ASTParser.newParser(AST.getJLSLatest());
+        parser.setSource(cu);
+        parser.setResolveBindings(true);
+        parser.setKind(ASTParser.K_COMPILATION_UNIT);
+        CompilationUnit root = (CompilationUnit) parser.createAST(null);
+        LambdaFinder finder = new LambdaFinder(enclosing, suffix);
+        root.accept(finder);
+        return finder.match;
+    }
+
+    /**
+     * AST visitor that captures the first lambda whose host member
+     * equals {@code enclosing} and whose Java-Model IType produces
+     * the requested {@link #suffixOf synthetic suffix}.
+     */
+    private static final class LambdaFinder extends ASTVisitor {
+        private final IJavaElement enclosing;
+        private final String suffix;
+        private IType match;
+
+        LambdaFinder(IJavaElement enclosing, String suffix) {
+            this.enclosing = enclosing;
+            this.suffix = suffix;
+        }
+
+        @Override
+        public boolean visit(LambdaExpression node) {
+            if (match != null) return false;
+            if (!inEnclosingMember(node)) return true;
+            // resolveMethodBinding() on a lambda gives the SAM
+            // IMethod whose declaringType IS the lambda IType.
+            // (resolveTypeBinding gives the functional interface,
+            // not the lambda's own synthetic type — wrong target.)
+            IMethodBinding samBinding = node.resolveMethodBinding();
+            if (samBinding == null) return true;
+            IJavaElement samJe = samBinding.getJavaElement();
+            if (!(samJe instanceof IMethod samMethod)) return true;
+            IType candidate = samMethod.getDeclaringType();
+            if (candidate == null) return true;
+            try {
+                if (candidate.isLambda()
+                        && suffix.equals(suffixOf(candidate))) {
+                    match = candidate;
+                    return false;
+                }
+            } catch (JavaModelException e) {
+                // skip this candidate on error — let the traversal
+                // continue looking for another.
+            }
+            return true;
+        }
+
+        private boolean inEnclosingMember(ASTNode node) {
+            ASTNode n = node.getParent();
+            while (n != null) {
+                if (n instanceof org.eclipse.jdt.core.dom
+                        .MethodDeclaration md) {
+                    IMethodBinding mb = md.resolveBinding();
+                    if (mb == null) return false;
+                    return enclosing.equals(mb.getJavaElement());
+                }
+                n = n.getParent();
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Regular (non-synthetic) FQN → IJavaElement. Plain type if
+     * no {@code #}, otherwise dispatches to {@link
+     * #resolveMemberInType}.
+     */
+    private static IJavaElement resolveRegular(String fqn)
+            throws JavaModelException {
+        int hash = fqn.indexOf('#');
+        if (hash < 0) return findTypeRaw(fqn);
+        IType declaring = findTypeRaw(fqn.substring(0, hash));
+        if (declaring == null) return null;
+        return resolveMemberInType(
+                declaring, fqn.substring(hash + 1));
+    }
+
+    /** Plain {@link IJavaProject#findType} walk across open projects. */
+    private static IType findTypeRaw(String fqn)
+            throws JavaModelException {
         var model = JavaCore.create(
                 ResourcesPlugin.getWorkspace().getRoot());
         for (IJavaProject project : model.getJavaProjects()) {
@@ -27,6 +235,92 @@ class JdtUtils {
             if (type != null && type.exists()) return type;
         }
         return null;
+    }
+
+    /**
+     * Resolve a member fragment ({@code name(params)} or
+     * {@code name}) against a declaring type. Parens → method.
+     * No parens → field first, then sole method of that name.
+     */
+    private static IJavaElement resolveMemberInType(
+            IType type, String memberPart) throws JavaModelException {
+        int paren = memberPart.indexOf('(');
+        if (paren < 0) {
+            IField field = type.getField(memberPart);
+            if (field != null && field.exists()) return field;
+            return findMethod(type, memberPart, null);
+        }
+        String name = memberPart.substring(0, paren);
+        int closeParen = memberPart.lastIndexOf(')');
+        String params = closeParen > paren
+                ? memberPart.substring(paren + 1, closeParen)
+                : memberPart.substring(paren + 1);
+        return findMethod(type, name, params);
+    }
+
+    /**
+     * Locate the {@code .}-separator that starts a lambda /
+     * anonymous suffix in a composite synthetic FQN like
+     * {@code pkg.Outer#enclose(Args).() -> {...} Iface}. Returns
+     * {@code -1} when the fqn has no synthetic suffix.
+     */
+    private static int syntheticSuffixStart(String fqn) {
+        int lambda = fqn.indexOf(LAMBDA_SUFFIX_HEAD);
+        int anon   = fqn.indexOf(ANON_SUFFIX_HEAD);
+        if (lambda < 0 && anon < 0) return -1;
+        if (lambda < 0) return anon;
+        if (anon < 0)   return lambda;
+        return Math.min(lambda, anon);
+    }
+
+    private static boolean matchesSuffix(IType type, String suffix)
+            throws JavaModelException {
+        String expected = suffixOf(type);
+        return expected != null && expected.equals(suffix);
+    }
+
+    private static String suffixOf(IType type) throws JavaModelException {
+        if (type.isLambda()) {
+            String iface = firstSuperInterfaceSimple(type);
+            return iface != null
+                    ? "() -> {...} " + iface
+                    : "() -> {...}";
+        }
+        if (type.isAnonymous()) {
+            String iface = firstSuperInterfaceSimple(type);
+            if (iface != null) return "new " + iface + ANON_SUFFIX_TAIL;
+            String superName = simpleOf(
+                    type, type.getSuperclassTypeSignature());
+            if (superName != null) return "new " + superName + ANON_SUFFIX_TAIL;
+            return "new {...}";
+        }
+        return null;
+    }
+
+    private static String firstSuperInterfaceSimple(IType type)
+            throws JavaModelException {
+        String[] sigs = type.getSuperInterfaceTypeSignatures();
+        return sigs.length > 0 ? simpleOf(type, sigs[0]) : null;
+    }
+
+    private static String simpleOf(IType context, String signature)
+            throws JavaModelException {
+        if (signature == null) return null;
+        String erased = Signature.getTypeErasure(signature);
+        String elementSig = Signature.getArrayCount(erased) > 0
+                ? Signature.getElementType(erased) : erased;
+        String elementName = Signature.toString(elementSig);
+        if (elementSig.length() > 0
+                && elementSig.charAt(0) == 'Q') {
+            String[][] resolved = context.resolveType(elementName);
+            if (resolved != null && resolved.length > 0) {
+                return resolved[0][1];
+            }
+        }
+        int lastDot = elementName.lastIndexOf('.');
+        return lastDot >= 0
+                ? elementName.substring(lastDot + 1)
+                : elementName;
     }
 
     static IMethod findMethod(IType type, String name,
@@ -188,8 +482,8 @@ class JdtUtils {
 
     /**
      * Find all implementations of an interface/abstract method
-     * via type hierarchy. Returns FQMN → IMethod map.
-     * Shared by SourceReport and SearchHandler.
+     * via type hierarchy. Returns FQN → IMethod map. Callers:
+     * {@link SourceReport}, {@link GraphHandler#handleImplementors}.
      */
     static java.util.LinkedHashMap<String, IMethod>
             findImplementations(IMethod method)

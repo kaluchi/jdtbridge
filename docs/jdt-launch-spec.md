@@ -89,8 +89,8 @@ Columns:
 - **CONFIGID** — configuration name (unique identifier for `jdt launch run`)
 - **CONFIGTYPE** — Eclipse ILaunchConfigurationType (human-readable name)
 - **PROJECT** — Java project (from `org.eclipse.jdt.launching.PROJECT_ATTR`)
-- **TARGET** — synthesized FQMN, type-specific:
-  - JUnit class: `class#method` (FQMN from `MAIN_TYPE` + `TESTNAME`)
+- **TARGET** — synthesized FQN, type-specific:
+  - JUnit class: `class#method` (FQN from `MAIN_TYPE` + `TESTNAME`)
   - JUnit package: package name (parsed from `CONTAINER`)
   - JUnit project: empty (redundant with PROJECT)
   - Java Application: main class (from `MAIN_TYPE`)
@@ -127,7 +127,7 @@ org.eclipse.jdt.launching.VM_ARGUMENTS          -ea
 ```
 
 Header rows (Name, Type, Project, Target, File) are synthesized from
-raw attributes. Target uses the same FQMN logic as `launch configs`.
+raw attributes. Target uses the same FQN logic as `launch configs`.
 Remaining attributes are shown with full Eclipse key names and all values
 (including false and empty). Multiline values are aligned to the VALUE column.
 
@@ -161,7 +161,7 @@ Design decisions:
 - `getAttributes()` preserves types: strings, booleans, integers, lists, maps.
   This is richer than parsing XML where everything is a string.
 - The text and JSON views share the same data from a single endpoint.
-  Target synthesis (FQMN) happens on the CLI side from raw attributes,
+  Target synthesis (FQN) happens on the CLI side from raw attributes,
   not on the server — keeps the API clean and the rendering consistent
   between `configs` and `config`.
 
@@ -399,16 +399,31 @@ Key lifecycle facts:
 
 ## Launch history and ordering
 
-`jdt launch configs` uses Eclipse's internal launch history API
-(`DebugUIPlugin.getLaunchConfigurationManager()`) to sort results:
+`jdt launch configs` reads
+`<workspace>/.metadata/.plugins/org.eclipse.debug.ui/launchConfigurationHistory.xml`
+(persisted by Eclipse on workspace save) to sort results. Group
+order: run → debug → coverage (EclEmma group, present when the
+plugin is installed). Per group, section order:
 
-1. **Favorites** (Run favorites, then Debug favorites)
-2. **Recent history** (Run history, then Debug history)
-3. **Remaining configs** (alphabetical)
+1. **Favorites** (run favorites → debug favorites → coverage favorites)
+2. **Recent history** (run mruHistory → debug mruHistory → coverage mruHistory,
+   most-recent-first)
+3. **Remaining configs** (alphabetical from `ILaunchManager.getLaunchConfigurations()`)
 
-This matches the order in Eclipse's Run > Run History menu.
-The API is `@SuppressWarnings("restriction")` — internal Eclipse API,
-but stable across versions.
+Dedup by name across the whole sequence — each config appears once,
+at its earliest position. This matches the order in Eclipse's
+Run > Run History menu.
+
+The XML path was chosen over `DebugUIPlugin.getLaunchConfigurationManager()`
+because the latter pulls in `org.eclipse.ui.workbench` which fails to
+activate in PDE headless test runtimes. The tradeoff: the XML file
+is updated on workspace save (typically on shutdown or periodic
+snapshot), so this sort order lags in-memory state by up to a
+workspace save interval.
+
+`--limit N` trims the result to the first N entries (applied CLI-side
+after ordering). `jdt status` uses `--limit 20` to keep the dashboard
+bounded; drop the flag for the full list.
 
 ## Relationship to `jdt test`
 
@@ -445,6 +460,9 @@ be aware of `--skip-build` and skip the Maven requirement.
 4. **Console buffer limits.** LaunchTracker uses unbounded StringBuilders.
    Very long-running processes (hours of output) may consume significant memory.
 
-5. **Path conversion.** In Docker sandbox mode, Windows paths from Eclipse
-   are converted to Linux paths via `toSandboxPath()`. This applies to
-   `file` fields in JSON output.
+5. **Path conversion.** In Docker sandbox mode, paths returned by
+   Eclipse are rewritten via the per-remote-instance project path
+   cache (`path-translate.mjs`) before they reach the output. See
+   [jdt-setup-remote-spec](jdt-setup-remote-spec.md). Applies to
+   every path-keyed response field (`:file`, `:path`, `:rootPath`,
+   `:outputLocation`).

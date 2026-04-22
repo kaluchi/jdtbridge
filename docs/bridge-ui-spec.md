@@ -98,19 +98,3 @@ ui/
 | Agent lifecycle (providers, CLI commands) | [jdt-agent-spec](jdt-agent-spec.md) |
 | Session scope (project filtering) | [bridge-session-spec](bridge-session-spec.md) |
 
-## Future work
-
-### Telemetry view
-
-Many `jdt` CLI operations don't hit the bridge HTTP server: `jdt setup`,
-discovery, agent spawning, hook installation. A dedicated Eclipse View
-showing live stream of bridge HTTP requests + CLI telemetry events.
-
-`POST /telemetry` endpoint, ring buffer on plugin side, Activity
-Monitor view. Fire-and-forget, default-on, local-only.
-
-### Onboarding dashboard
-
-Eclipse View with environment health checks: Node.js, npm, CLI
-version, Docker availability. Fix-it actions: install CLI globally,
-run `jdt setup --claude` in a specific project.
