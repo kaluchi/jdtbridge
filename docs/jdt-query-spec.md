@@ -298,7 +298,7 @@ renderer — one-shot from an fqn or node subject:
 
 | Conduit | Expands to |
 |---|---|
-| `@sourceCard` | `{:node @detail :text @source :outgoing @outgoingRefs :incoming @incomingRefs(:all)} \| mdSource` |
+| `@sourceCard` | `{:node @detail :text @source :outgoing @outgoingRefs :incoming @incomingRefs(:all) :supers @supers :subtypes @subtypes} \| mdSource` |
 | `@hierarchyCard` | `{:node @detail :supers @supers :subtypes @subtypes} \| mdHierarchy` |
 | `@outlineCard` | `{:node @detail :members @members} \| mdOutline` |
 
