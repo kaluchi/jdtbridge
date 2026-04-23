@@ -118,7 +118,7 @@ jdt q '"io.github.kaluchi.jdtbridge.SearchHandler" | @members * /name'
 jdt q '"io.github.kaluchi.jdtbridge.JdtUtils#findMethod" | @callers | count'
 jdt q '"my-server" | @problems * /message'
 jdt q '"org.springframework.jdbc.core.JdbcTemplate#query" | @source' | grep -n throw
-jdt q '"io.github.kaluchi.jdtbridge.HttpServer" | @methods | @untested * /fqn'
+jdt q '"io.github.kaluchi.jdtbridge.HttpServer" | @methods | filter(@untested) * /fqn'
 ```
 
 ### Subagents (Explore, Plan)

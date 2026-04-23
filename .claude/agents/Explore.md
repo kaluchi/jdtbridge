@@ -21,8 +21,8 @@ For Java-specific queries, use `jdt q '<qlang-pipeline>'` — semantic results f
 jdt q '"<FQN>" | @callers'                  # call sites (not string matches)
 jdt q '"<FQN>" | @calls'                    # methods this body invokes
 jdt q '"<FQN>" | @source'                   # source text
-jdt q '"<FQN>" | @members | table'           # class overview (fields, methods)
-jdt q '"<FQN>" | @methods | @untested * /fqn'  # members with no test-scope caller
+jdt q '"<FQN>" | @members * /fqn'            # class overview (fields, methods)
+jdt q '"<FQN>" | @methods | filter(@untested) * /fqn'  # members with no test-scope caller
 jdt q '"*Pat*" | @types * /fqn'              # find types by name pattern
 jdt q '"<FQN>" | @implementors'              # type or method implementors
 jdt q '"<FQN>" | @supers | @ancestors'       # transitive supertypes

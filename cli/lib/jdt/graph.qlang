@@ -342,18 +342,18 @@
 |~~ Polymorphic seed lift. Map subjects (skeleton/detail) pass
     through. String subjects dispatch by shape:
       - has '#' and '(' → @method (FQN with explicit signature)
-      - has '#', no '(' → @field (FQN for a field)
-      - no '#'          → @type (FQN for a type)
-    A bare method name without parens (`Type#method`) is
-    syntactically indistinguishable from a field reference — to
-    resolve a method use `Type#method(ArgTypes)` or feed it to
-    @method directly. ~~|
+      - has '#', no '(' → @field, falling back to @method via fail-track
+                          (mirrors GraphHandler.resolveTarget — fields take
+                          priority over nullary / sole-overload methods of
+                          the same name)
+      - no '#'          → @type (FQN for a type) ~~|
 let(:@asNode, as(:subj)
     | reify | /type | as(:subjType)
     | subj
     | when(subjType | eq(:string),
            cond(contains("#"),
-                cond(contains("("), @method, @field),
+                cond(contains("("), @method,
+                     @field !| (subj | @method)),
                 @type)))
 
 |~~ Type that contains a member. Member skeletons carry :containingType
@@ -470,7 +470,9 @@ let(:@problemsVia, [:fetcher, :liftNode, :fileLocation, :packageTypes],
     @problemMarkers / @asNode / @containingFile / @typesInPackage
     operands plug into the conduit. ~~|
 let(:@problems, @problemsVia(@problemMarkers, @asNode,
-                              @containingFile, @typesInPackage))
+                              @containingFile, @typesInPackage)
+                * union({:error   /severity | eq("error")
+                         :warning /severity | eq("warning")}))
 
 |~~ Incoming call sites of a method — distinct :from skeletons
     of every :call reference. Eclipse SearchEngine emits one
@@ -598,11 +600,18 @@ let(:@testCallers, @callers | filter(/isTestScope))
 |~~ Callers outside test scope — production usage audit. ~~|
 let(:@productionCallers, @callers | filter(/isTestScope | not))
 
-|~~ Keep only elements whose @callers include no test-scope code.
-    Applied after @methods / @fields — yields un-exercised
-    declarations. ~~|
+|~~ Subject-level predicate — true iff the method/field has zero
+    test-scope callers. An exercise-gap marker for production code
+    that tests do not reach. Members with only test-scope callers
+    (no production users) are NOT flagged — they already have a
+    test touching them.
+
+    Compose over a Vec of member skeletons via filter / every / any:
+      "pkg.Foo" | @methods | filter(@untested) * /fqn
+      "pkg.Foo" | @methods | any(@untested)
+    Or apply to a single method / field node for a boolean check. ~~|
 let(:@untested,
-    filter(@callers | filter(/isTestScope) | empty))
+    @callers | filter(/isTestScope) | empty)
 
 |~~ For a type node, every test-scope caller across the type
     itself plus its declared methods and fields. Returns the Vec
@@ -621,30 +630,31 @@ let(:@tests,
 
 |~ ── Annotation conduits ───────────────────────────────────── ~|
 
-|~~ Keep only elements declaring the given annotation FQN. The
-    argument is a String — the full qualified annotation type,
-    e.g. "org.junit.jupiter.api.Test", "java.lang.Deprecated",
-    "org.springframework.stereotype.Service". ~~|
-let(:@annotated, [:annotationFqn],
-    filter(/annotations | any(eq(annotationFqn))))
+|~~ Subject-level predicate — true iff the element's :annotations
+    Vec contains annotationFqn. Argument is a String — the full
+    qualified annotation type, e.g. "org.junit.jupiter.api.Test",
+    "java.lang.Deprecated", "org.springframework.stereotype.Service".
 
-|~~ Deprecated elements — shorthand for
-    @annotated("java.lang.Deprecated"). ~~|
-let(:@deprecated, @annotated("java.lang.Deprecated"))
+    Compose with filter / every / any over a Vec of skeletons:
+      xs | filter(@annotatedWith("...Service"))
+      xs | any(@annotatedWith("...Test"))
+    Or apply directly to a single node-Map for a boolean check. ~~|
+let(:@annotatedWith, [:annotationFqn],
+    /annotations | any(eq(annotationFqn)))
 
-|~~ JUnit Jupiter `@Test` methods. Portable across JUnit 4 if the
-    caller wants that flavor, they pass the JUnit 4 FQN to
-    @annotated directly: @annotated("org.junit.Test"). ~~|
-let(:@testMethods,
-    @annotated("org.junit.jupiter.api.Test"))
+|~~ Deprecated-element predicate — alias of
+    @annotatedWith("java.lang.Deprecated"). Same predicate
+    contract — compose with filter / every / any, or apply to
+    a single node for true / false. ~~|
+let(:@deprecated, @annotatedWith("java.lang.Deprecated"))
 
 |~ ── Markdown render shortcuts ────────────────────────────── ~|
 
-|~~ Collect a member's detail + source text + outgoing + incoming
-    refs into a single bundle and hand it to the host-bound
-    mdSource renderer. For a method / field: source body + call
-    sites both ways. For a type: source + its type-use refs on
-    each side.
+|~~ @source enriched with the context an IDE shows on Ctrl/Cmd-hover:
+    detail header (signature, modifiers, javadoc), source body,
+    outgoing / incoming refs, and — for types — supers / subtypes.
+    Subject can be a Type, Method, or Field; mdSource omits empty
+    sections, so non-type subjects render without a Hierarchy block.
 
     Pipes the rendered String through as-is — `jdt q '…' >
     Foo.md` writes markdown without quoting.  ~~|
@@ -652,8 +662,10 @@ let(:@sourceCard,
     @asNode | as(:self)
     | {:node     self | @detail
        :text     self | @source
-       :outgoing self | @outgoingRefs     !| []
-       :incoming self | @incomingRefs(:all) !| []}
+       :outgoing self | @outgoingRefs       !| []
+       :incoming self | @incomingRefs(:all) !| []
+       :supers   self | @supers             !| []
+       :subtypes self | @subtypes           !| []}
     | mdSource)
 
 |~~ Type hierarchy card — ↑ supers / ↓ subtypes flat markdown. ~~|

@@ -19,7 +19,7 @@ This is a READ-ONLY planning task. You CANNOT edit, write, or create files.
 
 ```
 jdt q '"<FQN>" | @source'                   # source text of type/method/field
-jdt q '"<FQN>" | @members | table'          # class overview without reading 600 lines
+jdt q '"<FQN>" | @members * /fqn'           # class overview without reading 600 lines
 jdt q '"<FQN>" | @callers'                  # who calls this method
 jdt q '"<FQN>" | @calls'                    # what this method invokes
 jdt q '"<FQN>" | @implementors'             # implementations of an interface method
@@ -34,7 +34,7 @@ jdt q '"<project>" | @problems'             # compilation state of a project
 1. **Understand Requirements**: Read provided context, explore with `jdt q`
 2. **Explore Thoroughly**:
    - `| @source` for source text
-   - `| @members | table` for class overviews
+   - `| @members * /fqn` for class overviews
    - `| @callers` / `| @calls` to trace call graphs both ways
    - `| @supers` / `| @subtypes` / `| @ancestors` / `| @descendants` for type relationships
    - Grep/Glob for non-Java files

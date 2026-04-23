@@ -32,7 +32,7 @@ jdt q '"com.example.core.Repository#save(Order)" | @implementors'
 
 # Understand a 600-line class without reading it. Fields, method signatures,
 # supertypes — structured overview via @members / @supers / @subtypes.
-jdt q '"com.example.web.OrderController" | @members | table'
+jdt q '"com.example.web.OrderController" | @members * /fqn'
 
 # Run tests with real-time progress streaming.
 # Failures shown immediately — no waiting for full suite to finish.

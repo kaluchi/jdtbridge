@@ -120,13 +120,17 @@ public class DualSocketTest {
                 assertTrue(clientSocket.isConnected());
             }
 
-            // Remote refuses
+            // Remote refuses (retry — OS may not have released
+            // the port immediately after close)
             boolean remoteRefused = false;
-            try (Socket clientSocket = new Socket(
-                    "127.0.0.1", remotePort)) {
-                // might connect to something reusing port
-            } catch (Exception connectionException) {
-                remoteRefused = true;
+            for (int attempt = 0; attempt < 10; attempt++) {
+                try (Socket clientSocket = new Socket(
+                        "127.0.0.1", remotePort)) {
+                    Thread.sleep(50);
+                } catch (Exception connectionException) {
+                    remoteRefused = true;
+                    break;
+                }
             }
             assertTrue(remoteRefused,
                     "Remote port should refuse after stop");

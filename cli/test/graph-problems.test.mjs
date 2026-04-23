@@ -19,53 +19,16 @@
 // no range filter, matching the @source "Top-level types return
 // the full compilation unit" docstring.
 
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { readFileSync } from "node:fs";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { describe, it, expect, afterEach } from "vitest";
 import { keyword } from "@kaluchi/qlang-core";
+import { loadGraphSession, resetGraphSession }
+    from "./helpers/graph-session.mjs";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const MODULE_LIB = join(__dirname, "..", "lib");
+// Thin wrapper preserving the (mockedGet) → session signature used
+// across this file's 50+ call sites.
+const loadSession = (mockedGet) => loadGraphSession({ mockedGet });
 
-function createLocator(graphImpls) {
-  return (namespaceName) => {
-    const qlangPath = join(
-        MODULE_LIB, ...namespaceName.split("/")) + ".qlang";
-    const source = readFileSync(qlangPath, "utf8");
-    const impls = namespaceName === "jdt/graph"
-        ? graphImpls : undefined;
-    return { source, impls };
-  };
-}
-
-async function loadSession(mockedGet) {
-  process.env.JDT_GRAPH_CACHE = "0";
-  vi.resetModules();
-  // client.mjs is imported by both graph.impl.mjs (get) and
-  // path-translate.mjs (currentInstance). currentInstance is
-  // stubbed to null so translateHostPathFromLocal is a no-op —
-  // tests run as a local instance, paths pass through unchanged.
-  vi.doMock("../src/client.mjs", () => ({
-    get: mockedGet,
-    currentInstance: () => null,
-    BridgeNotRunningError: class BridgeNotRunningError extends Error {},
-    isConnectionError: () => false,
-  }));
-  const graphImpl = await import(
-      "../lib/jdt/graph.impl.mjs?graphmod=" + Date.now());
-  const { createSession } = await import(
-      "@kaluchi/qlang-core/session");
-  const session = await createSession({
-      locator: createLocator(graphImpl.createImpls()) });
-  return session;
-}
-
-afterEach(() => {
-  delete process.env.JDT_GRAPH_CACHE;
-  vi.resetModules();
-  vi.doUnmock("../src/client.mjs");
-});
+afterEach(resetGraphSession);
 
 // ────────────────────────────────────────────────────────────────
 // HTTP-path mode: verifies primitive @problemMarkers URL shape.

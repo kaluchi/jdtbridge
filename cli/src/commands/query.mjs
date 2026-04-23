@@ -214,34 +214,56 @@ wildcard like "*Service") or a nullary axis (@projects, @problems).
 Exit is always 0; errors land on stdout as \`!{:kind … :message …}\`
 values — route with \`!|\`.
 
-───── Cookbook — copy, swap the FQN, run ─────
+───── fqn — fully qualified name ─────
 
-  # 1. Find types by wildcard
+  fqn identifies a workspace element. Format depends on element kind:
+
+  <Type>      pkg.Class                         inner: pkg.Outer.Inner
+  <Method>    pkg.Class#name(ParamType,…)       signature optional — required only to disambiguate overloads
+  <Field>     pkg.Class#name
+  <Package>   pkg.sub
+  <Project>   eclipse project name (NOT a path)
+  <File>      absolute filesystem path
+
+  Interfaces / annotations / enums / records share the <Type> format.
+
+───── Cookbook ─────
+
+  # Find types by wildcard
   jdt q '"*Service" | @types * /fqn'
 
-  # 2. Full card for a method — source + refs + hierarchy, markdown
-  jdt q '"pkg.Foo#bar()" | @sourceCard' > bar.md
+  # Read source — Type, Method, or Field; library sources too when a JAR has source attachment
+  jdt q '"<Method>" | @source'
 
-  # 3. Who calls a method (distinct FQNs)
-  jdt q '"pkg.Foo#bar" | @callers * /fqn | distinct'
+  # Markdown card — header + code fence + outgoing / incoming refs
+  jdt q '"<Method>" | @sourceCard'
 
-  # 4. Full supertype chain of a type
-  jdt q '"pkg.Foo" | @ancestors * /fqn'
+  # Callers of a method
+  jdt q '"<Method>" | @callers * /fqn'
 
-  # 5. Compilation state, flat table
-  jdt q '@problems * {:sev /severity :file /location/file :line /location/startLine :msg /message} | table'
+  # Outgoing calls of a method
+  jdt q '"<Method>" | @calls * /fqn'
 
-  # 6. Deletion candidates — public methods with zero callers
-  jdt q '"pkg.Foo" | @methods | filter(/modifiers | any(eq("public"))) | filter(@callers | empty) * /fqn'
+  # Supertype chain of a type
+  jdt q '"<Type>" | @ancestors * /fqn'
 
-  # 7. Hotspots — biggest methods in a type, ranked
-  jdt q '"pkg.Foo" | @methods | sortWith(desc(/location/lineCount)) | take(5) * {:fqn /fqn :lines /location/lineCount} | table'
+  # Subtypes of a type (all descendants), or implementations of an abstract/interface method
+  jdt q '"<Type>" | @implementors * /fqn'
 
-  # 8. Project-wide dead code — every type's public orphans
-  jdt q '"my.project" | @typesInProject * @publicOrphans | flat * /fqn'
-  -- pattern: Vec-of-nodes | * conduit | flat * /fqn  — distribute,
-  -- flatten the per-type Vecs, project fqn. Reuse for @tests,
-  -- @untested, @typeUses, etc. across a project.
+  # Compile errors in a project (drop filter or use /warning to see warnings instead)
+  jdt q '"<Project>" | @problems | filter(/error) * {:file /location/file :line /location/startLine :msg /message}'
+
+  # Types in a project carrying an annotation (annotation is a <Type>)
+  jdt q '"<Project>" | @typesInProject | filter(@annotatedWith("<Type>")) * /fqn'
+
+  # Tests that exercise a type
+  jdt q '"<Type>" | @tests * /fqn'
+
+  # Existence check — element on success, :type-not-found via fail-track on miss
+  jdt q '"<Type>" | @type !| /kind'
+
+  # Hotspots — biggest methods in a type
+  jdt q '"<Type>" | @methods | sortWith(desc(/location/lineCount)) | take(5) * {:fqn /fqn :lines /location/lineCount}'
 
 ───── Volume estimate — size a result before reading it ─────
 
@@ -279,12 +301,13 @@ Containment:
   package | @typesInPackage
   file    | @typesInFile
   project | @packagesInProject  @typesInProject
-  node    | @classpath  @containingType  @containingPackage
+  project | @classpath
+  node    | @containingType  @containingPackage
             @containingFile  @containingProject
 
 Hierarchy:
   type   | @supers  @subtypes  @ancestors  @descendants  @implementors
-  method | @overrides  @overloads
+  method | @overrides  @overloads  @implementors
 
 References (nullary, subject from pipeValue):
   node   | @incomingRefs          default refKind by subject kind
@@ -295,15 +318,16 @@ References (nullary, subject from pipeValue):
 Sugar conduits:
   method  | @callers  @testCallers  @productionCallers
   field   | @readers  @writers
-  member  | @calls  @typeUses  @dependsOn  @usedBy
+  member  | @calls  @typeUses
+  type    | @dependsOn  @usedBy
   type    | @tests                  test-scope callers across type + members
   node    | @detail                 lift skeleton → detail
-  element | @annotated(fqn)  @deprecated  @testMethods
-            @untested  @publicOrphans  @deadCode
+  element | @annotatedWith(fqn)  @deprecated  @untested   — predicates, use inside filter/every/any
+  type    | @publicOrphans  @deadCode
   Vec     | @sourceOnly  @overview  @inProject(projName)
 
 Markdown cards (return a String — pipe to a file):
-  "pkg.Foo#bar()" | @sourceCard      header + code + refs + hierarchy
+  "pkg.Foo#bar()" | @sourceCard      header + code fence + outgoing / incoming refs
   "pkg.Foo"       | @hierarchyCard   ↑ supers / ↓ subtypes
   "pkg.Foo"       | @outlineCard     fields / methods / inner types
   Vec<:reference> | mdRefs           grouped by refKind
@@ -318,7 +342,7 @@ Host-bound I/O + format (from qlang-cli):
   manifest | count                              all ops
   manifest | filter(/effectful) * /name         every axis name
   reify(:@members)                              descriptor
-  reify(:@members) | runExamples | table        verify docs
+  reify(:@members) | runExamples                verify docs
   reify(:@callers) | /source                    read a conduit's body
 
 ───── Debug — errors are data ─────
