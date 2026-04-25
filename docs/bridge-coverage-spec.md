@@ -86,7 +86,7 @@ upstream.
 | `JavaCoverageLoader` | `org.eclipse.eclemma.internal.core` | active session analysis cache | `EclEmmaCorePlugin.getInstance().getJavaCoverageLoader()` |
 | `IJavaModelCoverage` | `org.eclipse.eclemma.core.analysis` | per-active-session analyzed coverage tree | `CoverageTools.getJavaModelCoverage()` (also `IJavaModelCoverage.LOADING` sentinel constant) |
 | `SessionAnalyzer` | `org.eclipse.eclemma.internal.core.analysis` | runs JaCoCo `Analyzer` over scope (`SessionAnalyzer.java:60-87`); `processSession(...)` returns `IJavaModelCoverage`. The same call also accumulates `ExecutionDataStore` + `SessionInfoStore` as instance state, exposed afterwards via `getSessionInfos(): List<SessionInfo>` (`SessionAnalyzer.java:89-91`) and `getExecutionData(): Collection<ExecutionData>` (`:93-95`). Bridge keeps the analyzer instance alive long enough to read both getters. | `SessionAnalyzer a = new SessionAnalyzer(); IJavaModelCoverage cov = a.processSession(session, monitor); a.getSessionInfos(); a.getExecutionData();` |
-| `IPackageFragmentRoot` | `org.eclipse.jdt.core` | JDT source/binary root | `ICoverageSession.getScope()` member; `IPackageFragmentRoot.getHandleIdentifier()` for wire serialization |
+| `IPackageFragmentRoot` | `org.eclipse.jdt.core` | JDT source/binary root | `ICoverageSession.getScope()` member; `IPackageFragmentRoot.getPath().toString()` for wire serialization |
 | `SessionInfo` | `org.jacoco.core.data` | JaCoCo per-dump metadata (id/start/dump timestamps) | `SessionAnalyzer.getSessionInfos()` after `processSession` |
 | `ExecutionData` | `org.jacoco.core.data` | per-class probe array for one JVM session | `SessionAnalyzer.getExecutionData()` |
 | `ICounter` | `org.jacoco.core.analysis` | counts for one entity (covered/missed/total/ratios/status) | `ICoverageNode.getInstructionCounter()` etc. |
@@ -113,8 +113,8 @@ upstream.
 | `configType` | `ILaunch.getLaunchConfiguration().getType().getName()` | same on `ICoverageSession.getLaunchConfiguration()` if non-null; else `null` | `null` |
 | `configTypeId` | `ILaunch.getLaunchConfiguration().getType().getIdentifier()` | same on `ICoverageSession.getLaunchConfiguration()` if non-null; else `null` | `null` |
 | `description` | `ICoverageSession.getDescription()` of latest dump (set by `AgentServer.createDescription()` = `MessageFormat(CoreMessages.LaunchSessionDescription_value, configName, new Date())`) | `ICoverageSession.getDescription()` (set from `description` arg to `SessionManager.mergeSessions(sessions, description, monitor)`) | `ICoverageSession.getDescription()` (set via `SessionImporter.setDescription(...)` before `importSession`) |
-| `coverageScope` | `ICoverageSession.getScope()` → `IPackageFragmentRoot.getHandleIdentifier()` per element. For live: scope was set in `CoverageLauncher.getLaunch():106` to `ScopeUtils.getConfiguredScope(config)` | same shape; scope set in `SessionManager.mergeSessions:170,174` as union of inputs' `getScope()` | same shape; scope set via `SessionImporter.setScope(...)` |
-| `terminated` | `ILaunch.isTerminated()` | constant `true` (no `ILaunch`) | constant `true` (no `ILaunch`) |
+| `coverageScope` | `ICoverageSession.getScope()` → `IPackageFragmentRoot.getPath().toString()` per element (workspace path, e.g. `/MyProject/src/main/java`). For live: scope was set in `CoverageLauncher.getLaunch():106` to `ScopeUtils.getConfiguredScope(config)` | same shape; scope set in `SessionManager.mergeSessions:170,174` as union of inputs' `getScope()` | same shape; scope set via `SessionImporter.setScope(...)` |
+| `terminated` | `CoverageRun.terminated` — flipped to `true` inside `ILaunchesListener2.launchesTerminated`, alongside `terminatedAt`. Reading `ILaunch.isTerminated()` directly would race with the listener (Eclipse flips the launch flag before our listener sees the event), producing JSON with `terminated:true, terminatedAt:null`. | constant `true` (factory sets it; no `ILaunch`) | constant `true` (factory sets it; no `ILaunch`) |
 | `dataReceived` | `((CoverageLaunch) launch).getAgentServer().hasDataReceived()` (`AgentServer.java:98-100`) | constant `true` — merge precondition is `getSessions().size() > 1` (`MergeSessionsHandler.isEnabled():48-50`), every input had data | constant `true` — the `IExecutionDataSource` set via `SessionImporter.setExecutionDataSource` is the imported data |
 | `analysisLoading` | `sessionManager.getActiveSession() ∈ run.sessions` AND `JavaCoverageLoader.getJavaModelCoverage() == IJavaModelCoverage.LOADING` | same | same |
 | `analysisReady` | `sessionManager.getActiveSession() ∈ run.sessions` AND `coverage != null && coverage != IJavaModelCoverage.LOADING` | same | same |
@@ -123,14 +123,21 @@ upstream.
 | `terminatedAt` | bridge: `System.currentTimeMillis()` at `ILaunchesListener2.launchesTerminated` callback for this `ILaunch` | bridge: `System.currentTimeMillis()` at `sessionAdded(merged)` (no live launch ever existed) | bridge: `System.currentTimeMillis()` at `sessionAdded(imported)` |
 | `consumedCoverageIds` | absent | bridge-collected `List<String>` of tracker `coverageId`s from the burst of `sessionRemoved` immediately after `sessionAdded(merged)` | absent |
 
-`analysisLoading` / `analysisReady` apply only to the **active**
-session: EclEmma's `JavaCoverageLoader` holds a single
+`analysisLoading` reflects EclEmma's `JavaCoverageLoader` for the
+active session only: the loader holds a single
 `IJavaModelCoverage coverage` field (`JavaCoverageLoader.java:42`),
 populated by `LoadSessionJob` for whichever session was last
-activated. For non-active sessions both are `false` on
-`/coverage/runs`; counters reach the wire via
-`CoverageAnalyzer.ensureAnalyzed(session)` invoked by
-`/coverage/session`.
+activated. On deactivation (active flips to another session), the
+bridge clears `analysisLoading` on the previous run since the loader
+stops being authoritative for it.
+
+`analysisReady` is durable on deactivation. The bridge's own
+`CoverageAnalyzer` caches the analysis result for every session it
+has analyzed, so once `analysisReady` flips to `true` it stays true
+even after the active session changes — the cache, not EclEmma's
+loader, backs the flag from that point. Counters for non-active
+sessions reach the wire via `CoverageAnalyzer.ensureAnalyzed(session)`
+invoked by `/coverage/session`.
 
 ### Lifetime
 
@@ -326,8 +333,8 @@ Response on success:
   "configType": "JUnit Plug-in Test",
   "configTypeId": "org.eclipse.pde.ui.JunitLaunchConfig",
   "coverageScope": [
-    "=MyProject/src\\/main\\/java",
-    "=MyProject/src\\/test\\/java"
+    "/MyProject/src/main/java",
+    "/MyProject/src/test/java"
   ],
   "launchTimestamp": 1777078913423,
   "processPid": "6408",
@@ -335,11 +342,12 @@ Response on success:
 }
 ```
 
-`coverageScope` entries are JDT handle identifiers
-(`IPackageFragmentRoot.getHandleIdentifier()` — same form EclEmma
-stores in `ATTR_SCOPE_IDS`). They survive workspace restart and
-disambiguate roots that share a path. Conversion to human paths
-happens in CLI rendering, not in the wire format.
+`coverageScope` entries are workspace-relative paths
+(`IPackageFragmentRoot.getPath().toString()`) — `/MyProject/src/main/java`,
+ready for display without client-side resolution. EclEmma's own
+`ATTR_SCOPE_IDS` storage uses handle identifiers; the bridge
+converts to paths at the wire boundary so consumers don't have to
+parse attribute-encoded handles.
 
 ### `POST /coverage/dump`
 
@@ -434,7 +442,7 @@ Response:
     "configType": "JUnit Plug-in Test",
     "configTypeId": "org.eclipse.pde.ui.JunitLaunchConfig",
     "description": "MyTest (Apr 25, 2026 03:14:25 AM)",
-    "coverageScope": ["=MyProject/src\\/main\\/java", "=MyProject/src\\/test\\/java"],
+    "coverageScope": ["/MyProject/src/main/java", "/MyProject/src/test/java"],
     "active": true,
     "terminated": false,
     "dataReceived": true,
@@ -452,7 +460,7 @@ Response:
     "configType": null,
     "configTypeId": null,
     "description": "Merged (Apr 25, 2026 03:14:25 AM)",
-    "coverageScope": ["=ProjectA/src", "=ProjectB/src"],
+    "coverageScope": ["/ProjectA/src", "/ProjectB/src"],
     "active": false,
     "terminated": true,
     "dataReceived": true,
@@ -471,7 +479,7 @@ Response:
     "configType": null,
     "configTypeId": null,
     "description": "<value passed to SessionImporter.setDescription via SessionImportWizard>",
-    "coverageScope": ["=ProjectA/src/main/java"],
+    "coverageScope": ["/ProjectA/src/main/java"],
     "active": false,
     "terminated": true,
     "dataReceived": true,
@@ -878,10 +886,13 @@ UI (prompts, dialogs) do not surface.
   if a query for it arrives, since the bridge cache entry was
   populated only on `ready` event.
 
-- **`coverageScope` wire format is JDT handle identifiers.**
-  `IPackageFragmentRoot.getHandleIdentifier()` returns strings like
-  `=MyProject/src\\/main\\/java`. CLI rendering converts to human
-  paths via `JavaCore.create(handleId).getResource().getLocation()`.
+- **`coverageScope` wire format is workspace-relative paths.**
+  `IPackageFragmentRoot.getPath().toString()` produces strings like
+  `/MyProject/src/main/java` — directly displayable, no
+  client-side resolution needed. The bridge picks `getPath()`
+  rather than `getHandleIdentifier()` so the wire stays free of
+  the classpath-attribute serialisation that handle IDs carry
+  (e.g. `=...=/optional=/true=/`).
 
 - **`coverageScope` is `getConfiguredScope`, not `getOverallScope`.**
   `ScopeUtils.getConfiguredScope(config)` applies either the

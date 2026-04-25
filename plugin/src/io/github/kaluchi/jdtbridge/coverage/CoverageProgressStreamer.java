@@ -65,6 +65,13 @@ public final class CoverageProgressStreamer {
 
         CountDownLatch done = new CountDownLatch(1);
         AtomicBoolean closed = new AtomicBoolean(false);
+        // Listener and the post-subscribe re-check both want to
+        // emit a terminated event — CAS lets exactly one of them
+        // win. Without the guard, a run that terminates between
+        // subscribe and re-check would produce two terminated
+        // lines, possibly with interleaved bytes on a non-
+        // synchronized OutputStream.
+        AtomicBoolean terminatedWritten = new AtomicBoolean(false);
         CoverageTracker.CoverageEventListener listener =
                 new CoverageTracker.CoverageEventListener() {
             @Override
@@ -92,7 +99,10 @@ public final class CoverageProgressStreamer {
 
             @Override
             public void onTerminated(CoverageRun r) {
-                safeWrite(out, terminatedEvent(r), closed, done);
+                if (terminatedWritten.compareAndSet(false, true)) {
+                    safeWrite(out, terminatedEvent(r),
+                            closed, done);
+                }
                 if (isTerminal(r)) {
                     done.countDown();
                 }
@@ -117,7 +127,9 @@ public final class CoverageProgressStreamer {
             CoverageRun postSubscribe = tracker.byCoverageId(
                     run.coverageId);
             if (postSubscribe != null && isTerminal(postSubscribe)) {
-                writeLine(out, terminatedEvent(postSubscribe));
+                if (terminatedWritten.compareAndSet(false, true)) {
+                    writeLine(out, terminatedEvent(postSubscribe));
+                }
                 return;
             }
             done.await(1, TimeUnit.HOURS);

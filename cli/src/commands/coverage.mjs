@@ -28,13 +28,14 @@ export async function coverageRun(args) {
   let url = `/coverage/run?configId=${encodeURIComponent(configId)}`;
   if (flags.args) url += `&args=${encodeURIComponent(flags.args)}`;
 
+  const jsonFlag = args.includes("--json");
   const result = await get(url, 30_000);
   if (result.error) {
-    console.error(JSON.stringify(result));
+    if (jsonFlag) console.log(JSON.stringify(result));
+    else console.error(JSON.stringify(result));
     process.exit(1);
   }
 
-  const jsonFlag = args.includes("--json");
   if (jsonFlag) {
     console.log(JSON.stringify(result, null, 2));
   } else {
@@ -133,11 +134,8 @@ export async function coverageDump(args) {
     "application/json",
   );
   output(args, data, {
-    text(d) {
-      if (d.error) {
-        console.error(JSON.stringify(d));
-        process.exit(1);
-      }
+    mutating: true,
+    text() {
       console.log(`Dumped ${coverageId}${reset ? " (reset)" : ""}`);
     },
   });
@@ -158,11 +156,8 @@ Flags:
 export async function coverageRefresh(args) {
   const data = await post("/coverage/refresh", "{}", "application/json");
   output(args, data, {
+    mutating: true,
     text(d) {
-      if (d.error) {
-        console.error(JSON.stringify(d));
-        process.exit(1);
-      }
       console.log(`Refreshed ${d.activeCoverageId}`);
     },
   });
@@ -178,11 +173,12 @@ Mirrors Coverage View popup → Refresh (F5).`;
 
 export async function coverageRelaunch(args) {
   const data = await post("/coverage/relaunch", "{}", "application/json");
+  const jsonFlag = args.includes("--json");
   if (data.error) {
-    console.error(JSON.stringify(data));
+    if (jsonFlag) console.log(JSON.stringify(data));
+    else console.error(JSON.stringify(data));
     process.exit(1);
   }
-  const jsonFlag = args.includes("--json");
   if (jsonFlag) {
     console.log(JSON.stringify(data, null, 2));
     return;
@@ -236,11 +232,8 @@ export async function coverageActivate(args) {
     "application/json",
   );
   output(args, data, {
+    mutating: true,
     text(d) {
-      if (d.error) {
-        console.error(JSON.stringify(d));
-        process.exit(1);
-      }
       console.log(`Activated ${d.activeCoverageId}`);
       if (d.previousActiveCoverageId) {
         console.log(`Previous: ${d.previousActiveCoverageId}`);
@@ -271,11 +264,8 @@ export async function coverageMerge(args) {
     "application/json",
   );
   output(args, data, {
+    mutating: true,
     text(d) {
-      if (d.error) {
-        console.error(JSON.stringify(d));
-        process.exit(1);
-      }
       const consumed = d.consumedCoverageIds || [];
       console.log(`#### Merged ${consumed.length} sessions → ${d.mergedCoverageId}`);
       if (consumed.length) {
@@ -308,11 +298,8 @@ export async function coverageRemove(args) {
     "application/json",
   );
   output(args, data, {
+    mutating: true,
     text(d) {
-      if (d.error) {
-        console.error(JSON.stringify(d));
-        process.exit(1);
-      }
       const removed = d.removedCoverageIds || [];
       console.log(`Removed ${removed.length} coverage session${removed.length === 1 ? "" : "s"}`);
     },
@@ -350,13 +337,17 @@ export async function coverageStop(args) {
     console.error(`coverage-launch-not-live: ${coverageId}`);
     process.exit(1);
   }
+  if (run.terminated) {
+    console.error(`coverage-launch-terminated: ${coverageId}`);
+    process.exit(1);
+  }
   if (!run.launchId) {
     console.error(`coverage-launch-not-live: no launchId for ${coverageId}`);
     process.exit(1);
   }
   const data = await get(`/launch/stop?launchId=${encodeURIComponent(run.launchId)}`);
   if (data.error) {
-    console.error(data.error);
+    console.error(`coverage-launch-failed: ${data.error}`);
     process.exit(1);
   }
   console.log(`Stopped ${coverageId}`);

@@ -238,7 +238,7 @@ class CoverageHandler {
             var arr = new JsonArray();
             for (IPackageFragmentRoot root
                     : coverageLaunch.getScope()) {
-                arr.add(root.getHandleIdentifier());
+                arr.add(root.getPath().toString());
             }
             obj.add("coverageScope", arr);
         }

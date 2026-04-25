@@ -278,19 +278,17 @@ class CoverageSessionHandler {
 
         JsonArray scopeArr = new JsonArray();
         for (IPackageFragmentRoot root : run.coverageScope) {
-            scopeArr.add(root.getHandleIdentifier());
+            scopeArr.add(root.getPath().toString());
         }
         obj.add("coverageScope", scopeArr);
 
         obj.addProperty("dumpCount", run.dumpCount());
 
-        if (run.kind == CoverageRun.Kind.LIVE) {
-            obj.addProperty("terminated",
-                    run.launch != null
-                            ? run.launch.isTerminated() : true);
-        } else {
-            obj.addProperty("terminated", true);
-        }
+        // run.terminated is the SSOT — set together with terminatedAt
+        // inside launchesTerminated, so the two fields stay consistent
+        // across the wire. ILaunch.isTerminated() flips before our
+        // listener runs and would briefly disagree with terminatedAt.
+        obj.addProperty("terminated", run.terminated);
         obj.addProperty("dataReceived", run.dataReceived);
         obj.addProperty("analysisLoading", run.analysisLoading);
         obj.addProperty("analysisReady", run.analysisReady);

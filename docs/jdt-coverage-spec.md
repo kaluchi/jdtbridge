@@ -191,6 +191,12 @@ Calls `POST /coverage/relaunch` (empty body). Re-launches the active
 session's source config in coverage mode. Returns the same shape as
 `jdt coverage run`.
 
+Errors:
+- `coverage-no-active-session` — no session is active
+- `coverage-launch-not-live` — active session exists but has no
+  associated launch configuration (typical for imported sessions
+  and merged sessions whose inputs didn't share a single config)
+
 ```bash
 jdt coverage relaunch
 ```
@@ -395,6 +401,24 @@ Examples:
 - `finished 12m ago, no data received`
 - `merged 2 sessions, analysis ready`
 - `imported, analysis pending`
+
+## PDE coverage caveat
+
+`JUnit Plug-in Test` configurations (`org.eclipse.pde.ui.JunitLaunchConfig`)
+launch the JaCoCo agent in a separate Eclipse PDE runtime that
+loads classes from the *installed* bundle, while EclEmma's
+`SessionAnalyzer` walks workspace source roots. The two
+classpath views often don't match — JaCoCo records probes against
+bundle-loaded classes, the analyzer can't pair them with workspace
+sources, and `/coverage/session` returns `analysisReady: true`
+with all six counters at `0/0/0 EMPTY`.
+
+The session is healthy (`dataReceived: true`, `dumpCount >= 1`) —
+the empty result is JaCoCo + PDE talking past each other. For
+useful counters on a PDE plugin, run a `Java Application`
+configuration that exercises the same code under the workspace
+classpath, or the plain `JUnit` (non-plug-in) launch type when
+the test logic doesn't require the OSGi runtime.
 
 ## Files
 
