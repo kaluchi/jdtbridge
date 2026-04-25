@@ -26,6 +26,7 @@ import org.eclipse.eclemma.core.analysis.IJavaCoverageListener;
 import org.eclipse.eclemma.core.analysis.IJavaModelCoverage;
 import org.eclipse.eclemma.core.launching.ICoverageLaunch;
 
+import io.github.kaluchi.jdtbridge.LaunchAttrs;
 import io.github.kaluchi.jdtbridge.Log;
 
 /**
@@ -524,13 +525,11 @@ final class CoverageTracker
     // -- helpers --
 
     private static ILaunchManager launchManager() {
-        DebugPlugin debug = DebugPlugin.getDefault();
-        return debug != null ? debug.getLaunchManager() : null;
+        return LaunchAttrs.launchManager();
     }
 
     private static Long parseLaunchTimestamp(ILaunch launch) {
-        return CoverageJson.parseLaunchTimestamp(
-                launch.getAttribute(DebugPlugin.ATTR_LAUNCH_TIMESTAMP));
+        return LaunchAttrs.launchTimestamp(launch);
     }
 
     /** State held while a non-live {@code sessionAdded} waits for

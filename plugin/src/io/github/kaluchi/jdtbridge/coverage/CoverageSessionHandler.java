@@ -304,16 +304,8 @@ class CoverageSessionHandler {
     }
 
     private static String buildLaunchId(CoverageRun run) {
-        var procs = run.launch.getProcesses();
-        if (procs.length > 0) {
-            String pid = procs[0].getAttribute(
-                    org.eclipse.debug.core.model.IProcess
-                            .ATTR_PROCESS_ID);
-            if (pid != null) {
-                return run.configId + ":" + pid;
-            }
-        }
-        return run.configId;
+        return io.github.kaluchi.jdtbridge.LaunchAttrs
+                .launchIdOf(run.configId, run.launch);
     }
 
     private static JsonArray sessionInfosJson(

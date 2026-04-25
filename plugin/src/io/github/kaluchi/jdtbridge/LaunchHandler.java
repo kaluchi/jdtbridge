@@ -109,7 +109,7 @@ class LaunchHandler {
     }
 
     private ILaunchManager launchManager() {
-        return DebugPlugin.getDefault().getLaunchManager();
+        return LaunchAttrs.launchManager();
     }
 
     String handleList(Map<String, String> params,
@@ -135,30 +135,20 @@ class LaunchHandler {
         String mode = launch.getLaunchMode();
         boolean terminated = launch.isTerminated();
 
-        String pid = null;
+        String pid = LaunchAttrs.firstPid(launch);
         IProcess[] processes = launch.getProcesses();
-        if (processes.length > 0) {
-            IProcess proc = processes[0];
-            pid = proc.getAttribute(
-                    IProcess.ATTR_PROCESS_ID);
-        }
 
         var entry = new JsonObject();
-        String launchId = pid != null
-                ? name + ":" + pid : name;
-        entry.addProperty("launchId", launchId);
+        entry.addProperty("launchId",
+                LaunchAttrs.launchIdOf(name, launch));
         entry.addProperty("configId", name);
         entry.addProperty("configType", type);
         entry.addProperty("mode", mode);
         entry.addProperty("terminated", terminated);
 
-        String startedAt = launch.getAttribute(
-                DebugPlugin.ATTR_LAUNCH_TIMESTAMP);
+        Long startedAt = LaunchAttrs.launchTimestamp(launch);
         if (startedAt != null) {
-            try {
-                entry.addProperty("started",
-                        Long.parseLong(startedAt));
-            } catch (NumberFormatException e) { /* skip */ }
+            entry.addProperty("started", startedAt);
         }
 
         if (processes.length > 0) {
@@ -666,12 +656,8 @@ class LaunchHandler {
             response.addProperty("configType",
                     launchType(launch));
             addProcessMetadata(launch, response);
-            // Add launchId after process metadata (has pid)
-            String pid = response.has("pid")
-                    ? response.get("pid").getAsString() : null;
             response.addProperty("launchId",
-                    pid != null ? configId + ":" + pid
-                            : configId);
+                    LaunchAttrs.launchIdOf(configId, launch));
             return response.toString();
         } catch (Exception e) {
             return HttpServer.jsonError(e.getMessage());
@@ -766,10 +752,8 @@ class LaunchHandler {
         var obj = new JsonObject();
         obj.addProperty("configId", cId);
         addProcessMetadata(tl.launch, obj);
-        // Compose launchId from configId + first PID
-        if (obj.has("pid"))
-            obj.addProperty("launchId",
-                    cId + ":" + obj.get("pid").getAsString());
+        obj.addProperty("launchId",
+                LaunchAttrs.launchIdOf(cId, tl.launch));
         obj.addProperty("terminated", tl.terminated);
         obj.addProperty("output", result);
         return obj.toString();

@@ -162,17 +162,10 @@ class LaunchTracker implements ILaunchesListener2 {
             return new TrackedLaunch(launch);
         });
 
-        // Register under launchId (configId:pid) when PID available
-        IProcess[] procs = launch.getProcesses();
-        if (procs.length > 0) {
-            String pid = procs[0].getAttribute(
-                    IProcess.ATTR_PROCESS_ID);
-            if (pid != null) {
-                tracked.putIfAbsent(configId + ":" + pid, tl);
-            }
+        String pid = LaunchAttrs.firstPid(launch);
+        if (pid != null) {
+            tracked.putIfAbsent(configId + ":" + pid, tl);
         }
-
-        // Register under testRunId (configId:timestamp) if available
         String ts = launch.getAttribute(
                 DebugPlugin.ATTR_LAUNCH_TIMESTAMP);
         if (ts != null) {
@@ -214,7 +207,6 @@ class LaunchTracker implements ILaunchesListener2 {
     }
 
     private static ILaunchManager launchManager() {
-        var debug = DebugPlugin.getDefault();
-        return debug != null ? debug.getLaunchManager() : null;
+        return LaunchAttrs.launchManager();
     }
 }

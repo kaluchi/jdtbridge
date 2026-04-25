@@ -244,21 +244,12 @@ public class TestHandler {
                 new NullProgressMonitor(), true);
 
         String configId = pl.configName();
-        String pid = null;
-        var processes = launch.getProcesses();
-        if (processes.length > 0) {
-            pid = processes[0].getAttribute(
-                    org.eclipse.debug.core.model.IProcess
-                            .ATTR_PROCESS_ID);
-        }
-
+        String pid = LaunchAttrs.firstPid(launch);
         String launchTimestamp = launch.getAttribute(
                 DebugPlugin.ATTR_LAUNCH_TIMESTAMP);
 
-        String launchId = pid != null
-                ? configId + ":" + pid : configId;
-        String testRunId = configId + ":"
-                + launchTimestamp;
+        String launchId = LaunchAttrs.launchIdOf(configId, launch);
+        String testRunId = configId + ":" + launchTimestamp;
 
         var response = new JsonObject();
         response.addProperty("ok", true);

@@ -4,9 +4,10 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.eclipse.debug.core.DebugPlugin;
 import org.eclipse.debug.core.ILaunchConfigurationType;
 import org.eclipse.debug.core.ILaunchManager;
+
+import io.github.kaluchi.jdtbridge.LaunchAttrs;
 
 /**
  * The set of launch configuration type IDs for which EclEmma
@@ -75,7 +76,7 @@ public final class CoverageTypes {
 
     private static Set<String> compute() {
         Set<String> modes = Set.of(LAUNCH_MODE);
-        ILaunchManager mgr = DebugPlugin.getDefault().getLaunchManager();
+        ILaunchManager mgr = LaunchAttrs.launchManager();
         Set<String> out = new LinkedHashSet<>();
         for (String typeId : CANDIDATE_TYPE_IDS) {
             ILaunchConfigurationType type =

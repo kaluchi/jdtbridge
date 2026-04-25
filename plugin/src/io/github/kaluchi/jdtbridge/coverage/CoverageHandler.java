@@ -20,6 +20,8 @@ import static io.github.kaluchi.jdtbridge.coverage.CoverageJson.optBool;
 import static io.github.kaluchi.jdtbridge.coverage.CoverageJson.optString;
 import static io.github.kaluchi.jdtbridge.coverage.CoverageJson.parseObjectBody;
 
+import io.github.kaluchi.jdtbridge.LaunchAttrs;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
@@ -168,7 +170,7 @@ class CoverageHandler {
     // -- helpers --
 
     private static ILaunchManager launchManager() {
-        return DebugPlugin.getDefault().getLaunchManager();
+        return LaunchAttrs.launchManager();
     }
 
     private static ILaunchConfiguration findConfig(String name) {
@@ -195,8 +197,7 @@ class CoverageHandler {
         String configId = config != null ? config.getName() : "";
         obj.addProperty("configId", configId);
 
-        Long timestamp = CoverageJson.parseLaunchTimestamp(
-                launch.getAttribute(DebugPlugin.ATTR_LAUNCH_TIMESTAMP));
+        Long timestamp = LaunchAttrs.launchTimestamp(launch);
         String coverageId = timestamp != null
                 ? configId + ":" + timestamp
                 : configId;
@@ -205,17 +206,14 @@ class CoverageHandler {
             obj.addProperty("launchTimestamp", timestamp);
         }
 
-        IProcess[] procs = launch.getProcesses();
-        String pid = procs.length > 0
-                ? procs[0].getAttribute(IProcess.ATTR_PROCESS_ID)
-                : null;
+        String pid = LaunchAttrs.firstPid(launch);
         if (pid != null) {
             obj.addProperty("processPid", pid);
-            obj.addProperty("launchId", configId + ":" + pid);
-        } else {
-            obj.addProperty("launchId", configId);
         }
+        obj.addProperty("launchId",
+                LaunchAttrs.launchIdOf(configId, launch));
 
+        IProcess[] procs = launch.getProcesses();
         if (procs.length > 0) {
             String cmdline = procs[0].getAttribute(ATTR_CMDLINE);
             if (cmdline != null) {

@@ -123,20 +123,6 @@ final class CoverageJson {
         }
     }
 
-    /** Eclipse stores {@code ATTR_LAUNCH_TIMESTAMP} as
-     *  {@code Long.toString(System.currentTimeMillis())}. Parses
-     *  back to {@link Long} or {@code null} on missing / malformed. */
-    static Long parseLaunchTimestamp(String raw) {
-        if (raw == null) {
-            return null;
-        }
-        try {
-            return Long.parseLong(raw);
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
     /** {@link ICounter#getStatus()} bit-flag → constant name from
      *  {@link ICoverageNode}. */
     static String statusName(int status) {
