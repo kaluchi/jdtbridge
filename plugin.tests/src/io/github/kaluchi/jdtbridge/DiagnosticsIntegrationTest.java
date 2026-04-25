@@ -3,6 +3,7 @@ package io.github.kaluchi.jdtbridge;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
@@ -118,13 +119,19 @@ public class DiagnosticsIntegrationTest {
     }
 
     @Test
-    public void buildCleanWithoutProject() throws Exception {
+    public void buildCleanWithoutProjectRunsWorkspaceWide()
+            throws Exception {
+        // clean without project = Project > Clean > Clean all
+        // projects: workspace-wide CLEAN_BUILD + FULL_BUILD.
+        // Verifies the call returns an errors count and no error.
         Map<String, String> params = new HashMap<>();
         params.put("clean", "");
         String json = handler.handleBuild(params);
         JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
-        assertNotNull(obj.get("error"),
-                "Should have error about missing project");
+        assertNull(obj.get("error"),
+                "Workspace clean should not return an error");
+        assertNotNull(obj.get("errors"),
+                "Should report errors count");
     }
 
     @Test
