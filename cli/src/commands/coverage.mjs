@@ -206,13 +206,13 @@ Mirrors Coverage View toolbar → Relaunch Session.`;
 
 export async function coverageActive(args) {
   const data = await get("/coverage/active");
+  // Read-only command — must exit 0 even on error
+  // (feedback_jdt_read_only_exit_zero.md). output() routes errors
+  // to stderr/stdout for us; no process.exit on the text path.
   output(args, data, {
     text(d) {
-      if (d.error) {
-        console.error(JSON.stringify(d));
-        process.exit(1);
-      }
-      console.log(d.activeCoverageId == null ? "none" : d.activeCoverageId);
+      console.log(d.activeCoverageId == null
+          ? "none" : d.activeCoverageId);
     },
   });
 }

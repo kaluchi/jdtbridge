@@ -57,8 +57,9 @@ class CoverageHandler {
         try {
             typeId = config.getType().getIdentifier();
         } catch (CoreException e) {
-            return error("coverage-config-not-found",
-                    e.getMessage());
+            return error("coverage-launch-failed",
+                    "Failed to read launch configuration type: "
+                            + e.getMessage());
         }
         if (!CoverageTypes.isSupported(typeId)) {
             return modeNotSupported(typeId);
@@ -175,8 +176,8 @@ class CoverageHandler {
                     return c;
                 }
             }
-        } catch (Exception e) {
-            // fall through to null
+        } catch (CoreException e) {
+            return null;
         }
         return null;
     }
@@ -276,8 +277,8 @@ class CoverageHandler {
             if (parsed.isJsonObject()) {
                 return parsed.getAsJsonObject();
             }
-        } catch (Exception e) {
-            // fall through to null
+        } catch (com.google.gson.JsonParseException e) {
+            return null;
         }
         return null;
     }

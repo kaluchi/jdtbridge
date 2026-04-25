@@ -6,6 +6,11 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import org.eclipse.core.runtime.CoreException;
+import org.eclipse.eclemma.core.ICoverageSession;
+import org.jacoco.core.analysis.ICounter;
 
 import com.google.gson.JsonObject;
 
@@ -40,7 +45,7 @@ public final class CoverageProgressStreamer {
      * client disconnects mid-stream.
      */
     public static void stream(OutputStream out, String coverageId,
-            CoverageTracker tracker) {
+            CoverageTracker tracker, CoverageAnalyzer analyzer) {
         if (coverageId == null || coverageId.isBlank()) {
             writeLine(out, errorEvent("missing-coverageId"));
             return;
@@ -60,47 +65,59 @@ public final class CoverageProgressStreamer {
         }
 
         CountDownLatch done = new CountDownLatch(1);
+        AtomicBoolean closed = new AtomicBoolean(false);
         CoverageTracker.CoverageEventListener listener =
                 new CoverageTracker.CoverageEventListener() {
             @Override
             public void onDumped(CoverageRun r, int dumpIndex,
                     long dumpTimestamp) {
-                writeLine(out, dumpedEvent(r, dumpIndex,
-                        dumpTimestamp));
+                safeWrite(out, dumpedEvent(r, dumpIndex,
+                        dumpTimestamp), closed, done);
             }
 
             @Override
             public void onAnalysisLoading(CoverageRun r) {
-                writeLine(out, analysisEvent(r,
-                        "analysisLoading"));
+                safeWrite(out, analysisEvent(r,
+                        "analysisLoading", null), closed, done);
             }
 
             @Override
             public void onAnalysisReady(CoverageRun r) {
-                writeLine(out, analysisEvent(r,
-                        "analysisReady"));
+                JsonObject counters = countersFor(r, analyzer);
+                safeWrite(out, analysisEvent(r,
+                        "analysisReady", counters), closed, done);
                 if (isTerminal(r)) {
-                    writeLine(out, terminatedEvent(r));
+                    safeWrite(out, terminatedEvent(r), closed, done);
                     done.countDown();
                 }
             }
 
             @Override
             public void onTerminated(CoverageRun r) {
-                writeLine(out, terminatedEvent(r));
+                safeWrite(out, terminatedEvent(r), closed, done);
+                done.countDown();
+            }
+
+            @Override
+            public void onFailed(CoverageRun r, String reason) {
+                safeWrite(out, failedEvent(r, reason),
+                        closed, done);
+                // Cancellation is terminal for the analysis phase
+                // even when the run itself isn't terminated yet —
+                // close the stream so the caller doesn't hang.
                 done.countDown();
             }
         };
 
         tracker.addCoverageListener(run.coverageId, listener);
         try {
-            // Re-check terminal state after subscription — covers
-            // the race where the run terminated between snapshot
-            // and listener registration.
-            CoverageRun snapshot = tracker.byCoverageId(
+            // Re-check after subscribe — covers the race where the
+            // run terminated between snapshot and listener
+            // registration.
+            CoverageRun postSubscribe = tracker.byCoverageId(
                     run.coverageId);
-            if (snapshot != null && isTerminal(snapshot)) {
-                writeLine(out, terminatedEvent(snapshot));
+            if (postSubscribe != null && isTerminal(postSubscribe)) {
+                writeLine(out, terminatedEvent(postSubscribe));
                 return;
             }
             done.await(1, TimeUnit.HOURS);
@@ -108,6 +125,48 @@ public final class CoverageProgressStreamer {
             Thread.currentThread().interrupt();
         } finally {
             tracker.removeCoverageListener(run.coverageId, listener);
+        }
+    }
+
+    /**
+     * Write one event from a listener callback, or no-op once the
+     * client has disconnected. The underlying {@link #writeLine}
+     * throws {@link StreamClosedException} on broken pipe — that
+     * propagates onto the listener-dispatch thread, where the
+     * tracker's {@code fire*} method catches it and ignores. To
+     * avoid quietly leaking the listener (the streamer thread
+     * would still be parked on {@code done.await}), we trip the
+     * latch on the first failure and skip subsequent writes.
+     */
+    private static void safeWrite(OutputStream out, String json,
+            AtomicBoolean closed, CountDownLatch done) {
+        if (closed.get()) {
+            return;
+        }
+        try {
+            writeLine(out, json);
+        } catch (StreamClosedException e) {
+            closed.set(true);
+            done.countDown();
+        }
+    }
+
+    /** Best-effort counter snapshot for the streamer's
+     *  {@code analysisReady} event. Returns {@code null} when
+     *  analysis isn't reproducible (e.g. stale workspace, no
+     *  classes resolvable) — the event still fires without
+     *  counters in that case. */
+    private static JsonObject countersFor(CoverageRun run,
+            CoverageAnalyzer analyzer) {
+        if (analyzer == null) return null;
+        ICoverageSession session = run.resolveSession(null);
+        if (session == null) return null;
+        try {
+            CoverageAnalyzer.CachedAnalysis ca =
+                    analyzer.ensureAnalyzed(session);
+            return countersJson(ca.modelCoverage);
+        } catch (CoreException e) {
+            return null;
         }
     }
 
@@ -139,11 +198,14 @@ public final class CoverageProgressStreamer {
     }
 
     private static String analysisEvent(CoverageRun run,
-            String eventName) {
+            String eventName, JsonObject counters) {
         var obj = new JsonObject();
         obj.addProperty("event", eventName);
         obj.addProperty("coverageId", run.coverageId);
         obj.addProperty("dumpIndex", run.dumpCount());
+        if (counters != null) {
+            obj.add("counters", counters);
+        }
         return obj.toString();
     }
 
@@ -158,11 +220,72 @@ public final class CoverageProgressStreamer {
         return obj.toString();
     }
 
+    private static String failedEvent(CoverageRun run,
+            String reason) {
+        var obj = new JsonObject();
+        obj.addProperty("event", "failed");
+        obj.addProperty("coverageId", run.coverageId);
+        obj.addProperty("reason", reason);
+        obj.addProperty("dumpIndex", run.dumpCount());
+        return obj.toString();
+    }
+
     private static String errorEvent(String reason) {
         var obj = new JsonObject();
         obj.addProperty("event", "failed");
         obj.addProperty("reason", reason);
         return obj.toString();
+    }
+
+    /** Same shape used by {@code CoverageSessionHandler.counterJson}
+     *  but locally inlined to avoid a public dep. */
+    private static JsonObject countersJson(
+            org.eclipse.eclemma.core.analysis.IJavaModelCoverage cov) {
+        var obj = new JsonObject();
+        if (cov == null) {
+            return obj;
+        }
+        obj.add("instruction",
+                counterJson(cov.getInstructionCounter()));
+        obj.add("branch", counterJson(cov.getBranchCounter()));
+        obj.add("line", counterJson(cov.getLineCounter()));
+        obj.add("complexity",
+                counterJson(cov.getComplexityCounter()));
+        obj.add("method", counterJson(cov.getMethodCounter()));
+        obj.add("class", counterJson(cov.getClassCounter()));
+        return obj;
+    }
+
+    private static JsonObject counterJson(ICounter counter) {
+        var obj = new JsonObject();
+        if (counter == null) return obj;
+        obj.addProperty("coveredCount", counter.getCoveredCount());
+        obj.addProperty("missedCount", counter.getMissedCount());
+        obj.addProperty("totalCount", counter.getTotalCount());
+        addRatio(obj, "coveredRatio", counter.getCoveredRatio());
+        addRatio(obj, "missedRatio", counter.getMissedRatio());
+        obj.addProperty("coverageStatus",
+                statusName(counter.getStatus()));
+        return obj;
+    }
+
+    private static void addRatio(JsonObject obj, String key,
+            double value) {
+        if (Double.isNaN(value)) {
+            obj.add(key, com.google.gson.JsonNull.INSTANCE);
+        } else {
+            obj.addProperty(key, value);
+        }
+    }
+
+    private static String statusName(int status) {
+        return switch (status) {
+            case ICounter.EMPTY -> "EMPTY";
+            case ICounter.NOT_COVERED -> "NOT_COVERED";
+            case ICounter.FULLY_COVERED -> "FULLY_COVERED";
+            case ICounter.PARTLY_COVERED -> "PARTLY_COVERED";
+            default -> "UNKNOWN";
+        };
     }
 
     private static void writeLine(OutputStream out, String json) {

@@ -11,10 +11,6 @@ import io.github.kaluchi.jdtbridge.ProjectScope;
  * {@link CoverageBridge#isAvailable()} is true. Owns the lazy
  * lifecycle of every coverage-side stateful component
  * (tracker, analyzer, handlers, streamer).
- * <p>
- * Phase 1 only knows the path list — every endpoint returns the
- * stub {@link #notImplemented(String)} JSON. Subsequent phases
- * replace each branch with a real handler call.
  */
 class CoverageRouter {
 
@@ -71,15 +67,6 @@ class CoverageRouter {
                     sessionHandler.handleRemove(body);
             default -> unknownPath(path);
         };
-    }
-
-    /** Stub response while the corresponding handler is not yet
-     *  wired in. Replaced phase by phase as handlers land. */
-    private static String notImplemented(String path) {
-        var obj = new JsonObject();
-        obj.addProperty("error", "coverage-not-implemented");
-        obj.addProperty("path", path);
-        return obj.toString();
     }
 
     private static String unknownPath(String path) {

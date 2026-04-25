@@ -51,7 +51,7 @@ public class CoverageProgressStreamerTest {
         @Test
         void missingCoverageIdEmitsFailedEvent() {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
-            CoverageProgressStreamer.stream(out, null, tracker);
+            CoverageProgressStreamer.stream(out, null, tracker, analyzer);
             JsonObject obj = parseLine(out, 0);
             assertEquals("failed",
                     obj.get("event").getAsString());
@@ -62,7 +62,7 @@ public class CoverageProgressStreamerTest {
         @Test
         void blankCoverageIdEmitsFailedEvent() {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
-            CoverageProgressStreamer.stream(out, "  ", tracker);
+            CoverageProgressStreamer.stream(out, "  ", tracker, analyzer);
             JsonObject obj = parseLine(out, 0);
             assertEquals("failed",
                     obj.get("event").getAsString());
@@ -72,7 +72,7 @@ public class CoverageProgressStreamerTest {
         void unknownCoverageIdEmitsFailed() {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             CoverageProgressStreamer.stream(out, "Bogus:9999",
-                    tracker);
+                    tracker, analyzer);
             JsonObject obj = parseLine(out, 0);
             assertEquals("failed",
                     obj.get("event").getAsString());
@@ -89,7 +89,7 @@ public class CoverageProgressStreamerTest {
             String coverageId = importAndAwait("stream-terminal");
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             CoverageProgressStreamer.stream(out, coverageId,
-                    tracker);
+                    tracker, analyzer);
             String[] lines = lines(out);
             assertEquals(2, lines.length,
                     "Expected snapshot + terminated lines, got: "
@@ -113,7 +113,7 @@ public class CoverageProgressStreamerTest {
             String coverageId = importAndAwait("snap-flags");
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             CoverageProgressStreamer.stream(out, coverageId,
-                    tracker);
+                    tracker, analyzer);
             JsonObject snap = parseLine(out, 0);
             for (String key : new String[] {
                     "coverageId", "coverageSessionKind",
@@ -132,7 +132,7 @@ public class CoverageProgressStreamerTest {
             String coverageId = importAndAwait("term-data");
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             CoverageProgressStreamer.stream(out, coverageId,
-                    tracker);
+                    tracker, analyzer);
             JsonObject term = parseLine(out, 1);
             assertTrue(term.get("dataReceived").getAsBoolean());
             assertNotNull(term.get("terminatedAt"),
@@ -145,7 +145,7 @@ public class CoverageProgressStreamerTest {
             String coverageId = importAndAwait("kind-imported");
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             CoverageProgressStreamer.stream(out, coverageId,
-                    tracker);
+                    tracker, analyzer);
             JsonObject snap = parseLine(out, 0);
             assertEquals("imported",
                     snap.get("coverageSessionKind").getAsString());
@@ -160,7 +160,7 @@ public class CoverageProgressStreamerTest {
             String coverageId = importAndAwait("oneline");
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             CoverageProgressStreamer.stream(out, coverageId,
-                    tracker);
+                    tracker, analyzer);
             String body = out.toString(
                     java.nio.charset.StandardCharsets.UTF_8);
             // Expect exactly two LF-terminated records.
@@ -175,7 +175,7 @@ public class CoverageProgressStreamerTest {
             String coverageId = importAndAwait("no-trailer");
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             CoverageProgressStreamer.stream(out, coverageId,
-                    tracker);
+                    tracker, analyzer);
             String body = out.toString(
                     java.nio.charset.StandardCharsets.UTF_8);
             assertTrue(body.endsWith("\n"),

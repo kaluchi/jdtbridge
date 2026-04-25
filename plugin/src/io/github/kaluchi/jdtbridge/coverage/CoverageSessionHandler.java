@@ -3,7 +3,6 @@ package io.github.kaluchi.jdtbridge.coverage;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -15,7 +14,6 @@ import org.eclipse.eclemma.core.ISessionManager;
 import org.eclipse.eclemma.core.analysis.IJavaModelCoverage;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.jacoco.core.analysis.ICounter;
-import org.jacoco.core.analysis.ICoverageNode;
 import org.jacoco.core.data.SessionInfo;
 
 import com.google.gson.JsonArray;
@@ -189,32 +187,32 @@ class CoverageSessionHandler {
                     new Object[] { new Date() });
         }
         ISessionManager sm = CoverageTools.getSessionManager();
+        ICoverageSession merged;
         try {
-            ICoverageSession merged = sm.mergeSessions(inputs,
-                    description, new NullProgressMonitor());
-            // Wait for the deferred classification to settle so the
-            // tracker has the merged run indexed before responding.
-            org.eclipse.core.runtime.jobs.Job.getJobManager().join(
-                    CoverageTracker.CLASSIFY_FAMILY,
+            merged = sm.mergeSessions(inputs, description,
                     new NullProgressMonitor());
-            String mergedCoverageId = findCoverageIdFor(merged);
-            var obj = new JsonObject();
-            obj.addProperty("ok", true);
-            obj.addProperty("mergedCoverageId", mergedCoverageId);
-            JsonArray consumed = new JsonArray();
-            for (JsonElement el : inputArr) {
-                consumed.add(el.getAsString());
-            }
-            obj.add("consumedCoverageIds", consumed);
-            obj.addProperty("active", true);
-            return obj.toString();
-        } catch (CoreException | InterruptedException e) {
-            if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
+        } catch (CoreException e) {
             return error("coverage-launch-failed",
                     "Merge failed: " + e.getMessage());
         }
+        try {
+            org.eclipse.core.runtime.jobs.Job.getJobManager().join(
+                    CoverageTracker.CLASSIFY_FAMILY,
+                    new NullProgressMonitor());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        String mergedCoverageId = findCoverageIdFor(merged);
+        var obj = new JsonObject();
+        obj.addProperty("ok", true);
+        obj.addProperty("mergedCoverageId", mergedCoverageId);
+        JsonArray consumed = new JsonArray();
+        for (JsonElement el : inputArr) {
+            consumed.add(el.getAsString());
+        }
+        obj.add("consumedCoverageIds", consumed);
+        obj.addProperty("active", true);
+        return obj.toString();
     }
 
     /** {@code POST /coverage/remove} — body {@code {}} removes
@@ -474,8 +472,8 @@ class CoverageSessionHandler {
             if (parsed.isJsonObject()) {
                 return parsed.getAsJsonObject();
             }
-        } catch (Exception e) {
-            // fall through
+        } catch (com.google.gson.JsonParseException e) {
+            return null;
         }
         return null;
     }
@@ -493,25 +491,4 @@ class CoverageSessionHandler {
                 ? el.getAsBoolean() : defaultValue;
     }
 
-    /** Static accessor used by {@link CoverageRouter} so existing
-     *  helpers stay package-private. */
-    static String mergeDescriptionTemplate() {
-        return MERGE_DESC_TEMPLATE;
-    }
-
-    /** Test/inspection accessor — count the keys an entry would
-     *  emit. Used to keep wire-shape regression tests honest. */
-    static Map<String, Object> sampleEntryShape() {
-        // Reflects the keys runEntry emits — keep in sync.
-        return new LinkedHashMap<>(Map.of(
-                "coverageId", "",
-                "coverageSessionKind", "",
-                "configId", "",
-                "configType", "",
-                "configTypeId", "",
-                "launchId", "",
-                "description", "",
-                "coverageScope", new JsonArray(),
-                "dumpCount", 0));
-    }
 }

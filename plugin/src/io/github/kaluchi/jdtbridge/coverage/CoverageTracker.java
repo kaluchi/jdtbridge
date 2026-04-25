@@ -94,6 +94,7 @@ final class CoverageTracker
         void onAnalysisLoading(CoverageRun run);
         void onAnalysisReady(CoverageRun run);
         void onTerminated(CoverageRun run);
+        void onFailed(CoverageRun run, String reason);
     }
 
     /** Subscribe to events for one {@code coverageId}. Multiple
@@ -168,6 +169,19 @@ final class CoverageTracker
         for (CoverageEventListener l : list) {
             try {
                 l.onTerminated(run);
+            } catch (RuntimeException e) {
+                // ignore
+            }
+        }
+    }
+
+    private void fireFailed(CoverageRun run, String reason) {
+        java.util.List<CoverageEventListener> list =
+                listeners.get(run.coverageId);
+        if (list == null) return;
+        for (CoverageEventListener l : list) {
+            try {
+                l.onFailed(run, reason);
             } catch (RuntimeException e) {
                 // ignore
             }
@@ -455,18 +469,9 @@ final class CoverageTracker
         fireDumped(run);
     }
 
-    /** Classify a deferred session once any synchronous
-     *  {@code sessionRemoved} burst has had a chance to populate
-     *  {@link PendingClassification#removedCoverageIds}. Idempotent. */
     private IStatus finalizePending(ICoverageSession session) {
-        // Lock barrier: SessionManager.getSessions() synchronizes
-        // on the same lock that the merger thread holds across the
-        // sessionAdded(merged) → N×removeSession(input) dispatch.
-        // This call blocks until that lock is released, so by the
-        // time we read pending.removedCoverageIds below the
-        // listener callbacks have already populated it. Determinism
-        // via lock acquisition replaces the earlier 50ms delay.
-        // No-op when called from the merger thread (reentrant).
+        // Lock barrier — wait for the merger's synchronized
+        // dispatch to release before reading removedCoverageIds.
         CoverageTools.getSessionManager().getSessions();
 
         PendingClassification pc = pending.remove(session);
@@ -506,17 +511,12 @@ final class CoverageTracker
         run.dumpedAt.add(now);
         runs.put(coverageId, run);
         sessionToRunId.put(session, coverageId);
-        // For merged/imported runs the kind was just decided here,
-        // so the dump-add fires now (no live launch fired it).
         fireDumped(run);
-        // sessionActivated may have fired BEFORE this deferred
-        // classification ran (SessionImporter activates the new
-        // session synchronously inside the same dispatch). Adopt
-        // the SessionManager's current active session as our
-        // active here if it matches.
         if (session.equals(
                 CoverageTools.getSessionManager().getActiveSession())) {
             activeCoverageId = coverageId;
+            applyCoverageState(run,
+                    CoverageTools.getJavaModelCoverage());
         }
         return Status.OK_STATUS;
     }
@@ -550,15 +550,19 @@ final class CoverageTracker
 
     @Override
     public void coverageChanged() {
-        String activeId = activeCoverageId;
-        if (activeId == null) {
-            return;
-        }
-        CoverageRun run = runs.get(activeId);
-        if (run == null) {
-            return;
-        }
-        IJavaModelCoverage coverage = CoverageTools.getJavaModelCoverage();
+        ICoverageSession active =
+                CoverageTools.getSessionManager().getActiveSession();
+        if (active == null) return;
+        String coverageId = sessionToRunId.get(active);
+        if (coverageId == null) return;
+        CoverageRun run = runs.get(coverageId);
+        if (run == null) return;
+        applyCoverageState(run,
+                CoverageTools.getJavaModelCoverage());
+    }
+
+    private void applyCoverageState(CoverageRun run,
+            IJavaModelCoverage coverage) {
         if (coverage == IJavaModelCoverage.LOADING) {
             run.analysisLoading = true;
             run.analysisReady = false;
@@ -566,6 +570,9 @@ final class CoverageTracker
         } else if (coverage == null) {
             run.analysisLoading = false;
             run.analysisReady = false;
+            if (!run.terminated) {
+                fireFailed(run, "analysis-cancelled");
+            }
         } else {
             run.analysisLoading = false;
             run.analysisReady = true;

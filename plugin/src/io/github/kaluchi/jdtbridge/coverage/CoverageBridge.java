@@ -91,7 +91,7 @@ public class CoverageBridge {
         }
         CoverageRouter r = (CoverageRouter) router();
         CoverageProgressStreamer.stream(out, coverageId,
-                r.tracker());
+                r.tracker(), r.analyzer());
     }
 
     /** JSONL line emitted by {@link #streamSession} when EclEmma
