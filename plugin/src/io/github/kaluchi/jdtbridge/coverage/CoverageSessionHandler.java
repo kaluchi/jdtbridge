@@ -62,11 +62,15 @@ class CoverageSessionHandler {
      *  filtered by {@link ProjectScope}. */
     String handleRuns(ProjectScope scope) {
         var arr = new JsonArray();
+        String activeCoverageId = tracker.activeCoverageId();
         for (CoverageRun run : tracker.snapshot().values()) {
             if (!inScope(run, scope)) {
                 continue;
             }
-            arr.add(runEntry(run));
+            JsonObject entry = runEntry(run);
+            entry.addProperty("active",
+                    run.coverageId.equals(activeCoverageId));
+            arr.add(entry);
         }
         return arr.toString();
     }
@@ -86,7 +90,10 @@ class CoverageSessionHandler {
         Integer dumpIndex = parseDumpIndex(coverageId);
         ICoverageSession session = run.resolveSession(dumpIndex);
         if (session == null) {
-            return error("coverage-dump-not-found", coverageId);
+            if (dumpIndex != null) {
+                return error("coverage-dump-not-found", coverageId);
+            }
+            return runEntry(run).toString();
         }
         JsonObject entry = runEntry(run);
         try {

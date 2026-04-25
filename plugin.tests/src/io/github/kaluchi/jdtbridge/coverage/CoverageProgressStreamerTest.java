@@ -240,6 +240,52 @@ public class CoverageProgressStreamerTest {
         }
 
         @Test
+        void terminatedDuringLoadingDoesNotCloseUntilReady()
+                throws Exception {
+            // Real coverage launches fire terminated BEFORE
+            // analysisReady (LoadSessionJob completes after the
+            // JVM exits). Stream must stay open through the
+            // terminated event and close only when analysisReady
+            // arrives — otherwise consumers never see counters.
+            String coverageId = importAndAwait("late-ready");
+            CoverageRun run = tracker.byCoverageId(coverageId);
+            run.terminated = false;
+            run.analysisLoading = true;
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            Thread worker = new Thread(() ->
+                    CoverageProgressStreamer.stream(out, coverageId,
+                            tracker, analyzer));
+            worker.start();
+            awaitListener(coverageId);
+
+            // Step 1: terminate — stream still has analysisLoading
+            // pending, must NOT close.
+            run.terminated = true;
+            tracker.eventBus().fire(coverageId,
+                    l -> l.onTerminated(run));
+            // Yield + brief sleep so the worker observes the
+            // event without false-completing.
+            Thread.sleep(100);
+            assertTrue(worker.isAlive(),
+                    "Stream must stay open after terminated when"
+                            + " analysisLoading is still true");
+
+            // Step 2: analysis finishes — now stream closes.
+            run.analysisLoading = false;
+            run.analysisReady = true;
+            tracker.eventBus().fire(coverageId,
+                    l -> l.onAnalysisReady(run));
+            worker.join(5000);
+
+            String body = out.toString(StandardCharsets.UTF_8);
+            assertTrue(body.contains("\"event\":\"terminated\""),
+                    "terminated event must be present: " + body);
+            assertTrue(body.contains("\"event\":\"analysisReady\""),
+                    "analysisReady must be present after terminated"
+                            + ": " + body);
+        }
+
+        @Test
         void dumpedEventCarriesIndexAndTimestamp() throws Exception {
             String coverageId = importAndAwait("dumped-test");
             CoverageRun run = tracker.byCoverageId(coverageId);

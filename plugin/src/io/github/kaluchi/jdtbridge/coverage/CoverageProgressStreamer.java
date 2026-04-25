@@ -86,7 +86,6 @@ public final class CoverageProgressStreamer {
                 safeWrite(out, analysisEvent(r,
                         "analysisReady", counters), closed, done);
                 if (isTerminal(r)) {
-                    safeWrite(out, terminatedEvent(r), closed, done);
                     done.countDown();
                 }
             }
@@ -94,7 +93,9 @@ public final class CoverageProgressStreamer {
             @Override
             public void onTerminated(CoverageRun r) {
                 safeWrite(out, terminatedEvent(r), closed, done);
-                done.countDown();
+                if (isTerminal(r)) {
+                    done.countDown();
+                }
             }
 
             @Override

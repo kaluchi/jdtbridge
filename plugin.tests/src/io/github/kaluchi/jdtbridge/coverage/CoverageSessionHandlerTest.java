@@ -86,7 +86,7 @@ public class CoverageSessionHandlerTest {
                     "launchId", "description", "coverageScope",
                     "dumpCount", "terminated", "dataReceived",
                     "analysisLoading", "analysisReady",
-                    "launchTimestamp", "terminatedAt"
+                    "launchTimestamp", "terminatedAt", "active"
             }) {
                 assertTrue(entry.has(required),
                         "Missing required field '" + required
@@ -119,6 +119,39 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
+        void activeRunMarkedActiveTrue() {
+            String coverageId = importAndAwait("active-marker");
+            JsonArray arr = JsonParser.parseString(
+                            handler.handleRuns(ProjectScope.ALL))
+                    .getAsJsonArray();
+            JsonObject entry = arr.get(0).getAsJsonObject();
+            assertTrue(entry.get("active").getAsBoolean(),
+                    "Imported session is auto-activated, runs"
+                            + " must mark it active=true");
+            assertEquals(coverageId,
+                    entry.get("coverageId").getAsString());
+        }
+
+        @Test
+        void inactiveRunsMarkedActiveFalse() {
+            importAndAwait("first");
+            String activeId = importAndAwait("second");
+            JsonArray arr = JsonParser.parseString(
+                            handler.handleRuns(ProjectScope.ALL))
+                    .getAsJsonArray();
+            int activeCount = 0;
+            for (var el : arr) {
+                if (el.getAsJsonObject().get("active").getAsBoolean()) {
+                    activeCount++;
+                    assertEquals(activeId, el.getAsJsonObject()
+                            .get("coverageId").getAsString());
+                }
+            }
+            assertEquals(1, activeCount,
+                    "Exactly one run must be active at a time");
+        }
+
+        @Test
         void scopeFilteringExcludesUnscopedImported() {
             importAndAwait("scope-out");
             // Imported with empty scope set — containsAnyOfRoots
@@ -145,6 +178,15 @@ public class CoverageSessionHandlerTest {
             JsonObject obj = parseObj(handler.handleSession(
                     Map.of("coverageId", "Bogus:9999")));
             assertEquals("coverage-not-found",
+                    obj.get("error").getAsString());
+        }
+
+        @Test
+        void unknownDumpSuffixReturnsDumpNotFound() {
+            String coverageId = importAndAwait("dump-out-of-range");
+            JsonObject obj = parseObj(handler.handleSession(
+                    Map.of("coverageId", coverageId + ":99")));
+            assertEquals("coverage-dump-not-found",
                     obj.get("error").getAsString());
         }
 

@@ -214,6 +214,24 @@ final class CoverageTracker
         return activeCoverageId;
     }
 
+    /** Swap {@link #activeCoverageId} and clear analysis flags on
+     *  the previously-active run. The previous run is no longer the
+     *  analysis target, so its {@code analysisLoading}/
+     *  {@code analysisReady} bits would be stale once EclEmma starts
+     *  re-loading for the new session. */
+    private void setActiveCoverageId(String newId) {
+        String previous = activeCoverageId;
+        activeCoverageId = newId;
+        if (previous == null || previous.equals(newId)) {
+            return;
+        }
+        CoverageRun stale = runs.get(previous);
+        if (stale != null) {
+            stale.analysisLoading = false;
+            stale.analysisReady = false;
+        }
+    }
+
     CoverageRun byCoverageId(String coverageId) {
         if (coverageId == null) {
             return null;
@@ -349,13 +367,15 @@ final class CoverageTracker
     @Override
     public void sessionActivated(ICoverageSession session) {
         if (session == null) {
-            activeCoverageId = null;
+            setActiveCoverageId(null);
             return;
         }
         String coverageId = sessionToRunId.get(session);
         if (coverageId != null) {
-            activeCoverageId = coverageId;
+            setActiveCoverageId(coverageId);
         }
+        // If the session isn't classified yet, finalizePending will
+        // call setActiveCoverageId once it lands.
     }
 
     private void classifyImmediately(ICoverageSession session) {
@@ -462,7 +482,7 @@ final class CoverageTracker
         fireDumped(run);
         if (session.equals(
                 CoverageTools.getSessionManager().getActiveSession())) {
-            activeCoverageId = coverageId;
+            setActiveCoverageId(coverageId);
             applyCoverageState(run,
                     CoverageTools.getJavaModelCoverage());
         }

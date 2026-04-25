@@ -1,6 +1,7 @@
 package io.github.kaluchi.jdtbridge.coverage;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -154,6 +155,31 @@ public class CoverageTrackerTest {
             String coverageId = importAndAwait(description);
             CoverageRun run = tracker.byCoverageId(coverageId);
             assertEquals(description, run.description);
+        }
+    }
+
+    @Nested
+    class ActivationFlagReset {
+
+        @Test
+        void switchingActiveSessionClearsPreviousAnalysisFlags() {
+            String firstId = importAndAwait("first");
+            CoverageRun first = tracker.byCoverageId(firstId);
+            // Pretend EclEmma had finished analysis on first.
+            first.analysisLoading = false;
+            first.analysisReady = true;
+
+            String secondId = importAndAwait("second");
+            // Importing a second session activates it; the
+            // first is no longer the analysis target.
+
+            CoverageRun firstAgain = tracker.byCoverageId(firstId);
+            assertNotNull(firstAgain);
+            assertFalse(firstAgain.analysisReady,
+                    "Previous active run must have analysisReady"
+                            + " cleared when another session"
+                            + " becomes active");
+            assertFalse(firstAgain.analysisLoading);
         }
     }
 
