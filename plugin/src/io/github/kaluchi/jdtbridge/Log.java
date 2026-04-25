@@ -10,7 +10,7 @@ import org.eclipse.core.runtime.Status;
  * Messages appear in Error Log view and {@code <workspace>/.metadata/.log}.
  * Falls back to stderr when running outside OSGi (e.g. plain JUnit).
  */
-class Log {
+public class Log {
 
     private static final String BUNDLE_ID =
             "io.github.kaluchi.jdtbridge";
@@ -24,23 +24,23 @@ class Log {
         }
     }
 
-    static void info(String msg) {
+    public static void info(String msg) {
         log(IStatus.INFO, msg, null);
     }
 
-    static void warn(String msg) {
+    public static void warn(String msg) {
         log(IStatus.WARNING, msg, null);
     }
 
-    static void warn(String msg, Throwable t) {
+    public static void warn(String msg, Throwable t) {
         log(IStatus.WARNING, msg, t);
     }
 
-    static void error(String msg) {
+    public static void error(String msg) {
         log(IStatus.ERROR, msg, null);
     }
 
-    static void error(String msg, Throwable t) {
+    public static void error(String msg, Throwable t) {
         log(IStatus.ERROR, msg, t);
     }
 

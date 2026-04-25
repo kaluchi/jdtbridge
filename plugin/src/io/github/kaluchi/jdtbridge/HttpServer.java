@@ -104,6 +104,7 @@ public class HttpServer {
     public void start(InetAddress bindAddress, int port)
             throws IOException {
         launchTracker.start();
+        coverageBridge.start();
         serverSocket = bindWithFallback(bindAddress, port);
         running = true;
         startAcceptLoop(serverSocket);
@@ -161,6 +162,7 @@ public class HttpServer {
 
 
     public void stop() {
+        coverageBridge.stop();
         launchTracker.stop();
         running = false;
         try {

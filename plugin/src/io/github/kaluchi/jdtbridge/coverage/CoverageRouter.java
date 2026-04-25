@@ -18,6 +18,21 @@ import io.github.kaluchi.jdtbridge.ProjectScope;
  */
 class CoverageRouter {
 
+    private final CoverageTracker tracker = new CoverageTracker();
+
+    void start() {
+        tracker.start();
+    }
+
+    void stop() {
+        tracker.stop();
+    }
+
+    /** Test/inspection accessor. */
+    CoverageTracker tracker() {
+        return tracker;
+    }
+
     String dispatch(String path, Map<String, String> params,
             String body, ProjectScope scope) {
         return switch (path) {

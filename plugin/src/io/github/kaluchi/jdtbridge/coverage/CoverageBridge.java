@@ -38,6 +38,27 @@ public class CoverageBridge {
         return AVAILABLE;
     }
 
+    /** Activate the EclEmma listeners (session manager, launch
+     *  manager, coverage loader). No-op when EclEmma absent. Safe
+     *  to call multiple times. */
+    public void start() {
+        if (!AVAILABLE) {
+            return;
+        }
+        ((CoverageRouter) router()).start();
+    }
+
+    /** Deregister the listeners and clear bridge state. */
+    public void stop() {
+        if (!AVAILABLE) {
+            return;
+        }
+        Object r = router;
+        if (r != null) {
+            ((CoverageRouter) r).stop();
+        }
+    }
+
     /**
      * Dispatch a {@code /coverage/*} request. When EclEmma is
      * absent, returns {@link #notInstalledError()} JSON without
