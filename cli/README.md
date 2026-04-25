@@ -75,6 +75,7 @@ See `jdt status intro` for the canonical sell-through pipelines.
 jdt build [--project <name>] [--incremental]           # (alias: b) build project (default: clean)
 jdt test run <FQN>[#method] [--project <name>] [-f]    # launch tests (non-blocking)
 jdt test run --project <name> [--package <pkg>] [-f]   # run tests in project
+jdt test run <FQN> --coverage                          # launch under EclEmma in coverage mode
 jdt test status <testRunId> [-f] [--all] [--ignored]   # show test progress/results
 jdt test runs                                          # list test runs
 ```
@@ -118,6 +119,27 @@ jdt rename <FQN> <newName>                             # rename type or method (
 jdt rename <FQN> <newName> --field <old>               # rename field
 jdt move <FQN> <target.package>                        # move type to another package
 ```
+
+### Coverage (EclEmma)
+
+```bash
+jdt coverage run <configId> [-f] [-q] [--json]         # start coverage launch
+jdt coverage runs                                      # list all sessions (table)
+jdt coverage status <coverageId> [-f] [--json]         # snapshot or stream status
+jdt coverage dump <coverageId> [--reset]               # request a JaCoCo dump
+jdt coverage refresh                                   # re-analyze active session
+jdt coverage relaunch                                  # relaunch active config in coverage mode
+jdt coverage active                                    # show active coverageId
+jdt coverage activate <coverageId>                     # switch active session
+jdt coverage merge <id> <id> [...] [--name <text>]     # merge two or more sessions
+jdt coverage remove [--all]                            # remove active or every session
+jdt coverage stop <coverageId>                         # terminate a live coverage launch
+```
+
+Requires the EclEmma plugin installed alongside jdtbridge. Without it,
+every subcommand returns `coverage-not-installed` JSON. `coverageId`
+for live launches mirrors `testRunId` byte-for-byte; for merged /
+imported sessions it carries the `merged:` / `imported:` prefix.
 
 ### Launches
 

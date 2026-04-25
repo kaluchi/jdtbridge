@@ -28,11 +28,12 @@ function parseCommands(src) {
     }
   }
 
-  // Subcommand maps: launch, test, agent
+  // Subcommand maps: launch, test, agent, coverage
   const subMaps = [
     { pattern: /^const launchSubcommands = \{([\s\S]*?)^\};/m, prefix: "jdt launch" },
     { pattern: /^const testSubcommands = \{([\s\S]*?)^\};/m, prefix: "jdt test" },
     { pattern: /^const agentSubcommands = \{([\s\S]*?)^\};/m, prefix: "jdt agent" },
+    { pattern: /^const coverageSubcommands = \{([\s\S]*?)^\};/m, prefix: "jdt coverage" },
   ];
   for (const { pattern, prefix } of subMaps) {
     const match = src.match(pattern);
@@ -58,7 +59,7 @@ function parseReadmeCommands(content) {
   let inBlock = false;
 
   // Subcommand parents — next word after these is part of the command name
-  const parents = new Set(["launch", "test", "agent", "maven"]);
+  const parents = new Set(["launch", "test", "agent", "maven", "coverage"]);
 
   for (const line of lines) {
     if (line.startsWith("```bash")) { inBlock = true; continue; }
@@ -103,7 +104,7 @@ describe("CLI README completeness", () => {
     for (const cmd of srcCommands) {
       if (hidden.has(cmd)) continue;
       // For parent commands (launch, test, agent, maven) — subcommands cover them
-      if (["jdt launch", "jdt test", "jdt agent", "jdt maven"].includes(cmd)) continue;
+      if (["jdt launch", "jdt test", "jdt agent", "jdt maven", "jdt coverage"].includes(cmd)) continue;
       if (!readmeCommands.has(cmd)) {
         missing.push(cmd);
       }

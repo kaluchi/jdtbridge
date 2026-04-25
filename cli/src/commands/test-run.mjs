@@ -39,6 +39,8 @@ export async function testRun(args) {
   }
 
   if (args.includes("--no-refresh")) url += "&no-refresh";
+  const coverage = args.includes("--coverage");
+  if (coverage) url += "&coverage=true";
 
   const result = await get(url, 30_000);
   if (result.error) {
@@ -71,6 +73,15 @@ export async function testRun(args) {
   const jsonFlag = args.includes("--json");
   if (!jsonFlag) console.log(formatTestRunHeader(result));
 
+  if (coverage && !jsonFlag) {
+    if (result.coverageId) {
+      console.log(`CoverageId: \`${result.coverageId}\``);
+    }
+    if (result.launchMode) {
+      console.log(`LaunchMode: ${result.launchMode}`);
+    }
+  }
+
   const follow = args.includes("-f") || args.includes("--follow");
   if (follow) {
     if (!jsonFlag) console.log();
@@ -81,6 +92,12 @@ export async function testRun(args) {
   const quiet = args.includes("-q") || args.includes("--quiet");
   if (!quiet) {
     console.log(testRunGuide(testRunId, launchId));
+    if (coverage && result.coverageId && !jsonFlag) {
+      console.log("");
+      console.log("**Coverage status:**");
+      console.log(`  \`jdt coverage status ${result.coverageId}\`             snapshot`);
+      console.log(`  \`jdt coverage status ${result.coverageId} -f\`          follow`);
+    }
   }
 }
 

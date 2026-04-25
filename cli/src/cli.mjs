@@ -60,6 +60,30 @@ import {
 import { setup, help as setupHelp } from "./commands/setup.mjs";
 import { use, help as useHelp } from "./commands/use.mjs";
 import { query, help as queryHelp } from "./commands/query.mjs";
+import {
+  coverageRun,
+  coverageRuns,
+  coverageStatus,
+  coverageDump,
+  coverageRefresh,
+  coverageRelaunch,
+  coverageActive,
+  coverageActivate,
+  coverageMerge,
+  coverageRemove,
+  coverageStop,
+  coverageRunHelp,
+  coverageRunsHelp,
+  coverageStatusHelp,
+  coverageDumpHelp,
+  coverageRefreshHelp,
+  coverageRelaunchHelp,
+  coverageActiveHelp,
+  coverageActivateHelp,
+  coverageMergeHelp,
+  coverageRemoveHelp,
+  coverageStopHelp,
+} from "./commands/coverage.mjs";
 import { isConnectionError, BridgeNotRunningError } from "./client.mjs";
 import { bold, red, dim } from "./color.mjs";
 import { installTelemetry } from "./telemetry.mjs";
@@ -144,6 +168,55 @@ async function testDispatch(args) {
   await cmd.fn(rest);
 }
 
+const coverageSubcommands = {
+  run: { fn: coverageRun, help: coverageRunHelp },
+  runs: { fn: coverageRuns, help: coverageRunsHelp },
+  status: { fn: coverageStatus, help: coverageStatusHelp },
+  dump: { fn: coverageDump, help: coverageDumpHelp },
+  refresh: { fn: coverageRefresh, help: coverageRefreshHelp },
+  relaunch: { fn: coverageRelaunch, help: coverageRelaunchHelp },
+  active: { fn: coverageActive, help: coverageActiveHelp },
+  activate: { fn: coverageActivate, help: coverageActivateHelp },
+  merge: { fn: coverageMerge, help: coverageMergeHelp },
+  remove: { fn: coverageRemove, help: coverageRemoveHelp },
+  stop: { fn: coverageStop, help: coverageStopHelp },
+};
+
+const coverageHelp = `Manage EclEmma code coverage sessions and launches.
+
+Subcommands:
+  jdt coverage run <configId> [-f] [-q]              start coverage launch
+  jdt coverage runs                                  list all sessions
+  jdt coverage status <coverageId> [-f]              snapshot or stream
+  jdt coverage dump <coverageId> [--reset]           request a dump
+  jdt coverage refresh                               re-analyze active
+  jdt coverage relaunch                              relaunch active config
+  jdt coverage activate <coverageId>                 switch active session
+  jdt coverage active                                show active session
+  jdt coverage merge <id> <id> [...] [--name <txt>]  merge two or more
+  jdt coverage remove [--all]                        remove active or all
+  jdt coverage stop <coverageId>                     terminate live launch
+
+Requires EclEmma installed in Eclipse. Without it, every subcommand
+returns coverage-not-installed.
+
+Use "jdt help coverage <subcommand>" for details.`;
+
+async function coverageDispatch(args) {
+  const [sub, ...rest] = args;
+  if (!sub || sub === "--help") {
+    console.log(coverageHelp);
+    return;
+  }
+  const cmd = coverageSubcommands[sub];
+  if (!cmd) {
+    console.error(`Unknown coverage subcommand: ${sub}\n`);
+    printFullSubcommandHelp("coverage", coverageSubcommands);
+    process.exit(1);
+  }
+  await cmd.fn(rest);
+}
+
 const agentSubcommands = {
   run: { fn: agentRun, help: agentRunHelp },
   list: { fn: agentList, help: agentListHelp },
@@ -192,6 +265,7 @@ const commands = {
   status: { fn: status, help: statusHelp },
   git: { fn: git, help: gitHelp },
   launch: { fn: launchDispatch, help: launchHelp },
+  coverage: { fn: coverageDispatch, help: coverageHelp },
   agent: { fn: agentDispatch, help: agentHelp },
   setup: { fn: setup, help: setupHelp },
   use: { fn: use, help: useHelp },

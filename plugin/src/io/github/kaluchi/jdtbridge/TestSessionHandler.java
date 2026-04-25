@@ -201,17 +201,12 @@ class TestSessionHandler {
             obj.addProperty("configId", configId);
             obj.addProperty("testRunId", testRunId(s));
 
-            // LaunchId from ILaunch → PID
             ILaunch launch = s.getLaunch();
             if (launch != null) {
-                var procs = launch.getProcesses();
-                if (procs.length > 0) {
-                    String pid = procs[0].getAttribute(
-                            org.eclipse.debug.core.model
-                                    .IProcess.ATTR_PROCESS_ID);
-                    if (pid != null)
-                        obj.addProperty("launchId",
-                                configId + ":" + pid);
+                String pid = LaunchAttrs.firstPid(launch);
+                if (pid != null) {
+                    obj.addProperty("launchId",
+                            configId + ":" + pid);
                 }
             }
 
@@ -238,11 +233,10 @@ class TestSessionHandler {
             obj.addProperty("time",
                     Double.isNaN(elapsed) ? 0.0 : elapsed);
             if (launch != null) {
-                String ts = launch.getAttribute(
-                        DebugPlugin.ATTR_LAUNCH_TIMESTAMP);
-                if (ts != null)
-                    obj.addProperty("startedAt",
-                            Long.parseLong(ts));
+                Long ts = LaunchAttrs.launchTimestamp(launch);
+                if (ts != null) {
+                    obj.addProperty("startedAt", ts);
+                }
             }
             arr.add(obj);
         }

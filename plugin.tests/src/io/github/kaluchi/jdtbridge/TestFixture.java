@@ -52,10 +52,10 @@ import org.eclipse.jdt.core.JavaCore;
  *   ImportTarget         — unused imports (organize-imports tests)
  * </pre>
  */
-class TestFixture {
+public class TestFixture {
 
-    static final String PROJECT_NAME = "jdtbridge-test";
-    static final String NON_JAVA_PROJECT_NAME = "jdtbridge-test-nonjava";
+    public static final String PROJECT_NAME = "jdtbridge-test";
+    public static final String NON_JAVA_PROJECT_NAME = "jdtbridge-test-nonjava";
 
     private static final String ANIMAL_SRC = """
             package test.model;
@@ -442,7 +442,7 @@ class TestFixture {
             }
             """;
 
-    static void create() throws Exception {
+    public static void create() throws Exception {
         IWorkspaceRoot root = ResourcesPlugin.getWorkspace().getRoot();
         IProject project = root.getProject(PROJECT_NAME);
 
@@ -615,7 +615,7 @@ class TestFixture {
         return null;
     }
 
-    static void destroy() throws Exception {
+    public static void destroy() throws Exception {
         IWorkspaceRoot root =
                 ResourcesPlugin.getWorkspace().getRoot();
         for (String name : new String[] {
@@ -628,7 +628,7 @@ class TestFixture {
     }
 
     /** Create a plain project without Java nature. */
-    static void createNonJavaProject() throws Exception {
+    public static void createNonJavaProject() throws Exception {
         IWorkspaceRoot root =
                 ResourcesPlugin.getWorkspace().getRoot();
         IProject project = root.getProject(NON_JAVA_PROJECT_NAME);

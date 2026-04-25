@@ -1,6 +1,8 @@
 package io.github.kaluchi.jdtbridge;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import io.github.kaluchi.jdtbridge.coverage.CoverageTypes;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IPath;
@@ -30,9 +32,9 @@ import java.util.jar.Manifest;
  * Handler for /test endpoint: run JUnit tests via Eclipse's
  * built-in runner.
  */
-class TestHandler {
+public class TestHandler {
 
-    TestHandler() {
+    public TestHandler() {
     }
 
     private static final String JUNIT_LAUNCH_TYPE =
@@ -211,33 +213,43 @@ class TestHandler {
     /**
      * Non-blocking test launch. Returns immediately with session
      * info. Progress tracked by {@link TestSessionTracker}.
+     * <p>
+     * When {@code coverage=true} is present in {@code params},
+     * the launch is started in EclEmma's coverage mode instead of
+     * run mode. The response then carries the additional
+     * {@code coverageId} and {@code launchMode: "coverage"}
+     * fields. {@code coverageId} and {@code testRunId} are
+     * byte-identical strings — they identify the same
+     * {@link ILaunch} from coverage and test perspectives.
      */
-    String handleTestRun(Map<String, String> params)
+    public String handleTestRun(Map<String, String> params)
             throws Exception {
+        boolean coverage = parseBool(params.get("coverage"));
+
         String[] errorOut = { null };
         PreparedLaunch pl = prepareLaunch(params, errorOut);
         if (pl == null) return errorOut[0];
 
-        ILaunch launch = pl.config().launch(
-                ILaunchManager.RUN_MODE,
+        if (coverage) {
+            String typeId = pl.config().getType().getIdentifier();
+            if (!CoverageTypes.isSupported(typeId)) {
+                return coverageModeNotSupported(typeId);
+            }
+        }
+
+        String launchMode = coverage
+                ? CoverageTypes.LAUNCH_MODE
+                : ILaunchManager.RUN_MODE;
+        ILaunch launch = pl.config().launch(launchMode,
                 new NullProgressMonitor(), true);
 
         String configId = pl.configName();
-        String pid = null;
-        var processes = launch.getProcesses();
-        if (processes.length > 0) {
-            pid = processes[0].getAttribute(
-                    org.eclipse.debug.core.model.IProcess
-                            .ATTR_PROCESS_ID);
-        }
-
+        String pid = LaunchAttrs.firstPid(launch);
         String launchTimestamp = launch.getAttribute(
                 DebugPlugin.ATTR_LAUNCH_TIMESTAMP);
 
-        String launchId = pid != null
-                ? configId + ":" + pid : configId;
-        String testRunId = configId + ":"
-                + launchTimestamp;
+        String launchId = LaunchAttrs.launchIdOf(configId, launch);
+        String testRunId = configId + ":" + launchTimestamp;
 
         var response = new JsonObject();
         response.addProperty("ok", true);
@@ -249,8 +261,37 @@ class TestHandler {
         response.addProperty("runner", pl.runner());
         if (pid != null)
             response.addProperty("pid", pid);
+        if (coverage) {
+            response.addProperty("coverageId", testRunId);
+            response.addProperty("launchMode",
+                    CoverageTypes.LAUNCH_MODE);
+        }
 
         return response.toString();
+    }
+
+    /** Strict {@code true} parse: accepts {@code "true"}
+     *  (case-insensitive) and {@code "1"} only. The CLI always
+     *  sends {@code coverage=true}, so empty-string ambiguity
+     *  ({@code ?coverage=}) deliberately does NOT enable
+     *  coverage — clients that forgot the value get the
+     *  no-coverage path. */
+    private static boolean parseBool(String raw) {
+        return "true".equalsIgnoreCase(raw) || "1".equals(raw);
+    }
+
+    private static String coverageModeNotSupported(String typeId) {
+        var obj = new JsonObject();
+        obj.addProperty("error", "coverage-mode-not-supported");
+        obj.addProperty("message",
+                "Launch type does not support coverage mode: "
+                        + typeId);
+        var arr = new JsonArray();
+        for (String supported : CoverageTypes.supported()) {
+            arr.add(supported);
+        }
+        obj.add("supportedTypeIds", arr);
+        return obj.toString();
     }
 
     private String formatRunner(String testKind) {

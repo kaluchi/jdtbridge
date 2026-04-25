@@ -7,6 +7,8 @@ Bundle-Version: 2.6.0.qualifier
 Fragment-Host: io.github.kaluchi.jdtbridge
 Bundle-RequiredExecutionEnvironment: JavaSE-21
 Require-Bundle: junit-jupiter-api;bundle-version="5.14",
- org.opentest4j
+ org.opentest4j,
+ org.eclipse.eclemma.core;resolution:=optional,
+ org.jacoco.core;resolution:=optional
 Import-Package: com.google.gson
 Automatic-Module-Name: io.github.kaluchi.jdtbridge.tests

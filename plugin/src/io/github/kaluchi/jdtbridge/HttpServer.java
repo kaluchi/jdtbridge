@@ -39,6 +39,10 @@ public class HttpServer {
             new TestSessionHandler();
     private final TestHandler testHandler =
             new TestHandler();
+    private final io.github.kaluchi.jdtbridge.coverage
+            .CoverageBridge coverageBridge =
+            new io.github.kaluchi.jdtbridge.coverage
+                    .CoverageBridge();
     private final LogHandler logHandler = new LogHandler();
     private final SessionScope sessionScope = new SessionScope();
     private final RequestTracker requestTracker = new RequestTracker();
@@ -100,6 +104,7 @@ public class HttpServer {
     public void start(InetAddress bindAddress, int port)
             throws IOException {
         launchTracker.start();
+        coverageBridge.start();
         serverSocket = bindWithFallback(bindAddress, port);
         running = true;
         startAcceptLoop(serverSocket);
@@ -157,6 +162,7 @@ public class HttpServer {
 
 
     public void stop() {
+        coverageBridge.stop();
         launchTracker.stop();
         running = false;
         try {
@@ -272,6 +278,10 @@ public class HttpServer {
             }
             if ("/test/status/stream".equals(path)) {
                 handleTestStatusStream(socket, params);
+                return;
+            }
+            if ("/coverage/session/stream".equals(path)) {
+                handleCoverageSessionStream(socket, params);
                 return;
             }
 
@@ -477,6 +487,35 @@ public class HttpServer {
         }
     }
 
+    /** Streaming /coverage/session/stream — bypasses dispatch,
+     *  delegates to CoverageBridge through the same guard pattern
+     *  as other /coverage/* routes. */
+    private void handleCoverageSessionStream(Socket socket,
+            Map<String, String> params) {
+        String coverageId = params.get("coverageId");
+        if (coverageId == null || coverageId.isBlank()) {
+            try { sendError(socket, 400, "Missing coverageId"); }
+            catch (IOException e) { /* ignore */ }
+            return;
+        }
+        try {
+            socket.setSoTimeout(0);
+            OutputStream out = socket.getOutputStream();
+            out.write(("HTTP/1.1 200 OK\r\n"
+                    + "Content-Type: application/x-ndjson;"
+                    + " charset=utf-8\r\n"
+                    + "Connection: close\r\n"
+                    + "Cache-Control: no-cache\r\n\r\n")
+                    .getBytes(StandardCharsets.UTF_8));
+            coverageBridge.streamSession(out, coverageId);
+        } catch (IOException
+                | io.github.kaluchi.jdtbridge.coverage
+                        .CoverageProgressStreamer
+                        .StreamClosedException e) {
+            // Client disconnected — normal.
+        }
+    }
+
     /** Wait briefly for a launch to appear in the tracker. */
     private LaunchTracker.TrackedLaunch awaitLaunch(String name) {
         for (int i = 0; i < 10; i++) {
@@ -637,6 +676,13 @@ public class HttpServer {
                         launch.handleRun(params));
                 case "/launch/stop" -> Response.json(
                         launch.handleStop(params));
+                case "/coverage/run", "/coverage/dump",
+                        "/coverage/refresh", "/coverage/relaunch",
+                        "/coverage/runs", "/coverage/session",
+                        "/coverage/active", "/coverage/activate",
+                        "/coverage/merge", "/coverage/remove" ->
+                        Response.json(coverageBridge.dispatch(
+                                path, params, requestBody, scope));
                 default -> Response.json(jsonError(
                         "Unknown path: " + path));
             };
