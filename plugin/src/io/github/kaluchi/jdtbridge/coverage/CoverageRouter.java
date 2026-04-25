@@ -21,6 +21,8 @@ class CoverageRouter {
     private final CoverageAnalyzer analyzer = new CoverageAnalyzer();
     private final CoverageTracker tracker = new CoverageTracker(analyzer);
     private final CoverageHandler handler = new CoverageHandler(tracker);
+    private final CoverageSessionHandler sessionHandler =
+            new CoverageSessionHandler(tracker, analyzer);
 
     void start() {
         tracker.start();
@@ -46,6 +48,11 @@ class CoverageRouter {
         return analyzer;
     }
 
+    /** Test/inspection accessor. */
+    CoverageSessionHandler sessionHandler() {
+        return sessionHandler;
+    }
+
     String dispatch(String path, Map<String, String> params,
             String body, ProjectScope scope) {
         return switch (path) {
@@ -53,12 +60,15 @@ class CoverageRouter {
             case "/coverage/dump" -> handler.handleDump(body);
             case "/coverage/refresh" -> handler.handleRefresh();
             case "/coverage/relaunch" -> handler.handleRelaunch();
-            case "/coverage/runs" -> notImplemented(path);
-            case "/coverage/session" -> notImplemented(path);
-            case "/coverage/active" -> notImplemented(path);
-            case "/coverage/activate" -> notImplemented(path);
-            case "/coverage/merge" -> notImplemented(path);
-            case "/coverage/remove" -> notImplemented(path);
+            case "/coverage/runs" -> sessionHandler.handleRuns(scope);
+            case "/coverage/session" ->
+                    sessionHandler.handleSession(params);
+            case "/coverage/active" -> sessionHandler.handleActive();
+            case "/coverage/activate" ->
+                    sessionHandler.handleActivate(body);
+            case "/coverage/merge" -> sessionHandler.handleMerge(body);
+            case "/coverage/remove" ->
+                    sessionHandler.handleRemove(body);
             default -> unknownPath(path);
         };
     }

@@ -45,7 +45,7 @@ public class ProjectScope {
     }
 
     /** Create a filtered scope for the given project names. */
-    static ProjectScope of(Set<String> projectNames) {
+    public static ProjectScope of(Set<String> projectNames) {
         if (projectNames == null || projectNames.isEmpty()) {
             return ALL;
         }
@@ -173,8 +173,31 @@ public class ProjectScope {
         }
     }
 
+    /** Check if any of the given JDT package-fragment roots
+     *  belongs to a project in this scope. Used by the coverage
+     *  bridge to filter merged / imported sessions whose only
+     *  project link is the scope set (no {@code ILaunch}, no
+     *  {@code ILaunchConfiguration}). */
+    public boolean containsAnyOfRoots(
+            java.util.Set<org.eclipse.jdt.core.IPackageFragmentRoot> roots) {
+        if (projects == null) {
+            return true;
+        }
+        if (roots == null || roots.isEmpty()) {
+            return false;
+        }
+        for (org.eclipse.jdt.core.IPackageFragmentRoot root : roots) {
+            org.eclipse.jdt.core.IJavaProject jp = root.getJavaProject();
+            if (jp != null
+                    && projects.contains(jp.getElementName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** Check if a launch's configuration project is in scope. */
-    boolean containsLaunch(ILaunch launch) {
+    public boolean containsLaunch(ILaunch launch) {
         if (projects == null) return true;
         var config = launch.getLaunchConfiguration();
         return config == null || containsConfig(config);
