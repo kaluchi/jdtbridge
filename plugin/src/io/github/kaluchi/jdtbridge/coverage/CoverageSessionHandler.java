@@ -13,13 +13,19 @@ import org.eclipse.eclemma.core.ICoverageSession;
 import org.eclipse.eclemma.core.ISessionManager;
 import org.eclipse.eclemma.core.analysis.IJavaModelCoverage;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
-import org.jacoco.core.analysis.ICounter;
 import org.jacoco.core.data.SessionInfo;
+
+import static io.github.kaluchi.jdtbridge.coverage.CoverageJson.addNullableLong;
+import static io.github.kaluchi.jdtbridge.coverage.CoverageJson.addNullableString;
+import static io.github.kaluchi.jdtbridge.coverage.CoverageJson.countersOf;
+import static io.github.kaluchi.jdtbridge.coverage.CoverageJson.error;
+import static io.github.kaluchi.jdtbridge.coverage.CoverageJson.optBool;
+import static io.github.kaluchi.jdtbridge.coverage.CoverageJson.optString;
+import static io.github.kaluchi.jdtbridge.coverage.CoverageJson.parseObjectBody;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 
 import io.github.kaluchi.jdtbridge.ProjectScope;
 
@@ -87,7 +93,7 @@ class CoverageSessionHandler {
             CoverageAnalyzer.CachedAnalysis ca =
                     analyzer.ensureAnalyzed(session);
             entry.add("counters",
-                    countersJson(ca.modelCoverage));
+                    countersOf(ca.modelCoverage));
             entry.add("jacocoSessionInfos",
                     sessionInfosJson(ca.jacocoSessionInfos));
         } catch (CoreException e) {
@@ -101,19 +107,14 @@ class CoverageSessionHandler {
      *  or {@code null}. */
     String handleActive() {
         var obj = new JsonObject();
-        String activeId = tracker.activeCoverageId();
-        if (activeId != null) {
-            obj.addProperty("activeCoverageId", activeId);
-        } else {
-            obj.add("activeCoverageId",
-                    com.google.gson.JsonNull.INSTANCE);
-        }
+        addNullableString(obj, "activeCoverageId",
+                tracker.activeCoverageId());
         return obj.toString();
     }
 
     /** {@code POST /coverage/activate} body {@code {coverageId}}. */
     String handleActivate(String requestBody) {
-        JsonObject body = parseBody(requestBody);
+        JsonObject body = parseObjectBody(requestBody);
         if (body == null) {
             return error("coverage-not-found",
                     "Missing or invalid request body");
@@ -137,19 +138,14 @@ class CoverageSessionHandler {
         var obj = new JsonObject();
         obj.addProperty("ok", true);
         obj.addProperty("activeCoverageId", run.coverageId);
-        if (previous != null) {
-            obj.addProperty("previousActiveCoverageId", previous);
-        } else {
-            obj.add("previousActiveCoverageId",
-                    com.google.gson.JsonNull.INSTANCE);
-        }
+        addNullableString(obj, "previousActiveCoverageId", previous);
         return obj.toString();
     }
 
     /** {@code POST /coverage/merge} body
      *  {@code {coverageIds, description}}. */
     String handleMerge(String requestBody) {
-        JsonObject body = parseBody(requestBody);
+        JsonObject body = parseObjectBody(requestBody);
         if (body == null) {
             return error("coverage-not-found",
                     "Missing or invalid request body");
@@ -218,7 +214,7 @@ class CoverageSessionHandler {
     /** {@code POST /coverage/remove} — body {@code {}} removes
      *  the active session, body {@code {all: true}} removes all. */
     String handleRemove(String requestBody) {
-        JsonObject body = parseBody(requestBody);
+        JsonObject body = parseObjectBody(requestBody);
         boolean all = body != null && optBool(body, "all", false);
         ISessionManager sm = CoverageTools.getSessionManager();
         List<String> removed = new ArrayList<>();
@@ -266,12 +262,9 @@ class CoverageSessionHandler {
         addNullableString(obj, "configType", run.configType);
         addNullableString(obj, "configTypeId", run.configTypeId);
 
-        if (run.launch != null && run.kind == CoverageRun.Kind.LIVE) {
-            obj.addProperty("launchId", buildLaunchId(run));
-        } else {
-            obj.add("launchId",
-                    com.google.gson.JsonNull.INSTANCE);
-        }
+        addNullableString(obj, "launchId",
+                run.launch != null && run.kind == CoverageRun.Kind.LIVE
+                        ? buildLaunchId(run) : null);
 
         obj.addProperty("description", run.description != null
                 ? run.description : "");
@@ -295,18 +288,8 @@ class CoverageSessionHandler {
         obj.addProperty("analysisLoading", run.analysisLoading);
         obj.addProperty("analysisReady", run.analysisReady);
 
-        if (run.launchTimestamp != null) {
-            obj.addProperty("launchTimestamp", run.launchTimestamp);
-        } else {
-            obj.add("launchTimestamp",
-                    com.google.gson.JsonNull.INSTANCE);
-        }
-        if (run.terminatedAt != null) {
-            obj.addProperty("terminatedAt", run.terminatedAt);
-        } else {
-            obj.add("terminatedAt",
-                    com.google.gson.JsonNull.INSTANCE);
-        }
+        addNullableLong(obj, "launchTimestamp", run.launchTimestamp);
+        addNullableLong(obj, "terminatedAt", run.terminatedAt);
 
         if (run.kind == CoverageRun.Kind.MERGED
                 && !run.consumedCoverageIds.isEmpty()) {
@@ -331,56 +314,6 @@ class CoverageSessionHandler {
             }
         }
         return run.configId;
-    }
-
-    private static JsonObject countersJson(IJavaModelCoverage cov) {
-        var obj = new JsonObject();
-        if (cov == null) {
-            return obj;
-        }
-        obj.add("instruction",
-                counterJson(cov.getInstructionCounter()));
-        obj.add("branch", counterJson(cov.getBranchCounter()));
-        obj.add("line", counterJson(cov.getLineCounter()));
-        obj.add("complexity",
-                counterJson(cov.getComplexityCounter()));
-        obj.add("method", counterJson(cov.getMethodCounter()));
-        obj.add("class", counterJson(cov.getClassCounter()));
-        return obj;
-    }
-
-    private static JsonObject counterJson(ICounter counter) {
-        var obj = new JsonObject();
-        if (counter == null) {
-            return obj;
-        }
-        obj.addProperty("coveredCount", counter.getCoveredCount());
-        obj.addProperty("missedCount", counter.getMissedCount());
-        obj.addProperty("totalCount", counter.getTotalCount());
-        addRatio(obj, "coveredRatio", counter.getCoveredRatio());
-        addRatio(obj, "missedRatio", counter.getMissedRatio());
-        obj.addProperty("coverageStatus",
-                statusName(counter.getStatus()));
-        return obj;
-    }
-
-    private static void addRatio(JsonObject obj, String key,
-            double value) {
-        if (Double.isNaN(value)) {
-            obj.add(key, com.google.gson.JsonNull.INSTANCE);
-        } else {
-            obj.addProperty(key, value);
-        }
-    }
-
-    private static String statusName(int status) {
-        return switch (status) {
-            case ICounter.EMPTY -> "EMPTY";
-            case ICounter.NOT_COVERED -> "NOT_COVERED";
-            case ICounter.FULLY_COVERED -> "FULLY_COVERED";
-            case ICounter.PARTLY_COVERED -> "PARTLY_COVERED";
-            default -> "UNKNOWN_" + status;
-        };
     }
 
     private static JsonArray sessionInfosJson(
@@ -443,52 +376,6 @@ class CoverageSessionHandler {
             return null;
         }
         return (int) parsed;
-    }
-
-    private static void addNullableString(JsonObject obj,
-            String key, String value) {
-        if (value == null) {
-            obj.add(key, com.google.gson.JsonNull.INSTANCE);
-        } else {
-            obj.addProperty(key, value);
-        }
-    }
-
-    private static String error(String kind, String message) {
-        var obj = new JsonObject();
-        obj.addProperty("error", kind);
-        if (message != null && !message.isEmpty()) {
-            obj.addProperty("message", message);
-        }
-        return obj.toString();
-    }
-
-    private static JsonObject parseBody(String body) {
-        if (body == null || body.isBlank()) {
-            return null;
-        }
-        try {
-            JsonElement parsed = JsonParser.parseString(body);
-            if (parsed.isJsonObject()) {
-                return parsed.getAsJsonObject();
-            }
-        } catch (com.google.gson.JsonParseException e) {
-            return null;
-        }
-        return null;
-    }
-
-    private static String optString(JsonObject body, String key) {
-        JsonElement el = body.get(key);
-        return el != null && !el.isJsonNull()
-                ? el.getAsString() : null;
-    }
-
-    private static boolean optBool(JsonObject body, String key,
-            boolean defaultValue) {
-        JsonElement el = body.get(key);
-        return el != null && !el.isJsonNull()
-                ? el.getAsBoolean() : defaultValue;
     }
 
 }

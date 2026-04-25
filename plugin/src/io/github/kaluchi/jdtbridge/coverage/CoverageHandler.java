@@ -15,10 +15,13 @@ import org.eclipse.eclemma.core.ISessionManager;
 import org.eclipse.eclemma.core.launching.ICoverageLaunch;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
 
+import static io.github.kaluchi.jdtbridge.coverage.CoverageJson.error;
+import static io.github.kaluchi.jdtbridge.coverage.CoverageJson.optBool;
+import static io.github.kaluchi.jdtbridge.coverage.CoverageJson.optString;
+import static io.github.kaluchi.jdtbridge.coverage.CoverageJson.parseObjectBody;
+
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 
 /**
  * HTTP handlers for the four mutating {@code /coverage/*}
@@ -77,7 +80,7 @@ class CoverageHandler {
     /** {@code POST /coverage/dump} body {@code {coverageId, reset}}
      *  — request a dump from the running JaCoCo agent. */
     String handleDump(String requestBody) {
-        JsonObject body = parseBody(requestBody);
+        JsonObject body = parseObjectBody(requestBody);
         if (body == null) {
             return error("coverage-not-found",
                     "Missing or invalid request body");
@@ -192,8 +195,8 @@ class CoverageHandler {
         String configId = config != null ? config.getName() : "";
         obj.addProperty("configId", configId);
 
-        Long timestamp = parseLong(launch.getAttribute(
-                DebugPlugin.ATTR_LAUNCH_TIMESTAMP));
+        Long timestamp = CoverageJson.parseLaunchTimestamp(
+                launch.getAttribute(DebugPlugin.ATTR_LAUNCH_TIMESTAMP));
         String coverageId = timestamp != null
                 ? configId + ":" + timestamp
                 : configId;
@@ -259,49 +262,4 @@ class CoverageHandler {
         return obj.toString();
     }
 
-    private static String error(String kind, String message) {
-        var obj = new JsonObject();
-        obj.addProperty("error", kind);
-        if (message != null && !message.isEmpty()) {
-            obj.addProperty("message", message);
-        }
-        return obj.toString();
-    }
-
-    private static JsonObject parseBody(String body) {
-        if (body == null || body.isBlank()) {
-            return null;
-        }
-        try {
-            JsonElement parsed = JsonParser.parseString(body);
-            if (parsed.isJsonObject()) {
-                return parsed.getAsJsonObject();
-            }
-        } catch (com.google.gson.JsonParseException e) {
-            return null;
-        }
-        return null;
-    }
-
-    private static String optString(JsonObject body, String key) {
-        JsonElement el = body.get(key);
-        return el != null && !el.isJsonNull()
-                ? el.getAsString() : null;
-    }
-
-    private static boolean optBool(JsonObject body, String key,
-            boolean defaultValue) {
-        JsonElement el = body.get(key);
-        return el != null && !el.isJsonNull()
-                ? el.getAsBoolean() : defaultValue;
-    }
-
-    private static Long parseLong(String raw) {
-        if (raw == null) return null;
-        try {
-            return Long.parseLong(raw);
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
 }

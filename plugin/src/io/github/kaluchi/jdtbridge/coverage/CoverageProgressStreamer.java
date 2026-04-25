@@ -10,7 +10,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.eclemma.core.ICoverageSession;
-import org.jacoco.core.analysis.ICounter;
 
 import com.google.gson.JsonObject;
 
@@ -164,7 +163,7 @@ public final class CoverageProgressStreamer {
         try {
             CoverageAnalyzer.CachedAnalysis ca =
                     analyzer.ensureAnalyzed(session);
-            return countersJson(ca.modelCoverage);
+            return CoverageJson.countersOf(ca.modelCoverage);
         } catch (CoreException e) {
             return null;
         }
@@ -235,57 +234,6 @@ public final class CoverageProgressStreamer {
         obj.addProperty("event", "failed");
         obj.addProperty("reason", reason);
         return obj.toString();
-    }
-
-    /** Same shape used by {@code CoverageSessionHandler.counterJson}
-     *  but locally inlined to avoid a public dep. */
-    private static JsonObject countersJson(
-            org.eclipse.eclemma.core.analysis.IJavaModelCoverage cov) {
-        var obj = new JsonObject();
-        if (cov == null) {
-            return obj;
-        }
-        obj.add("instruction",
-                counterJson(cov.getInstructionCounter()));
-        obj.add("branch", counterJson(cov.getBranchCounter()));
-        obj.add("line", counterJson(cov.getLineCounter()));
-        obj.add("complexity",
-                counterJson(cov.getComplexityCounter()));
-        obj.add("method", counterJson(cov.getMethodCounter()));
-        obj.add("class", counterJson(cov.getClassCounter()));
-        return obj;
-    }
-
-    private static JsonObject counterJson(ICounter counter) {
-        var obj = new JsonObject();
-        if (counter == null) return obj;
-        obj.addProperty("coveredCount", counter.getCoveredCount());
-        obj.addProperty("missedCount", counter.getMissedCount());
-        obj.addProperty("totalCount", counter.getTotalCount());
-        addRatio(obj, "coveredRatio", counter.getCoveredRatio());
-        addRatio(obj, "missedRatio", counter.getMissedRatio());
-        obj.addProperty("coverageStatus",
-                statusName(counter.getStatus()));
-        return obj;
-    }
-
-    private static void addRatio(JsonObject obj, String key,
-            double value) {
-        if (Double.isNaN(value)) {
-            obj.add(key, com.google.gson.JsonNull.INSTANCE);
-        } else {
-            obj.addProperty(key, value);
-        }
-    }
-
-    private static String statusName(int status) {
-        return switch (status) {
-            case ICounter.EMPTY -> "EMPTY";
-            case ICounter.NOT_COVERED -> "NOT_COVERED";
-            case ICounter.FULLY_COVERED -> "FULLY_COVERED";
-            case ICounter.PARTLY_COVERED -> "PARTLY_COVERED";
-            default -> "UNKNOWN";
-        };
     }
 
     private static void writeLine(OutputStream out, String json) {

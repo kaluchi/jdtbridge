@@ -79,11 +79,7 @@ final class CoverageTracker
      *  {@code Job.getJobManager().join(CLASSIFY_FAMILY, ...)}. */
     static final Object CLASSIFY_FAMILY = new Object();
 
-    /** Per-{@code coverageId} subscriber list for streaming
-     *  endpoints. Keyed by coverage ID without dump suffix. */
-    private final ConcurrentHashMap<String,
-            java.util.List<CoverageEventListener>> listeners =
-            new ConcurrentHashMap<>();
+    private final CoverageEventBus events = new CoverageEventBus();
 
     /** Streaming-side hook. {@code on*} methods are called
      *  synchronously from the listener thread. Implementations
@@ -97,95 +93,39 @@ final class CoverageTracker
         void onFailed(CoverageRun run, String reason);
     }
 
-    /** Subscribe to events for one {@code coverageId}. Multiple
-     *  subscribers are allowed; remove via
-     *  {@link #removeCoverageListener}. */
     void addCoverageListener(String coverageId,
             CoverageEventListener listener) {
-        listeners.computeIfAbsent(coverageId,
-                k -> new java.util.concurrent.CopyOnWriteArrayList<>())
-                .add(listener);
+        events.subscribe(coverageId, listener);
     }
 
     void removeCoverageListener(String coverageId,
             CoverageEventListener listener) {
-        java.util.List<CoverageEventListener> list =
-                listeners.get(coverageId);
-        if (list != null) {
-            list.remove(listener);
-            if (list.isEmpty()) {
-                listeners.remove(coverageId, list);
-            }
-        }
+        events.unsubscribe(coverageId, listener);
     }
 
     private void fireDumped(CoverageRun run) {
-        java.util.List<CoverageEventListener> list =
-                listeners.get(run.coverageId);
-        if (list == null) return;
         int dumpIndex = run.sessions.size();
         long dumpTimestamp = run.dumpedAt.isEmpty()
                 ? System.currentTimeMillis()
                 : run.dumpedAt.get(run.dumpedAt.size() - 1);
-        for (CoverageEventListener l : list) {
-            try {
-                l.onDumped(run, dumpIndex, dumpTimestamp);
-            } catch (RuntimeException e) {
-                // Don't let one listener break the rest.
-            }
-        }
+        events.fire(run.coverageId,
+                l -> l.onDumped(run, dumpIndex, dumpTimestamp));
     }
 
     private void fireAnalysisLoading(CoverageRun run) {
-        java.util.List<CoverageEventListener> list =
-                listeners.get(run.coverageId);
-        if (list == null) return;
-        for (CoverageEventListener l : list) {
-            try {
-                l.onAnalysisLoading(run);
-            } catch (RuntimeException e) {
-                // ignore
-            }
-        }
+        events.fire(run.coverageId, l -> l.onAnalysisLoading(run));
     }
 
     private void fireAnalysisReady(CoverageRun run) {
-        java.util.List<CoverageEventListener> list =
-                listeners.get(run.coverageId);
-        if (list == null) return;
-        for (CoverageEventListener l : list) {
-            try {
-                l.onAnalysisReady(run);
-            } catch (RuntimeException e) {
-                // ignore
-            }
-        }
+        events.fire(run.coverageId, l -> l.onAnalysisReady(run));
     }
 
     private void fireTerminated(CoverageRun run) {
-        java.util.List<CoverageEventListener> list =
-                listeners.get(run.coverageId);
-        if (list == null) return;
-        for (CoverageEventListener l : list) {
-            try {
-                l.onTerminated(run);
-            } catch (RuntimeException e) {
-                // ignore
-            }
-        }
+        events.fire(run.coverageId, l -> l.onTerminated(run));
     }
 
     private void fireFailed(CoverageRun run, String reason) {
-        java.util.List<CoverageEventListener> list =
-                listeners.get(run.coverageId);
-        if (list == null) return;
-        for (CoverageEventListener l : list) {
-            try {
-                l.onFailed(run, reason);
-            } catch (RuntimeException e) {
-                // ignore
-            }
-        }
+        events.fire(run.coverageId, l -> l.onFailed(run, reason));
     }
 
     /** Per-millisecond collision counter for {@code merged:}/{@code
@@ -253,6 +193,7 @@ final class CoverageTracker
         runs.clear();
         sessionToRunId.clear();
         pending.clear();
+        events.clear();
         activeCoverageId = null;
     }
 
@@ -588,16 +529,8 @@ final class CoverageTracker
     }
 
     private static Long parseLaunchTimestamp(ILaunch launch) {
-        String raw = launch.getAttribute(
-                DebugPlugin.ATTR_LAUNCH_TIMESTAMP);
-        if (raw == null) {
-            return null;
-        }
-        try {
-            return Long.parseLong(raw);
-        } catch (NumberFormatException e) {
-            return null;
-        }
+        return CoverageJson.parseLaunchTimestamp(
+                launch.getAttribute(DebugPlugin.ATTR_LAUNCH_TIMESTAMP));
     }
 
     /** State held while a non-live {@code sessionAdded} waits for
