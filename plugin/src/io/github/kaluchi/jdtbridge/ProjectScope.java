@@ -28,7 +28,7 @@ import org.eclipse.jdt.core.search.SearchEngine;
  * {@link #containsProject(String)}, {@link #containsConfig(ILaunchConfiguration)},
  * {@link #containsLaunch(ILaunch)}.
  */
-class ProjectScope {
+public class ProjectScope {
 
     private static final String ATTR_PROJECT_NAME =
             "org.eclipse.jdt.launching.PROJECT_ATTR";
@@ -36,7 +36,7 @@ class ProjectScope {
             "org.eclipse.jdt.launching.WORKING_DIRECTORY";
 
     /** Default scope — all projects visible, no filtering. */
-    static final ProjectScope ALL = new ProjectScope(null);
+    public static final ProjectScope ALL = new ProjectScope(null);
 
     private final Set<String> projects;
 

@@ -3,6 +3,8 @@ bin/
 !cli/bin/
 node_modules/
 coverage/
+!plugin/src/**/coverage/
+!plugin.tests/src/**/coverage/
 
 # Eclipse IDE
 .settings/

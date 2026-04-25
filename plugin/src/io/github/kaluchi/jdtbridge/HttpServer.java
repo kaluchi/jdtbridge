@@ -39,6 +39,10 @@ public class HttpServer {
             new TestSessionHandler();
     private final TestHandler testHandler =
             new TestHandler();
+    private final io.github.kaluchi.jdtbridge.coverage
+            .CoverageBridge coverageBridge =
+            new io.github.kaluchi.jdtbridge.coverage
+                    .CoverageBridge();
     private final LogHandler logHandler = new LogHandler();
     private final SessionScope sessionScope = new SessionScope();
     private final RequestTracker requestTracker = new RequestTracker();
@@ -637,6 +641,13 @@ public class HttpServer {
                         launch.handleRun(params));
                 case "/launch/stop" -> Response.json(
                         launch.handleStop(params));
+                case "/coverage/run", "/coverage/dump",
+                        "/coverage/refresh", "/coverage/relaunch",
+                        "/coverage/runs", "/coverage/session",
+                        "/coverage/active", "/coverage/activate",
+                        "/coverage/merge", "/coverage/remove" ->
+                        Response.json(coverageBridge.dispatch(
+                                path, params, requestBody, scope));
                 default -> Response.json(jsonError(
                         "Unknown path: " + path));
             };
