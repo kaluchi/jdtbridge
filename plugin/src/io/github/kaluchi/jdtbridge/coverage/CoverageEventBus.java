@@ -53,4 +53,11 @@ final class CoverageEventBus {
     void clear() {
         listeners.clear();
     }
+
+    /** Test/inspection accessor — true when at least one subscriber
+     *  is currently registered for {@code coverageId}. */
+    boolean hasListeners(String coverageId) {
+        List<CoverageEventListener> list = listeners.get(coverageId);
+        return list != null && !list.isEmpty();
+    }
 }

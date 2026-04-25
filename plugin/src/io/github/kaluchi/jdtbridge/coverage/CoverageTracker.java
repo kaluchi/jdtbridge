@@ -82,6 +82,12 @@ final class CoverageTracker
 
     private final CoverageEventBus events = new CoverageEventBus();
 
+    /** Test/inspection accessor — lets tests drive listener
+     *  callbacks without going through real EclEmma listeners. */
+    CoverageEventBus eventBus() {
+        return events;
+    }
+
     /** Streaming-side hook. {@code on*} methods are called
      *  synchronously from the listener thread. Implementations
      *  must be non-blocking and exception-safe. */
