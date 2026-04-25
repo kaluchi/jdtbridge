@@ -418,7 +418,15 @@ final class CoverageTracker
             }
         };
         job.setSystem(true);
-        job.schedule();
+        // 50ms delay: SessionManager.mergeSessions fires
+        // sessionAdded(merged) FIRST, then loops removeSession on
+        // inputs — both inside the same synchronized(lock) block
+        // on the merger thread. The classify worker runs on a
+        // different thread, so a delayless schedule races and may
+        // observe an empty removal burst (→ misclassify as
+        // imported). The delay defers the worker until the
+        // lock-bound dispatch has finished.
+        job.schedule(50);
     }
 
     /** Synchronously finalize every pending classification. Useful
