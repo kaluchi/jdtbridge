@@ -97,20 +97,25 @@ class DiagnosticsHandler {
             scope = root;
         }
 
-        if (clean && buildProject == null) {
-            return HttpServer.jsonError(
-                    "clean requires a specific project"
-                    + " (use 'project' param)");
-        }
-
         scope.refreshLocal(IResource.DEPTH_INFINITE, null);
         JdtUtils.joinAutoBuild();
 
-        if (clean) {
+        // Project > Clean dialog default = "Build immediately after
+        // the clean": CLEAN_BUILD discards state, then FULL_BUILD
+        // recompiles. CLEAN_BUILD on its own only deletes derived
+        // resources and leaves the workspace uncompiled.
+        if (clean && buildProject != null) {
             buildProject.build(
                     IncrementalProjectBuilder.CLEAN_BUILD,
                     null);
             buildProject.build(
+                    IncrementalProjectBuilder.FULL_BUILD,
+                    null);
+        } else if (clean) {
+            ResourcesPlugin.getWorkspace().build(
+                    IncrementalProjectBuilder.CLEAN_BUILD,
+                    null);
+            ResourcesPlugin.getWorkspace().build(
                     IncrementalProjectBuilder.FULL_BUILD,
                     null);
         } else if (buildProject != null) {
