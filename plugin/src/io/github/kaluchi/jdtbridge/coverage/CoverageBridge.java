@@ -73,6 +73,27 @@ public class CoverageBridge {
                 path, params, body, scope);
     }
 
+    /** {@code GET /coverage/session/stream} — write JSONL events
+     *  to {@code out}. Bypasses {@link #dispatch} because the HTTP
+     *  layer streams directly to the socket. */
+    public void streamSession(java.io.OutputStream out,
+            String coverageId) {
+        if (!AVAILABLE) {
+            try {
+                out.write(notInstalledError().getBytes(
+                        java.nio.charset.StandardCharsets.UTF_8));
+                out.write('\n');
+                out.flush();
+            } catch (java.io.IOException e) {
+                // peer gone — nothing to do
+            }
+            return;
+        }
+        CoverageRouter r = (CoverageRouter) router();
+        CoverageProgressStreamer.stream(out, coverageId,
+                r.tracker());
+    }
+
     private synchronized Object router() {
         if (router == null) {
             router = new CoverageRouter();

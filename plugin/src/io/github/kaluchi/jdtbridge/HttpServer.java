@@ -280,6 +280,10 @@ public class HttpServer {
                 handleTestStatusStream(socket, params);
                 return;
             }
+            if ("/coverage/session/stream".equals(path)) {
+                handleCoverageSessionStream(socket, params);
+                return;
+            }
 
             // Telemetry — POST enqueues, GET drains
             if ("/telemetry".equals(path)) {
@@ -480,6 +484,35 @@ public class HttpServer {
         } catch (IOException
                 | TestProgressStreamer.StreamClosedException e) {
             // Client disconnected — normal for Ctrl+C
+        }
+    }
+
+    /** Streaming /coverage/session/stream — bypasses dispatch,
+     *  delegates to CoverageBridge through the same guard pattern
+     *  as other /coverage/* routes. */
+    private void handleCoverageSessionStream(Socket socket,
+            Map<String, String> params) {
+        String coverageId = params.get("coverageId");
+        if (coverageId == null || coverageId.isBlank()) {
+            try { sendError(socket, 400, "Missing coverageId"); }
+            catch (IOException e) { /* ignore */ }
+            return;
+        }
+        try {
+            socket.setSoTimeout(0);
+            OutputStream out = socket.getOutputStream();
+            out.write(("HTTP/1.1 200 OK\r\n"
+                    + "Content-Type: application/x-ndjson;"
+                    + " charset=utf-8\r\n"
+                    + "Connection: close\r\n"
+                    + "Cache-Control: no-cache\r\n\r\n")
+                    .getBytes(StandardCharsets.UTF_8));
+            coverageBridge.streamSession(out, coverageId);
+        } catch (IOException
+                | io.github.kaluchi.jdtbridge.coverage
+                        .CoverageProgressStreamer
+                        .StreamClosedException e) {
+            // Client disconnected — normal.
         }
     }
 

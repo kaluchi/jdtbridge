@@ -79,6 +79,101 @@ final class CoverageTracker
      *  {@code Job.getJobManager().join(CLASSIFY_FAMILY, ...)}. */
     static final Object CLASSIFY_FAMILY = new Object();
 
+    /** Per-{@code coverageId} subscriber list for streaming
+     *  endpoints. Keyed by coverage ID without dump suffix. */
+    private final ConcurrentHashMap<String,
+            java.util.List<CoverageEventListener>> listeners =
+            new ConcurrentHashMap<>();
+
+    /** Streaming-side hook. {@code on*} methods are called
+     *  synchronously from the listener thread. Implementations
+     *  must be non-blocking and exception-safe. */
+    interface CoverageEventListener {
+        void onDumped(CoverageRun run, int dumpIndex,
+                long dumpTimestamp);
+        void onAnalysisLoading(CoverageRun run);
+        void onAnalysisReady(CoverageRun run);
+        void onTerminated(CoverageRun run);
+    }
+
+    /** Subscribe to events for one {@code coverageId}. Multiple
+     *  subscribers are allowed; remove via
+     *  {@link #removeCoverageListener}. */
+    void addCoverageListener(String coverageId,
+            CoverageEventListener listener) {
+        listeners.computeIfAbsent(coverageId,
+                k -> new java.util.concurrent.CopyOnWriteArrayList<>())
+                .add(listener);
+    }
+
+    void removeCoverageListener(String coverageId,
+            CoverageEventListener listener) {
+        java.util.List<CoverageEventListener> list =
+                listeners.get(coverageId);
+        if (list != null) {
+            list.remove(listener);
+            if (list.isEmpty()) {
+                listeners.remove(coverageId, list);
+            }
+        }
+    }
+
+    private void fireDumped(CoverageRun run) {
+        java.util.List<CoverageEventListener> list =
+                listeners.get(run.coverageId);
+        if (list == null) return;
+        int dumpIndex = run.sessions.size();
+        long dumpTimestamp = run.dumpedAt.isEmpty()
+                ? System.currentTimeMillis()
+                : run.dumpedAt.get(run.dumpedAt.size() - 1);
+        for (CoverageEventListener l : list) {
+            try {
+                l.onDumped(run, dumpIndex, dumpTimestamp);
+            } catch (RuntimeException e) {
+                // Don't let one listener break the rest.
+            }
+        }
+    }
+
+    private void fireAnalysisLoading(CoverageRun run) {
+        java.util.List<CoverageEventListener> list =
+                listeners.get(run.coverageId);
+        if (list == null) return;
+        for (CoverageEventListener l : list) {
+            try {
+                l.onAnalysisLoading(run);
+            } catch (RuntimeException e) {
+                // ignore
+            }
+        }
+    }
+
+    private void fireAnalysisReady(CoverageRun run) {
+        java.util.List<CoverageEventListener> list =
+                listeners.get(run.coverageId);
+        if (list == null) return;
+        for (CoverageEventListener l : list) {
+            try {
+                l.onAnalysisReady(run);
+            } catch (RuntimeException e) {
+                // ignore
+            }
+        }
+    }
+
+    private void fireTerminated(CoverageRun run) {
+        java.util.List<CoverageEventListener> list =
+                listeners.get(run.coverageId);
+        if (list == null) return;
+        for (CoverageEventListener l : list) {
+            try {
+                l.onTerminated(run);
+            } catch (RuntimeException e) {
+                // ignore
+            }
+        }
+    }
+
     /** Per-millisecond collision counter for {@code merged:}/{@code
      *  imported:} coverage IDs. Bumped when a generated ID was
      *  already issued (i.e. two events landed in the same
@@ -208,6 +303,7 @@ final class CoverageTracker
                     if (run.terminatedAt == null) {
                         run.terminatedAt = now;
                     }
+                    fireTerminated(run);
                 }
             }
         }
@@ -356,6 +452,7 @@ final class CoverageTracker
         run.dataReceived = true;
         run.description = session.getDescription();
         sessionToRunId.put(session, run.coverageId);
+        fireDumped(run);
     }
 
     /** Classify a deferred session once any synchronous
@@ -399,6 +496,9 @@ final class CoverageTracker
         run.dumpedAt.add(now);
         runs.put(coverageId, run);
         sessionToRunId.put(session, coverageId);
+        // For merged/imported runs the kind was just decided here,
+        // so the dump-add fires now (no live launch fired it).
+        fireDumped(run);
         // sessionActivated may have fired BEFORE this deferred
         // classification ran (SessionImporter activates the new
         // session synchronously inside the same dispatch). Adopt
@@ -452,12 +552,14 @@ final class CoverageTracker
         if (coverage == IJavaModelCoverage.LOADING) {
             run.analysisLoading = true;
             run.analysisReady = false;
+            fireAnalysisLoading(run);
         } else if (coverage == null) {
             run.analysisLoading = false;
             run.analysisReady = false;
         } else {
             run.analysisLoading = false;
             run.analysisReady = true;
+            fireAnalysisReady(run);
         }
     }
 
