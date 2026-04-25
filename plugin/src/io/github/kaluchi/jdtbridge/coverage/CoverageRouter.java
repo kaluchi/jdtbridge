@@ -19,6 +19,7 @@ import io.github.kaluchi.jdtbridge.ProjectScope;
 class CoverageRouter {
 
     private final CoverageTracker tracker = new CoverageTracker();
+    private final CoverageHandler handler = new CoverageHandler(tracker);
 
     void start() {
         tracker.start();
@@ -33,13 +34,18 @@ class CoverageRouter {
         return tracker;
     }
 
+    /** Test/inspection accessor. */
+    CoverageHandler handler() {
+        return handler;
+    }
+
     String dispatch(String path, Map<String, String> params,
             String body, ProjectScope scope) {
         return switch (path) {
-            case "/coverage/run" -> notImplemented(path);
-            case "/coverage/dump" -> notImplemented(path);
-            case "/coverage/refresh" -> notImplemented(path);
-            case "/coverage/relaunch" -> notImplemented(path);
+            case "/coverage/run" -> handler.handleRun(params);
+            case "/coverage/dump" -> handler.handleDump(body);
+            case "/coverage/refresh" -> handler.handleRefresh();
+            case "/coverage/relaunch" -> handler.handleRelaunch();
             case "/coverage/runs" -> notImplemented(path);
             case "/coverage/session" -> notImplemented(path);
             case "/coverage/active" -> notImplemented(path);
