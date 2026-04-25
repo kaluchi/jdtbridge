@@ -76,6 +76,46 @@ public class TestRunCoverageFlagTest {
             assertFalse(json.contains("\"coverageId\""),
                     "coverage=false → no coverageId: " + json);
         }
+
+        @Test
+        void coverageEmptyDoesNotEnableCoverage() throws Exception {
+            // Empty value (?coverage=) deliberately does NOT
+            // enable coverage — fix for the empty-string surprise
+            // flagged in PR review.
+            Map<String, String> params = new HashMap<>();
+            params.put("class", "no.such.TestClass");
+            params.put("no-refresh", "");
+            params.put("coverage", "");
+            String json = handler.handleTestRun(params);
+            assertFalse(json.contains("\"coverageId\""),
+                    "coverage='' → no coverageId: " + json);
+            assertFalse(json.contains("\"launchMode\""),
+                    "coverage='' → no launchMode: " + json);
+        }
+
+        @Test
+        void coverageOneEnablesCoverage() throws Exception {
+            // Spec accepts "true" or "1".
+            if (!CoverageTypes.isSupported(
+                    "org.eclipse.jdt.junit.launchconfig")) {
+                return;
+            }
+            org.osgi.framework.Bundle eclemmaUi =
+                    org.eclipse.core.runtime.Platform.getBundle(
+                            "org.eclipse.eclemma.ui");
+            if (eclemmaUi == null
+                    || eclemmaUi.getState()
+                            < org.osgi.framework.Bundle.ACTIVE) {
+                return;
+            }
+            Map<String, String> params = new HashMap<>();
+            params.put("class", "test.edge.SimpleTest");
+            params.put("no-refresh", "");
+            params.put("coverage", "1");
+            String json = handler.handleTestRun(params);
+            assertTrue(json.contains("\"launchMode\":\"coverage\""),
+                    "coverage=1 must enable coverage mode: " + json);
+        }
     }
 
     @Nested

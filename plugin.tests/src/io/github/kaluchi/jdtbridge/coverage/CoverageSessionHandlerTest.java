@@ -338,6 +338,87 @@ public class CoverageSessionHandlerTest {
     }
 
     @Nested
+    class ParseDumpIndex {
+
+        @Test
+        void nullReturnsNull() {
+            assertNull(CoverageSessionHandler.parseDumpIndex(null));
+        }
+
+        @Test
+        void noColonReturnsNull() {
+            assertNull(CoverageSessionHandler.parseDumpIndex("MyTest"));
+        }
+
+        @Test
+        void singleColonNotADumpIndex() {
+            // "MyTest:1700000000000" — bare configId:timestamp,
+            // no dump suffix.
+            assertNull(CoverageSessionHandler.parseDumpIndex(
+                    "MyTest:1700000000000"));
+        }
+
+        @Test
+        void doubleColonReturnsDumpIndex() {
+            assertEquals(2,
+                    (int) CoverageSessionHandler.parseDumpIndex(
+                            "MyTest:1700000000000:2"));
+        }
+
+        @Test
+        void importedHasNoDumpIndex() {
+            assertNull(CoverageSessionHandler.parseDumpIndex(
+                    "imported:1700000000000"));
+        }
+
+        @Test
+        void mergedHasNoDumpIndex() {
+            assertNull(CoverageSessionHandler.parseDumpIndex(
+                    "merged:1700000000000"));
+        }
+
+        @Test
+        void collisionSuffixIsNotDumpIndex() {
+            // "merged:1700000000000#2" — # in suffix, not digits.
+            assertNull(CoverageSessionHandler.parseDumpIndex(
+                    "merged:1700000000000#2"));
+        }
+
+        @Test
+        void colonInConfigIdWithTimestampDoesNotOverflow() {
+            // Regression — fix for PR review: configIds with ':'
+            // produce three-or-more colon ids; the trailing
+            // 13-digit timestamp overflows Integer.parseInt and
+            // used to throw NumberFormatException. Now must
+            // return null gracefully.
+            Integer result = CoverageSessionHandler.parseDumpIndex(
+                    "Foo:Bar:1700000000000");
+            assertNull(result, "13-digit timestamp must NOT be"
+                    + " interpreted as a dump index: got "
+                    + result);
+        }
+
+        @Test
+        void colonInConfigIdWithRealDumpIndexResolves() {
+            // "Foo:Bar:1700000000000:3" — three-colon id with a
+            // small int tail. The current heuristic (last colon
+            // tail must be parseable) treats the last segment as
+            // the dump index. This is best-effort given the
+            // ambiguity introduced by ':' in configIds; documented.
+            assertEquals(3,
+                    (int) CoverageSessionHandler.parseDumpIndex(
+                            "Foo:Bar:1700000000000:3"));
+        }
+
+        @Test
+        void zeroIsNotAValidDumpIndex() {
+            // Dump indices are 1-based.
+            assertNull(CoverageSessionHandler.parseDumpIndex(
+                    "MyTest:1700000000000:0"));
+        }
+    }
+
+    @Nested
     class HandleRemove {
 
         @Test

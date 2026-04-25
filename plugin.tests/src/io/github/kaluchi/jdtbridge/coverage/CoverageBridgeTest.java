@@ -47,6 +47,35 @@ public class CoverageBridgeTest {
     }
 
     @Nested
+    class StreamNotInstalledEvent {
+
+        @Test
+        void usesEventFailedShape() {
+            String json = CoverageBridge.streamNotInstalledEvent();
+            var obj = JsonParser.parseString(json).getAsJsonObject();
+            assertEquals("failed",
+                    obj.get("event").getAsString());
+            assertEquals("coverage-not-installed",
+                    obj.get("reason").getAsString());
+        }
+
+        @Test
+        void doesNotUseDispatchErrorShape() {
+            // Dispatch errors use {"error":"...","message":"..."};
+            // stream events use {"event":"failed","reason":"..."}.
+            // Stream consumers parse by event field — the dispatch
+            // shape would be invisible to them.
+            String json = CoverageBridge.streamNotInstalledEvent();
+            var obj = JsonParser.parseString(json).getAsJsonObject();
+            assertTrue(obj.has("event"),
+                    "Stream error must carry event field: " + json);
+            assertTrue(!obj.has("error"),
+                    "Stream error must NOT use dispatch shape: "
+                            + json);
+        }
+    }
+
+    @Nested
     class IsAvailable {
 
         // The test runtime imports EclEmma as resolution:=optional;

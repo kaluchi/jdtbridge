@@ -80,7 +80,7 @@ public class CoverageBridge {
             String coverageId) {
         if (!AVAILABLE) {
             try {
-                out.write(notInstalledError().getBytes(
+                out.write(streamNotInstalledEvent().getBytes(
                         java.nio.charset.StandardCharsets.UTF_8));
                 out.write('\n');
                 out.flush();
@@ -92,6 +92,17 @@ public class CoverageBridge {
         CoverageRouter r = (CoverageRouter) router();
         CoverageProgressStreamer.stream(out, coverageId,
                 r.tracker());
+    }
+
+    /** JSONL line emitted by {@link #streamSession} when EclEmma
+     *  is absent — uses the {@code event}/{@code reason} shape
+     *  consumers of {@code /coverage/session/stream} expect, so
+     *  parsers don't have to special-case the not-installed path. */
+    static String streamNotInstalledEvent() {
+        var obj = new JsonObject();
+        obj.addProperty("event", "failed");
+        obj.addProperty("reason", "coverage-not-installed");
+        return obj.toString();
     }
 
     private synchronized Object router() {

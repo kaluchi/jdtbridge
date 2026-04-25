@@ -1,6 +1,8 @@
 package io.github.kaluchi.jdtbridge;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import io.github.kaluchi.jdtbridge.coverage.CoverageTypes;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IPath;
@@ -230,15 +232,13 @@ public class TestHandler {
 
         if (coverage) {
             String typeId = pl.config().getType().getIdentifier();
-            if (!io.github.kaluchi.jdtbridge.coverage
-                    .CoverageTypes.isSupported(typeId)) {
+            if (!CoverageTypes.isSupported(typeId)) {
                 return coverageModeNotSupported(typeId);
             }
         }
 
         String launchMode = coverage
-                ? io.github.kaluchi.jdtbridge.coverage
-                        .CoverageTypes.LAUNCH_MODE
+                ? CoverageTypes.LAUNCH_MODE
                 : ILaunchManager.RUN_MODE;
         ILaunch launch = pl.config().launch(launchMode,
                 new NullProgressMonitor(), true);
@@ -273,17 +273,20 @@ public class TestHandler {
         if (coverage) {
             response.addProperty("coverageId", testRunId);
             response.addProperty("launchMode",
-                    io.github.kaluchi.jdtbridge.coverage
-                            .CoverageTypes.LAUNCH_MODE);
+                    CoverageTypes.LAUNCH_MODE);
         }
 
         return response.toString();
     }
 
+    /** Strict {@code true} parse: accepts {@code "true"}
+     *  (case-insensitive) and {@code "1"} only. The CLI always
+     *  sends {@code coverage=true}, so empty-string ambiguity
+     *  ({@code ?coverage=}) deliberately does NOT enable
+     *  coverage — clients that forgot the value get the
+     *  no-coverage path. */
     private static boolean parseBool(String raw) {
-        return "true".equalsIgnoreCase(raw)
-                || "1".equals(raw)
-                || (raw != null && raw.isEmpty());
+        return "true".equalsIgnoreCase(raw) || "1".equals(raw);
     }
 
     private static String coverageModeNotSupported(String typeId) {
@@ -292,10 +295,8 @@ public class TestHandler {
         obj.addProperty("message",
                 "Launch type does not support coverage mode: "
                         + typeId);
-        var arr = new com.google.gson.JsonArray();
-        for (String supported
-                : io.github.kaluchi.jdtbridge.coverage
-                        .CoverageTypes.supported()) {
+        var arr = new JsonArray();
+        for (String supported : CoverageTypes.supported()) {
             arr.add(supported);
         }
         obj.add("supportedTypeIds", arr);

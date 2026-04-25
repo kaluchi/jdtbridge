@@ -418,15 +418,7 @@ final class CoverageTracker
             }
         };
         job.setSystem(true);
-        // 50ms delay: SessionManager.mergeSessions fires
-        // sessionAdded(merged) FIRST, then loops removeSession on
-        // inputs — both inside the same synchronized(lock) block
-        // on the merger thread. The classify worker runs on a
-        // different thread, so a delayless schedule races and may
-        // observe an empty removal burst (→ misclassify as
-        // imported). The delay defers the worker until the
-        // lock-bound dispatch has finished.
-        job.schedule(50);
+        job.schedule();
     }
 
     /** Synchronously finalize every pending classification. Useful
@@ -467,6 +459,16 @@ final class CoverageTracker
      *  {@code sessionRemoved} burst has had a chance to populate
      *  {@link PendingClassification#removedCoverageIds}. Idempotent. */
     private IStatus finalizePending(ICoverageSession session) {
+        // Lock barrier: SessionManager.getSessions() synchronizes
+        // on the same lock that the merger thread holds across the
+        // sessionAdded(merged) → N×removeSession(input) dispatch.
+        // This call blocks until that lock is released, so by the
+        // time we read pending.removedCoverageIds below the
+        // listener callbacks have already populated it. Determinism
+        // via lock acquisition replaces the earlier 50ms delay.
+        // No-op when called from the merger thread (reentrant).
+        CoverageTools.getSessionManager().getSessions();
+
         PendingClassification pc = pending.remove(session);
         if (pc == null) {
             return Status.OK_STATUS;

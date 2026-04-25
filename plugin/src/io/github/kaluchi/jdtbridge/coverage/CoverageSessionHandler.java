@@ -412,7 +412,9 @@ class CoverageSessionHandler {
         return null;
     }
 
-    private static Integer parseDumpIndex(String coverageId) {
+    /** Package-private for unit tests of the colon-in-configId
+     *  edge cases. */
+    static Integer parseDumpIndex(String coverageId) {
         if (coverageId == null) return null;
         int colon = coverageId.lastIndexOf(':');
         if (colon < 0) return null;
@@ -425,7 +427,24 @@ class CoverageSessionHandler {
         if (prefix.indexOf(':') < 0) {
             return null;
         }
-        return Integer.parseInt(tail);
+        // Configurations with ':' in the name produce three-or-more
+        // colon ids whose tail is the launchTimestamp (13-digit
+        // millis), not a dump index. Parse via Long with explicit
+        // range guard so a timestamp doesn't overflow Integer and
+        // throw NumberFormatException — and is rejected outright as
+        // not a real dump index. A real dump count is bounded by
+        // the number of requestDump calls in one launch (single /
+        // double digits in practice; cap at MAX_INT to be safe).
+        long parsed;
+        try {
+            parsed = Long.parseLong(tail);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+        if (parsed < 1 || parsed > Integer.MAX_VALUE) {
+            return null;
+        }
+        return (int) parsed;
     }
 
     private static void addNullableString(JsonObject obj,
