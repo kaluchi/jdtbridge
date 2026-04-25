@@ -184,7 +184,7 @@ Add \`-q\` to suppress this guide.`;
  * Returns exit code: 0 if all pass, 1 if any failures.
  */
 export async function followTestStream(testRunId, args) {
-  const { getStreamLines } = await import("../client.mjs");
+  const { followJsonlStream } = await import("./stream.mjs");
   const jsonFlag = args.includes("--json");
 
   let filter = "failures";
@@ -193,38 +193,18 @@ export async function followTestStream(testRunId, args) {
 
   const url = `/test/status/stream?testRunId=${encodeURIComponent(testRunId)}&filter=${filter}`;
 
-  let detached = false;
-  const onSigint = () => {
-    detached = true;
-    process.stdout.write("\n");
-    process.exit(0);
-  };
-  process.on("SIGINT", onSigint);
-
   let hasFailed = false;
-  try {
-    await getStreamLines(url, (line) => {
-      if (jsonFlag) {
-        console.log(line);
-      } else {
-        formatTestEvent(line);
+  const exit = await followJsonlStream(url, (line) => {
+    if (jsonFlag) console.log(line);
+    else formatTestEvent(line);
+    try {
+      const ev = JSON.parse(line);
+      if (ev.event === "finished"
+          && (ev.failed > 0 || ev.errors > 0)) {
+        hasFailed = true;
       }
-      try {
-        const ev = JSON.parse(line);
-        if (ev.event === "finished"
-            && (ev.failed > 0 || ev.errors > 0)) {
-          hasFailed = true;
-        }
-      } catch { /* ignore parse errors */ }
-    });
-  } catch (e) {
-    if (!detached) {
-      console.error(e.message);
-      return 1;
-    }
-    return 0;
-  } finally {
-    process.removeListener("SIGINT", onSigint);
-  }
+    } catch { /* ignore parse errors */ }
+  });
+  if (exit !== 0) return exit;
   return hasFailed ? 1 : 0;
 }

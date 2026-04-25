@@ -202,31 +202,11 @@ function formatTime(millis) {
  * Returns 0 on clean exit, 1 on error.
  */
 export async function followCoverageStream(coverageId, args) {
-  const { getStreamLines } = await import("../client.mjs");
+  const { followJsonlStream } = await import("./stream.mjs");
   const jsonFlag = args.includes("--json");
   const url = `/coverage/session/stream?coverageId=${encodeURIComponent(coverageId)}`;
-
-  let detached = false;
-  const onSigint = () => {
-    detached = true;
-    process.stdout.write("\n");
-    process.exit(0);
-  };
-  process.on("SIGINT", onSigint);
-
-  try {
-    await getStreamLines(url, (line) => {
-      if (jsonFlag) console.log(line);
-      else formatStreamEvent(line);
-    });
-  } catch (e) {
-    if (!detached) {
-      console.error(e.message);
-      return 1;
-    }
-    return 0;
-  } finally {
-    process.removeListener("SIGINT", onSigint);
-  }
-  return 0;
+  return followJsonlStream(url, (line) => {
+    if (jsonFlag) console.log(line);
+    else formatStreamEvent(line);
+  });
 }
