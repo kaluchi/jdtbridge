@@ -55,6 +55,8 @@ final class CoverageTracker
         implements ISessionListener, ILaunchesListener2,
                    IJavaCoverageListener {
 
+    private final CoverageAnalyzer analyzer;
+
     private final ConcurrentHashMap<String, CoverageRun> runs =
             new ConcurrentHashMap<>();
 
@@ -85,6 +87,18 @@ final class CoverageTracker
 
     private volatile String activeCoverageId;
     private volatile boolean started;
+
+    /** Production wiring — creates a fresh, dedicated
+     *  {@link CoverageAnalyzer} for cache invalidation. */
+    CoverageTracker() {
+        this(new CoverageAnalyzer());
+    }
+
+    /** Test/router wiring — pass an explicit analyzer so the
+     *  invalidation hook is observable. */
+    CoverageTracker(CoverageAnalyzer analyzer) {
+        this.analyzer = analyzer;
+    }
 
     void start() {
         if (started) {
@@ -248,6 +262,7 @@ final class CoverageTracker
 
     @Override
     public void sessionRemoved(ICoverageSession session) {
+        analyzer.invalidate(session);
         String coverageId = sessionToRunId.remove(session);
         if (coverageId != null) {
             CoverageRun run = runs.get(coverageId);

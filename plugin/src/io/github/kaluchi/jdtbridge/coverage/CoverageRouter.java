@@ -18,7 +18,8 @@ import io.github.kaluchi.jdtbridge.ProjectScope;
  */
 class CoverageRouter {
 
-    private final CoverageTracker tracker = new CoverageTracker();
+    private final CoverageAnalyzer analyzer = new CoverageAnalyzer();
+    private final CoverageTracker tracker = new CoverageTracker(analyzer);
     private final CoverageHandler handler = new CoverageHandler(tracker);
 
     void start() {
@@ -27,6 +28,7 @@ class CoverageRouter {
 
     void stop() {
         tracker.stop();
+        analyzer.clear();
     }
 
     /** Test/inspection accessor. */
@@ -37,6 +39,11 @@ class CoverageRouter {
     /** Test/inspection accessor. */
     CoverageHandler handler() {
         return handler;
+    }
+
+    /** Test/inspection accessor. */
+    CoverageAnalyzer analyzer() {
+        return analyzer;
     }
 
     String dispatch(String path, Map<String, String> params,
