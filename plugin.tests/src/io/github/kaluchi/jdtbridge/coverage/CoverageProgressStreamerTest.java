@@ -465,21 +465,24 @@ public class CoverageProgressStreamerTest {
     }
 
     private void awaitAnalysisSettled(String coverageId) {
-        long deadline = System.currentTimeMillis() + 5_000;
+        // 30s — empty-data analysis is sub-millisecond locally, but
+        // CI runners can stall the EclEmma LoadSessionJob behind
+        // other jobs in the manager queue.
+        long deadline = System.currentTimeMillis() + 30_000;
         while (System.currentTimeMillis() < deadline) {
             CoverageRun run = tracker.byCoverageId(coverageId);
             if (run == null || !run.analysisLoading) {
                 return;
             }
             try {
-                Thread.sleep(1);
+                Thread.sleep(10);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return;
             }
         }
         throw new AssertionError(
-                "LoadSessionJob did not settle within 5s for "
+                "LoadSessionJob did not settle within 30s for "
                         + coverageId);
     }
 
