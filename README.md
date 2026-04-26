@@ -38,19 +38,9 @@ jdt q '"com.example.web.OrderController" | @members * /fqn'
 # Failures shown immediately — no waiting for full suite to finish.
 jdt test run com.example.service.OrderServiceTest -f
 
-# Code coverage via the EclEmma plugin (when installed):
-# launch in coverage mode, list active sessions, dump on demand.
-jdt coverage run my-server
-jdt coverage runs
-jdt coverage status MyTest:1700000000000 -f
-jdt coverage dump MyTest:1700000000000 --reset
-jdt coverage refresh
-jdt coverage relaunch
-jdt coverage active
-jdt coverage activate MyTest:1700000000000
-jdt coverage merge MyTest:1700000000000 OtherTest:1700000000050
-jdt coverage remove --all
-jdt coverage stop MyTest:1700000000000
+# Code coverage via EclEmma — launch in coverage mode and
+# stream session progress as classes get analyzed.
+jdt coverage run my-server -f
 ```
 
 ## Getting started
