@@ -36,6 +36,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import io.github.kaluchi.jdtbridge.ProjectScope;
+import io.github.kaluchi.jdtbridge.TestFixture;
 
 /**
  * Tests for {@link CoverageSessionHandler}. Drives state through
@@ -258,6 +259,78 @@ public class CoverageSessionHandlerTest {
                     .get("coverageStatus").getAsString();
             // Empty execution data → EMPTY status from JaCoCo.
             assertEquals("EMPTY", status);
+        }
+    }
+
+    @Nested
+    class HandleNode {
+
+        @BeforeEach
+        void seedFixture() throws Exception {
+            // Need a real workspace type to test the
+            // resolvable-fqn → no-data-for-element path; the
+            // imported empty session has no scope, so even with
+            // the type present getCoverageFor returns null.
+            TestFixture.create();
+        }
+
+        @Test
+        void missingCoverageIdReturnsNotFound() {
+            JsonObject obj = parseObj(
+                    handler.handleNode(Map.of()));
+            assertEquals("coverage-not-found",
+                    obj.get("error").getAsString());
+        }
+
+        @Test
+        void missingFqnReturnsFqnUnresolved() {
+            String coverageId = importAndAwait("node-no-fqn");
+            JsonObject obj = parseObj(handler.handleNode(
+                    Map.of("coverageId", coverageId)));
+            assertEquals("coverage-fqn-unresolved",
+                    obj.get("error").getAsString());
+        }
+
+        @Test
+        void unknownCoverageIdReturnsNotFound() {
+            JsonObject obj = parseObj(handler.handleNode(Map.of(
+                    "coverageId", "Bogus:9999",
+                    "fqn", "anything")));
+            assertEquals("coverage-not-found",
+                    obj.get("error").getAsString());
+        }
+
+        @Test
+        void unresolvableFqnReturnsFqnUnresolved() {
+            String coverageId = importAndAwait("node-bad-fqn");
+            JsonObject obj = parseObj(handler.handleNode(Map.of(
+                    "coverageId", coverageId,
+                    "fqn", "no.such.Type")));
+            assertEquals("coverage-fqn-unresolved",
+                    obj.get("error").getAsString());
+        }
+
+        @Test
+        void resolvableFqnOutsideScopeReturnsNoDataForElement() {
+            // The imported empty-scope session has no projects in
+            // modelCoverage; the fixture type resolves but
+            // getCoverageFor returns null.
+            String coverageId = importAndAwait("node-no-data");
+            JsonObject obj = parseObj(handler.handleNode(Map.of(
+                    "coverageId", coverageId,
+                    "fqn", "test.model.Animal")));
+            assertEquals("coverage-no-data-for-element",
+                    obj.get("error").getAsString());
+        }
+
+        @Test
+        void unknownDumpSuffixReturnsDumpNotFound() {
+            String coverageId = importAndAwait("node-dump");
+            JsonObject obj = parseObj(handler.handleNode(Map.of(
+                    "coverageId", coverageId + ":99",
+                    "fqn", "test.model.Animal")));
+            assertEquals("coverage-dump-not-found",
+                    obj.get("error").getAsString());
         }
     }
 

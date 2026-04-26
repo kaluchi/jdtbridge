@@ -12,11 +12,18 @@ import org.eclipse.eclemma.core.CoverageTools;
 import org.eclipse.eclemma.core.ICoverageSession;
 import org.eclipse.eclemma.core.ISessionManager;
 import org.eclipse.eclemma.core.analysis.IJavaModelCoverage;
+import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
+import org.eclipse.jdt.core.JavaModelException;
 import org.jacoco.core.analysis.CoverageNodeImpl;
+import org.jacoco.core.analysis.ICounter;
 import org.jacoco.core.analysis.ICoverageNode;
+import org.jacoco.core.analysis.ILine;
+import org.jacoco.core.analysis.ISourceNode;
 import org.jacoco.core.data.SessionInfo;
+
+import io.github.kaluchi.jdtbridge.JdtUtils;
 
 import static io.github.kaluchi.jdtbridge.coverage.CoverageJson.addNullableLong;
 import static io.github.kaluchi.jdtbridge.coverage.CoverageJson.addNullableString;
@@ -114,16 +121,10 @@ class CoverageSessionHandler {
     }
 
     /**
-     * Aggregate per-project counters into a single session-level
-     * coverage node. EclEmma's
-     * {@link org.eclipse.eclemma.internal.core.analysis.JavaModelCoverage#putFragmentRoot}
-     * increments only the child project node
-     * ({@code getProjectCoverage(...).increment(coverage)}); the
-     * root {@link IJavaModelCoverage} itself is never incremented
-     * and its counters stay at zero. Eclipse's Coverage View
-     * sidesteps this by rendering project / fragment-root / package
-     * children directly, never the root. The wire format must
-     * aggregate to give the client session totals.
+     * Sum per-project child counters into a session-level
+     * {@link CoverageNodeImpl}. Iterates {@code model.getProjects()},
+     * folds {@code getCoverageFor(project)} into the result via
+     * {@link CoverageNodeImpl#increment(ICoverageNode)}.
      */
     static ICoverageNode aggregateProjectCounters(
             IJavaModelCoverage model) {
@@ -139,6 +140,133 @@ class CoverageSessionHandler {
             }
         }
         return agg;
+    }
+
+    /**
+     * {@code GET /coverage/node?coverageId=...&fqn=...} — point
+     * lookup of one element's raw coverage. Resolves {@code fqn}
+     * via {@link JdtUtils#resolveElement} → {@link IJavaElement},
+     * then asks the cached {@link IJavaModelCoverage} for that
+     * element's {@link ICoverageNode}. The response is the raw
+     * counters plus, for {@link ISourceNode} subtypes (type /
+     * method / source-file), the per-line breakdown — no
+     * aggregation, no derived flags, no synthesis.
+     */
+    String handleNode(Map<String, String> params) {
+        String coverageId = params.get("coverageId");
+        if (coverageId == null || coverageId.isBlank()) {
+            return error("coverage-not-found",
+                    "Missing 'coverageId' parameter");
+        }
+        String fqn = params.get("fqn");
+        if (fqn == null || fqn.isBlank()) {
+            return error("coverage-fqn-unresolved",
+                    "Missing 'fqn' parameter");
+        }
+        CoverageRun run = tracker.byCoverageId(coverageId);
+        if (run == null) {
+            return error("coverage-not-found", coverageId);
+        }
+        Integer dumpIndex = parseDumpIndex(coverageId);
+        ICoverageSession session = run.resolveSession(dumpIndex);
+        if (session == null) {
+            return error(dumpIndex != null
+                    ? "coverage-dump-not-found"
+                    : "coverage-not-found", coverageId);
+        }
+        IJavaElement element;
+        try {
+            element = JdtUtils.resolveElement(fqn);
+        } catch (JavaModelException e) {
+            return error("coverage-fqn-unresolved",
+                    fqn + ": " + e.getMessage());
+        }
+        if (element == null) {
+            return error("coverage-fqn-unresolved", fqn);
+        }
+        CoverageAnalyzer.CachedAnalysis ca;
+        try {
+            ca = analyzer.ensureAnalyzed(session);
+        } catch (CoreException e) {
+            return error("coverage-analysis-failed",
+                    e.getMessage());
+        }
+        ICoverageNode node = ca.modelCoverage.getCoverageFor(element);
+        if (node == null) {
+            return error("coverage-no-data-for-element",
+                    fqn + " (kind=" + elementKind(element) + ")");
+        }
+        var obj = new JsonObject();
+        obj.addProperty("coverageId", coverageId);
+        obj.addProperty("fqn", fqn);
+        obj.addProperty("elementKind", elementKind(element));
+        obj.addProperty("elementType",
+                node.getElementType().name());
+        obj.add("counters", countersOf(node));
+        if (node instanceof ISourceNode src) {
+            obj.add("lines", linesJson(src));
+        }
+        return obj.toString();
+    }
+
+    /** Per-line breakdown for an {@link ISourceNode}. Iterates
+     *  {@code [firstLine, lastLine]}, skips lines with status
+     *  {@link ICounter#EMPTY}, and emits one entry per non-empty
+     *  line carrying the line's status plus its instruction and
+     *  branch counter values. No collapsing into ranges, no
+     *  classification into covered/missed buckets — that is the
+     *  client's job. */
+    private static JsonObject linesJson(ISourceNode src) {
+        var obj = new JsonObject();
+        int first = src.getFirstLine();
+        int last = src.getLastLine();
+        obj.addProperty("firstLine", first);
+        obj.addProperty("lastLine", last);
+        var entries = new JsonArray();
+        if (first != ISourceNode.UNKNOWN_LINE) {
+            for (int i = first; i <= last; i++) {
+                ILine line = src.getLine(i);
+                if (line.getStatus() == ICounter.EMPTY) {
+                    continue;
+                }
+                var entry = new JsonObject();
+                entry.addProperty("line", i);
+                entry.addProperty("status",
+                        CoverageJson.statusName(line.getStatus()));
+                ICounter ic = line.getInstructionCounter();
+                entry.addProperty("instructionCovered",
+                        ic.getCoveredCount());
+                entry.addProperty("instructionMissed",
+                        ic.getMissedCount());
+                ICounter bc = line.getBranchCounter();
+                entry.addProperty("branchCovered",
+                        bc.getCoveredCount());
+                entry.addProperty("branchMissed",
+                        bc.getMissedCount());
+                entries.add(entry);
+            }
+        }
+        obj.add("entries", entries);
+        return obj;
+    }
+
+    /** {@link IJavaElement#getElementType()} → wire kebab token.
+     *  Mirrors the {@code :kind} keyword the {@code :jdt/graph}
+     *  axes already use, so a graph-side {@code /kind} projection
+     *  joins cleanly with the coverage-side {@code /elementKind}. */
+    private static String elementKind(IJavaElement element) {
+        return switch (element.getElementType()) {
+            case IJavaElement.JAVA_PROJECT -> "project";
+            case IJavaElement.PACKAGE_FRAGMENT_ROOT ->
+                    "packageFragmentRoot";
+            case IJavaElement.PACKAGE_FRAGMENT -> "package";
+            case IJavaElement.TYPE -> "type";
+            case IJavaElement.METHOD -> "method";
+            case IJavaElement.FIELD -> "field";
+            case IJavaElement.COMPILATION_UNIT -> "file";
+            case IJavaElement.CLASS_FILE -> "classFile";
+            default -> "other";
+        };
     }
 
     /** {@code GET /coverage/active} — id of the active session,
