@@ -3,7 +3,9 @@ package io.github.kaluchi.jdtbridge;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.ResourcesPlugin;
+import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.jdt.core.ICompilationUnit;
@@ -12,6 +14,8 @@ import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IMember;
 import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.IPackageFragment;
+import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.IParent;
 import org.eclipse.jdt.core.ITypeHierarchy;
 import org.eclipse.jdt.core.IType;
@@ -218,11 +222,82 @@ public class JdtUtils {
     private static IJavaElement resolveRegular(String fqn)
             throws JavaModelException {
         int hash = fqn.indexOf('#');
-        if (hash < 0) return findTypeRaw(fqn);
+        if (hash < 0) return resolveContainerOrType(fqn);
         IType declaring = findTypeRaw(fqn.substring(0, hash));
         if (declaring == null) return null;
         return resolveMemberInType(
                 declaring, fqn.substring(hash + 1));
+    }
+
+    /**
+     * Hash-less fqn → workspace element. Probes in priority order:
+     * <ol>
+     *   <li>type ({@code pkg.Class}) — most common, kept first</li>
+     *   <li>project (workspace name)</li>
+     *   <li>package fragment (across all projects' source roots)</li>
+     *   <li>file (absolute filesystem path → {@link ICompilationUnit}
+     *       or class file)</li>
+     * </ol>
+     * Returns {@code null} when none match.
+     */
+    private static IJavaElement resolveContainerOrType(String fqn)
+            throws JavaModelException {
+        if (fqn.isEmpty()) return null;
+
+        IType type = findTypeRaw(fqn);
+        if (type != null) return type;
+
+        var workspaceRoot =
+                ResourcesPlugin.getWorkspace().getRoot();
+        var model = JavaCore.create(workspaceRoot);
+
+        if (isValidProjectName(fqn)) {
+            IJavaProject project = model.getJavaProject(fqn);
+            if (project != null && project.exists()) return project;
+        }
+
+        for (IJavaProject p : model.getJavaProjects()) {
+            for (IPackageFragmentRoot root
+                    : p.getPackageFragmentRoots()) {
+                IPackageFragment pkg = root.getPackageFragment(fqn);
+                if (pkg != null && pkg.exists()) return pkg;
+            }
+        }
+
+        if (looksLikeFilePath(fqn)) {
+            IPath path = IPath.fromOSString(fqn);
+            IFile file = workspaceRoot.getFileForLocation(path);
+            if (file != null && file.exists()) {
+                IJavaElement el = JavaCore.create(file);
+                if (el != null) return el;
+            }
+        }
+
+        return null;
+    }
+
+    /** {@link org.eclipse.core.resources.IWorkspaceRoot#getProject}
+     *  requires a single-segment name (no separators); guards the
+     *  {@link org.eclipse.jdt.core.IJavaModel#getJavaProject} call
+     *  which would otherwise throw {@link IllegalArgumentException}
+     *  on a path-shaped fqn. */
+    private static boolean isValidProjectName(String name) {
+        return name.indexOf('/') < 0 && name.indexOf('\\') < 0;
+    }
+
+    /** Heuristic to decide whether {@code fqn} is an absolute
+     *  filesystem path (and therefore a candidate for
+     *  {@link ICompilationUnit} / class-file resolution). Matches
+     *  Windows drive letters ({@code D:\…}, {@code D:/…}) and POSIX
+     *  absolute paths ({@code /…}). Plain dotted names — types,
+     *  packages, projects — never qualify. */
+    private static boolean looksLikeFilePath(String fqn) {
+        if (fqn.isEmpty()) return false;
+        char first = fqn.charAt(0);
+        if (first == '/' || first == '\\') return true;
+        return fqn.length() >= 3
+                && fqn.charAt(1) == ':'
+                && (fqn.charAt(2) == '/' || fqn.charAt(2) == '\\');
     }
 
     /** Plain {@link IJavaProject#findType} walk across open projects. */
