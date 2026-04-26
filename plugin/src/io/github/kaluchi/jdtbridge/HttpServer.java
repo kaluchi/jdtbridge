@@ -679,6 +679,7 @@ public class HttpServer {
                 case "/coverage/run", "/coverage/dump",
                         "/coverage/refresh", "/coverage/relaunch",
                         "/coverage/runs", "/coverage/session",
+                        "/coverage/node",
                         "/coverage/active", "/coverage/activate",
                         "/coverage/merge", "/coverage/remove" ->
                         Response.json(coverageBridge.dispatch(
