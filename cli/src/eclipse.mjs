@@ -1,7 +1,10 @@
 // Eclipse management — discovery, lifecycle, p2 operations.
 
-import { execSync, spawn } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { execSync, spawn, spawnSync } from "node:child_process";
+import {
+  existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { request } from "node:http";
 import { normalizePath } from "./paths.mjs";
@@ -249,6 +252,83 @@ export function runDirector(eclipsePath, profile, extraArgs) {
           l.trim(),
       );
     throw new Error(lines.join("\n"));
+  }
+}
+
+/**
+ * Block until the p2 profile file lock can be acquired, or throw
+ * after {@code timeoutMs}. The lock is released immediately on
+ * acquisition — the call is a barrier, not a held-lock primitive.
+ *
+ * Uses the same API path as Eclipse's
+ * {@code SimpleProfileRegistry.lockProfile}:
+ * {@link java.nio.channels.FileChannel#tryLock} on
+ * {@code <profileDir>/.lock}. Node's stdlib does not expose
+ * {@code LockFileEx}/{@code fcntl(F_SETLK)}, so the check spawns a
+ * single-file Java helper.
+ *
+ * @param {string} profileDir - absolute path to the profile dir,
+ *     e.g. {@code <eclipse>/p2/.../profileRegistry/<profile>.profile}
+ * @param {string} javaCmd - absolute path to a {@code java} binary
+ *     (Java 11+ for single-file source mode)
+ * @param {number} [timeoutMs=30000]
+ */
+export function awaitProfileLockFree(profileDir, javaCmd, timeoutMs = 30_000) {
+  const lockFile = join(profileDir, ".lock");
+  if (!existsSync(lockFile)) {
+    // No lock file = profile not yet engaged by p2; nothing to
+    // contend with. p2 director will create it on first run.
+    return;
+  }
+  const helper = `import java.io.RandomAccessFile;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+public class ProfileLockProbe {
+    public static void main(String[] args) throws Exception {
+        String path = args[0];
+        long timeoutMs = Long.parseLong(args[1]);
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        try (RandomAccessFile raf = new RandomAccessFile(path, "rw");
+             FileChannel ch = raf.getChannel()) {
+            while (true) {
+                FileLock l = ch.tryLock();
+                if (l != null) { l.release(); System.exit(0); }
+                if (System.currentTimeMillis() >= deadline) {
+                    System.err.println("Profile lock still held after "
+                            + timeoutMs + "ms");
+                    System.exit(1);
+                }
+                Thread.sleep(200);
+            }
+        }
+    }
+}
+`;
+  const tmp = mkdtempSync(join(tmpdir(), "jdt-profile-lock-"));
+  const src = join(tmp, "ProfileLockProbe.java");
+  writeFileSync(src, helper);
+  try {
+    const r = spawnSync(javaCmd, [src, lockFile, String(timeoutMs)], {
+      encoding: "utf8",
+      timeout: timeoutMs + 5_000,
+    });
+    if (r.status === 0) return;
+    if (r.status === 1) {
+      throw new Error(
+        `Profile lock at ${lockFile} is held by another JVM`
+        + ` after ${timeoutMs}ms. Identify the holder via Sysinternals`
+        + ` handle.exe (Windows) or lsof (POSIX) and terminate it`
+        + ` before retrying.`,
+      );
+    }
+    const detail = (r.stderr || r.error?.message || "no output").toString().trim();
+    throw new Error(
+      `Profile lock probe failed (exit ${r.status}): ${detail}`,
+    );
+  } finally {
+    try { rmSync(tmp, { recursive: true, force: true }); } catch {
+      /* tmp cleanup best-effort */
+    }
   }
 }
 
