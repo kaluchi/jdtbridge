@@ -12,7 +12,10 @@ import org.eclipse.eclemma.core.CoverageTools;
 import org.eclipse.eclemma.core.ICoverageSession;
 import org.eclipse.eclemma.core.ISessionManager;
 import org.eclipse.eclemma.core.analysis.IJavaModelCoverage;
+import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
+import org.jacoco.core.analysis.CoverageNodeImpl;
+import org.jacoco.core.analysis.ICoverageNode;
 import org.jacoco.core.data.SessionInfo;
 
 import static io.github.kaluchi.jdtbridge.coverage.CoverageJson.addNullableLong;
@@ -100,7 +103,7 @@ class CoverageSessionHandler {
             CoverageAnalyzer.CachedAnalysis ca =
                     analyzer.ensureAnalyzed(session);
             entry.add("counters",
-                    countersOf(ca.modelCoverage));
+                    countersOf(aggregateProjectCounters(ca.modelCoverage)));
             entry.add("jacocoSessionInfos",
                     sessionInfosJson(ca.jacocoSessionInfos));
         } catch (CoreException e) {
@@ -108,6 +111,34 @@ class CoverageSessionHandler {
                     e.getMessage());
         }
         return entry.toString();
+    }
+
+    /**
+     * Aggregate per-project counters into a single session-level
+     * coverage node. EclEmma's
+     * {@link org.eclipse.eclemma.internal.core.analysis.JavaModelCoverage#putFragmentRoot}
+     * increments only the child project node
+     * ({@code getProjectCoverage(...).increment(coverage)}); the
+     * root {@link IJavaModelCoverage} itself is never incremented
+     * and its counters stay at zero. Eclipse's Coverage View
+     * sidesteps this by rendering project / fragment-root / package
+     * children directly, never the root. The wire format must
+     * aggregate to give the client session totals.
+     */
+    static ICoverageNode aggregateProjectCounters(
+            IJavaModelCoverage model) {
+        CoverageNodeImpl agg = new CoverageNodeImpl(
+                ICoverageNode.ElementType.GROUP, "session");
+        if (model == null) {
+            return agg;
+        }
+        for (IJavaProject project : model.getProjects()) {
+            ICoverageNode pc = model.getCoverageFor(project);
+            if (pc != null) {
+                agg.increment(pc);
+            }
+        }
+        return agg;
     }
 
     /** {@code GET /coverage/active} — id of the active session,

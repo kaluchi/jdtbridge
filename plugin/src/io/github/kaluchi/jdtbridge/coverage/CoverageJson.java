@@ -2,7 +2,6 @@ package io.github.kaluchi.jdtbridge.coverage;
 
 import org.jacoco.core.analysis.ICounter;
 import org.jacoco.core.analysis.ICoverageNode;
-import org.eclipse.eclemma.core.analysis.IJavaModelCoverage;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
@@ -79,8 +78,14 @@ final class CoverageJson {
     }
 
     /** All six {@link ICounter}s wrapped in a single counters
-     *  object — wire shape per spec § Counter shape. */
-    static JsonObject countersOf(IJavaModelCoverage cov) {
+     *  object — wire shape per spec § Counter shape. Accepts any
+     *  {@link ICoverageNode}; for session-level aggregation pass
+     *  the result of
+     *  {@link CoverageSessionHandler#aggregateProjectCounters} since
+     *  the root {@link
+     *  org.eclipse.eclemma.core.analysis.IJavaModelCoverage} itself
+     *  is never incremented by EclEmma. */
+    static JsonObject countersOf(ICoverageNode cov) {
         var obj = new JsonObject();
         if (cov == null) {
             return obj;
