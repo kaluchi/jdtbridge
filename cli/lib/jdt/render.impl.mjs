@@ -26,6 +26,26 @@ const K_INCOMING   = keyword('incoming');
 const K_SUPERS     = keyword('supers');
 const K_SUBTYPES   = keyword('subtypes');
 const K_MEMBERS    = keyword('members');
+const K_COVERAGE   = keyword('coverage');
+
+// Coverage-bundle and node-Map keys
+const K_COUNTERS         = keyword('counters');
+const K_LINES_BUNDLE     = keyword('lines');
+const K_ENTRIES          = keyword('entries');
+const K_STATUS           = keyword('status');
+const K_LINE_NUMBER      = keyword('line');
+const K_COVERED_COUNT    = keyword('coveredCount');
+const K_MISSED_COUNT     = keyword('missedCount');
+const K_TOTAL_COUNT      = keyword('totalCount');
+const K_COVERED_RATIO    = keyword('coveredRatio');
+const K_BRANCH_COVERED   = keyword('branchCovered');
+const K_BRANCH_MISSED    = keyword('branchMissed');
+const K_C_INSTRUCTION    = keyword('instruction');
+const K_C_BRANCH         = keyword('branch');
+const K_C_LINE           = keyword('line');
+const K_C_METHOD         = keyword('method');
+const K_C_CLASS          = keyword('class');
+const K_C_COMPLEXITY     = keyword('complexity');
 
 // Node-Map fields
 const K_FQN           = keyword('fqn');
@@ -495,6 +515,179 @@ function lineRangeSuffix(node) {
     return startLine + '-' + endLine;
 }
 
+// ── mdCoverage: counters table + per-line ranges ───────────────
+
+const COUNTER_ROWS = [
+    [K_C_INSTRUCTION, 'Instructions'],
+    [K_C_BRANCH,      'Branches'],
+    [K_C_LINE,        'Lines'],
+    [K_C_METHOD,      'Methods'],
+    [K_C_CLASS,       'Types'],
+    [K_C_COMPLEXITY,  'Complexity'],
+];
+
+/**
+ * Bundle shape for mdCoverage:
+ *   :node     — detail node-Map of the viewed element (required)
+ *   :coverage — /coverage/node response Map: :counters always,
+ *               :lines block when subject is an ISourceNode
+ *
+ * Layout follows EclEmma's Coverage View vocabulary verbatim:
+ *
+ *   `Element` (header) `Counter | Coverage | Covered | Missed | Total`
+ *
+ * with EclEmma counter names (`Types` not `Classes`, `Complexity`
+ * not `Cxty`) and `0.0 %` ratio format. The Lines section, when
+ * present, splits entries into Covered / Partial / Uncovered with
+ * consecutive line numbers collapsed to ranges (`33-35, 39, 41-50`)
+ * — same idiom as coverage.py's Missing column.
+ */
+function formatMdCoverage(bundle) {
+    ensureMap(bundle, 'mdCoverage');
+    const node = mapGet(bundle, K_NODE);
+    if (!(node instanceof Map)) {
+        throw new TypeError(
+            'mdCoverage: :node must be a node-Map');
+    }
+    const coverage = mapGet(bundle, K_COVERAGE);
+    if (!(coverage instanceof Map)) {
+        throw new TypeError(
+            'mdCoverage: :coverage must be a Map from @coverage, got '
+            + describe(coverage));
+    }
+
+    const out = [];
+    out.push('#### ' + badgeOf(node) + ' '
+            + (mapGet(node, K_FQN) ?? '?'));
+    const loc = locationLine(node);
+    if (loc) out.push(loc);
+    out.push('');
+
+    const counters = mapGet(coverage, K_COUNTERS);
+    if (counters instanceof Map) {
+        out.push('#### Coverage:');
+        out.push('');
+        out.push(...formatCountersTable(counters));
+    }
+
+    const linesBundle = mapGet(coverage, K_LINES_BUNDLE);
+    if (linesBundle instanceof Map) {
+        const entries = mapGet(linesBundle, K_ENTRIES);
+        if (Array.isArray(entries) && entries.length > 0) {
+            out.push('');
+            out.push('#### Lines:');
+            out.push(...formatLinesBlock(entries));
+        }
+    }
+
+    return out.join('\n');
+}
+
+function formatCountersTable(counters) {
+    const lines = [];
+    lines.push(
+        '| Counter      | Coverage | Covered | Missed |    Total |');
+    lines.push(
+        '|--------------|---------:|--------:|-------:|---------:|');
+    for (const [wireKey, label] of COUNTER_ROWS) {
+        const c = mapGet(counters, wireKey);
+        if (!(c instanceof Map)) continue;
+        const cov   = mapGet(c, K_COVERED_COUNT) ?? 0;
+        const miss  = mapGet(c, K_MISSED_COUNT)  ?? 0;
+        const total = mapGet(c, K_TOTAL_COUNT)   ?? 0;
+        const ratio = mapGet(c, K_COVERED_RATIO);
+        lines.push('| ' + label.padEnd(12)
+                + ' | ' + formatRatio(ratio).padStart(8)
+                + ' | ' + String(cov).padStart(7)
+                + ' | ' + String(miss).padStart(6)
+                + ' | ' + String(total).padStart(8)
+                + ' |');
+    }
+    return lines;
+}
+
+/** EclEmma's `0.0 %` format — one decimal, space before `%`. Empty
+ *  string when total = 0 (server emits null ratio in that case). */
+function formatRatio(r) {
+    if (r === null || r === undefined || Number.isNaN(r)) return '';
+    return (r * 100).toFixed(1) + ' %';
+}
+
+function formatLinesBlock(entries) {
+    const covered = [];
+    const partial = [];
+    const uncovered = [];
+    for (const e of entries) {
+        if (!(e instanceof Map)) continue;
+        const status = mapGet(e, K_STATUS);
+        const line = mapGet(e, K_LINE_NUMBER);
+        if (typeof line !== 'number') continue;
+        if (status === 'FULLY_COVERED')      covered.push(line);
+        else if (status === 'PARTLY_COVERED') partial.push(e);
+        else if (status === 'NOT_COVERED')    uncovered.push(line);
+    }
+    const out = [];
+    if (covered.length > 0) {
+        out.push('  Covered:   ' + collapseRanges(covered));
+    }
+    if (partial.length > 0) {
+        out.push('  Partial:   '
+                + partial.map(formatPartialEntry).join(', '));
+    }
+    if (uncovered.length > 0) {
+        out.push('  Uncovered: ' + collapseRanges(uncovered));
+    }
+    return out;
+}
+
+/**
+ * Per-line partial entry: line number plus the branch hover-text
+ * EclEmma uses on its gutter annotations:
+ *
+ *   `{0} of {1} branches missed.`
+ *
+ * (verbatim from `AnnotationTextSomeBranchesMissed_message` in
+ * EclEmma's `uimessages.properties`).
+ */
+function formatPartialEntry(entry) {
+    const line   = mapGet(entry, K_LINE_NUMBER);
+    const missed = mapGet(entry, K_BRANCH_MISSED);
+    const cov    = mapGet(entry, K_BRANCH_COVERED);
+    const total  = (typeof missed === 'number' ? missed : 0)
+                 + (typeof cov    === 'number' ? cov    : 0);
+    if (typeof missed === 'number' && total > 0) {
+        return line + ' (' + missed + ' of ' + total
+                + ' branches missed)';
+    }
+    return String(line);
+}
+
+/**
+ * Collapse a sorted (or unsorted) list of integers into
+ * comma-joined consecutive ranges: `[42,43,44,46,50,51,52]`
+ * → `"42-44, 46, 50-52"`.
+ */
+function collapseRanges(numbers) {
+    if (numbers.length === 0) return '';
+    const sorted = [...numbers].sort((a, b) => a - b);
+    const out = [];
+    let start = sorted[0];
+    let end = sorted[0];
+    for (let i = 1; i < sorted.length; i++) {
+        const n = sorted[i];
+        if (n === end + 1) {
+            end = n;
+        } else {
+            out.push(start === end ? String(start)
+                    : start + '-' + end);
+            start = n;
+            end = n;
+        }
+    }
+    out.push(start === end ? String(start) : start + '-' + end);
+    return out.join(', ');
+}
+
 // ── Operand bindings ───────────────────────────────────────────
 
 export function bindJdtRenderOperands(session) {
@@ -506,4 +699,6 @@ export function bindJdtRenderOperands(session) {
             async (bundle) => formatMdOutline(bundle)));
     session.bind('mdRefs', valueOp('mdRefs', 1,
             async (refs) => formatMdRefs(refs)));
+    session.bind('mdCoverage', valueOp('mdCoverage', 1,
+            async (bundle) => formatMdCoverage(bundle)));
 }

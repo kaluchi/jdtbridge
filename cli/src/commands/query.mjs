@@ -23,6 +23,7 @@ import { bindIoOperands } from '@kaluchi/qlang-cli/io-operands';
 import { bindFormatOperands } from '@kaluchi/qlang-cli/format-operands';
 import { bindParseOperands } from '@kaluchi/qlang-cli/parse-operands';
 import { createImpls as createGraphImpls } from '../../lib/jdt/graph.impl.mjs';
+import { createImpls as createCoverageImpls } from '../../lib/jdt/coverage.impl.mjs';
 import { bindJdtRenderOperands } from '../../lib/jdt/render.impl.mjs';
 import { BridgeNotRunningError, isConnectionError } from '../client.mjs';
 
@@ -31,7 +32,8 @@ const MODULE_LIB = join(__dirname, '..', '..', 'lib');
 
 function createLocator() {
   const implFactories = {
-    'jdt/graph': createGraphImpls
+    'jdt/graph':    createGraphImpls,
+    'jdt/coverage': createCoverageImpls,
   };
 
   return (namespaceName) => {
@@ -179,7 +181,8 @@ export async function query(args) {
     bindFormatOperands(session);
     bindParseOperands(session);
     bindJdtRenderOperands(session);
-    const cellEntry = await session.evalCell(`use(:jdt/graph) | ${querySource}`);
+    const cellEntry = await session.evalCell(
+        `use(:jdt/graph) | use(:jdt/coverage) | ${querySource}`);
 
     if (cellEntry.error) {
       printQueryResult(parseErrorToValue(cellEntry.error, cellEntry.uri));
@@ -326,10 +329,19 @@ Sugar conduits:
   type    | @publicOrphans  @deadCode
   Vec     | @sourceOnly  @overview  @inProject(projName)
 
+Coverage axes (need an active or pinned coverage session):
+  node    | @coverage                /coverage/node Map: counters + lines (when ISourceNode)
+  node    | @coverage("MyTest:1234") pin to a specific coverageId
+  @activeCoverageId                  String id of the active session, or null
+  element | @uncovered  @partial  @fullyCovered  — predicates over instruction status
+  ISourceNode | @coveredLines  @uncoveredLines  — Vec<int> line numbers
+  ISourceNode | @partialLines        Vec<entry> with branch counts
+
 Markdown cards (return a String — pipe to a file):
   "pkg.Foo#bar()" | @sourceCard      header + code fence + outgoing / incoming refs
   "pkg.Foo"       | @hierarchyCard   ↑ supers / ↓ subtypes
   "pkg.Foo"       | @outlineCard     fields / methods / inner types
+  "pkg.Foo"       | @coverageCard    counters table + Lines section
   Vec<:reference> | mdRefs           grouped by refKind
 
 Host-bound I/O + format (from qlang-cli):
