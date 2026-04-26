@@ -78,13 +78,7 @@ final class CoverageJson {
     }
 
     /** All six {@link ICounter}s wrapped in a single counters
-     *  object — wire shape per spec § Counter shape. Accepts any
-     *  {@link ICoverageNode}; for session-level aggregation pass
-     *  the result of
-     *  {@link CoverageSessionHandler#aggregateProjectCounters} since
-     *  the root {@link
-     *  org.eclipse.eclemma.core.analysis.IJavaModelCoverage} itself
-     *  is never incremented by EclEmma. */
+     *  object — wire shape per spec § Counter shape. */
     static JsonObject countersOf(ICoverageNode cov) {
         var obj = new JsonObject();
         if (cov == null) {

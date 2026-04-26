@@ -30,7 +30,7 @@ import org.eclipse.jdt.core.dom.LambdaExpression;
 /**
  * Shared JDT utilities used by multiple handlers.
  */
-class JdtUtils {
+public class JdtUtils {
 
     /** Lambda-suffix marker in a composite synthetic FQN. */
     private static final String LAMBDA_SUFFIX_HEAD = ".() -> {...}";
@@ -72,7 +72,7 @@ class JdtUtils {
      * the parsed one; first match wins when multiple identical
      * synthetics share the enclosing method.
      */
-    static IJavaElement resolveElement(String fqn)
+    public static IJavaElement resolveElement(String fqn)
             throws JavaModelException {
         int syntheticIdx = syntheticSuffixStart(fqn);
         if (syntheticIdx < 0) return resolveRegular(fqn);

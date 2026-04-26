@@ -59,6 +59,8 @@ class CoverageRouter {
             case "/coverage/runs" -> sessionHandler.handleRuns(scope);
             case "/coverage/session" ->
                     sessionHandler.handleSession(params);
+            case "/coverage/node" ->
+                    sessionHandler.handleNode(params);
             case "/coverage/active" -> sessionHandler.handleActive();
             case "/coverage/activate" ->
                     sessionHandler.handleActivate(body);

@@ -553,6 +553,13 @@ SSOT for the additional fields:
 returned successfully (it always runs synchronously when called —
 either reads bridge cache or invokes `SessionAnalyzer.processSession`).
 
+`counters.*` is the sum of per-project children:
+`Σ getCoverageFor(project).getCounter*()` over
+`IJavaModelCoverage.getProjects()`, accumulated through
+`CoverageNodeImpl.increment` into a session-level
+`CoverageNodeImpl(GROUP, "session")` by
+`CoverageSessionHandler.aggregateProjectCounters`.
+
 `jacocoSessionInfos` length comes from
 `SessionInfoStore.getInfos()` after `session.accept(execStore,
 sessionInfoStore)`. Per kind:
@@ -568,6 +575,88 @@ sessionInfoStore)`. Per kind:
 - `imported`: whatever the imported `.exec` file contains, parsed
   by `URLExecutionDataSource.accept` via
   `ExecutionDataReader.read()`
+
+### `GET /coverage/node`
+
+Point lookup of one element's raw coverage data — counters and
+(for source-bearing element kinds) per-line breakdown.
+
+Params:
+- `coverageId` (required, with optional `:N` dump suffix)
+- `fqn` (required) — IJavaElement identifier in the convention
+  used by `jdt q` (see `jdt-query-spec` § fqn format by kind)
+
+Resolves `fqn` via `JdtUtils.resolveElement` to an `IJavaElement`,
+then asks the cached `IJavaModelCoverage` for that element's
+`ICoverageNode`. Triggers `CoverageAnalyzer.ensureAnalyzed(session)`
+on first call (cached after). The endpoint blocks during analysis.
+
+Response — `counters` always present; `lines` block present iff
+the returned `ICoverageNode` is an `ISourceNode` subtype (type /
+method / source-file):
+
+```json
+{
+  "coverageId": "MyTest:1777078913423",
+  "fqn": "pkg.Foo#bar(java.lang.String)",
+  "elementKind": "method",
+  "elementType": "METHOD",
+  "counters": {
+    "instruction": { ...counter shape... },
+    "branch":      { ...counter shape... },
+    "line":        { ...counter shape... },
+    "complexity":  { ...counter shape... },
+    "method":      { ...counter shape... },
+    "class":       { ...counter shape... }
+  },
+  "lines": {
+    "firstLine": 42,
+    "lastLine": 78,
+    "entries": [
+      {
+        "line": 42,
+        "status": "FULLY_COVERED",
+        "instructionCovered": 5,
+        "instructionMissed": 0,
+        "branchCovered": 0,
+        "branchMissed": 0
+      }
+    ]
+  }
+}
+```
+
+`entries` includes only non-empty source lines — those whose
+`ILine.getStatus() != ICounter.EMPTY`. Empty lines (outside
+`[firstLine, lastLine]`, or with no instructions / no branches)
+are omitted; clients re-derive them as the gap between
+consecutive entries.
+
+SSOT mapping:
+
+| Field | SSOT type | API path |
+|---|---|---|
+| `elementKind` | wire kebab-token | `IJavaElement.getElementType()` mapped to `project` / `packageFragmentRoot` / `package` / `type` / `method` / `field` / `file` / `classFile` / `other` |
+| `elementType` | `ICoverageNode.ElementType` | `node.getElementType().name()` (`GROUP` / `BUNDLE` / `PACKAGE` / `CLASS` / `METHOD` / `SOURCEFILE`) |
+| `counters.*` | `ICounter` (JaCoCo) | `node.get<X>Counter()` where `node = IJavaModelCoverage.getCoverageFor(element)` |
+| `lines.firstLine` | `int` | `ISourceNode.getFirstLine()` |
+| `lines.lastLine` | `int` | `ISourceNode.getLastLine()` |
+| `lines.entries[i].line` | `int` | iteration index in `[firstLine, lastLine]` |
+| `lines.entries[i].status` | wire enum | `ILine.getStatus()` → `EMPTY` / `NOT_COVERED` / `FULLY_COVERED` / `PARTLY_COVERED` |
+| `lines.entries[i].instructionCovered/Missed` | `ICounter` | `ILine.getInstructionCounter().getCoveredCount()` / `getMissedCount()` |
+| `lines.entries[i].branchCovered/Missed` | `ICounter` | `ILine.getBranchCounter().getCoveredCount()` / `getMissedCount()` |
+
+Errors specific to this endpoint:
+- `coverage-fqn-unresolved` — missing `fqn`, malformed, or
+  `JdtUtils.resolveElement` returned `null` (no such workspace
+  element)
+- `coverage-no-data-for-element` — element resolved but
+  `IJavaModelCoverage.getCoverageFor` returned `null`. JaCoCo has
+  no field-level coverage, so all `IField` subjects fall here;
+  types outside the session's analysis scope also fall here.
+
+Plus the shared `coverage-not-found` / `coverage-dump-not-found` /
+`coverage-analysis-failed` from `/coverage/session`.
 
 ### `GET /coverage/session/stream`
 

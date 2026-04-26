@@ -1,52 +1,32 @@
 # jdt coverage analyze — Design Spec
 
-Synthesis of UX research, EclEmma data-model surface, onboarding
-lifecycle, and design constraints for the coverage-analysis query
-layer of `jdt q`.
-
-This document is a single dump of the design rationale before
-implementation. After the feature lands, the constituent parts split
-into the relevant pinpoint specs:
+Cross-cutting principles, vocabulary contract, and edge-case
+constraints for the `:jdt/coverage` qlang axes layered on the
+coverage analysis cache. Detail surfaces split across:
 
 - CLI commands and onboarding texts → `jdt-coverage-spec.md`
-- qlang axes and conduits → `jdt-query-spec.md` (or a sibling
-  `jdt-coverage-query-spec.md`)
+- qlang axes and conduits → `jdt-query-spec.md`
 - HTTP endpoint and node-Map shape → `bridge-coverage-spec.md`
-
-What lives here permanently: the cross-cutting principles, vocabulary
-contract, and edge-case constraints that any of the downstream specs
-must respect.
 
 ## Context
 
-The existing CLI gives the agent only session-management commands —
-`run`, `runs`, `status`, `dump`, `merge`, `relaunch`, `remove`,
-`stop`. Once a session reaches `analysisReady`, the agent has no
-first-class way to ask *anything* about the result without dropping
-into raw HTTP / JSON parsing. Aggregate counters at session level
-are returned by `/coverage/session`, but per-element drilldown,
-per-line gaps, untested-predicate filtering, and graph-joined
-queries are absent.
-
-Underneath, the data is already there. EclEmma's
-`SessionAnalyzer` produces `IJavaModelCoverage` per session;
-`CoverageAnalyzer` (this plugin) caches that result by
-`ICoverageSession` identity, including raw JaCoCo `SessionInfo`
-and `ExecutionData`. A query layer over this cache, exposing the
-results via `:jdt/coverage` qlang axes, closes the analysis gap
-without touching session lifecycle.
+`CoverageAnalyzer` (this plugin) caches `IJavaModelCoverage` per
+`ICoverageSession`, including raw JaCoCo `SessionInfo` and
+`ExecutionData`. The `:jdt/coverage` axes expose this cache as a
+qlang queryable surface — point lookups, per-line breakdowns,
+predicate composition with `:jdt/graph`, no rebuild of session
+lifecycle.
 
 ## Design principles
 
-### 1. Not a replacement for the Coverage View
+### 1. Mirror EclEmma idioms
 
 The user works in Eclipse with full GUI — Coverage View tree,
 gutter coloring, session dropdown, every menu including those the
-CLI doesn't expose. The CLI surface is for the agent. Wherever a
-choice exists between mirroring an existing EclEmma idiom and
-inventing a new one, mirror EclEmma. The user's mental model is
-already shaped by years of EclEmma use; the CLI extends, never
-replaces.
+CLI doesn't expose. The CLI surface is for the agent. Where a
+choice exists between mirroring an EclEmma idiom and introducing
+a new one, the CLI mirrors EclEmma; the user's mental model
+carries over from the GUI verbatim.
 
 ### 2. Scope inherits from the launch config
 
@@ -71,14 +51,13 @@ their radar at all.
 
 ### 4. Contextual onboarding by lifecycle moment
 
-Discovery of analysis commands happens at the moment the agent is
-already in the relevant context, never via up-front help dumps.
-Six lifecycle moments carry onboarding (§ Lifecycle onboarding).
-On `jdt help`, only the canonical happy-path commands surface; on
-`jdt coverage run`, the existing 4-section guide gains a 5th
-"Analyze results" section; on `analysisReady` events in `-f`
-streams, a 3-line tail offers the next step; full reference lives
-in `jdt help coverage analyze`.
+Analysis-command discovery surfaces at the moment the agent is
+in the relevant context. Six lifecycle moments carry onboarding
+(§ Lifecycle onboarding): `jdt help` shows only the canonical
+happy-path commands; `jdt coverage run` carries an "Analyze
+results" section in its guide; `analysisReady` events in `-f`
+streams emit a 3-line tail; the full reference lives in
+`jdt help coverage analyze`.
 
 ### 5. Top-5 user questions resolve in 1-2 commands
 
@@ -88,15 +67,13 @@ a method) each map to a single qlang pipeline that the onboarding
 text shows verbatim. The agent does not assemble these from
 primitives — it copies a template, substitutes the fqn, and runs.
 
-### 6. Composition with graph axes is the unique advantage
+### 6. Composition with `:jdt/graph` axes
 
-JaCoCo CLI, IntelliJ Run-with-Coverage, SonarQube, Codecov — none
-of them compose coverage with the Eclipse semantic graph (callers,
-hierarchy, annotations, complexity). The CLI does, and that is
-the differentiator. Queries like
-`@methods | filter(@untested) | filter(@callers | empty | not)`
-("hot uncovered methods") are one-liners with no equivalent in
-mature coverage tooling.
+`:jdt/coverage` axes share `pipeValue` semantics with `:jdt/graph`,
+so coverage and graph predicates compose in a single pipeline.
+Example: `@methods | filter(@untested) | filter(@callers | empty | not)`
+selects methods with zero instruction coverage and at least one
+caller — the "hot uncovered" set — in one expression.
 
 ## Top-20 user questions
 
@@ -387,10 +364,10 @@ Run with coverage instrumentation:
   jdt test run <fqn> --coverage          adds CoverageId/CoverageScope to header
 ```
 
-### M3 — `jdt coverage run <id>` guide (5th section)
+### M3 — `jdt coverage run <id>` guide
 
-The existing run-guide has four sections (status / logs /
-manage / sessions). Add a fifth:
+The run-guide carries five sections: status / logs / manage /
+sessions / analyze. The analyze block:
 
 ```
 **Analyze results** (after analysisReady):
@@ -403,12 +380,11 @@ manage / sessions). Add a fifth:
   jdt help coverage analyze                         full reference
 ```
 
-Analysis runs against the active session by default; pinning to
-a specific coverageId is the optional advanced step from M6.
+Analysis targets the active session unless pinned via `M6`.
 
 ### M4 — Stream tail after `analysisReady`
 
-Three-line tail appended in `formatStreamEvent`:
+Three-line tail in `formatStreamEvent`:
 
 ```
 [hh:mm:ss] ready #1 — instructions 94.8%, branches 80.7%, ...
@@ -418,15 +394,11 @@ Next: jdt q '"<class>" | @uncoveredLines'   line gaps
       jdt help coverage analyze             full reference
 ```
 
-The agent in `-f` follow-mode does not have to scroll back to M3
-to find the next-step menu.
-
 ### M5 — `jdt coverage status` snapshot tail
 
-Same 3-line tail appended to `formatStatusSnapshot` when
-`analysisReady=true`. This is the second entry path: the user
-ran coverage in Eclipse, the agent comes in fresh and lands on
-`status` directly, never seeing M3.
+Same 3-line tail in `formatStatusSnapshot` when
+`analysisReady=true`. Covers the entry path where the agent
+joins a session created in Eclipse without going through M3.
 
 ### M6 — `jdt help coverage analyze`
 
@@ -436,71 +408,57 @@ conduits, subject polymorphism rules, composition examples with
 This is the depth surface — agent reaches it only when M3/M4/M5
 pointed there.
 
-## CLI ergonomics — idioms borrowed from mature tooling
-
-Cross-tool patterns observed across `coverage.py`, `pytest-cov`,
-`nyc`/`c8`, `lcov`, `gcov`, `llvm-cov`, `go tool cover`,
-`jacoco-cli`. The ones we adopt:
+## CLI ergonomics
 
 ### Collapsed line ranges
 
 Per-line gap output collapses consecutive line numbers into
 ranges: `33-35, 39, 41-50` instead of
-`33, 34, 35, 39, 41, 42, 43, ..., 50`. Source: coverage.py
-`--show-missing`, nyc `Uncovered Line #s` column. Implemented in
-`mdCoverage` renderer, not in the wire format — the server emits
-raw `Vec<int>` and the CLI collapses on render.
+`33, 34, 35, 39, 41, 42, 43, ..., 50`. Collapse happens in the
+`mdCoverage` renderer; the server emits raw `Vec<int>`.
 
 ### Text-summary micro-format
 
 A 4-line block of `Metric : XX% (n/m)` per counter, no per-file
-detail, designed for CI logs. Source: nyc `text-summary`, c8
-`text-summary`. Available as a render mode of `@coverageSummary`
-when the agent wants a compact CI-log fragment.
+detail. Available as a render mode of `@coverageSummary`.
 
 ### Color-coded ratios
 
 Ratio percentages render colored: red <50, yellow 50-80, green
->80. Already in the existing `composeStatus` — extend to ratio
-columns in tables. Source: nyc / c8 / istanbul text reporters.
+>80. The same `composeStatus` palette used elsewhere applies to
+ratio columns in tables.
 
 ### TOTAL row pinned at bottom of tables
 
-Tables of per-package or per-class coverage include a synthetic
-TOTAL row for the aggregate. Source: coverage.py `report`,
-llvm-cov `report`, nyc `text`, lcov `--list`.
+Per-package and per-class coverage tables carry a synthetic
+TOTAL row for the aggregate.
 
-### `--skip-covered` style filter
+### `@onlyGaps` filter
 
-Conduit `@onlyGaps` filters elements at 100% coverage out of the
-result, surfacing only files needing attention. Source:
-coverage.py `--skip-covered`, nyc `--per-file`. Implemented as
-a qlang filter, not a server flag — `filter(/counters/instruction/coveredRatio | lt(1.0))`.
+Conduit `@onlyGaps` keeps elements below 100% coverage,
+expressed as `filter(/counters/instruction/coveredRatio | lt(1.0))`.
 
-### What we don't borrow
+### Boundaries
 
-- `--fail-under=N` threshold-gate flag at the command level.
-  Threshold gates are agent-side decisions; expressed as
-  ordinary qlang predicates plus exit-code mapping if needed.
-  Adding a flag adds another configuration knob the agent must
-  learn.
-- `--show-contexts` / per-test labeling. Per-test forward
-  mapping is not natively supported by JaCoCo agent's session
-  model; achievable only by running each test as its own launch
-  (test-FQN configId). The CLI does not pretend to deliver
-  testwise coverage from a single session.
-- Diff-coverage as a primitive flag. Diff is a qlang join over
-  two sessions (`@coverageOf(:idA)` vs `@coverageOf(:idB)`)
-  composed with git axes, not a dedicated server endpoint.
+- Threshold gates are agent-side qlang predicates plus exit-code
+  mapping; no `--fail-under=N` flag.
+- Per-test (testwise) attribution comes from running each test
+  as its own launch (test-FQN configId) so the session's data
+  IS the testwise mapping. No `--show-contexts`-style labeling
+  inside a multi-test session — JaCoCo's session model does not
+  carry it.
+- Diff coverage is a qlang join over `@coverageOf(:idA)` vs
+  `@coverageOf(:idB)` composed with git axes. No dedicated
+  server endpoint.
 
 ## Architectural constraints
 
 ### Field coverage = null
 
 `IJavaModelCoverage.getCoverageFor(IField)` returns `null`
-unconditionally — JaCoCo does not model field coverage at the
-data layer. The `@coverage` axis on a `:field` subject returns
-a typed error value:
+unconditionally — JaCoCo's data layer carries no field-level
+coverage. The `@coverage` axis on a `:field` subject returns a
+typed error value:
 
 ```
 !{:kind :coverage-no-data-for-element
@@ -509,10 +467,9 @@ a typed error value:
   :fqn "..."}
 ```
 
-This surfaces explicitly on the fail-track; the agent never
-silently sees zero coverage on a field. Filter idiom for a
-mixed-member iteration: `... | filter(/kind | eq("field") | not)`
-before applying coverage axes.
+The error rides the fail-track. Filter idiom for a mixed-member
+iteration: `... | filter(/kind | eq("field") | not)` before
+applying coverage axes.
 
 ### Per-line breakdown only for `ISourceNode`
 
@@ -539,11 +496,8 @@ anonymous class as a separate `IClassCoverage` with a
 `$N`-suffixed VM name; EclEmma maps these back to their IType
 through the binary-name traversal.
 
-The `@coverage` axis on a synthetic-type fqn returns counters
-for that synthetic class. Cross-validation against running
-sessions is needed before the surface is declared stable for
-synthetic types — the synthetic-name → IClassCoverage mapping
-is the most failure-prone path in the EclEmma adapter.
+`@coverage` on a synthetic-type fqn returns counters for that
+synthetic class.
 
 ## Glossary
 
@@ -564,32 +518,26 @@ example, and reshape literal in the codebase uses these terms.
 | **diff coverage** | Comparison of two coverage sessions, surfacing lines covered in one but not the other. Implemented as a qlang join over `@coverageOf(:idA)` and `@coverageOf(:idB)`, never as a server primitive. |
 | **testwise** | Per-test attribution of covered lines. Achievable only when a test runs as its own launch (test-FQN configId, `--coverage`); then the session's data IS the testwise mapping. Multi-test sessions aggregate and lose per-test attribution. |
 
-## What is out of scope
+## Boundaries of the analyze surface
 
-Items deliberately not part of the analyze surface:
-
-- **Trend over time.** No history storage. Each `coverageId` is
-  point-in-time; trends require external time-series storage
-  (CI artifacts, SonarQube). Out of scope for the CLI.
-- **Threshold-gate flag.** No `--fail-under=N`. Gates are qlang
-  predicates the agent composes. Mapping a predicate result to
-  the process exit code is an agent-side decision.
-- **Custom exclude patterns at query time.** EclEmma's
-  `Coverage Runtime` preferences (`Includes:`, `Excludes:`,
-  `Exclude classloaders:`) live in the Eclipse preferences UI.
-  Filtering at query time uses qlang `filter(...)` — generated /
-  Lombok / DTO exclusion is composed per-query, not configured.
-- **Diff-coverage as a server primitive.** Composed in qlang
-  from two `@coverageOf` calls.
-- **HTML report rendering.** EclEmma already exports JaCoCo HTML
-  via Coverage View → Export. The CLI does not duplicate that.
-  Markdown cards (`@coverageCard`) are the CLI's rendering
-  surface, optimized for PR comments and agent context.
-- **Live source-annotated view.** `gcov`-style inline-annotated
-  source is not a CLI primary output. The bridge offers
-  `@source` (raw) and `@coveredLines`/`@uncoveredLines` (line
-  numbers) — composing them into an annotated view is a render
-  conduit if a user demands it, not a default surface.
+- **Trend over time** — each `coverageId` is point-in-time;
+  trend storage lives in CI artifacts or SonarQube, not in the
+  bridge.
+- **Threshold gating** — qlang predicates plus agent-side
+  exit-code mapping; no `--fail-under=N` CLI flag.
+- **Exclude patterns** — EclEmma's `Coverage Runtime`
+  preferences (`Includes:`, `Excludes:`, `Exclude classloaders:`)
+  shape what the JaCoCo agent instruments. Per-query filtering
+  of generated / Lombok / DTO classes goes through qlang
+  `filter(...)`.
+- **Diff coverage** — qlang join of two `@coverageOf` calls; no
+  dedicated server endpoint.
+- **HTML report rendering** — Coverage View → Export Session
+  emits JaCoCo HTML. The analyze surface emits markdown cards
+  (`@coverageCard`) suited to PR comments and agent context.
+- **Inline source-annotated view** — `gcov`-style overlay is a
+  composition of `@source` plus `@coveredLines` /
+  `@uncoveredLines`, expressed as a render conduit when needed.
 
 ## References
 
