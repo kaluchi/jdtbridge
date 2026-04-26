@@ -28,6 +28,7 @@ import {
   waitForBridge,
   p2Install,
   p2Uninstall,
+  awaitProfileLockFree,
 } from "../eclipse.mjs";
 
 const BUNDLE_ID = "io.github.kaluchi.jdtbridge";
@@ -332,6 +333,27 @@ async function runInstall(config, flags) {
   console.log(bold("Installing plugin..."));
   if (!(await ensureStopped())) return;
 
+  // The p2 profile is shared with any other Eclipse-based JVM
+  // attached to this install (third-party LSP servers, parallel
+  // Eclipse runtimes, etc.). Such a JVM can briefly hold the OS
+  // file lock on the profile while running its own dropins/install
+  // operations, racing with our p2 director and surfacing as
+  // ProfileInUseException disguised as "missing requirement".
+  // Wait for the lock to be acquirable before invoking p2.
+  const profileDir = join(
+    eclipsePath, "p2", "org.eclipse.equinox.p2.engine",
+    "profileRegistry", `${profile}.profile`);
+  const javaHome = getEclipseJavaHome(eclipsePath);
+  const javaCmd = javaHome
+    ? join(javaHome, "bin", eclipseExe("java"))
+    : "java";
+  try {
+    awaitProfileLockFree(profileDir, javaCmd, 30_000);
+  } catch (e) {
+    console.error(`\n  ${e.message}`);
+    process.exit(1);
+  }
+
   try {
     if (installedVersion) {
       info("Removing old version...");
@@ -428,6 +450,21 @@ async function runRemove(config) {
   }
 
   if (!(await ensureStopped())) return;
+
+  // Same profile-lock barrier as the install flow — see comment there.
+  const profileDir = join(
+    eclipsePath, "p2", "org.eclipse.equinox.p2.engine",
+    "profileRegistry", `${profile}.profile`);
+  const javaHome = getEclipseJavaHome(eclipsePath);
+  const javaCmd = javaHome
+    ? join(javaHome, "bin", eclipseExe("java"))
+    : "java";
+  try {
+    awaitProfileLockFree(profileDir, javaCmd, 30_000);
+  } catch (e) {
+    console.error(`\n  ${e.message}`);
+    process.exit(1);
+  }
 
   try {
     p2Uninstall(eclipsePath, profile, FEATURE_IU);

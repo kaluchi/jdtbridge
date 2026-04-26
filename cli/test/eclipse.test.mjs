@@ -17,6 +17,7 @@ import {
   getEclipseJavaHome,
   generateTargetPlatform,
   waitForBridge,
+  awaitProfileLockFree,
 } from "../src/eclipse.mjs";
 
 const IS_WIN = process.platform === "win32";
@@ -287,5 +288,67 @@ describe("eclipse", () => {
         waitForBridge(discoverFn, 200, 3),
       ).rejects.toThrow("Timed out");
     });
+  });
+
+  describe("awaitProfileLockFree", () => {
+    it("returns silently when .lock file does not exist", () => {
+      const profileDir = join(testDir, "fresh.profile");
+      mkdirSync(profileDir);
+      // No java needed — fresh profile path short-circuits.
+      awaitProfileLockFree(profileDir, "java-not-installed", 1_000);
+    });
+
+    it("acquires the lock when free and returns successfully", () => {
+      const profileDir = join(testDir, "free.profile");
+      mkdirSync(profileDir);
+      writeFileSync(join(profileDir, ".lock"), "");
+      // Use system java — required for this test path.
+      awaitProfileLockFree(profileDir, "java", 5_000);
+    });
+
+    it("throws with a clear message when another JVM holds the lock",
+        async () => {
+      const profileDir = join(testDir, "held.profile");
+      mkdirSync(profileDir);
+      const lockFile = join(profileDir, ".lock");
+      writeFileSync(lockFile, "");
+      // Spawn a Java holder that takes the lock and parks.
+      const { spawn } = await import("node:child_process");
+      const holderSrc = join(testDir, "Holder.java");
+      writeFileSync(holderSrc,
+          `import java.io.RandomAccessFile;\n`
+          + `import java.nio.channels.FileChannel;\n`
+          + `import java.nio.channels.FileLock;\n`
+          + `public class Holder {\n`
+          + `  public static void main(String[] a) throws Exception {\n`
+          + `    try (RandomAccessFile r = new RandomAccessFile(a[0], "rw");\n`
+          + `         FileChannel ch = r.getChannel()) {\n`
+          + `      FileLock l = ch.tryLock();\n`
+          + `      if (l == null) System.exit(2);\n`
+          + `      System.out.println("locked");\n`
+          + `      Thread.sleep(60_000);\n`
+          + `    }\n`
+          + `  }\n`
+          + `}\n`);
+      const holder = spawn("java", [holderSrc, lockFile],
+          { stdio: ["ignore", "pipe", "pipe"] });
+      // Wait for "locked" line so the lock is taken before probe.
+      await new Promise((resolve, reject) => {
+        const t = setTimeout(() => reject(new Error("holder timeout")), 10_000);
+        holder.stdout.on("data", (b) => {
+          if (b.toString().includes("locked")) {
+            clearTimeout(t); resolve();
+          }
+        });
+        holder.on("error", reject);
+      });
+      try {
+        expect(() =>
+          awaitProfileLockFree(profileDir, "java", 1_500),
+        ).toThrow(/held by another JVM/);
+      } finally {
+        holder.kill();
+      }
+    }, 20_000);
   });
 });

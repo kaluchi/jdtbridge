@@ -162,7 +162,7 @@ public class CoverageTrackerTest {
     class ActivationFlagReset {
 
         @Test
-        void switchingActiveSessionClearsPreviousAnalysisFlags() {
+        void switchingActiveClearsLoadingButPreservesReady() {
             String firstId = importAndAwait("first");
             CoverageRun first = tracker.byCoverageId(firstId);
             // Pretend EclEmma had finished analysis on first.
@@ -171,15 +171,33 @@ public class CoverageTrackerTest {
 
             String secondId = importAndAwait("second");
             // Importing a second session activates it; the
-            // first is no longer the analysis target.
+            // first is no longer the loader's target, but its
+            // analysis result lives in CoverageAnalyzer cache.
 
             CoverageRun firstAgain = tracker.byCoverageId(firstId);
             assertNotNull(firstAgain);
-            assertFalse(firstAgain.analysisReady,
-                    "Previous active run must have analysisReady"
-                            + " cleared when another session"
-                            + " becomes active");
+            assertTrue(firstAgain.analysisReady,
+                    "analysisReady must persist on deactivation —"
+                            + " analysis is durable in the cache");
             assertFalse(firstAgain.analysisLoading);
+        }
+
+        @Test
+        void switchingActiveClearsLoadingFromPreviousRun() {
+            String firstId = importAndAwait("loading-first");
+            CoverageRun first = tracker.byCoverageId(firstId);
+            // EclEmma was mid-load when the user switched away.
+            first.analysisLoading = true;
+            first.analysisReady = false;
+
+            importAndAwait("loading-second");
+
+            CoverageRun firstAgain = tracker.byCoverageId(firstId);
+            assertNotNull(firstAgain);
+            assertFalse(firstAgain.analysisLoading,
+                    "Loader stops being authoritative for the"
+                            + " previous active session — its"
+                            + " loading bit must drop");
         }
     }
 

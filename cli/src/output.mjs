@@ -19,7 +19,7 @@ import { printJson } from "./json-output.mjs";
 /** Built-in format strategies that work for any data shape. */
 const BUILT_IN = {
   json: {
-    error(msg) { console.log(JSON.stringify({ error: msg })); },
+    error(payload) { console.log(JSON.stringify(payload)); },
     empty() { console.log("[]"); },
     data(d) { printJson(d); },
   },
@@ -46,6 +46,7 @@ function resolveFormat(args) {
  * @param {Object} renderers - per-command renderers keyed by format name
  * @param {Function} renderers.text - text renderer: (data) => void
  * @param {string} [renderers.empty] - empty message for text format (default: "(no results)")
+ * @param {boolean} [renderers.mutating] - exit 1 on server error (mutating commands)
  */
 export function output(args, data, renderers) {
   const format = resolveFormat(args);
@@ -53,8 +54,12 @@ export function output(args, data, renderers) {
 
   // --- Server error ---
   if (data?.error && !Array.isArray(data)) {
-    if (strategy) { strategy.error(data.error); return; }
-    console.error(data.error);
+    if (strategy) {
+      strategy.error(data);
+    } else {
+      console.error(JSON.stringify(data));
+    }
+    if (renderers?.mutating) process.exit(1);
     return;
   }
 

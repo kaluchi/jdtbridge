@@ -445,11 +445,45 @@ public class CoverageProgressStreamerTest {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-        return tracker.snapshot().values().stream()
+        String coverageId = tracker.snapshot().values().stream()
                 .filter(r -> description.equals(r.description))
                 .map(r -> r.coverageId)
                 .findFirst()
                 .orElseThrow();
+        // EclEmma's LoadSessionJob (LOADJOB family — private to
+        // JavaCoverageLoader) runs independently of our
+        // CLASSIFY_FAMILY. Without this barrier callers race: a
+        // finalizePending that observed coverage==LOADING leaves
+        // run.analysisLoading=true, and the streamer's
+        // pre-subscribe isTerminal check fails — so the streamer
+        // takes the await path and emits analysisReady instead of
+        // terminated. The race was passing locally and failing on
+        // CI's slower runner. Poll the run state until the loader
+        // has actually settled.
+        awaitAnalysisSettled(coverageId);
+        return coverageId;
+    }
+
+    private void awaitAnalysisSettled(String coverageId) {
+        // 30s — empty-data analysis is sub-millisecond locally, but
+        // CI runners can stall the EclEmma LoadSessionJob behind
+        // other jobs in the manager queue.
+        long deadline = System.currentTimeMillis() + 30_000;
+        while (System.currentTimeMillis() < deadline) {
+            CoverageRun run = tracker.byCoverageId(coverageId);
+            if (run == null || !run.analysisLoading) {
+                return;
+            }
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+        throw new AssertionError(
+                "LoadSessionJob did not settle within 30s for "
+                        + coverageId);
     }
 
     private static IExecutionDataSource emptyDataSource() {

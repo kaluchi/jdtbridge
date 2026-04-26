@@ -10,8 +10,8 @@ export function formatRunHeader(result) {
   parts.push(`CoverageId:    \`${result.coverageId}\``);
   if (result.coverageScope?.length) {
     parts.push("CoverageScope:");
-    for (const handle of result.coverageScope) {
-      parts.push(`  ${handle}`);
+    for (const path of result.coverageScope) {
+      parts.push(`  ${path}`);
     }
   }
   if (result.launchId) parts.push(`LaunchId:      \`${result.launchId}\``);
@@ -59,8 +59,8 @@ export function formatStatusSnapshot(entry) {
   lines.push("");
   if (entry.coverageScope?.length) {
     lines.push("CoverageScope:");
-    for (const handle of entry.coverageScope) {
-      lines.push(`  ${handle}`);
+    for (const path of entry.coverageScope) {
+      lines.push(`  ${path}`);
     }
   }
   if (entry.description) {

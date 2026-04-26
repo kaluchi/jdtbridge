@@ -57,7 +57,7 @@ final class CoverageRun {
 
     /** {@link IPackageFragmentRoot} set defining the run's scope.
      *  Stable over the run's lifetime. */
-    volatile Set<IPackageFragmentRoot> coverageScope;
+    final Set<IPackageFragmentRoot> coverageScope;
 
     /** All sessions that belong to this run, latest last. Live runs
      *  grow this list per dump; merged/imported runs hold exactly

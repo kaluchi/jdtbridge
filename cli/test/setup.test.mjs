@@ -46,6 +46,8 @@ describe("setup command", () => {
       runDirector: () => "",
       p2Install: () => "",
       p2Uninstall: () => "",
+      getEclipseJavaHome: () => null,
+      awaitProfileLockFree: () => {},
       ...overrides.eclipse,
     };
 

@@ -23,7 +23,7 @@ describe("formatRunHeader", () => {
       coverageId: "MyTest:1700000000000",
       launchId: "MyTest:6408",
       configType: "JUnit Plug-in Test",
-      coverageScope: ["=MyProject/src/main/java", "=MyProject/src/test/java"],
+      coverageScope: ["/MyProject/src/main/java", "/MyProject/src/test/java"],
     });
     expect(out).toContain("#### Coverage: MyTest");
     expect(out).toContain("CoverageId:    `MyTest:1700000000000`");
@@ -31,7 +31,7 @@ describe("formatRunHeader", () => {
     expect(out).toContain("ConfigId:      `MyTest`");
     expect(out).toContain("ConfigType:    JUnit Plug-in Test");
     expect(out).toContain("LaunchMode:    coverage");
-    expect(out).toContain("=MyProject/src/main/java");
+    expect(out).toContain("/MyProject/src/main/java");
   });
 
   it("omits scope block when coverageScope empty", () => {

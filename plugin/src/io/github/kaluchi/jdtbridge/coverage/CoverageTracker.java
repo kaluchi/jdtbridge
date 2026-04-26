@@ -214,11 +214,13 @@ final class CoverageTracker
         return activeCoverageId;
     }
 
-    /** Swap {@link #activeCoverageId} and clear analysis flags on
-     *  the previously-active run. The previous run is no longer the
-     *  analysis target, so its {@code analysisLoading}/
-     *  {@code analysisReady} bits would be stale once EclEmma starts
-     *  re-loading for the new session. */
+    /** Swap {@link #activeCoverageId} and clear the loading bit on
+     *  the previously-active run. {@code analysisReady} is durable
+     *  on deactivation: EclEmma's loader stops being authoritative
+     *  for the old session, but {@link CoverageAnalyzer} still
+     *  caches the analysis result. The flag therefore reflects
+     *  "we have an analysis for this session" rather than "the
+     *  loader is currently pointing at it". */
     private void setActiveCoverageId(String newId) {
         String previous = activeCoverageId;
         activeCoverageId = newId;
@@ -228,7 +230,6 @@ final class CoverageTracker
         CoverageRun stale = runs.get(previous);
         if (stale != null) {
             stale.analysisLoading = false;
-            stale.analysisReady = false;
         }
     }
 
@@ -386,8 +387,15 @@ final class CoverageTracker
         }
         // Defer — sessionRemoved bursts that arrive synchronously
         // after this call distinguish merged from imported.
+        // putIfAbsent guards the retroactive-scan race: a session
+        // that arrives via the listener AND via the start()
+        // catch-up loop would otherwise overwrite the first
+        // PendingClassification (which already accumulated the
+        // sessionRemoved burst) with an empty second one.
         PendingClassification pc = new PendingClassification(session);
-        pending.put(session, pc);
+        if (pending.putIfAbsent(session, pc) != null) {
+            return;
+        }
         Job job = new Job("jdtbridge coverage classify") {
             @Override
             protected IStatus run(IProgressMonitor monitor) {
@@ -429,11 +437,17 @@ final class CoverageTracker
 
     private void appendLiveDump(CoverageRun run,
             ICoverageSession session) {
+        // putIfAbsent makes the append idempotent — without it, a
+        // session that arrives via both the listener AND the
+        // retroactive scan in start() would be added twice.
+        if (sessionToRunId.putIfAbsent(
+                session, run.coverageId) != null) {
+            return;
+        }
         run.sessions.add(session);
         run.dumpedAt.add(System.currentTimeMillis());
         run.dataReceived = true;
         run.description = session.getDescription();
-        sessionToRunId.put(session, run.coverageId);
         fireDumped(run);
     }
 
