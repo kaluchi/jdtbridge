@@ -50,77 +50,51 @@ public class ServerPreferences {
 
     /** Read local port from preferences. */
     public static int resolveLocalPort() {
-        try {
-            return Platform.getPreferencesService().getInt(
-                    PREFERENCE_NODE, LOCAL_PORT, 0, null);
-        } catch (Exception e) {
-            Log.warn("Failed to read local port preference", e);
-            return 0;
-        }
+        return getInt(LOCAL_PORT, 0);
     }
 
     /** Whether local token should regenerate on restart. */
     public static boolean resolveLocalRegenerateToken() {
-        try {
-            return Platform.getPreferencesService().getBoolean(
-                    PREFERENCE_NODE, LOCAL_REGENERATE_TOKEN,
-                    true, null);
-        } catch (Exception e) {
-            return true;
-        }
+        return getBoolean(LOCAL_REGENERATE_TOKEN, true);
     }
 
     /** Read persisted local token (when regenerate is off). */
     public static String resolveLocalToken() {
-        try {
-            return Platform.getPreferencesService().getString(
-                    PREFERENCE_NODE, LOCAL_TOKEN, "", null);
-        } catch (Exception e) {
-            return "";
-        }
+        return getString(LOCAL_TOKEN, "");
     }
 
     /** Whether remote socket is enabled. */
     public static boolean resolveRemoteEnabled() {
-        try {
-            return Platform.getPreferencesService()
-                    .getBoolean(PREFERENCE_NODE, REMOTE_ENABLED,
-                            false, null);
-        } catch (Exception e) {
-            return false;
-        }
+        return getBoolean(REMOTE_ENABLED, false);
     }
 
     /** Read remote port from preferences. */
     public static int resolveRemotePort() {
-        try {
-            return Platform.getPreferencesService().getInt(
-                    PREFERENCE_NODE, REMOTE_PORT, 0, null);
-        } catch (Exception e) {
-            Log.warn("Failed to read remote port preference", e);
-            return 0;
-        }
+        return getInt(REMOTE_PORT, 0);
     }
 
     /** Whether remote token should regenerate on restart. */
     public static boolean resolveRemoteRegenerateToken() {
-        try {
-            return Platform.getPreferencesService().getBoolean(
-                    PREFERENCE_NODE, REMOTE_REGENERATE_TOKEN,
-                    false, null);
-        } catch (Exception e) {
-            return false;
-        }
+        return getBoolean(REMOTE_REGENERATE_TOKEN, false);
     }
 
     /** Read persisted remote token. */
     public static String resolveRemoteToken() {
-        try {
-            return Platform.getPreferencesService().getString(
-                    PREFERENCE_NODE, REMOTE_TOKEN, "", null);
-        } catch (Exception e) {
-            return "";
-        }
+        return getString(REMOTE_TOKEN, "");
     }
 
+    private static int getInt(String key, int defaultValue) {
+        return Platform.getPreferencesService().getInt(
+                PREFERENCE_NODE, key, defaultValue, null);
+    }
+
+    private static boolean getBoolean(String key, boolean defaultValue) {
+        return Platform.getPreferencesService().getBoolean(
+                PREFERENCE_NODE, key, defaultValue, null);
+    }
+
+    private static String getString(String key, String defaultValue) {
+        return Platform.getPreferencesService().getString(
+                PREFERENCE_NODE, key, defaultValue, null);
+    }
 }
