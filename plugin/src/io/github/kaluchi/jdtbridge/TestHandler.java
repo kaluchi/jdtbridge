@@ -41,9 +41,9 @@ public class TestHandler {
     }
 
     private static final String JUNIT_LAUNCH_TYPE =
-            "org.eclipse.jdt.junit.launchconfig";
+            JUnitLaunchConst.LAUNCH_TYPE;
     private static final String PDE_JUNIT_LAUNCH_TYPE =
-            "org.eclipse.pde.ui.JunitLaunchConfig";
+            JUnitLaunchConst.PDE_LAUNCH_TYPE;
     private static final String PDE_PLUGIN_NATURE =
             "org.eclipse.pde.PluginNature";
     private static final String PDE_RUN_IN_UI_THREAD =
@@ -63,17 +63,17 @@ public class TestHandler {
     private static final String PDE_INCLUDE_OPTIONAL =
             "includeOptional";
     private static final String ATTR_TEST_KIND =
-            "org.eclipse.jdt.junit.TEST_KIND";
+            JUnitLaunchConst.ATTR_TEST_KIND;
     private static final String ATTR_TEST_NAME =
-            "org.eclipse.jdt.junit.TESTNAME";
+            JUnitLaunchConst.ATTR_TEST_NAME;
     private static final String ATTR_TEST_CONTAINER =
-            "org.eclipse.jdt.junit.CONTAINER";
+            JUnitLaunchConst.ATTR_CONTAINER;
     private static final String JUNIT6_KIND =
-            "org.eclipse.jdt.junit.loader.junit6";
+            JUnitLaunchConst.KIND_JUNIT6;
     private static final String JUNIT5_KIND =
-            "org.eclipse.jdt.junit.loader.junit5";
+            JUnitLaunchConst.KIND_JUNIT5;
     private static final String JUNIT4_KIND =
-            "org.eclipse.jdt.junit.loader.junit4";
+            JUnitLaunchConst.KIND_JUNIT4;
     private static final String JUNIT_PLATFORM_COMMONS_PREFIX =
             "junit-platform-commons";
     private static final String JUNIT_PLATFORM_SUITE_API_PREFIX =

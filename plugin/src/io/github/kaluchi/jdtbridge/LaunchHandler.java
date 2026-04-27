@@ -52,15 +52,15 @@ class LaunchHandler {
             "org.eclipse.jdt.launching.localJavaApplication";
 
     private static final String ATTR_TEST_KIND =
-            "org.eclipse.jdt.junit.TEST_KIND";
+            JUnitLaunchConst.ATTR_TEST_KIND;
     private static final String ATTR_TEST_NAME =
-            "org.eclipse.jdt.junit.TESTNAME";
+            JUnitLaunchConst.ATTR_TEST_NAME;
     private static final String ATTR_CONTAINER =
-            "org.eclipse.jdt.junit.CONTAINER";
+            JUnitLaunchConst.ATTR_CONTAINER;
     private static final String JUNIT_LAUNCH_TYPE =
-            "org.eclipse.jdt.junit.launchconfig";
+            JUnitLaunchConst.LAUNCH_TYPE;
     private static final String PDE_JUNIT_LAUNCH_TYPE =
-            "org.eclipse.pde.ui.JunitLaunchConfig";
+            JUnitLaunchConst.PDE_LAUNCH_TYPE;
     private static final String MAVEN_LAUNCH_TYPE =
             "org.eclipse.m2e.Maven2LaunchConfigurationType";
     private static final String MAVEN_GOALS =
