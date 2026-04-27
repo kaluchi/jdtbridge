@@ -6,11 +6,15 @@ import com.google.gson.JsonObject;
 import java.util.Map;
 
 import org.eclipse.core.resources.IFile;
+import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.core.JavaCore;
+import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.ui.JavaUI;
 import org.eclipse.swt.widgets.Display;
+import org.eclipse.ui.IEditorInput;
 import org.eclipse.ui.IEditorPart;
 import org.eclipse.ui.IEditorReference;
 import org.eclipse.ui.IFileEditorInput;
@@ -24,85 +28,77 @@ class EditorHandler {
             ProjectScope scope) throws Exception {
         String[] result = {"[]"};
         Runnable query = () -> {
-            try {
-                IWorkbenchWindow window = PlatformUI
-                        .getWorkbench()
-                        .getActiveWorkbenchWindow();
-                if (window == null
-                        || window.getActivePage() == null) {
-                    return;
-                }
-
-                IWorkbenchPage page =
-                        window.getActivePage();
-                IEditorReference[] refs =
-                        page.getEditorReferences();
-                IEditorPart active =
-                        page.getActiveEditor();
-
-                var arr = new JsonArray();
-                if (active != null) {
-                    addEditorEntry(
-                            active.getEditorInput(), arr,
-                            true, scope);
-                }
-                for (IEditorReference ref : refs) {
-                    IEditorPart editor =
-                            ref.getEditor(false);
-                    if (editor != null && editor == active)
-                        continue;
-                    try {
-                        addEditorEntry(
-                                ref.getEditorInput(), arr,
-                                false, scope);
-                    } catch (Exception ignored) {
-                    }
-                }
-                result[0] = arr.toString();
-            } catch (Exception e) {
+            IWorkbenchWindow window = PlatformUI.getWorkbench()
+                    .getActiveWorkbenchWindow();
+            if (window == null
+                    || window.getActivePage() == null) {
+                return;
             }
+            IWorkbenchPage page = window.getActivePage();
+            IEditorPart active = page.getActiveEditor();
+            JsonArray arr = new JsonArray();
+            if (active != null) {
+                appendEntry(active.getEditorInput(), arr,
+                        true, scope);
+            }
+            for (IEditorReference ref
+                    : page.getEditorReferences()) {
+                IEditorPart editor = ref.getEditor(false);
+                if (editor != null && editor == active) continue;
+                appendEntry(inputOf(ref), arr, false, scope);
+            }
+            result[0] = arr.toString();
         };
-        Display display = Display.getCurrent();
-        if (display != null) {
+        if (Display.getCurrent() != null) {
             query.run();
         } else {
-            try {
-                Display.getDefault().syncExec(query);
-            } catch (Exception e) {
-            }
+            Display.getDefault().syncExec(query);
         }
         return result[0];
     }
 
-    private void addEditorEntry(
-            org.eclipse.ui.IEditorInput input,
+    private static IEditorInput inputOf(IEditorReference ref) {
+        try {
+            return ref.getEditorInput();
+        } catch (org.eclipse.ui.PartInitException e) {
+            throw new IllegalStateException(
+                    "Editor reference not initialised: " + ref, e);
+        }
+    }
+
+    private static void appendEntry(IEditorInput input,
             JsonArray arr, boolean isActive,
             ProjectScope scope) {
         if (!(input instanceof IFileEditorInput fi)) return;
         IFile file = fi.getFile();
         if (file.getLocation() == null) return;
-        if (!scope.containsProject(
-                file.getProject().getName())) return;
-        var obj = new JsonObject();
-        obj.addProperty("file",
-                file.getLocation().toOSString());
-        obj.addProperty("project",
-                file.getProject().getName());
-        if (isActive) obj.addProperty("active", true);
-        // FQN for Java files
+        String project = file.getProject().getName();
+        if (!scope.containsProject(project)) return;
+        arr.add(EditorJson.entry(
+                file.getLocation().toOSString(),
+                project,
+                primaryTypeFqn(file),
+                isActive));
+    }
+
+    /**
+     * Primary type FQN if {@code file} is a compilation unit,
+     * otherwise {@code null}. {@link JavaCore#create(IFile)} returns
+     * {@code null} for non-Java files, so the cast is the gate.
+     */
+    private static String primaryTypeFqn(IFile file)
+            throws RuntimeException {
+        IJavaElement el = JavaCore.create(file);
+        if (!(el instanceof ICompilationUnit cu)) return null;
         try {
-            var javaElement = org.eclipse.jdt.core.JavaCore
-                    .create(file);
-            if (javaElement instanceof org.eclipse.jdt.core
-                    .ICompilationUnit cu) {
-                var types = cu.getTypes();
-                if (types.length > 0) {
-                    obj.addProperty("fqn",
-                            types[0].getFullyQualifiedName());
-                }
-            }
-        } catch (Exception ignored) { }
-        arr.add(obj);
+            IType[] types = cu.getTypes();
+            return types.length > 0
+                    ? types[0].getFullyQualifiedName()
+                    : null;
+        } catch (JavaModelException e) {
+            throw new RuntimeException(
+                    "Could not read types of " + file, e);
+        }
     }
 
     String handleOpen(Map<String, String> params)
@@ -141,7 +137,7 @@ class EditorHandler {
                 if (editor != null) {
                     JavaUI.revealInEditor(editor, element);
                 }
-                var ok = new JsonObject();
+                JsonObject ok = new JsonObject();
                 ok.addProperty("ok", true);
                 result[0] = ok.toString();
             } catch (Exception e) {
