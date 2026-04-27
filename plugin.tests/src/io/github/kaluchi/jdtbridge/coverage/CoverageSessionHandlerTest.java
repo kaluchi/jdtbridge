@@ -74,7 +74,7 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void importedSessionAppearsInRuns() {
+        void importedSessionAppearsInRuns() throws Exception {
             String coverageId = importAndAwait("runs-test");
             JsonArray arr = JsonParser.parseString(
                             handler.handleRuns(ProjectScope.ALL))
@@ -88,7 +88,7 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void entryShapeHasAllRequiredFields() {
+        void entryShapeHasAllRequiredFields() throws Exception {
             importAndAwait("shape-test");
             JsonArray arr = JsonParser.parseString(
                             handler.handleRuns(ProjectScope.ALL))
@@ -109,7 +109,7 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void importedRunHasNullConfigFields() {
+        void importedRunHasNullConfigFields() throws Exception {
             importAndAwait("null-config-test");
             JsonObject entry = JsonParser.parseString(
                             handler.handleRuns(ProjectScope.ALL))
@@ -122,7 +122,7 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void importedRunIsTerminated() {
+        void importedRunIsTerminated() throws Exception {
             importAndAwait("terminated-test");
             JsonObject entry = JsonParser.parseString(
                             handler.handleRuns(ProjectScope.ALL))
@@ -133,7 +133,7 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void activeRunMarkedActiveTrue() {
+        void activeRunMarkedActiveTrue() throws Exception {
             String coverageId = importAndAwait("active-marker");
             JsonArray arr = JsonParser.parseString(
                             handler.handleRuns(ProjectScope.ALL))
@@ -147,7 +147,7 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void inactiveRunsMarkedActiveFalse() {
+        void inactiveRunsMarkedActiveFalse() throws Exception {
             importAndAwait("first");
             String activeId = importAndAwait("second");
             JsonArray arr = JsonParser.parseString(
@@ -166,7 +166,7 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void scopeFilteringExcludesUnscopedImported() {
+        void scopeFilteringExcludesUnscopedImported() throws Exception {
             importAndAwait("scope-out");
             // Imported with empty scope set — containsAnyOfRoots
             // returns false for any non-null projects scope.
@@ -196,7 +196,7 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void unknownDumpSuffixReturnsDumpNotFound() {
+        void unknownDumpSuffixReturnsDumpNotFound() throws Exception {
             String coverageId = importAndAwait("dump-out-of-range");
             JsonObject obj = parseObj(handler.handleSession(
                     Map.of("coverageId", coverageId + ":99")));
@@ -205,7 +205,7 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void importedSessionHasCountersAndInfos() {
+        void importedSessionHasCountersAndInfos() throws Exception {
             String coverageId = importAndAwait("session-test");
             JsonObject obj = parseObj(handler.handleSession(
                     Map.of("coverageId", coverageId)));
@@ -223,7 +223,7 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void emptyExecDataYieldsZeroCounters() {
+        void emptyExecDataYieldsZeroCounters() throws Exception {
             String coverageId = importAndAwait("zero-counters");
             JsonObject obj = parseObj(handler.handleSession(
                     Map.of("coverageId", coverageId)));
@@ -235,7 +235,7 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void zeroTotalsYieldNullRatios() {
+        void zeroTotalsYieldNullRatios() throws Exception {
             String coverageId = importAndAwait("nan-ratios");
             JsonObject instr = parseObj(handler.handleSession(
                             Map.of("coverageId", coverageId)))
@@ -250,7 +250,7 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void coverageStatusIsConstantName() {
+        void coverageStatusIsConstantName() throws Exception {
             String coverageId = importAndAwait("status-test");
             String status = parseObj(handler.handleSession(
                             Map.of("coverageId", coverageId)))
@@ -283,7 +283,7 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void missingFqnReturnsFqnUnresolved() {
+        void missingFqnReturnsFqnUnresolved() throws Exception {
             String coverageId = importAndAwait("node-no-fqn");
             JsonObject obj = parseObj(handler.handleNode(
                     Map.of("coverageId", coverageId)));
@@ -301,7 +301,7 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void unresolvableFqnReturnsFqnUnresolved() {
+        void unresolvableFqnReturnsFqnUnresolved() throws Exception {
             String coverageId = importAndAwait("node-bad-fqn");
             JsonObject obj = parseObj(handler.handleNode(Map.of(
                     "coverageId", coverageId,
@@ -311,7 +311,7 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void resolvableFqnOutsideScopeReturnsNoDataForElement() {
+        void resolvableFqnOutsideScopeReturnsNoDataForElement() throws Exception {
             // The imported empty-scope session has no projects in
             // modelCoverage; the fixture type resolves but
             // getCoverageFor returns null.
@@ -324,7 +324,7 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void unknownDumpSuffixReturnsDumpNotFound() {
+        void unknownDumpSuffixReturnsDumpNotFound() throws Exception {
             String coverageId = importAndAwait("node-dump");
             JsonObject obj = parseObj(handler.handleNode(Map.of(
                     "coverageId", coverageId + ":99",
@@ -423,7 +423,7 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void activeReturnsId() {
+        void activeReturnsId() throws Exception {
             String coverageId = importAndAwait("active-test");
             JsonObject obj = parseObj(handler.handleActive());
             assertEquals(coverageId,
@@ -450,7 +450,7 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void activatesAndReturnsPrevious() {
+        void activatesAndReturnsPrevious() throws Exception {
             String firstId = importAndAwait("activate-1");
             String secondId = importAndAwait("activate-2");
             // After two imports, second one is active by default
@@ -476,7 +476,7 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void singleInputReturnsTooFewInputs() {
+        void singleInputReturnsTooFewInputs() throws Exception {
             String single = importAndAwait("merge-1");
             JsonObject obj = parseObj(handler.handleMerge(
                     "{\"coverageIds\":[\"" + single + "\"]}"));
@@ -485,7 +485,7 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void unknownIdSurfacesContextMissing() {
+        void unknownIdSurfacesContextMissing() throws Exception {
             String first = importAndAwait("merge-known");
             JsonObject obj = parseObj(handler.handleMerge(
                     "{\"coverageIds\":[\"" + first
@@ -498,7 +498,7 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void twoImportedSessionsMergeSuccessfully() {
+        void twoImportedSessionsMergeSuccessfully() throws Exception {
             String a = importAndAwait("merge-a");
             String b = importAndAwait("merge-b");
             JsonObject obj = parseObj(handler.handleMerge(
@@ -529,7 +529,7 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void omittedDescriptionUsesEclipseDefault() {
+        void omittedDescriptionUsesEclipseDefault() throws Exception {
             String a = importAndAwait("desc-a");
             String b = importAndAwait("desc-b");
             String mergedId = parseObj(handler.handleMerge(
@@ -636,7 +636,7 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void emptyBodyRemovesActiveOnly() {
+        void emptyBodyRemovesActiveOnly() throws Exception {
             importAndAwait("remove-keep");
             String activeId = importAndAwait("remove-active");
             JsonObject obj = parseObj(handler.handleRemove("{}"));
@@ -650,7 +650,7 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void allTrueRemovesEverything() {
+        void allTrueRemovesEverything() throws Exception {
             importAndAwait("all-1");
             importAndAwait("all-2");
             JsonObject obj = parseObj(handler.handleRemove(
@@ -662,7 +662,7 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void allFalseDefaultsToActiveRemoval() {
+        void allFalseDefaultsToActiveRemoval() throws Exception {
             importAndAwait("default-keep");
             String activeId = importAndAwait("default-active");
             JsonObject obj = parseObj(handler.handleRemove(
@@ -679,19 +679,15 @@ public class CoverageSessionHandlerTest {
         return JsonParser.parseString(json).getAsJsonObject();
     }
 
-    private String importAndAwait(String description) {
+    private String importAndAwait(String description) throws Exception {
         ISessionImporter importer = CoverageTools.getImporter();
         importer.setDescription(description);
         importer.setScope(Set.of());
         importer.setExecutionDataSource(emptyDataSource());
         importer.setCopy(false);
-        try {
-            importer.importSession(new NullProgressMonitor());
-            Job.getJobManager().join(
-                    CoverageTracker.CLASSIFY_FAMILY, null);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        importer.importSession(new NullProgressMonitor());
+        Job.getJobManager().join(
+                CoverageTracker.CLASSIFY_FAMILY, null);
         return tracker.snapshot().values().stream()
                 .filter(r -> description.equals(r.description))
                 .map(r -> r.coverageId)

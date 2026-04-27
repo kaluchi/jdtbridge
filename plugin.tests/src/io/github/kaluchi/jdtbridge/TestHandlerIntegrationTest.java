@@ -74,33 +74,8 @@ public class TestHandlerIntegrationTest {
     @Test
     public void detectTestKindJunit5() throws Exception {
         // test project has JUnit 5 on classpath
-        Object type = invokeFindType("test.model.Dog");
-        String kind = invokeDetectTestKind(type);
+        var type = JdtUtils.findType("test.model.Dog");
+        String kind = handler.detectTestKind(type);
         assertEquals("org.eclipse.jdt.junit.loader.junit5", kind);
-    }
-
-    private Object invokeFindType(String fqn) {
-        try {
-            Class<?> clazz = Class.forName(
-                    "io.github.kaluchi.jdtbridge.JdtUtils");
-            var method = clazz
-                    .getDeclaredMethod("findType", String.class);
-            method.setAccessible(true);
-            return method.invoke(null, fqn);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private String invokeDetectTestKind(Object type) {
-        try {
-            var method = TestHandler.class
-                    .getDeclaredMethod("detectTestKind",
-                            org.eclipse.jdt.core.IType.class);
-            method.setAccessible(true);
-            return (String) method.invoke(handler, type);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
     }
 }

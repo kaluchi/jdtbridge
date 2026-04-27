@@ -89,7 +89,7 @@ public class CoverageProgressStreamerTest {
     class TerminalSession {
 
         @Test
-        void importedSessionEmitsSnapshotThenTerminated() {
+        void importedSessionEmitsSnapshotThenTerminated() throws Exception {
             String coverageId = importAndAwait("stream-terminal");
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             CoverageProgressStreamer.stream(out, coverageId,
@@ -113,7 +113,7 @@ public class CoverageProgressStreamerTest {
         }
 
         @Test
-        void snapshotCarriesAllStatusFlags() {
+        void snapshotCarriesAllStatusFlags() throws Exception {
             String coverageId = importAndAwait("snap-flags");
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             CoverageProgressStreamer.stream(out, coverageId,
@@ -132,7 +132,7 @@ public class CoverageProgressStreamerTest {
         }
 
         @Test
-        void terminatedEventCarriesDataReceived() {
+        void terminatedEventCarriesDataReceived() throws Exception {
             String coverageId = importAndAwait("term-data");
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             CoverageProgressStreamer.stream(out, coverageId,
@@ -145,7 +145,7 @@ public class CoverageProgressStreamerTest {
         }
 
         @Test
-        void importedRunSessionKindIsImported() {
+        void importedRunSessionKindIsImported() throws Exception {
             String coverageId = importAndAwait("kind-imported");
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             CoverageProgressStreamer.stream(out, coverageId,
@@ -391,7 +391,7 @@ public class CoverageProgressStreamerTest {
     class Newlines {
 
         @Test
-        void everyEventIsOneLine() {
+        void everyEventIsOneLine() throws Exception {
             String coverageId = importAndAwait("oneline");
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             CoverageProgressStreamer.stream(out, coverageId,
@@ -406,7 +406,7 @@ public class CoverageProgressStreamerTest {
         }
 
         @Test
-        void noTrailingTextAfterLastNewline() {
+        void noTrailingTextAfterLastNewline() throws Exception {
             String coverageId = importAndAwait("no-trailer");
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             CoverageProgressStreamer.stream(out, coverageId,
@@ -432,19 +432,15 @@ public class CoverageProgressStreamerTest {
         return body.split("\n");
     }
 
-    private String importAndAwait(String description) {
+    private String importAndAwait(String description) throws Exception {
         ISessionImporter importer = CoverageTools.getImporter();
         importer.setDescription(description);
         importer.setScope(Set.of());
         importer.setExecutionDataSource(emptyDataSource());
         importer.setCopy(false);
-        try {
-            importer.importSession(new NullProgressMonitor());
-            Job.getJobManager().join(
-                    CoverageTracker.CLASSIFY_FAMILY, null);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        importer.importSession(new NullProgressMonitor());
+        Job.getJobManager().join(
+                CoverageTracker.CLASSIFY_FAMILY, null);
         String coverageId = tracker.snapshot().values().stream()
                 .filter(r -> description.equals(r.description))
                 .map(r -> r.coverageId)
@@ -507,17 +503,15 @@ public class CoverageProgressStreamerTest {
     }
 
     /** Locate the first JSONL line in {@code out} whose {@code event}
-     *  field equals {@code name}. Returns {@code null} when absent. */
+     *  field equals {@code name}. Returns {@code null} when absent.
+     *  Lines are produced by the streamer itself — controlled JSON,
+     *  no parse-failure path. */
     private static JsonObject findEvent(ByteArrayOutputStream out,
             String name) {
         for (String line : lines(out)) {
             if (line.isEmpty()) continue;
-            JsonObject obj;
-            try {
-                obj = JsonParser.parseString(line).getAsJsonObject();
-            } catch (Exception e) {
-                continue;
-            }
+            JsonObject obj = JsonParser.parseString(line)
+                    .getAsJsonObject();
             if (obj.has("event")
                     && name.equals(obj.get("event").getAsString())) {
                 return obj;
