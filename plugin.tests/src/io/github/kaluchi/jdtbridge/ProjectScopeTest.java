@@ -131,7 +131,9 @@ public class ProjectScopeTest {
             ILaunchConfigurationType mavenType = mgr
                     .getLaunchConfigurationType(
                             "org.eclipse.m2e.Maven2LaunchConfigurationType");
-            if (mavenType == null) return; // m2e not available
+            org.junit.jupiter.api.Assertions.assertNotNull(
+                    mavenType,
+                    "m2e launch type must be present in test runtime");
             var config = mavenType.newInstance(
                     null, "test-no-project");
             // No working dir set → passes (permissive)
@@ -150,7 +152,10 @@ public class ProjectScopeTest {
                     .getLaunchConfigurationType(
                             "org.eclipse.debug.core.groups."
                                     + "GroupLaunchConfigurationType");
-            if (groupType == null) return;
+            org.junit.jupiter.api.Assertions.assertNotNull(
+                    groupType,
+                    "Group launch type ships with debug.core "
+                            + "and must be present");
             var scope = ProjectScope.of(Set.of("anything"));
             var wc = groupType.newInstance(
                     null, "test-empty-group");

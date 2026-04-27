@@ -112,8 +112,7 @@ public class TestHandlerIntegrationTest {
             var cfg = launch.getLaunchConfiguration();
             if (cfg != null && configId.equals(cfg.getName())
                     && !launch.isTerminated()) {
-                try { launch.terminate(); }
-                catch (Exception ignored) { /* best effort */ }
+                launch.terminate();
             }
         }
     }
