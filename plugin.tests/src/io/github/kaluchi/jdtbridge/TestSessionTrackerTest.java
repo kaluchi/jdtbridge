@@ -309,6 +309,23 @@ public class TestSessionTrackerTest {
                         "Should have total: " + obj);
             }
         }
+
+        @Test
+        void filteredScopeSkipsSessionsOutsideScope() {
+            // Scope of a project name no real launch could ever
+            // belong to → every live session must be filtered out.
+            ProjectScope narrow = ProjectScope.of(
+                    java.util.Set.of(
+                            "no-project-with-this-name-"
+                                    + java.util.UUID.randomUUID()));
+            String json = handler.handleSessions(
+                    Map.of(), narrow);
+            var arr = JsonParser.parseString(json)
+                    .getAsJsonArray();
+            assertEquals(0, arr.size(),
+                    "Filtered scope must yield empty array: "
+                            + json);
+        }
     }
 
 
