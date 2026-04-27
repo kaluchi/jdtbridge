@@ -7,9 +7,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.jobs.Job;
+import org.eclipse.debug.core.DebugPlugin;
+import org.eclipse.debug.core.ILaunchConfiguration;
+import org.eclipse.debug.core.ILaunchConfigurationType;
+import org.eclipse.debug.core.ILaunchConfigurationWorkingCopy;
+import org.eclipse.debug.core.ILaunchManager;
 import org.eclipse.eclemma.core.CoverageTools;
 import org.eclipse.eclemma.core.IExecutionDataSource;
 import org.eclipse.eclemma.core.ISessionImporter;
@@ -68,6 +74,79 @@ public class CoverageHandlerTest {
                     "configId", "definitely-not-a-real-config-xyz-9z")));
             assertEquals("coverage-config-not-found",
                     obj.get("error").getAsString());
+        }
+    }
+
+    @Nested
+    class ModeNotSupported {
+
+        private static final String NON_COVERAGE_TYPE_ID =
+                "org.eclipse.ui.externaltools."
+                        + "ProgramLaunchConfigurationType";
+
+        @Test
+        void unsupportedTypeReturnsModeNotSupportedError()
+                throws Exception {
+            // External-tool launch type ships with every Eclipse and
+            // EclEmma never registers a coverage delegate for it,
+            // so it's a stable "unsupported" sample.
+            ILaunchManager mgr = DebugPlugin.getDefault()
+                    .getLaunchManager();
+            ILaunchConfigurationType type =
+                    mgr.getLaunchConfigurationType(
+                            NON_COVERAGE_TYPE_ID);
+            assertNotNull(type,
+                    "External-tool launch type missing in runtime");
+
+            String configName = "test-non-coverage-"
+                    + UUID.randomUUID();
+            ILaunchConfigurationWorkingCopy wc =
+                    type.newInstance(null, configName);
+            ILaunchConfiguration cfg = wc.doSave();
+            try {
+                JsonObject obj = parseObj(handler.handleRun(
+                        Map.of("configId", configName)));
+                assertEquals("coverage-mode-not-supported",
+                        obj.get("error").getAsString());
+                assertTrue(obj.has("supportedTypeIds"),
+                        "Should list supportedTypeIds: " + obj);
+                assertTrue(obj.get("message").getAsString()
+                                .contains(NON_COVERAGE_TYPE_ID),
+                        "Message should reference offending typeId: "
+                                + obj);
+            } finally {
+                cfg.delete();
+            }
+        }
+
+        @Test
+        void supportedTypeIdsListIsNonEmpty() throws Exception {
+            ILaunchManager mgr = DebugPlugin.getDefault()
+                    .getLaunchManager();
+            ILaunchConfigurationType type =
+                    mgr.getLaunchConfigurationType(
+                            NON_COVERAGE_TYPE_ID);
+            assertNotNull(type);
+
+            String configName = "test-non-coverage-list-"
+                    + UUID.randomUUID();
+            ILaunchConfigurationWorkingCopy wc =
+                    type.newInstance(null, configName);
+            ILaunchConfiguration cfg = wc.doSave();
+            try {
+                JsonObject obj = parseObj(handler.handleRun(
+                        Map.of("configId", configName)));
+                var arr = obj.get("supportedTypeIds")
+                        .getAsJsonArray();
+                // Coverage-supported set depends on which optional
+                // host bundles are installed, but at least the Java
+                // application type must always be present.
+                assertTrue(arr.size() > 0,
+                        "supportedTypeIds should not be empty: "
+                                + obj);
+            } finally {
+                cfg.delete();
+            }
         }
     }
 
