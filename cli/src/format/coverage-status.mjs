@@ -1,6 +1,7 @@
 // Renderers for jdt coverage run / status / -f stream.
 
 import { bold, dim, green, red, yellow } from "../color.mjs";
+import { alignCmds } from "./align.mjs";
 import { composeStatus } from "./coverage-state.mjs";
 
 /** Header printed by `jdt coverage run`. */
@@ -25,27 +26,33 @@ export function formatRunHeader(result) {
 export function runGuide(coverageId, launchId) {
   return `
 **Coverage status** (coverageId = ${coverageId}):
-  \`jdt coverage status ${coverageId}\`             snapshot
-  \`jdt coverage status ${coverageId} -f\`          follow until ready
-  \`jdt coverage active\`                            show active session
+${alignCmds([
+  [`jdt coverage status ${coverageId}`, "snapshot"],
+  [`jdt coverage status ${coverageId} -f`, "follow until ready"],
+  [`jdt coverage active`, "show active session"],
+])}
 
 **Console output** (launchId = ${launchId}):
   \`jdt launch logs ${launchId}\`
   \`jdt launch logs ${launchId} --tail 50\`
 
 **Manage running launch:**
-  \`jdt coverage dump ${coverageId}\`               request a dump
-  \`jdt coverage dump ${coverageId} --reset\`       dump + reset agent probes
-  \`jdt coverage stop ${coverageId}\`               terminate
+${alignCmds([
+  [`jdt coverage dump ${coverageId}`, "request a dump"],
+  [`jdt coverage dump ${coverageId} --reset`, "dump + reset agent probes"],
+  [`jdt coverage stop ${coverageId}`, "terminate"],
+])}
 
 **Sessions:**
-  \`jdt coverage runs\`                              list all sessions
-  \`jdt coverage activate ${coverageId}\`           switch IDE display
-  \`jdt coverage refresh\`                           re-analyze active
-  \`jdt coverage relaunch\`                          re-launch active in coverage mode
-  \`jdt coverage merge <coverageId> <coverageId>\`  merge two or more
-  \`jdt coverage remove\`                            remove active
-  \`jdt coverage remove --all\`                      remove all
+${alignCmds([
+  [`jdt coverage runs`, "list all sessions"],
+  [`jdt coverage activate ${coverageId}`, "switch IDE display"],
+  [`jdt coverage refresh`, "re-analyze active"],
+  [`jdt coverage relaunch`, "re-launch active in coverage mode"],
+  [`jdt coverage merge <coverageId> <coverageId>`, "merge two or more"],
+  [`jdt coverage remove`, "remove active"],
+  [`jdt coverage remove --all`, "remove all"],
+])}
 
 Add \`-q\` to suppress this guide.`;
 }

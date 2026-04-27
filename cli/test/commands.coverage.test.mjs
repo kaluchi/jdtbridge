@@ -51,7 +51,16 @@ describe("commands.coverage", () => {
   });
 
   async function setupMock(handler) {
-    ({ server, port } = await startServer(handler));
+    ({ server, port } = await startServer((req, res) => {
+      // Default /problems → [] so the coverage-run preflight clears
+      // without each test having to mock it.
+      if (req.url.startsWith("/problems")) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end("[]");
+        return;
+      }
+      handler(req, res);
+    }));
     vi.doMock("../src/resolve.mjs", () => ({
       resolveInstance: async () => ({
         port, token: null, pid: process.pid,
