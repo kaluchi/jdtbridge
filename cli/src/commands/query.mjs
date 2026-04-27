@@ -182,7 +182,7 @@ export async function query(args) {
     bindParseOperands(session);
     bindJdtRenderOperands(session);
     const cellEntry = await session.evalCell(
-        `use(:jdt/graph) | use(:jdt/coverage) | ${querySource}`);
+        `use(:jdt/aliases) | use(:jdt/graph) | use(:jdt/coverage) | ${querySource}`);
 
     if (cellEntry.error) {
       printQueryResult(parseErrorToValue(cellEntry.error, cellEntry.uri));
