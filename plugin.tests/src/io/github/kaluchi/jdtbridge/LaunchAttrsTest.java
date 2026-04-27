@@ -1,6 +1,7 @@
 package io.github.kaluchi.jdtbridge;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.junit.jupiter.api.Nested;
@@ -75,6 +76,39 @@ public class LaunchAttrsTest {
         void surroundingWhitespaceReturnsNull() {
             // Long.parseLong does not trim — strict format only.
             assertNull(LaunchAttrs.parseTimestamp(" 123 "));
+        }
+    }
+
+    @Nested
+    class FindConfig {
+
+        @Test
+        void unknownNameReturnsNull() {
+            assertNull(LaunchAttrs.findConfig(
+                    "never-registered-"
+                            + java.util.UUID.randomUUID()));
+        }
+
+        @Test
+        void existingConfigByNameRoundTrips() throws Exception {
+            // Create a real launch config, look it up by name.
+            String name = "launchattrs-find-"
+                    + java.util.UUID.randomUUID();
+            var mgr = org.eclipse.debug.core.DebugPlugin
+                    .getDefault().getLaunchManager();
+            var type = mgr.getLaunchConfigurationType(
+                    "org.eclipse.ui.externaltools."
+                            + "ProgramLaunchConfigurationType");
+            assertNotNull(type);
+            var wc = type.newInstance(null, name);
+            var cfg = wc.doSave();
+            try {
+                var found = LaunchAttrs.findConfig(name);
+                assertNotNull(found);
+                assertEquals(name, found.getName());
+            } finally {
+                cfg.delete();
+            }
         }
     }
 }
