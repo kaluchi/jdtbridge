@@ -34,11 +34,23 @@ import org.eclipse.debug.core.model.IProcess;
 
 class LaunchHandler {
 
-    // Attribute keys for launch configuration types
+    // Literal copies — switch case labels require compile-time
+    // constants, and SDK-side ATTR_* / ID_* are computed at class
+    // init via plugin id concatenation, so we cannot alias them
+    // directly. Values are pinned to the SDK by
+    // LaunchAttrKeysTest, which fails if a future SDK upgrade
+    // shifts any of them.
     private static final String ATTR_PROJECT_NAME =
             "org.eclipse.jdt.launching.PROJECT_ATTR";
     private static final String ATTR_MAIN_TYPE_NAME =
             "org.eclipse.jdt.launching.MAIN_TYPE";
+    private static final String ATTR_PROGRAM_ARGUMENTS =
+            "org.eclipse.jdt.launching.PROGRAM_ARGUMENTS";
+    private static final String ATTR_VM_ARGUMENTS =
+            "org.eclipse.jdt.launching.VM_ARGUMENTS";
+    private static final String JAVA_APP_LAUNCH_TYPE =
+            "org.eclipse.jdt.launching.localJavaApplication";
+
     private static final String ATTR_TEST_KIND =
             "org.eclipse.jdt.junit.TEST_KIND";
     private static final String ATTR_TEST_NAME =
@@ -49,8 +61,6 @@ class LaunchHandler {
             "org.eclipse.jdt.junit.launchconfig";
     private static final String PDE_JUNIT_LAUNCH_TYPE =
             "org.eclipse.pde.ui.JunitLaunchConfig";
-    private static final String JAVA_APP_LAUNCH_TYPE =
-            "org.eclipse.jdt.launching.localJavaApplication";
     private static final String MAVEN_LAUNCH_TYPE =
             "org.eclipse.m2e.Maven2LaunchConfigurationType";
     private static final String MAVEN_GOALS =
@@ -70,10 +80,6 @@ class LaunchHandler {
             + ".ProgramLaunchConfigurationType";
     private static final String ATTR_TOOL_ARGUMENTS =
             "org.eclipse.ui.externaltools.ATTR_TOOL_ARGUMENTS";
-    private static final String ATTR_PROGRAM_ARGUMENTS =
-            "org.eclipse.jdt.launching.PROGRAM_ARGUMENTS";
-    private static final String ATTR_VM_ARGUMENTS =
-            "org.eclipse.jdt.launching.VM_ARGUMENTS";
 
     private final LaunchTracker tracker;
 
