@@ -1,0 +1,15 @@
+|~ ───────────────────────────────────────────────────────────────────
+   :jdt/aliases — pure-qlang aliases for builtins whose canonical
+   name doesn't match common-English expectations from agents.
+
+   Adding entries here is cheap; each saves one round-trip when a
+   model reaches for the wrong-but-natural name and `jdt q` returns
+   `unresolved-identifier`.
+   ───────────────────────────────────────────────────────────── ~|
+
+|~~ Alias for the `flat` builtin — flattens one level of nesting.
+    Accepts the same Vec<Vec<T>> shape, returns Vec<T>. Models
+    consistently reach for `flatten` (Clojure / Lodash / JS Array
+    convention) rather than `flat` (Lisp / qlang); accepting both
+    avoids dead round-trips. ~~|
+let(:flatten, flat)
