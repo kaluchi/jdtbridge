@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.condition.EnabledIf;
 
 /**
  * Integration tests for RefactoringHandler: rename, move, format,
@@ -39,7 +40,11 @@ public class RefactoringIntegrationTest {
     // ---- Organize imports ----
 
     @Test
+    @EnabledIf("io.github.kaluchi.jdtbridge.IntegrationGuards#isWorkbenchRunning")
     public void a1_organizeImportsRemovesUnused() throws Exception {
+        // CodeStyleConfiguration.configureImportRewrite calls
+        // ProjectScope.getNode which requires a UI workbench.
+        // Headless PDE (Tycho CI) doesn't have one — gated above.
         String filePath = "/" + TestFixture.PROJECT_NAME
                 + "/src/test/refactor/ImportTarget.java";
         String json = handler.handleOrganizeImports(
@@ -50,6 +55,7 @@ public class RefactoringIntegrationTest {
     }
 
     @Test
+    @EnabledIf("io.github.kaluchi.jdtbridge.IntegrationGuards#isWorkbenchRunning")
     public void a2_organizeImportsNoChanges() throws Exception {
         String filePath = "/" + TestFixture.PROJECT_NAME
                 + "/src/test/refactor/ImportTarget.java";
@@ -127,7 +133,9 @@ public class RefactoringIntegrationTest {
     // ---- Rename field ----
 
     @Test
+    @EnabledIf("io.github.kaluchi.jdtbridge.IntegrationGuards#isWorkbenchRunning")
     public void c2_renameField() throws Exception {
+        // RenameFieldProcessor needs ProjectScope — workbench-gated.
         String json = handler.handleRename(Map.of(
                 "class", "test.refactor.RenameTarget",
                 "field", "counter",
@@ -174,7 +182,9 @@ public class RefactoringIntegrationTest {
     // ---- Move ----
 
     @Test
+    @EnabledIf("io.github.kaluchi.jdtbridge.IntegrationGuards#isWorkbenchRunning")
     public void d1_moveType() throws Exception {
+        // MoveCuUpdateCreator needs ProjectScope — workbench-gated.
         String json = handler.handleMove(Map.of(
                 "class", "test.refactor.RenameCaller",
                 "target", "test.moved"));

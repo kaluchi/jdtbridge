@@ -113,7 +113,7 @@ public class CoverageHandlerTest {
         }
 
         @Test
-        void importedSessionReturnsLaunchNotLive() {
+        void importedSessionReturnsLaunchNotLive() throws Exception {
             String coverageId = importAndAwait("dump-on-imported");
             JsonObject obj = parseObj(handler.handleDump(
                     "{\"coverageId\":\"" + coverageId + "\"}"));
@@ -145,7 +145,7 @@ public class CoverageHandlerTest {
         }
 
         @Test
-        void withActiveSessionReturnsOk() {
+        void withActiveSessionReturnsOk() throws Exception {
             String coverageId = importAndAwait("refresh-test");
             JsonObject obj = parseObj(handler.handleRefresh());
             assertTrue(obj.get("ok").getAsBoolean(),
@@ -167,7 +167,7 @@ public class CoverageHandlerTest {
         }
 
         @Test
-        void importedActiveReturnsLaunchNotLive() {
+        void importedActiveReturnsLaunchNotLive() throws Exception {
             // Imported session has launchConfiguration == null,
             // so relaunch can't reconstruct a launch from it.
             importAndAwait("relaunch-imported");
@@ -214,19 +214,15 @@ public class CoverageHandlerTest {
         return JsonParser.parseString(json).getAsJsonObject();
     }
 
-    private String importAndAwait(String description) {
+    private String importAndAwait(String description) throws Exception {
         ISessionImporter importer = CoverageTools.getImporter();
         importer.setDescription(description);
         importer.setScope(Set.of());
         importer.setExecutionDataSource(emptyDataSource());
         importer.setCopy(false);
-        try {
-            importer.importSession(new NullProgressMonitor());
-            Job.getJobManager().join(
-                    CoverageTracker.CLASSIFY_FAMILY, null);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        importer.importSession(new NullProgressMonitor());
+        Job.getJobManager().join(
+                CoverageTracker.CLASSIFY_FAMILY, null);
         return tracker.snapshot().values().stream()
                 .filter(r -> description.equals(r.description))
                 .map(r -> r.coverageId)
