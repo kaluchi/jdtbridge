@@ -1,5 +1,6 @@
 import { get } from "../client.mjs";
 import { extractPositional, parseFlags, parseFqn } from "../args.mjs";
+import { preflightCompileErrors } from "../preflight-compile-errors.mjs";
 import {
   formatTestRunHeader,
   testRunGuide,
@@ -42,6 +43,10 @@ export async function testRun(args) {
   const coverage = args.includes("--coverage");
   if (coverage) url += "&coverage=true";
 
+  const jsonFlag = args.includes("--json");
+  const cleared = await preflightCompileErrors(args, { json: jsonFlag });
+  if (!cleared) process.exit(1);
+
   const result = await get(url, 30_000);
   if (result.error) {
     console.error(result.error);
@@ -70,7 +75,6 @@ export async function testRun(args) {
   result.launchId = launchId;
   result.testRunId = testRunId;
 
-  const jsonFlag = args.includes("--json");
   if (!jsonFlag) console.log(formatTestRunHeader(result));
 
   if (coverage && !jsonFlag) {
@@ -118,12 +122,13 @@ but launched using the specified project's classpath. This is useful when
 test sources live in one project but need dependencies from another.
 
 Flags:
-  --project <name>  override the project for classpath resolution
-  -f, --follow      stream test status (only failures by default)
-  -q, --quiet       suppress onboarding guide
-  --all             include passed tests in output (with -f)
-  --ignored         show only ignored tests (with -f)
-  --json            output as JSONL when streaming (-f), or JSON snapshot
+  --project <name>          override the project for classpath resolution
+  -f, --follow              stream test status (only failures by default)
+  -q, --quiet               suppress onboarding guide
+  --all                     include passed tests in output (with -f)
+  --ignored                 show only ignored tests (with -f)
+  --json                    output as JSONL when streaming (-f), or JSON snapshot
+  --ignore-compile-errors   launch despite workspace compile errors
 
 Examples:
   jdt test run com.example.MyTest                       run + show guide

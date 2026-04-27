@@ -4,6 +4,7 @@
 import { get, post } from "../client.mjs";
 import { extractPositional, parseFlags } from "../args.mjs";
 import { output } from "../output.mjs";
+import { preflightCompileErrors } from "../preflight-compile-errors.mjs";
 import { renderRunsTable } from "../format/coverage-runs.mjs";
 import {
   analyzeNextStepsTail,
@@ -30,6 +31,9 @@ export async function coverageRun(args) {
   if (flags.args) url += `&args=${encodeURIComponent(flags.args)}`;
 
   const jsonFlag = args.includes("--json");
+  const cleared = await preflightCompileErrors(args, { json: jsonFlag });
+  if (!cleared) process.exit(1);
+
   const result = await get(url, 30_000);
   if (result.error) {
     if (jsonFlag) console.log(JSON.stringify(result));
@@ -61,10 +65,11 @@ export const coverageRunHelp = `Launch a coverage run (non-blocking).
 Usage:  jdt coverage run <configId> [-f] [-q] [--json]
 
 Flags:
-  -f, --follow    stream state events until analysis terminates
-  -q, --quiet     suppress onboarding guide
-  --args <text>   extra arguments appended to launch config
-  --json          JSON snapshot output
+  -f, --follow              stream state events until analysis terminates
+  -q, --quiet               suppress onboarding guide
+  --args <text>             extra arguments appended to launch config
+  --json                    JSON snapshot output
+  --ignore-compile-errors   launch despite workspace compile errors
 
 Examples:
   jdt coverage run MyTest

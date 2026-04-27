@@ -3,6 +3,7 @@
 // Uses FQN with # separator and [M] badges for navigation.
 
 import { red, green, yellow, bold, dim } from "../color.mjs";
+import { alignCmds } from "./align.mjs";
 
 /**
  * Format a test status snapshot (JSON from /test/status).
@@ -157,23 +158,29 @@ export function formatTestRunHeader(result) {
 export function testRunGuide(testRunId, launchId) {
   return `
 **Test status** (testRunId = ${testRunId}):
-  \`jdt test status ${testRunId}\`            failures only (default)
-  \`jdt test status ${testRunId} -f\`         stream live until done
-  \`jdt test status ${testRunId} --all\`      all tests including passed
-  \`jdt test status ${testRunId} --ignored\`  only skipped/disabled tests
+${alignCmds([
+  [`jdt test status ${testRunId}`, "failures only (default)"],
+  [`jdt test status ${testRunId} -f`, "stream live until done"],
+  [`jdt test status ${testRunId} --all`, "all tests including passed"],
+  [`jdt test status ${testRunId} --ignored`, "only skipped/disabled tests"],
+])}
 
 **Console output** (launchId = ${launchId}):
   \`jdt launch logs ${launchId}\`
   \`jdt launch logs ${launchId} --tail 50\`
 
 **Manage:**
-  \`jdt test runs\`                          list test runs
-  \`jdt launch stop ${launchId}\`            abort
-  \`jdt launch clear ${launchId}\`           remove
+${alignCmds([
+  [`jdt test runs`, "list test runs"],
+  [`jdt launch stop ${launchId}`, "abort"],
+  [`jdt launch clear ${launchId}`, "remove"],
+])}
 
 **Navigate** — FQNs from status output are copy-pasteable:
-  \`jdt q '"<FQN>" | @source'\`            view test source
-  \`jdt test run <FQN> -f\`                re-run single test
+${alignCmds([
+  [`jdt q '"<FQN>" | @source'`, "view test source"],
+  [`jdt test run <FQN> -f`, "re-run single test"],
+])}
 
 Add \`-q\` to suppress this guide.`;
 }
