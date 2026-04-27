@@ -150,6 +150,46 @@ public class TestSessionTrackerTest {
     }
 
     @Nested
+    class HandleClear {
+
+        private TestSessionHandler handler;
+
+        @BeforeEach
+        void setUp() {
+            handler = new TestSessionHandler();
+        }
+
+        @Test
+        void unknownTestRunIdRemovesNothing() {
+            String json = handler.handleClear(
+                    Map.of("testRunId",
+                            "no-such-run-"
+                                    + java.util.UUID.randomUUID()));
+            var obj = JsonParser.parseString(json)
+                    .getAsJsonObject();
+            assertEquals(0, obj.get("removed").getAsInt(),
+                    "No match → removed must be 0: " + json);
+        }
+
+        @Test
+        void responseAlwaysHasRemovedInteger() {
+            // Workspace can hold finished sessions from earlier
+            // runs in the suite; only assert the response shape,
+            // not a specific count.
+            String json = handler.handleClear(
+                    Map.of("testRunId",
+                            "no-match-shape-"
+                                    + java.util.UUID.randomUUID()));
+            var obj = JsonParser.parseString(json)
+                    .getAsJsonObject();
+            assertTrue(obj.has("removed"),
+                    "Response must carry 'removed' field: " + json);
+            assertTrue(obj.get("removed").getAsInt() >= 0,
+                    "removed must be non-negative: " + json);
+        }
+    }
+
+    @Nested
     class HandleSessions {
 
         private TestSessionHandler handler;
