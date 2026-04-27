@@ -48,6 +48,9 @@ describe("setup command", () => {
       p2Uninstall: () => "",
       getEclipseJavaHome: () => null,
       awaitProfileLockFree: () => {},
+      waitForBridge: () => Promise.resolve({
+        port: 12345, projects: ["mock-project"],
+      }),
       ...overrides.eclipse,
     };
 
