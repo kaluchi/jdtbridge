@@ -58,7 +58,7 @@ public class TestRunCoverageFlagTest {
             // No coverage param → response must not carry the
             // coverage fields, regardless of the prepare result.
             Map<String, String> params = new HashMap<>();
-            params.put("class", "no.such.TestClass");
+            params.put("target", "no.such.TestClass");
             params.put("no-refresh", "");
             String json = handler.handleTestRun(params);
             assertFalse(json.contains("\"coverageId\""),
@@ -70,7 +70,7 @@ public class TestRunCoverageFlagTest {
         @Test
         void coverageFalseDoesNotEnableCoverage() throws Exception {
             Map<String, String> params = new HashMap<>();
-            params.put("class", "no.such.TestClass");
+            params.put("target", "no.such.TestClass");
             params.put("no-refresh", "");
             params.put("coverage", "false");
             String json = handler.handleTestRun(params);
@@ -84,7 +84,7 @@ public class TestRunCoverageFlagTest {
             // enable coverage — fix for the empty-string surprise
             // flagged in PR review.
             Map<String, String> params = new HashMap<>();
-            params.put("class", "no.such.TestClass");
+            params.put("target", "no.such.TestClass");
             params.put("no-refresh", "");
             params.put("coverage", "");
             String json = handler.handleTestRun(params);
@@ -99,7 +99,7 @@ public class TestRunCoverageFlagTest {
         void coverageOneEnablesCoverage() throws Exception {
             // Spec accepts "true" or "1".
             Map<String, String> params = new HashMap<>();
-            params.put("class", "test.edge.SimpleTest");
+            params.put("target", "test.edge.SimpleTest");
             params.put("no-refresh", "");
             params.put("coverage", "1");
             String json = handler.handleTestRun(params);
@@ -114,25 +114,25 @@ public class TestRunCoverageFlagTest {
         @Test
         void unknownClassReturnsTypeNotFound() throws Exception {
             Map<String, String> params = new HashMap<>();
-            params.put("class", "no.such.TestClass");
+            params.put("target", "no.such.TestClass");
             params.put("no-refresh", "");
             params.put("coverage", "true");
             String json = handler.handleTestRun(params);
-            // prepareLaunch fails first → "Type not found" surfaces
-            // before coverage-mode-not-supported has a chance.
-            assertTrue(json.contains("not found"),
-                    "Should report type not found: " + json);
+            // resolveElement returns null first → target-not-found
+            // surfaces before coverage-mode-not-supported has a chance.
+            assertTrue(json.contains("target-not-found"),
+                    "Should report target-not-found: " + json);
         }
 
         @Test
         void unknownProjectReturnsProjectNotFound() throws Exception {
             Map<String, String> params = new HashMap<>();
-            params.put("project", "nonexistent-project-xyz");
+            params.put("target", "nonexistent-project-xyz");
             params.put("no-refresh", "");
             params.put("coverage", "true");
             String json = handler.handleTestRun(params);
-            assertTrue(json.contains("error"),
-                    "Should error: " + json);
+            assertTrue(json.contains("target-not-found"),
+                    "Should report target-not-found: " + json);
         }
     }
 
@@ -146,7 +146,7 @@ public class TestRunCoverageFlagTest {
             // delegate registered AND the EclEmma UI bundle active —
             // gated above.
             Map<String, String> params = new HashMap<>();
-            params.put("class", "test.edge.SimpleTest");
+            params.put("target", "test.edge.SimpleTest");
             params.put("no-refresh", "");
             params.put("coverage", "true");
             String json = handler.handleTestRun(params);

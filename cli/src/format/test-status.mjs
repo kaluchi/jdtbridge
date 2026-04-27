@@ -6,10 +6,11 @@ import { red, green, yellow, bold, dim } from "../color.mjs";
 import { alignCmds } from "./align.mjs";
 
 /**
- * Format a test status snapshot (JSON from /test/status).
- * Shows summary line + failure/ignored details based on filter.
+ * Single-line aggregate summary — header used by both the snapshot
+ * path and the end-of-stream tail in {@link followTestStream}.
+ * Format:  `#### <label> — <completed>/<total>, <counts>`
  */
-export function formatTestStatus(result) {
+export function formatTestSummaryLine(result) {
   const state = result.state === "running"
     ? " (running)"
     : result.state === "stopped"
@@ -21,9 +22,15 @@ export function formatTestStatus(result) {
     ? `${result.completed}/${result.total}`
     : `${result.total}/${result.total}`;
 
-  console.log(
-    `#### ${label} — ${progress}${state}, ${formatCounts(result)}`,
-  );
+  return `#### ${label} — ${progress}${state}, ${formatCounts(result)}`;
+}
+
+/**
+ * Format a test status snapshot (JSON from /test/status).
+ * Shows summary line + failure/ignored details based on filter.
+ */
+export function formatTestStatus(result) {
+  console.log(formatTestSummaryLine(result));
 
   const entries = result.entries || result.failures || [];
   if (entries.length > 0) {
@@ -189,9 +196,16 @@ Add \`-q\` to suppress this guide.`;
  * Stream test status via JSONL and format output.
  * Shared by test-run -f and test-status -f.
  * Returns exit code: 0 if all pass, 1 if any failures.
+ *
+ * On clean stream completion (terminal `finished` / `stopped` event)
+ * fetches the final /test/status snapshot and prints the aggregate
+ * summary header — same `#### <label> — N/N, X passed, Y failed`
+ * shape as the snapshot path emits, so the tail of `-f` carries the
+ * verdict line, not just the per-event firehose.
  */
 export async function followTestStream(testRunId, args) {
   const { followJsonlStream } = await import("./stream.mjs");
+  const { get } = await import("../client.mjs");
   const jsonFlag = args.includes("--json");
 
   let filter = "failures";
@@ -213,5 +227,19 @@ export async function followTestStream(testRunId, args) {
     } catch { /* ignore parse errors */ }
   });
   if (exit !== 0) return exit;
+
+  if (!jsonFlag) {
+    const snap = await get(
+      `/test/status?testRunId=${encodeURIComponent(testRunId)}`,
+      5_000);
+    if (snap.error) {
+      console.error(snap.error);
+      return 1;
+    }
+    if (snap.total > 0) {
+      console.log();
+      console.log(formatTestSummaryLine(snap));
+    }
+  }
   return hasFailed ? 1 : 0;
 }

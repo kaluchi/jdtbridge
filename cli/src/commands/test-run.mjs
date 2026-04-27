@@ -1,5 +1,5 @@
 import { get } from "../client.mjs";
-import { extractPositional, parseFlags, parseFqn } from "../args.mjs";
+import { extractPositional, parseFlags } from "../args.mjs";
 import { preflightCompileErrors } from "../preflight-compile-errors.mjs";
 import {
   formatTestRunHeader,
@@ -18,27 +18,19 @@ export async function testRun(args) {
   const pos = extractPositional(filtered);
   const flags = parseFlags(args);
 
-  let url = "/test/run?";
-  const parsed = parseFqn(pos[0]);
-  const fqn = parsed.className;
-
-  if (fqn) {
-    url += `class=${encodeURIComponent(fqn)}`;
-    const method = parsed.method;
-    if (method) url += `&method=${encodeURIComponent(method)}`;
-    if (flags.project)
-      url += `&project=${encodeURIComponent(flags.project)}`;
-  } else if (flags.project) {
-    url += `project=${encodeURIComponent(flags.project)}`;
-    if (flags.package)
-      url += `&package=${encodeURIComponent(flags.package)}`;
-  } else {
+  const target = pos[0];
+  if (!target) {
     console.error(
-      "Usage: test run <FQN>[#method] | test run --project <name> [--package <pkg>]",
-    );
+      "Usage: jdt test run <target> [--project <name>]"
+      + " [-f] [-q] [--json] [--coverage]"
+      + " [--no-refresh] [--ignore-compile-errors]");
     process.exit(1);
   }
 
+  let url = `/test/run?target=${encodeURIComponent(target)}`;
+  if (flags.project) {
+    url += `&project=${encodeURIComponent(flags.project)}`;
+  }
   if (args.includes("--no-refresh")) url += "&no-refresh";
   const coverage = args.includes("--coverage");
   if (coverage) url += "&coverage=true";
@@ -111,31 +103,44 @@ function sleep(ms) {
 
 export const help = `Launch tests non-blocking with real-time progress.
 
-Usage:  jdt test run <FQN>[#method] [--project <name>] [-f] [-q] [--json]
-        jdt test run --project <name> [--package <pkg>] [-f] [-q] [--json]
+Usage:  jdt test run <target> [--project <name>] [-f] [-q] [--json]
 
 Without -f, launches and prints a guide with available commands.
 With -f, launches and streams test progress until completion.
 
-When --project is used with <FQN>, the test class is resolved by name
-but launched using the specified project's classpath. This is useful when
-test sources live in one project but need dependencies from another.
+The target is one positional, polymorphically resolved by the bridge
+via JDT model lookup. Accepted shapes:
+
+  com.example.MyTest             test class (run all tests in class)
+  com.example.MyTest#testFoo     single test method
+  com.example.MyTest#testFoo(String)   method with overload signature
+  com.example                    package (run all tests in package)
+  my-project                     project name (run all tests in project)
+  /abs/path/to/Foo.java          file (run tests in file's primary type)
 
 Flags:
-  --project <name>          override the project for classpath resolution
+  --project <name>          override classpath/runtime context — use this
+                            project's classpath even if the test class
+                            physically lives in another project (test
+                            reuse across projects, e.g. test class in
+                            project A but dependencies from project B)
   -f, --follow              stream test status (only failures by default)
   -q, --quiet               suppress onboarding guide
   --all                     include passed tests in output (with -f)
   --ignored                 show only ignored tests (with -f)
   --json                    output as JSONL when streaming (-f), or JSON snapshot
+  --coverage                launch in coverage mode (EclEmma)
+  --no-refresh              skip the workspace refresh before launching
   --ignore-compile-errors   launch despite workspace compile errors
 
 Examples:
-  jdt test run com.example.MyTest                       run + show guide
-  jdt test run com.example.MyTest --project Build -f    run with Build classpath
-  jdt test run com.example.MyTest -f --all              run + stream all tests
-  jdt test run --project my-project -f                  run project tests + stream
-  jdt test run com.example.MyTest -f --json             stream as JSONL
+  jdt test run com.example.MyTest                  run + show guide
+  jdt test run com.example.MyTest#testFoo -f       single method, streamed
+  jdt test run my-project -f                       project tests + stream
+  jdt test run com.example -f                      package tests + stream
+  jdt test run com.example.MyTest --project Build -f
+                                                   reuse class, classpath = Build
+  jdt test run com.example.MyTest -f --json        stream as JSONL
 
 The output shows testRunId (for test commands) and launchId (for launch commands):
   jdt test status <testRunId> -f          test pass/fail details

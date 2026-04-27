@@ -40,35 +40,39 @@ public class TestHandlerIntegrationTest {
     @Test
     public void typeNotFound() throws Exception {
         Map<String, String> params = new HashMap<>();
-        params.put("class", "no.such.TestClass");
+        params.put("target", "no.such.TestClass");
         params.put("no-refresh", "");
         String json = handler.handleTestRun(params);
         assertTrue(json.contains("error"),
                 "Should return error: " + json);
-        assertTrue(json.contains("not found"),
-                "Should mention not found: " + json);
+        assertTrue(json.contains("target-not-found"),
+                "Should mention target-not-found: " + json);
     }
 
     @Test
     public void projectNotFound() throws Exception {
         Map<String, String> params = new HashMap<>();
-        params.put("project", "nonexistent-project-xyz");
+        params.put("target", "nonexistent-project-xyz");
         params.put("no-refresh", "");
         String json = handler.handleTestRun(params);
         assertTrue(json.contains("error"),
                 "Should return error: " + json);
+        assertTrue(json.contains("target-not-found"),
+                "Should mention target-not-found: " + json);
     }
 
     @Test
     public void notJavaProject() throws Exception {
         Map<String, String> params = new HashMap<>();
-        params.put("project", TestFixture.NON_JAVA_PROJECT_NAME);
+        params.put("target", TestFixture.NON_JAVA_PROJECT_NAME);
         params.put("no-refresh", "");
         String json = handler.handleTestRun(params);
-        assertTrue(json.contains("error"),
-                "Should return error: " + json);
-        assertTrue(json.contains("Not a Java project"),
-                "Should say not Java: " + json);
+        // IJavaProject.exists() is false on a project without the
+        // Java nature, so resolveContainerOrType skips it and the
+        // resolve falls through to the target-not-found error —
+        // same shape as a non-existent project name.
+        assertTrue(json.contains("target-not-found"),
+                "Non-Java project should be unresolvable: " + json);
     }
 
     @Test
