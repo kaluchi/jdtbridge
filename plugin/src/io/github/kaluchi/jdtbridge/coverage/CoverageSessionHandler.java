@@ -430,7 +430,9 @@ class CoverageSessionHandler {
 
         addNullableString(obj, "launchId",
                 run.launch != null && run.kind == CoverageRun.Kind.LIVE
-                        ? buildLaunchId(run) : null);
+                        ? io.github.kaluchi.jdtbridge.LaunchAttrs
+                                .launchIdOf(run.configId, run.launch)
+                        : null);
 
         obj.addProperty("description", run.description != null
                 ? run.description : "");
@@ -465,11 +467,6 @@ class CoverageSessionHandler {
         }
 
         return obj;
-    }
-
-    private static String buildLaunchId(CoverageRun run) {
-        return io.github.kaluchi.jdtbridge.LaunchAttrs
-                .launchIdOf(run.configId, run.launch);
     }
 
     private static JsonArray sessionInfosJson(
