@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { setColorEnabled } from "../src/color.mjs";
 import {
   formatRunHeader,
+  analyzeNextStepsTail,
   formatStatusSnapshot,
   formatStreamEvent,
   runGuide,
@@ -212,5 +213,14 @@ describe("runGuide", () => {
     expect(guide).toContain("jdt coverage dump MyTest:1");
     expect(guide).toContain("jdt coverage stop MyTest:1");
     expect(guide).toContain("jdt coverage activate MyTest:1");
+  });
+
+});
+
+describe("analyzeNextStepsTail", () => {
+  it("points at uncoveredLines and coverageCard", () => {
+    const tail = analyzeNextStepsTail();
+    expect(tail).toContain("@uncoveredLines");
+    expect(tail).toContain("@coverageCard");
   });
 });

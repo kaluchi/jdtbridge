@@ -50,6 +50,16 @@ export function runGuide(coverageId, launchId) {
 Add \`-q\` to suppress this guide.`;
 }
 
+/** Three-line "what next" tail surfaced after analysisReady in
+ *  `jdt coverage run -f`, `jdt coverage status -f`, and (when
+ *  analysisReady) the snapshot form of `jdt coverage status`.
+ *  Same content across all three; one place to update. */
+export function analyzeNextStepsTail() {
+  return `
+Next: jdt q '"<class>" | @uncoveredLines'   line gaps
+      jdt q '"<class>" | @coverageCard'     md card`;
+}
+
 /** Format a /coverage/session response as a snapshot block. */
 export function formatStatusSnapshot(entry) {
   const status = composeStatus(entry);
@@ -200,13 +210,24 @@ function formatTime(millis) {
 /**
  * Stream /coverage/session/stream events.
  * Returns 0 on clean exit, 1 on error.
+ *
+ * On clean exit (analysis terminal state reached) the M4 tail —
+ * three suggested follow-up commands plus a pointer to
+ * `jdt help coverage analyze` — is printed unless `--json` or `-q`
+ * is in args. Same tail content as the M5 snapshot path so the
+ * agent sees consistent next-step menus regardless of entry point.
  */
 export async function followCoverageStream(coverageId, args) {
   const { followJsonlStream } = await import("./stream.mjs");
   const jsonFlag = args.includes("--json");
+  const quiet = args.includes("-q") || args.includes("--quiet");
   const url = `/coverage/session/stream?coverageId=${encodeURIComponent(coverageId)}`;
-  return followJsonlStream(url, (line) => {
+  const exit = await followJsonlStream(url, (line) => {
     if (jsonFlag) console.log(line);
     else formatStreamEvent(line);
   });
+  if (exit === 0 && !jsonFlag && !quiet) {
+    console.log(analyzeNextStepsTail());
+  }
+  return exit;
 }
