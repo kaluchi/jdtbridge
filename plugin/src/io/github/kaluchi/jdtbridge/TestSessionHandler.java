@@ -8,7 +8,6 @@ import org.eclipse.jdt.internal.junit.JUnitCorePlugin;
 import org.eclipse.jdt.internal.junit.model.TestRunSession;
 import org.eclipse.jdt.junit.model.ITestCaseElement;
 import org.eclipse.jdt.junit.model.ITestElement;
-import org.eclipse.jdt.junit.model.ITestElement.FailureTrace;
 import org.eclipse.jdt.junit.model.ITestElementContainer;
 
 import java.util.List;
@@ -49,15 +48,14 @@ class TestSessionHandler {
 
         String configId = session.getTestRunName();
 
-        String state;
-        if (session.isRunning()) state = "running";
-        else if (session.isStarting()) state = "starting";
-        else state = "finished";
+        String state = TestSessionFormat.stateOf(
+                session.isRunning(), session.isStarting());
 
-        int passed = session.getStartedCount()
-                - session.getFailureCount()
-                - session.getErrorCount()
-                - session.getAssumptionFailureCount();
+        int passed = TestSessionFormat.passedCount(
+                session.getStartedCount(),
+                session.getFailureCount(),
+                session.getErrorCount(),
+                session.getAssumptionFailureCount());
 
         var result = new JsonObject();
         result.addProperty("configId", configId);
@@ -106,19 +104,8 @@ class TestSessionHandler {
             for (ITestElement child : container.getChildren()) {
                 if (child instanceof ITestCaseElement tc) {
                     var testResult = tc.getTestResult(false);
-                    String status;
-                    if (testResult == ITestElement.Result.OK)
-                        status = "PASS";
-                    else if (testResult
-                            == ITestElement.Result.FAILURE)
-                        status = "FAIL";
-                    else if (testResult
-                            == ITestElement.Result.ERROR)
-                        status = "ERROR";
-                    else if (testResult
-                            == ITestElement.Result.IGNORED)
-                        status = "IGNORED";
-                    else status = "UNKNOWN";
+                    String status = TestSessionFormat.statusName(
+                            testResult);
 
                     if ("ignored".equals(filter)
                             && !"IGNORED".equals(status))
@@ -142,18 +129,8 @@ class TestSessionHandler {
 
                     if (testResult == ITestElement.Result.FAILURE
                             || testResult == ITestElement.Result.ERROR) {
-                        FailureTrace ft = tc.getFailureTrace();
-                        if (ft != null) {
-                            if (ft.getTrace() != null)
-                                entry.addProperty("trace",
-                                        ft.getTrace());
-                            if (ft.getExpected() != null)
-                                entry.addProperty("expected",
-                                        ft.getExpected());
-                            if (ft.getActual() != null)
-                                entry.addProperty("actual",
-                                        ft.getActual());
-                        }
+                        TestSessionFormat.attachFailureTrace(
+                                entry, tc.getFailureTrace());
                     }
                     entries.add(entry);
                 } else if (child instanceof ITestElementContainer c) {
@@ -210,20 +187,18 @@ class TestSessionHandler {
                 }
             }
 
-            String state;
-            if (s.isRunning()) state = "running";
-            else if (s.isStarting()) state = "starting";
-            else state = "finished";
-            obj.addProperty("state", state);
+            obj.addProperty("state", TestSessionFormat.stateOf(
+                    s.isRunning(), s.isStarting()));
 
             obj.addProperty("total", s.getTotalCount());
             obj.addProperty("completed",
                     s.getStartedCount());
             obj.addProperty("passed",
-                    s.getStartedCount()
-                            - s.getFailureCount()
-                            - s.getErrorCount()
-                            - s.getAssumptionFailureCount());
+                    TestSessionFormat.passedCount(
+                            s.getStartedCount(),
+                            s.getFailureCount(),
+                            s.getErrorCount(),
+                            s.getAssumptionFailureCount()));
             obj.addProperty("failed", s.getFailureCount());
             obj.addProperty("errors", s.getErrorCount());
             obj.addProperty("ignored",
