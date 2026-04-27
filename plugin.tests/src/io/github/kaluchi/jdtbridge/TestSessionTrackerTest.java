@@ -1,11 +1,15 @@
 package io.github.kaluchi.jdtbridge;
 
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import org.eclipse.jdt.internal.junit.JUnitCorePlugin;
+import org.eclipse.jdt.internal.junit.model.TestRunSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -17,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Tests for {@link TestSessionTracker} — session tracking,
  * status reporting, and event accumulation.
  */
+@SuppressWarnings("restriction")
 public class TestSessionTrackerTest {
 
     @Nested
@@ -146,6 +151,84 @@ public class TestSessionTrackerTest {
                     "Should return error: " + json);
             assertTrue(json.contains("Missing"),
                     "Should say missing: " + json);
+        }
+
+        @Test
+        void liveRunningSessionShapeIsValid() {
+            // The PDE test runner has its own TestRunSession in
+            // JUnitCorePlugin's model (this very run). Walk the
+            // happy path of handleStatus against it and assert the
+            // wire shape — counts depend on suite progress, so we
+            // do not pin numbers.
+            List<TestRunSession> sessions =
+                    JUnitCorePlugin.getModel()
+                            .getTestRunSessions();
+            assertNotNull(sessions);
+            if (sessions.isEmpty()) return;
+            TestRunSession session = sessions.get(0);
+            String testRunId =
+                    TestSessionHandler.testRunId(session);
+            String json = handler.handleStatus(
+                    Map.of("testRunId", testRunId));
+            JsonObject obj = JsonParser.parseString(json)
+                    .getAsJsonObject();
+            assertTrue(obj.has("configId"),
+                    "Should have configId: " + obj);
+            assertTrue(obj.has("testRunId"),
+                    "Should have testRunId: " + obj);
+            assertTrue(obj.has("state"),
+                    "Should have state: " + obj);
+            assertTrue(obj.has("total"),
+                    "Should have total: " + obj);
+            assertTrue(obj.has("passed"),
+                    "Should have passed: " + obj);
+            assertTrue(obj.has("entries"),
+                    "Should have entries array: " + obj);
+            assertTrue(obj.get("entries").isJsonArray(),
+                    "entries must be JSON array: " + obj);
+            String state = obj.get("state").getAsString();
+            assertTrue("running".equals(state)
+                            || "starting".equals(state)
+                            || "finished".equals(state),
+                    "state must be one of running/starting/"
+                            + "finished, got: " + state);
+        }
+
+        @Test
+        void liveSessionWithFailuresFilterReturnsArray() {
+            // filter=failures makes collectEntries skip PASS+IGNORED
+            // and recurse into containers — the result is still a
+            // JSON array (possibly empty in a passing suite).
+            List<TestRunSession> sessions =
+                    JUnitCorePlugin.getModel()
+                            .getTestRunSessions();
+            if (sessions.isEmpty()) return;
+            TestRunSession session = sessions.get(0);
+            String testRunId =
+                    TestSessionHandler.testRunId(session);
+            String json = handler.handleStatus(Map.of(
+                    "testRunId", testRunId,
+                    "filter", "failures"));
+            JsonObject obj = JsonParser.parseString(json)
+                    .getAsJsonObject();
+            assertTrue(obj.get("entries").isJsonArray());
+        }
+
+        @Test
+        void liveSessionWithIgnoredFilterReturnsArray() {
+            List<TestRunSession> sessions =
+                    JUnitCorePlugin.getModel()
+                            .getTestRunSessions();
+            if (sessions.isEmpty()) return;
+            TestRunSession session = sessions.get(0);
+            String testRunId =
+                    TestSessionHandler.testRunId(session);
+            String json = handler.handleStatus(Map.of(
+                    "testRunId", testRunId,
+                    "filter", "ignored"));
+            JsonObject obj = JsonParser.parseString(json)
+                    .getAsJsonObject();
+            assertTrue(obj.get("entries").isJsonArray());
         }
     }
 
