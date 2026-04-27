@@ -6,6 +6,7 @@ import { extractPositional, parseFlags } from "../args.mjs";
 import { output } from "../output.mjs";
 import { renderRunsTable } from "../format/coverage-runs.mjs";
 import {
+  analyzeNextStepsTail,
   formatRunHeader,
   formatStatusSnapshot,
   followCoverageStream,
@@ -103,8 +104,18 @@ export async function coverageStatus(args) {
   }
   const url = `/coverage/session?coverageId=${encodeURIComponent(coverageId)}`;
   const data = await get(url, 30_000);
+  const jsonFlag = args.includes("--json");
+  const quiet = args.includes("-q") || args.includes("--quiet");
   output(args, data, {
-    text(d) { console.log(formatStatusSnapshot(d)); },
+    text(d) {
+      console.log(formatStatusSnapshot(d));
+      // M5: same 3-line analyze-next-steps tail as the -f stream
+      // path, surfaced once analysis is ready. Skipped under
+      // --json (machine output) and -q.
+      if (!jsonFlag && !quiet && d?.analysisReady === true) {
+        console.log(analyzeNextStepsTail());
+      }
+    },
   });
 }
 
@@ -360,3 +371,4 @@ Usage:  jdt coverage stop <coverageId>
 Resolves coverageId to launchId (via /coverage/runs) and delegates to
 jdt launch stop. Errors with coverage-launch-not-live for merged or
 imported sessions.`;
+
