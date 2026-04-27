@@ -319,7 +319,7 @@ public class TestHandler {
         if (coverage) {
             String typeId = pl.config().getType().getIdentifier();
             if (!CoverageTypes.isSupported(typeId)) {
-                return coverageModeNotSupported(typeId);
+                return CoverageTypes.modeNotSupportedJson(typeId);
             }
         }
 
@@ -366,19 +366,6 @@ public class TestHandler {
         return "true".equalsIgnoreCase(raw) || "1".equals(raw);
     }
 
-    private static String coverageModeNotSupported(String typeId) {
-        var obj = new JsonObject();
-        obj.addProperty("error", "coverage-mode-not-supported");
-        obj.addProperty("message",
-                "Launch type does not support coverage mode: "
-                        + typeId);
-        var arr = new JsonArray();
-        for (String supported : CoverageTypes.supported()) {
-            arr.add(supported);
-        }
-        obj.add("supportedTypeIds", arr);
-        return obj.toString();
-    }
 
     private String formatRunner(String testKind) {
         if (testKind == null) return null;

@@ -7,6 +7,9 @@ import java.util.Set;
 import org.eclipse.debug.core.ILaunchConfigurationType;
 import org.eclipse.debug.core.ILaunchManager;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+
 import io.github.kaluchi.jdtbridge.LaunchAttrs;
 
 /**
@@ -66,6 +69,23 @@ public final class CoverageTypes {
     /** True when {@code typeId} has a registered coverage delegate. */
     public static boolean isSupported(String typeId) {
         return supported().contains(typeId);
+    }
+
+    /** Standard {@code coverage-mode-not-supported} error envelope.
+     *  Lists currently {@link #supported()} type IDs as a hint
+     *  to the caller about valid alternatives. */
+    public static String modeNotSupportedJson(String typeId) {
+        var obj = new JsonObject();
+        obj.addProperty("error", "coverage-mode-not-supported");
+        obj.addProperty("message",
+                "Launch type does not support coverage mode: "
+                        + typeId);
+        var arr = new JsonArray();
+        for (String s : supported()) {
+            arr.add(s);
+        }
+        obj.add("supportedTypeIds", arr);
+        return obj.toString();
     }
 
     /** Recompute and replace the cached set — for tests, or after

@@ -65,7 +65,7 @@ class CoverageHandler {
                             + e.getMessage());
         }
         if (!CoverageTypes.isSupported(typeId)) {
-            return modeNotSupported(typeId);
+            return CoverageTypes.modeNotSupportedJson(typeId);
         }
         try {
             ILaunch launch = config.launch(
@@ -225,18 +225,5 @@ class CoverageHandler {
         return obj.toString();
     }
 
-    private String modeNotSupported(String typeId) {
-        var obj = new JsonObject();
-        obj.addProperty("error", "coverage-mode-not-supported");
-        obj.addProperty("message",
-                "Launch type does not support coverage mode: "
-                        + typeId);
-        var arr = new JsonArray();
-        for (String supported : CoverageTypes.supported()) {
-            arr.add(supported);
-        }
-        obj.add("supportedTypeIds", arr);
-        return obj.toString();
-    }
 
 }
