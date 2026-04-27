@@ -5,9 +5,7 @@ import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IProjectDescription;
 import org.eclipse.core.resources.IWorkspaceRoot;
 import org.eclipse.core.resources.ResourcesPlugin;
-import org.eclipse.core.runtime.FileLocator;
 import org.eclipse.core.runtime.Path;
-import org.eclipse.core.runtime.Platform;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.jdt.core.IClasspathEntry;
 import org.eclipse.jdt.core.IJavaProject;
@@ -471,18 +469,8 @@ public class TestFixture {
                 new Path("org.eclipse.jdt.launching.JRE_CONTAINER"));
         IClasspathEntry junitEntry = JavaCore.newContainerEntry(
                 new Path("org.eclipse.jdt.junit.JUNIT_CONTAINER/5"));
-
-        // Add org.eclipse.core.resources for binary source tests
-        IClasspathEntry resEntry = bundleClasspathEntry(
-                "org.eclipse.core.resources",
-                "org.eclipse.core.resources.source");
-
-        IClasspathEntry[] cp = resEntry != null
-                ? new IClasspathEntry[] { srcEntry, jreEntry,
-                        junitEntry, resEntry }
-                : new IClasspathEntry[] { srcEntry, jreEntry,
-                        junitEntry };
-        javaProject.setRawClasspath(cp, null);
+        javaProject.setRawClasspath(new IClasspathEntry[] {
+                srcEntry, jreEntry, junitEntry }, null);
 
         // Initialize project preferences (needed by refactoring APIs)
         javaProject.setOption(JavaCore.COMPILER_SOURCE, "21");
@@ -562,57 +550,6 @@ public class TestFixture {
         // Wait for auto-build to finish
         Job.getJobManager().join(
                 ResourcesPlugin.FAMILY_AUTO_BUILD, null);
-    }
-
-    /**
-     * Create a classpath entry for an OSGi bundle with optional
-     * source attachment from a source bundle.
-     */
-    private static IClasspathEntry bundleClasspathEntry(
-            String bundleId, String sourceBundleId) {
-        var bundle = Platform.getBundle(bundleId);
-        if (bundle == null) return null;
-        java.io.File file = FileLocator
-                .getBundleFileLocation(bundle).orElse(null);
-        if (file == null) return null;
-        Path srcPath = findSourceBundle(sourceBundleId, file);
-        return JavaCore.newLibraryEntry(
-                new Path(file.getAbsolutePath()),
-                srcPath, null);
-    }
-
-    /**
-     * Find source bundle — first via Platform.getBundle(),
-     * then by looking for a .source jar next to the binary
-     * bundle (handles PDE headless where source bundles may
-     * not be resolved by OSGi).
-     */
-    private static Path findSourceBundle(String sourceBundleId,
-            java.io.File binaryFile) {
-        // Try OSGi registry first
-        var srcBundle = Platform.getBundle(sourceBundleId);
-        if (srcBundle != null) {
-            java.io.File sf = FileLocator
-                    .getBundleFileLocation(srcBundle)
-                    .orElse(null);
-            if (sf != null)
-                return new Path(sf.getAbsolutePath());
-        }
-        // Fallback: find .source jar in same directory
-        java.io.File dir = binaryFile.getParentFile();
-        if (dir == null) return null;
-        String name = binaryFile.getName();
-        // binary: org.eclipse.core.resources_3.23.200.v123.jar
-        // source: org.eclipse.core.resources.source_3.23.200.v123.jar
-        int verIdx = name.indexOf('_');
-        if (verIdx < 0) return null;
-        String baseName = name.substring(0, verIdx);
-        String version = name.substring(verIdx);
-        java.io.File srcFile = new java.io.File(dir,
-                baseName + ".source" + version);
-        if (srcFile.exists())
-            return new Path(srcFile.getAbsolutePath());
-        return null;
     }
 
     public static void destroy() throws Exception {
