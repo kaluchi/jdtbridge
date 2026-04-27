@@ -472,16 +472,10 @@ public class TestFixture {
         IClasspathEntry junitEntry = JavaCore.newContainerEntry(
                 new Path("org.eclipse.jdt.junit.JUNIT_CONTAINER/5"));
 
-        // Add org.eclipse.core.resources for binary source tests
         IClasspathEntry resEntry = bundleClasspathEntry(
-                "org.eclipse.core.resources",
-                "org.eclipse.core.resources.source");
-
-        IClasspathEntry[] cp = resEntry != null
-                ? new IClasspathEntry[] { srcEntry, jreEntry,
-                        junitEntry, resEntry }
-                : new IClasspathEntry[] { srcEntry, jreEntry,
-                        junitEntry };
+                "org.eclipse.core.resources");
+        IClasspathEntry[] cp = new IClasspathEntry[] {
+                srcEntry, jreEntry, junitEntry, resEntry };
         javaProject.setRawClasspath(cp, null);
 
         // Initialize project preferences (needed by refactoring APIs)
@@ -564,55 +558,46 @@ public class TestFixture {
                 ResourcesPlugin.FAMILY_AUTO_BUILD, null);
     }
 
-    /**
-     * Create a classpath entry for an OSGi bundle with optional
-     * source attachment from a source bundle.
-     */
     private static IClasspathEntry bundleClasspathEntry(
-            String bundleId, String sourceBundleId) {
+            String bundleId) {
         var bundle = Platform.getBundle(bundleId);
-        if (bundle == null) return null;
+        if (bundle == null) {
+            throw new IllegalStateException(
+                    "Test runtime missing required bundle: "
+                            + bundleId);
+        }
         java.io.File file = FileLocator
-                .getBundleFileLocation(bundle).orElse(null);
-        if (file == null) return null;
-        Path srcPath = findSourceBundle(sourceBundleId, file);
+                .getBundleFileLocation(bundle).orElseThrow(() ->
+                        new IllegalStateException(
+                                "Bundle " + bundleId
+                                + " has no file location"));
         return JavaCore.newLibraryEntry(
                 new Path(file.getAbsolutePath()),
-                srcPath, null);
+                sourceJarBesides(file), null);
     }
 
     /**
-     * Find source bundle — first via Platform.getBundle(),
-     * then by looking for a .source jar next to the binary
-     * bundle (handles PDE headless where source bundles may
-     * not be resolved by OSGi).
+     * Source jar of a deployed bundle is named
+     * {@code <baseName>.source_<version>.jar} in the same directory
+     * as the binary jar. Returns {@code null} when the file is
+     * absent (bundle deployed without source attachment).
      */
-    private static Path findSourceBundle(String sourceBundleId,
-            java.io.File binaryFile) {
-        // Try OSGi registry first
-        var srcBundle = Platform.getBundle(sourceBundleId);
-        if (srcBundle != null) {
-            java.io.File sf = FileLocator
-                    .getBundleFileLocation(srcBundle)
-                    .orElse(null);
-            if (sf != null)
-                return new Path(sf.getAbsolutePath());
-        }
-        // Fallback: find .source jar in same directory
+    private static Path sourceJarBesides(java.io.File binaryFile) {
         java.io.File dir = binaryFile.getParentFile();
-        if (dir == null) return null;
         String name = binaryFile.getName();
-        // binary: org.eclipse.core.resources_3.23.200.v123.jar
-        // source: org.eclipse.core.resources.source_3.23.200.v123.jar
         int verIdx = name.indexOf('_');
-        if (verIdx < 0) return null;
-        String baseName = name.substring(0, verIdx);
-        String version = name.substring(verIdx);
+        if (dir == null || verIdx < 0) {
+            throw new IllegalStateException(
+                    "Bundle file does not match <name>_<version> "
+                    + "pattern: " + binaryFile);
+        }
         java.io.File srcFile = new java.io.File(dir,
-                baseName + ".source" + version);
-        if (srcFile.exists())
-            return new Path(srcFile.getAbsolutePath());
-        return null;
+                name.substring(0, verIdx)
+                + ".source"
+                + name.substring(verIdx));
+        return srcFile.exists()
+                ? new Path(srcFile.getAbsolutePath())
+                : null;
     }
 
     public static void destroy() throws Exception {
