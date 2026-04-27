@@ -388,7 +388,10 @@ async function runInstall(config, flags) {
       const { port, projects } = await waitForBridge(discoverInstances, pid);
       ok(`Bridge ready on port ${port} (${projects.length} projects)`);
     } catch {
-      fail("Bridge did not start (Eclipse may still be loading)");
+      fail("Bridge did not start — Eclipse came up but the plugin's"
+        + " HTTP server never registered. Check"
+        + " <workspace>/.metadata/.log for plugin activation errors.");
+      process.exit(1);
     }
   } else {
     // Restart all workspaces that were running before
@@ -404,7 +407,9 @@ async function runInstall(config, flags) {
         const { port, projects } = await waitForBridge(discoverInstances, pid);
         ok(`${workspace} — port ${port} (${projects.length} projects)`);
       } catch {
-        fail(`${workspace} — bridge did not start`);
+        fail(`${workspace} — bridge did not start. Check`
+          + ` ${workspace}/.metadata/.log for plugin activation errors.`);
+        process.exit(1);
       }
     }
   }
