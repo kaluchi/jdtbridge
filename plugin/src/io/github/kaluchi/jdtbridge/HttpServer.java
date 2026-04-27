@@ -352,39 +352,10 @@ public class HttpServer {
                 return true;
             }
             String msg = cursor.getMessage();
-            if (msg != null && containsDisconnectSignature(msg)) {
+            if (msg != null && DisconnectSignatures.matches(msg)) {
                 return true;
             }
         }
-        return false;
-    }
-
-    /** Message-substring match for wrapped disconnects. */
-    private static boolean containsDisconnectSignature(String msg) {
-        // POSIX / generic
-        if (msg.contains("Broken pipe")) return true;
-        if (msg.contains("Connection reset")) return true;
-        // Windows English — WSAECONNABORTED
-        if (msg.contains("connection was aborted")) return true;
-        if (msg.contains("established connection was aborted"))
-            return true;
-        if (msg.contains("existing connection was forcibly closed"))
-            return true;
-        // Windows Russian (ru_RU locale)
-        if (msg.contains("разорвала")) return true;
-        if (msg.contains("разорвано")) return true;
-        if (msg.contains("прервано")) return true;
-        // Windows German (de_DE)
-        if (msg.contains("Verbindung wurde")
-                && msg.contains("abgebrochen")) return true;
-        if (msg.contains("bestehende Verbindung wurde")) return true;
-        // Windows French (fr_FR)
-        if (msg.contains("connexion existante a")
-                && msg.contains("interrompue")) return true;
-        if (msg.contains("connexion a été abandonnée")) return true;
-        // Windows Spanish (es_ES)
-        if (msg.contains("conexión existente")
-                && msg.contains("forzosamente")) return true;
         return false;
     }
 

@@ -218,4 +218,49 @@ public class ReferenceCollectorTest {
             }
         }
     }
+
+    @Nested
+    class PureHelpers {
+
+        @Test
+        void stripGenericsRemovesEverythingFromAngle() {
+            assertEquals("List",
+                    ReferenceCollector.stripGenerics(
+                            "List<String>"));
+            assertEquals("java.util.Map",
+                    ReferenceCollector.stripGenerics(
+                            "java.util.Map<K,V>"));
+        }
+
+        @Test
+        void stripGenericsPassesThroughWhenNoAngle() {
+            assertEquals("plain.Class",
+                    ReferenceCollector.stripGenerics(
+                            "plain.Class"));
+            assertEquals("",
+                    ReferenceCollector.stripGenerics(""));
+        }
+
+        @Test
+        void paramSigEmptyForNoArgs() throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.model.Animal");
+            IMethod method = JdtUtils.findMethod(
+                    type, "name", null);
+            assertNotNull(method);
+            assertEquals("",
+                    ReferenceCollector.paramSig(method));
+        }
+
+        @Test
+        void paramSigPrimitivePair() throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.edge.Calculator");
+            IMethod method = JdtUtils.findMethod(
+                    type, "add", "int,int");
+            assertNotNull(method);
+            assertEquals("int,int",
+                    ReferenceCollector.paramSig(method));
+        }
+    }
 }
