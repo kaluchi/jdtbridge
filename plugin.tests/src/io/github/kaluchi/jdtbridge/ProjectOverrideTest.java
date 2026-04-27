@@ -1,5 +1,6 @@
 package io.github.kaluchi.jdtbridge;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
@@ -186,10 +187,14 @@ public class ProjectOverrideTest {
             java.util.List<IClasspathEntry> cp,
             String bundleId) {
         Bundle bundle = Platform.getBundle(bundleId);
-        if (bundle == null) return;
+        assertNotNull(bundle,
+                "Test platform missing required bundle: "
+                + bundleId);
         java.io.File file = FileLocator
-                .getBundleFileLocation(bundle).orElse(null);
-        if (file == null) return;
+                .getBundleFileLocation(bundle)
+                .orElseThrow(() -> new AssertionError(
+                        "Bundle " + bundleId
+                        + " has no file location"));
         cp.add(JavaCore.newLibraryEntry(
                 new Path(file.getAbsolutePath()),
                 null, null));
