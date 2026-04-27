@@ -116,6 +116,70 @@ public class TestSessionTrackerTest {
     }
 
     @Nested
+    class Registry {
+
+        private TestSessionTracker tracker;
+
+        @BeforeEach
+        void setUp() {
+            tracker = new TestSessionTracker();
+        }
+
+        @Test
+        void allEmptyTrackerYieldsNoSessions() {
+            int count = 0;
+            for (var s : tracker.all()) count++;
+            assertEquals(0, count);
+        }
+
+        @Test
+        void allReturnsRegisteredSessions() {
+            tracker.preRegister("a");
+            tracker.preRegister("b");
+            int count = 0;
+            for (var s : tracker.all()) count++;
+            assertEquals(2, count);
+        }
+
+        @Test
+        void removeDropsSessionFromGet() {
+            tracker.preRegister("doomed");
+            assertNotNull(tracker.get("doomed"));
+            tracker.remove("doomed");
+            assertNull(tracker.get("doomed"));
+        }
+
+        @Test
+        void removeUnknownKeyIsNoop() {
+            tracker.remove("never-existed");
+            // No exception, tracker still empty.
+            int count = 0;
+            for (var s : tracker.all()) count++;
+            assertEquals(0, count);
+        }
+
+        @Test
+        void registerAliasMakesGetReturnSameSession() {
+            var ts = tracker.preRegister("primary");
+            tracker.registerAlias("alias-1", ts);
+            assertEquals(ts, tracker.get("alias-1"));
+        }
+
+        @Test
+        void registerAliasIsIdempotent() {
+            var first = tracker.preRegister("primary");
+            var second =
+                    new TestSessionTracker.TrackedTestSession(
+                            "secondary");
+            tracker.registerAlias("shared", first);
+            // putIfAbsent semantics: second registration must not
+            // overwrite — alias keeps pointing at the first session.
+            tracker.registerAlias("shared", second);
+            assertEquals(first, tracker.get("shared"));
+        }
+    }
+
+    @Nested
     class HandleStatus {
 
         private TestSessionHandler handler;
