@@ -195,7 +195,7 @@ class LaunchHandler {
             return HttpServer.missingParamError("configId");
         }
         try {
-            ILaunchConfiguration config = findConfig(name);
+            ILaunchConfiguration config = LaunchAttrs.findConfig(name);
             if (config == null) {
                 return HttpServer.jsonError(
                         "Launch configuration not found: "
@@ -229,7 +229,7 @@ class LaunchHandler {
                     + "path separators or '..'");
         }
         // Check if configId already exists (API cache + file on disk)
-        if (findConfig(configId) != null
+        if (LaunchAttrs.findConfig(configId) != null
                 || launchFileExists(configId)) {
             return HttpServer.jsonError(
                     "Launch configuration \"" + configId
@@ -278,7 +278,7 @@ class LaunchHandler {
         if (configId == null || configId.isBlank()) {
             return HttpServer.missingParamError("configId");
         }
-        ILaunchConfiguration config = findConfig(configId);
+        ILaunchConfiguration config = LaunchAttrs.findConfig(configId);
         if (config == null) {
             return HttpServer.jsonError(
                     "Launch configuration not found: "
@@ -594,7 +594,7 @@ class LaunchHandler {
                 ? ILaunchManager.DEBUG_MODE
                 : ILaunchManager.RUN_MODE;
         try {
-            ILaunchConfiguration config = findConfig(name);
+            ILaunchConfiguration config = LaunchAttrs.findConfig(name);
             if (config == null) {
                 return HttpServer.jsonError(
                         "Launch configuration not found: "
@@ -650,18 +650,6 @@ class LaunchHandler {
         }
     }
 
-    private ILaunchConfiguration findConfig(String name) {
-        try {
-            for (var config
-                    : LaunchAttrs.launchManager()
-                            .getLaunchConfigurations()) {
-                if (name.equals(config.getName())) {
-                    return config;
-                }
-            }
-        } catch (Exception e) { /* ignored */ }
-        return null;
-    }
 
     /** Check .launch file exists on disk (handles LaunchManager cache lag). */
     private boolean launchFileExists(String configId) {
