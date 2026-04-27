@@ -61,7 +61,13 @@ public class TestProgressStreamerTest {
         if (session != null) {
             JUnitCorePlugin.getModel()
                     .removeTestRunSession(session);
+            session = null;
         }
+        // Delete the SimpleTest launch config so a sibling test
+        // class running afterwards can launch it under the same
+        // configId (otherwise Eclipse renames it to "SimpleTest (2)").
+        var cfg = LaunchAttrs.findConfig("SimpleTest");
+        if (cfg != null && cfg.isLocal()) cfg.delete();
         TestFixture.destroy();
     }
 

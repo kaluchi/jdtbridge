@@ -81,22 +81,18 @@ public class CoverageHandlerTest {
     class ModeNotSupported {
 
         private static final String NON_COVERAGE_TYPE_ID =
-                "org.eclipse.ui.externaltools."
-                        + "ProgramLaunchConfigurationType";
+                "org.eclipse.debug.core.groups."
+                        + "GroupLaunchConfigurationType";
 
         @Test
         void unsupportedTypeReturnsModeNotSupportedError()
                 throws Exception {
-            // External-tool launch type ships with every Eclipse and
-            // EclEmma never registers a coverage delegate for it,
-            // so it's a stable "unsupported" sample.
             ILaunchManager mgr = DebugPlugin.getDefault()
                     .getLaunchManager();
             ILaunchConfigurationType type =
                     mgr.getLaunchConfigurationType(
                             NON_COVERAGE_TYPE_ID);
-            assertNotNull(type,
-                    "External-tool launch type missing in runtime");
+            assertNotNull(type);
 
             String configName = "test-non-coverage-"
                     + UUID.randomUUID();
@@ -108,12 +104,9 @@ public class CoverageHandlerTest {
                         Map.of("configId", configName)));
                 assertEquals("coverage-mode-not-supported",
                         obj.get("error").getAsString());
-                assertTrue(obj.has("supportedTypeIds"),
-                        "Should list supportedTypeIds: " + obj);
+                assertTrue(obj.has("supportedTypeIds"));
                 assertTrue(obj.get("message").getAsString()
-                                .contains(NON_COVERAGE_TYPE_ID),
-                        "Message should reference offending typeId: "
-                                + obj);
+                                .contains(NON_COVERAGE_TYPE_ID));
             } finally {
                 cfg.delete();
             }
@@ -138,12 +131,7 @@ public class CoverageHandlerTest {
                         Map.of("configId", configName)));
                 var arr = obj.get("supportedTypeIds")
                         .getAsJsonArray();
-                // Coverage-supported set depends on which optional
-                // host bundles are installed, but at least the Java
-                // application type must always be present.
-                assertTrue(arr.size() > 0,
-                        "supportedTypeIds should not be empty: "
-                                + obj);
+                assertTrue(arr.size() > 0);
             } finally {
                 cfg.delete();
             }

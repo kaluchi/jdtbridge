@@ -91,14 +91,16 @@ public class LaunchAttrsTest {
 
         @Test
         void existingConfigByNameRoundTrips() throws Exception {
-            // Create a real launch config, look it up by name.
+            // JUnit launch type is part of org.eclipse.jdt.junit.core
+            // which the plugin already depends on, so it is always
+            // present — both in interactive Eclipse and headless
+            // Tycho.
             String name = "launchattrs-find-"
                     + java.util.UUID.randomUUID();
             var mgr = org.eclipse.debug.core.DebugPlugin
                     .getDefault().getLaunchManager();
             var type = mgr.getLaunchConfigurationType(
-                    "org.eclipse.ui.externaltools."
-                            + "ProgramLaunchConfigurationType");
+                    "org.eclipse.jdt.junit.launchconfig");
             assertNotNull(type);
             var wc = type.newInstance(null, name);
             var cfg = wc.doSave();

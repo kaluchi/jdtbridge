@@ -69,6 +69,10 @@ public class TestSessionTrackerTest {
                     .removeTestRunSession(finishedSession);
             finishedSession = null;
         }
+        // Delete the SimpleTest launch config — see
+        // TestProgressStreamerTest.tearDown for the same rationale.
+        var cfg = LaunchAttrs.findConfig("SimpleTest");
+        if (cfg != null && cfg.isLocal()) cfg.delete();
         TestFixture.destroy();
     }
 

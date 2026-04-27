@@ -124,19 +124,21 @@ public class ProjectScopeTest {
         @Test
         void configWithoutProjectPassesViaWorkingDir()
                 throws Exception {
-            // No PROJECT_ATTR, no WORKING_DIR → passes
+            // localJavaApplication is part of org.eclipse.jdt.launching
+            // (already a plugin dependency). With no PROJECT_ATTR and
+            // no WORKING_DIR, containsConfig must fall through to the
+            // permissive return-true branch.
             var scope = ProjectScope.of(Set.of("my-project"));
             ILaunchManager mgr = DebugPlugin.getDefault()
                     .getLaunchManager();
-            ILaunchConfigurationType mavenType = mgr
+            ILaunchConfigurationType javaType = mgr
                     .getLaunchConfigurationType(
-                            "org.eclipse.m2e.Maven2LaunchConfigurationType");
+                            "org.eclipse.jdt.launching."
+                                    + "localJavaApplication");
             org.junit.jupiter.api.Assertions.assertNotNull(
-                    mavenType,
-                    "m2e launch type must be present in test runtime");
-            var config = mavenType.newInstance(
+                    javaType);
+            var config = javaType.newInstance(
                     null, "test-no-project");
-            // No working dir set → passes (permissive)
             assertTrue(scope.containsConfig(config));
         }
 
