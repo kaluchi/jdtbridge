@@ -223,17 +223,17 @@ public class TestHandlerTest {
 
     @Test
     public void parseTimeoutDefault() {
-        assertEquals(120, invokeParseTimeout(null, 120));
+        assertEquals(120, handler.parseTimeout(null, 120));
     }
 
     @Test
     public void parseTimeoutValid() {
-        assertEquals(30, invokeParseTimeout("30", 120));
+        assertEquals(30, handler.parseTimeout("30", 120));
     }
 
     @Test
     public void parseTimeoutInvalid() {
-        assertEquals(120, invokeParseTimeout("abc", 120));
+        assertEquals(120, handler.parseTimeout("abc", 120));
     }
 
     // ---- launchPrefix ----
@@ -292,20 +292,6 @@ public class TestHandlerTest {
         assertEquals("com.example",
                 TestHandler.launchPrefix(
                         "  ", "com.example", "my-server"));
-    }
-
-    // ---- Helpers ----
-
-    private int invokeParseTimeout(String s, int defaultVal) {
-        try {
-            var method = TestHandler.class
-                    .getDeclaredMethod("parseTimeout",
-                            String.class, int.class);
-            method.setAccessible(true);
-            return (int) method.invoke(handler, s, defaultVal);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
     }
 
     /**

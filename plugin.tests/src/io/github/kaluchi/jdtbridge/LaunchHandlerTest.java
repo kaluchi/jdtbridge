@@ -7,11 +7,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
 
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import org.eclipse.debug.core.DebugPlugin;
 import org.eclipse.debug.core.ILaunch;
 import org.eclipse.debug.core.ILaunchManager;
+import org.eclipse.debug.core.ILaunchConfiguration;
+import org.eclipse.debug.core.ILaunchConfigurationType;
+import org.eclipse.debug.core.ILaunchConfigurationWorkingCopy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -34,6 +38,78 @@ public class LaunchHandlerTest {
     @AfterEach
     void stopTracker() {
         tracker.stop();
+    }
+
+    // ---- Synthetic-config helpers ----
+    //
+    // PDE test runtime starts with an empty workspace. Tests that
+    // need a launch config must create their own; tests that need a
+    // running launch must add an ILaunch to the manager. Returned
+    // handles are deleted in the matching @AfterEach to keep the
+    // workspace clean between tests.
+
+    private static ILaunchConfiguration createConfig(
+            String typeId, String name,
+            java.util.Map<String, String> attrs) throws Exception {
+        ILaunchManager mgr =
+                DebugPlugin.getDefault().getLaunchManager();
+        ILaunchConfigurationType type =
+                mgr.getLaunchConfigurationType(typeId);
+        assertNotNull(type, "Launch type missing: " + typeId);
+        ILaunchConfigurationWorkingCopy wc =
+                type.newInstance(null, name);
+        for (var e : attrs.entrySet()) {
+            wc.setAttribute(e.getKey(), e.getValue());
+        }
+        return wc.doSave();
+    }
+
+    private static ILaunchConfiguration createJavaConfig(
+            String name, String mainType) throws Exception {
+        return createConfig(
+                "org.eclipse.jdt.launching.localJavaApplication",
+                name,
+                Map.of("org.eclipse.jdt.launching.MAIN_TYPE",
+                        mainType));
+    }
+
+    private static ILaunchConfiguration createJunitConfig(
+            String name, String testClass) throws Exception {
+        return createConfig(
+                "org.eclipse.jdt.junit.launchconfig",
+                name,
+                Map.of("org.eclipse.jdt.launching.MAIN_TYPE",
+                        testClass));
+    }
+
+    private static ILaunchConfiguration createMavenConfig(
+            String name, String goals) throws Exception {
+        return createConfig(
+                "org.eclipse.m2e.Maven2LaunchConfigurationType",
+                name,
+                Map.of("M2_GOALS", goals));
+    }
+
+    private static void deleteIfPresent(ILaunchConfiguration cfg)
+            throws Exception {
+        if (cfg != null && cfg.exists()) cfg.delete();
+    }
+
+    private static ILaunch addSyntheticLaunch(String mode) {
+        ILaunchManager mgr =
+                DebugPlugin.getDefault().getLaunchManager();
+        ILaunch launch = new org.eclipse.debug.core.Launch(
+                null, mode, null);
+        launch.setAttribute(
+                DebugPlugin.ATTR_LAUNCH_TIMESTAMP,
+                Long.toString(System.currentTimeMillis()));
+        mgr.addLaunch(launch);
+        return launch;
+    }
+
+    private static void removeIfPresent(ILaunch launch) {
+        if (launch == null) return;
+        DebugPlugin.getDefault().getLaunchManager().removeLaunch(launch);
     }
 
     @Nested
@@ -66,25 +142,35 @@ public class LaunchHandlerTest {
 
         @Test
         void containsIdentityFields() {
-            String json = handler.handleList(Map.of(), ProjectScope.ALL);
-            if (!json.equals("[]")) {
+            ILaunch launch = addSyntheticLaunch("run");
+            try {
+                String json = handler.handleList(Map.of(), ProjectScope.ALL);
+                assertFalse(json.equals("[]"),
+                        "Synthetic launch should appear: " + json);
                 assertTrue(json.contains("\"configId\""),
                         "Should have configId: " + json);
                 assertTrue(json.contains("\"launchId\""),
                         "Should have launchId: " + json);
                 assertTrue(json.contains("\"terminated\""),
                         "Should have terminated: " + json);
+            } finally {
+                removeIfPresent(launch);
             }
         }
 
         @Test
         void containsModeAndType() {
-            String json = handler.handleList(Map.of(), ProjectScope.ALL);
-            if (!json.equals("[]")) {
+            ILaunch launch = addSyntheticLaunch("debug");
+            try {
+                String json = handler.handleList(Map.of(), ProjectScope.ALL);
+                assertFalse(json.equals("[]"),
+                        "Synthetic launch should appear: " + json);
                 assertTrue(json.contains("\"mode\""),
                         "Should have mode: " + json);
                 assertTrue(json.contains("\"configType\""),
                         "Should have configType: " + json);
+            } finally {
+                removeIfPresent(launch);
             }
         }
     }
@@ -142,6 +228,27 @@ public class LaunchHandlerTest {
     @Nested
     class Configs {
 
+        private ILaunchConfiguration javaCfg;
+        private ILaunchConfiguration junitCfg;
+        private ILaunchConfiguration mavenCfg;
+
+        @BeforeEach
+        void createConfigs() throws Exception {
+            javaCfg = createJavaConfig(
+                    "ConfigsTest-Java", "test.Main");
+            junitCfg = createJunitConfig(
+                    "ConfigsTest-JUnit", "test.SomeTest");
+            mavenCfg = createMavenConfig(
+                    "ConfigsTest-Maven", "clean install");
+        }
+
+        @AfterEach
+        void deleteConfigs() throws Exception {
+            deleteIfPresent(javaCfg);
+            deleteIfPresent(junitCfg);
+            deleteIfPresent(mavenCfg);
+        }
+
         @Test
         void returnsArray() {
             String json = handler.handleConfigs(Map.of(), ProjectScope.ALL);
@@ -153,12 +260,12 @@ public class LaunchHandlerTest {
         @Test
         void containsNameAndType() {
             String json = handler.handleConfigs(Map.of(), ProjectScope.ALL);
-            if (!json.equals("[]")) {
-                assertTrue(json.contains("\"configId\""),
-                        "Should have configId: " + json);
-                assertTrue(json.contains("\"configType\""),
-                        "Should have configType: " + json);
-            }
+            assertFalse(json.equals("[]"),
+                    "Created configs should appear: " + json);
+            assertTrue(json.contains("\"configId\""),
+                    "Should have configId: " + json);
+            assertTrue(json.contains("\"configType\""),
+                    "Should have configType: " + json);
         }
 
         @Test
@@ -166,19 +273,12 @@ public class LaunchHandlerTest {
             String json = handler.handleConfigs(Map.of(), ProjectScope.ALL);
             var arr = JsonParser.parseString(json)
                     .getAsJsonArray();
-            for (var el : arr) {
-                var obj = el.getAsJsonObject();
-                String type = obj.get("configType").getAsString();
-                if ("JUnit".equals(type)
-                        || "JUnit Plug-in Test".equals(type)) {
-                    assertTrue(obj.has("class")
-                            || obj.has("project"),
-                            "JUnit config should have class "
-                            + "or project: " + obj);
-                    return;
-                }
-            }
-            // No JUnit configs — skip
+            JsonObject junit = findByConfigId(arr, "ConfigsTest-JUnit");
+            assertNotNull(junit,
+                    "Created JUnit config must appear: " + json);
+            assertTrue(junit.has("class") || junit.has("project"),
+                    "JUnit config should have class or project: "
+                    + junit);
         }
 
         @Test
@@ -186,22 +286,44 @@ public class LaunchHandlerTest {
             String json = handler.handleConfigs(Map.of(), ProjectScope.ALL);
             var arr = JsonParser.parseString(json)
                     .getAsJsonArray();
-            for (var el : arr) {
-                var obj = el.getAsJsonObject();
-                String type = obj.get("configType").getAsString();
-                if ("Maven Build".equals(type)) {
-                    assertTrue(obj.has("goals"),
-                            "Maven config should have goals: "
-                            + obj);
-                    return;
-                }
-            }
-            // No Maven configs — skip
+            JsonObject maven = findByConfigId(arr, "ConfigsTest-Maven");
+            assertNotNull(maven,
+                    "Created Maven config must appear: " + json);
+            assertTrue(maven.has("goals"),
+                    "Maven config should have goals: " + maven);
         }
+    }
+
+    private static JsonObject findByConfigId(
+            com.google.gson.JsonArray arr, String configId) {
+        for (var el : arr) {
+            var obj = el.getAsJsonObject();
+            if (configId.equals(obj.get("configId").getAsString())) {
+                return obj;
+            }
+        }
+        return null;
     }
 
     @Nested
     class Config {
+
+        private ILaunchConfiguration javaCfg;
+        private ILaunchConfiguration junitCfg;
+
+        @BeforeEach
+        void createConfigs() throws Exception {
+            javaCfg = createJavaConfig(
+                    "ConfigTest-Java", "test.Main");
+            junitCfg = createJunitConfig(
+                    "ConfigTest-JUnit", "test.SomeTest");
+        }
+
+        @AfterEach
+        void deleteConfigs() throws Exception {
+            deleteIfPresent(javaCfg);
+            deleteIfPresent(junitCfg);
+        }
 
         @Test
         void missingNameReturnsError() {
@@ -224,21 +346,14 @@ public class LaunchHandlerTest {
 
         @Test
         void knownConfigReturnsAttributes() {
-            // Find any existing config name
-            String listJson = handler.handleConfigs(Map.of(), ProjectScope.ALL);
-            var arr = JsonParser.parseString(listJson)
-                    .getAsJsonArray();
-            if (arr.isEmpty()) return; // no configs to test
-            String configId = arr.get(0).getAsJsonObject()
-                    .get("configId").getAsString();
-
             String json = handler.handleConfig(
-                    Map.of("configId", configId));
+                    Map.of("configId", "ConfigTest-Java"));
             assertFalse(json.contains("\"error\""),
                     "Should not error: " + json);
             var obj = JsonParser.parseString(json)
                     .getAsJsonObject();
-            assertEquals(configId, obj.get("configId").getAsString());
+            assertEquals("ConfigTest-Java",
+                    obj.get("configId").getAsString());
             assertTrue(obj.has("configType"),
                     "Should have configType: " + json);
             assertTrue(obj.has("configTypeId"),
@@ -251,20 +366,15 @@ public class LaunchHandlerTest {
 
         @Test
         void xmlFormatReturnsXmlContent() {
-            String listJson = handler.handleConfigs(Map.of(), ProjectScope.ALL);
-            var arr = JsonParser.parseString(listJson)
-                    .getAsJsonArray();
-            if (arr.isEmpty()) return;
-            String configId = arr.get(0).getAsJsonObject()
-                    .get("configId").getAsString();
-
             String json = handler.handleConfig(
-                    Map.of("configId", configId, "format", "xml"));
+                    Map.of("configId", "ConfigTest-Java",
+                            "format", "xml"));
             assertFalse(json.contains("\"error\""),
                     "Should not error: " + json);
             var obj = JsonParser.parseString(json)
                     .getAsJsonObject();
-            assertEquals(configId, obj.get("configId").getAsString());
+            assertEquals("ConfigTest-Java",
+                    obj.get("configId").getAsString());
             assertTrue(obj.has("xml"),
                     "Should have xml field: " + json);
             String xml = obj.get("xml").getAsString();
@@ -277,24 +387,8 @@ public class LaunchHandlerTest {
 
         @Test
         void attributesContainExpectedKeys() {
-            // Find a JUnit config specifically
-            String listJson = handler.handleConfigs(Map.of(), ProjectScope.ALL);
-            var arr = JsonParser.parseString(listJson)
-                    .getAsJsonArray();
-            String configId = null;
-            for (var el : arr) {
-                var obj = el.getAsJsonObject();
-                String type = obj.get("configType").getAsString();
-                if ("JUnit".equals(type)
-                        || "JUnit Plug-in Test".equals(type)) {
-                    configId = obj.get("configId").getAsString();
-                    break;
-                }
-            }
-            if (configId == null) return;
-
             String json = handler.handleConfig(
-                    Map.of("configId", configId));
+                    Map.of("configId", "ConfigTest-JUnit"));
             var obj = JsonParser.parseString(json)
                     .getAsJsonObject();
             var attrs = obj.getAsJsonObject("attributes");
@@ -309,20 +403,11 @@ public class LaunchHandlerTest {
 
         @Test
         void attributeTypesPreserved() {
-            // Get any config and verify attribute value types
-            String listJson = handler.handleConfigs(Map.of(), ProjectScope.ALL);
-            var arr = JsonParser.parseString(listJson)
-                    .getAsJsonArray();
-            if (arr.isEmpty()) return;
-            String configId = arr.get(0).getAsJsonObject()
-                    .get("configId").getAsString();
-
             String json = handler.handleConfig(
-                    Map.of("configId", configId));
+                    Map.of("configId", "ConfigTest-Java"));
             var obj = JsonParser.parseString(json)
                     .getAsJsonObject();
             var attrs = obj.getAsJsonObject("attributes");
-            // Attributes should be valid JSON — no crashes
             assertNotNull(attrs);
             assertTrue(attrs.size() > 0,
                     "Config should have some attributes");

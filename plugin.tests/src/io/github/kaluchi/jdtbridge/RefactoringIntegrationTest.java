@@ -1,7 +1,6 @@
 package io.github.kaluchi.jdtbridge;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.util.Map;
 
@@ -43,35 +42,25 @@ public class RefactoringIntegrationTest {
     public void a1_organizeImportsRemovesUnused() throws Exception {
         String filePath = "/" + TestFixture.PROJECT_NAME
                 + "/src/test/refactor/ImportTarget.java";
-        try {
-            String json = handler.handleOrganizeImports(
-                    Map.of("file", filePath));
-            // ImportTarget imports Map and Set but only uses List
-            assertTrue(json.contains("\"removed\":2"),
-                    "Should remove unused imports: " + json);
-        } catch (IllegalArgumentException e) {
-            // ProjectScope.getNode() fails in headless PDE tests
-            // (no project preferences area). Works in full Eclipse.
-            assumeTrue(false, "organize-imports needs ProjectScope: " + e);
-        }
+        String json = handler.handleOrganizeImports(
+                Map.of("file", filePath));
+        // ImportTarget imports Map and Set but only uses List
+        assertTrue(json.contains("\"removed\":2"),
+                "Should remove unused imports: " + json);
     }
 
     @Test
     public void a2_organizeImportsNoChanges() throws Exception {
         String filePath = "/" + TestFixture.PROJECT_NAME
                 + "/src/test/refactor/ImportTarget.java";
-        try {
-            // Run twice — first organize, then verify idempotent
-            handler.handleOrganizeImports(Map.of("file", filePath));
-            String json = handler.handleOrganizeImports(
-                    Map.of("file", filePath));
-            assertTrue(json.contains("\"added\":0"),
-                    "Should have 0 added: " + json);
-            assertTrue(json.contains("\"removed\":0"),
-                    "Should have 0 removed: " + json);
-        } catch (IllegalArgumentException e) {
-            assumeTrue(false, "organize-imports needs ProjectScope: " + e);
-        }
+        // Run twice — first organize, then verify idempotent
+        handler.handleOrganizeImports(Map.of("file", filePath));
+        String json = handler.handleOrganizeImports(
+                Map.of("file", filePath));
+        assertTrue(json.contains("\"added\":0"),
+                "Should have 0 added: " + json);
+        assertTrue(json.contains("\"removed\":0"),
+                "Should have 0 removed: " + json);
     }
 
     @Test
@@ -139,26 +128,20 @@ public class RefactoringIntegrationTest {
 
     @Test
     public void c2_renameField() throws Exception {
-        try {
-            String json = handler.handleRename(Map.of(
-                    "class", "test.refactor.RenameTarget",
-                    "field", "counter",
-                    "newName", "count"));
-            assertTrue(json.contains("\"ok\":true"),
-                    "Should succeed: " + json);
+        String json = handler.handleRename(Map.of(
+                "class", "test.refactor.RenameTarget",
+                "field", "counter",
+                "newName", "count"));
+        assertTrue(json.contains("\"ok\":true"),
+                "Should succeed: " + json);
 
-            // Verify getter updated
-            Job.getJobManager().join(
-                    ResourcesPlugin.FAMILY_AUTO_BUILD, null);
-            String source = graph.handleSource(
-                    Map.of("of", "test.refactor.RenameTarget"));
-            assertTrue(source.contains("count"),
-                    "Should use new field name: " + source);
-        } catch (IllegalArgumentException e) {
-            // RenameFieldProcessor needs ProjectScope for getter/setter
-            // detection. Fails in headless PDE tests.
-            assumeTrue(false, "rename-field needs ProjectScope: " + e);
-        }
+        // Verify getter updated
+        Job.getJobManager().join(
+                ResourcesPlugin.FAMILY_AUTO_BUILD, null);
+        String source = graph.handleSource(
+                Map.of("of", "test.refactor.RenameTarget"));
+        assertTrue(source.contains("count"),
+                "Should use new field name: " + source);
     }
 
     // ---- Rename type ----
@@ -192,27 +175,21 @@ public class RefactoringIntegrationTest {
 
     @Test
     public void d1_moveType() throws Exception {
-        try {
-            String json = handler.handleMove(Map.of(
-                    "class", "test.refactor.RenameCaller",
-                    "target", "test.moved"));
-            assertTrue(json.contains("\"ok\":true"),
-                    "Should succeed: " + json);
+        String json = handler.handleMove(Map.of(
+                "class", "test.refactor.RenameCaller",
+                "target", "test.moved"));
+        assertTrue(json.contains("\"ok\":true"),
+                "Should succeed: " + json);
 
-            // Wait for build
-            Job.getJobManager().join(
-                    ResourcesPlugin.FAMILY_AUTO_BUILD, null);
+        // Wait for build
+        Job.getJobManager().join(
+                ResourcesPlugin.FAMILY_AUTO_BUILD, null);
 
-            // Verify type in new package
-            String findJson = graph.handleTypes(
-                    Map.of("pattern", "RenameCaller"), ProjectScope.ALL);
-            assertTrue(findJson.contains("test.moved.RenameCaller"),
-                    "Should be in test.moved: " + findJson);
-        } catch (IllegalArgumentException e) {
-            // MoveCuUpdateCreator needs ProjectScope for import rewriting.
-            // Fails in headless PDE tests.
-            assumeTrue(false, "move needs ProjectScope: " + e);
-        }
+        // Verify type in new package
+        String findJson = graph.handleTypes(
+                Map.of("pattern", "RenameCaller"), ProjectScope.ALL);
+        assertTrue(findJson.contains("test.moved.RenameCaller"),
+                "Should be in test.moved: " + findJson);
     }
 
     // ---- Error cases ----

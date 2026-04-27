@@ -111,6 +111,38 @@ let(:@partialLines,
     @coverage | /lines/entries
     | filter(/status | eq("PARTLY_COVERED")))
 
+|~ ── Drill conduits for cleanup workflows ────────────────────── ~|
+
+|~~ Partial-coverage methods of a type, sorted desc by missed
+    instruction count. Each row carries :fqn, :missed, :covered for
+    quick triage of which methods to drill into:
+
+      "pkg.Foo" | @partialMethods | take(5) | table
+                                          → top-5 partials with counts
+      "pkg.Foo" | @partialMethods * /fqn  → just the fqns ~~|
+let(:@partialMethods,
+    @methods | filter(@partial) * (
+        as(:m) | @coverage | /counters/instruction | as(:c)
+        | {:fqn (m | /fqn)
+           :missed (c | /missedCount)
+           :covered (c | /coveredCount)})
+    | sortWith(desc(/missed)))
+
+|~~ Partial-coverage classes of a project, sorted desc by missed
+    instruction count. Same row shape as @partialMethods. Note this
+    operates on @typesInProject — outer types only; @Nested inner
+    classes have their own counters and need separate drilling via
+    `<class> | @innerTypes | filter(@partial) * (...)`.
+
+      "myproject" | @partialClasses | take(15) | table ~~|
+let(:@partialClasses,
+    @typesInProject | filter(@partial) * (
+        as(:t) | @coverage | /counters/instruction | as(:c)
+        | {:fqn (t | /fqn)
+           :missed (c | /missedCount)
+           :covered (c | /coveredCount)})
+    | sortWith(desc(/missed)))
+
 |~ ── Markdown coverage card ──────────────────────────────────── ~|
 
 |~~ Bundle the subject's @detail node and its @coverage Map for

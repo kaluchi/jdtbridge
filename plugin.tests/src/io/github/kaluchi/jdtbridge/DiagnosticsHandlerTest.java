@@ -9,43 +9,34 @@ import org.junit.jupiter.api.Test;
  */
 public class DiagnosticsHandlerTest {
 
+    private final DiagnosticsHandler handler = new DiagnosticsHandler();
+
     @Test
     public void shortMarkerTypeJdt() {
-        assertEquals("jdt", invokeShortMarkerType(
+        assertEquals("jdt", handler.shortMarkerType(
                 "org.eclipse.jdt.core.problem"));
     }
 
     @Test
     public void shortMarkerTypeCheckstyle() {
-        assertEquals("checkstyle", invokeShortMarkerType(
+        assertEquals("checkstyle", handler.shortMarkerType(
                 "net.sf.eclipsecs.core.CheckstyleMarker"));
     }
 
     @Test
     public void shortMarkerTypeMaven() {
-        assertEquals("maven", invokeShortMarkerType(
+        assertEquals("maven", handler.shortMarkerType(
                 "org.eclipse.m2e.core.maven2Problem"));
     }
 
     @Test
     public void shortMarkerTypeUnknown() {
-        assertEquals("SomeProblem", invokeShortMarkerType(
+        assertEquals("SomeProblem", handler.shortMarkerType(
                 "com.vendor.SomeProblem"));
     }
 
     @Test
     public void shortMarkerTypeNull() {
-        assertEquals("unknown", invokeShortMarkerType(null));
-    }
-
-    private String invokeShortMarkerType(String type) {
-        try {
-            var method = DiagnosticsHandler.class
-                    .getDeclaredMethod("shortMarkerType", String.class);
-            method.setAccessible(true);
-            return (String) method.invoke(new DiagnosticsHandler(), type);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        assertEquals("unknown", handler.shortMarkerType(null));
     }
 }
