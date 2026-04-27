@@ -22,15 +22,15 @@ public class ActivatorTest {
 
     @Test
     public void tokenIs32HexChars() {
-        String token = invokeGenerateToken();
+        String token = Activator.generateToken();
         assertEquals(32, token.length());
         assertTrue(HEX_32.matcher(token).matches());
     }
 
     @Test
     public void tokenIsUnique() {
-        assertNotEquals(invokeGenerateToken(),
-                invokeGenerateToken());
+        assertNotEquals(Activator.generateToken(),
+                Activator.generateToken());
     }
 
     @Test
@@ -65,7 +65,7 @@ public class ActivatorTest {
         Path tempFile = Files.createTempFile(
                 "jdtbridge-test-", ".json");
         try {
-            String token = invokeGenerateToken();
+            String token = Activator.generateToken();
             var obj = new JsonObject();
             obj.addProperty("port", 54321);
             obj.addProperty("token", token);
@@ -116,14 +116,4 @@ public class ActivatorTest {
         assertNotNull(parsed.get("location").getAsString());
     }
 
-    private String invokeGenerateToken() {
-        try {
-            var method = Activator.class
-                    .getDeclaredMethod("generateToken");
-            method.setAccessible(true);
-            return (String) method.invoke(null);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
 }

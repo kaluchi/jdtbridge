@@ -58,7 +58,7 @@ public class CoverageTrackerTest {
         }
 
         @Test
-        void stopThenStartReregisters() {
+        void stopThenStartReregisters() throws Exception {
             tracker.stop();
             tracker.start();
             // Listener registration must succeed — verify by
@@ -90,7 +90,7 @@ public class CoverageTrackerTest {
         }
 
         @Test
-        void byCoverageIdResolvesAfterImport() {
+        void byCoverageIdResolvesAfterImport() throws Exception {
             String coverageId = importAndAwait("resolution-test");
             CoverageRun run = tracker.byCoverageId(coverageId);
             assertNotNull(run);
@@ -98,7 +98,7 @@ public class CoverageTrackerTest {
         }
 
         @Test
-        void byCoverageIdStripsDumpSuffix() {
+        void byCoverageIdStripsDumpSuffix() throws Exception {
             String coverageId = importAndAwait("suffix-test");
             // Imported runs only have one session, so :1 suffix
             // resolves to the same run.
@@ -114,21 +114,21 @@ public class CoverageTrackerTest {
     class ImportClassification {
 
         @Test
-        void importedSessionGetsImportedKind() {
+        void importedSessionGetsImportedKind() throws Exception {
             String coverageId = importAndAwait("imp-kind");
             CoverageRun run = tracker.byCoverageId(coverageId);
             assertEquals(CoverageRun.Kind.IMPORTED, run.kind);
         }
 
         @Test
-        void importedCoverageIdHasImportedPrefix() {
+        void importedCoverageIdHasImportedPrefix() throws Exception {
             String coverageId = importAndAwait("imp-prefix");
             assertTrue(coverageId.startsWith("imported:"),
                     "Expected imported: prefix, got: " + coverageId);
         }
 
         @Test
-        void importedRunIsTerminated() {
+        void importedRunIsTerminated() throws Exception {
             String coverageId = importAndAwait("imp-term");
             CoverageRun run = tracker.byCoverageId(coverageId);
             assertTrue(run.terminated);
@@ -136,21 +136,21 @@ public class CoverageTrackerTest {
         }
 
         @Test
-        void importedRunHasOneSession() {
+        void importedRunHasOneSession() throws Exception {
             String coverageId = importAndAwait("imp-one");
             CoverageRun run = tracker.byCoverageId(coverageId);
             assertEquals(1, run.dumpCount());
         }
 
         @Test
-        void importedRunHasNoConsumedIds() {
+        void importedRunHasNoConsumedIds() throws Exception {
             String coverageId = importAndAwait("imp-none");
             CoverageRun run = tracker.byCoverageId(coverageId);
             assertTrue(run.consumedCoverageIds.isEmpty());
         }
 
         @Test
-        void descriptionMirroredFromSession() {
+        void descriptionMirroredFromSession() throws Exception {
             String description = "imp-desc-" + System.nanoTime();
             String coverageId = importAndAwait(description);
             CoverageRun run = tracker.byCoverageId(coverageId);
@@ -162,7 +162,7 @@ public class CoverageTrackerTest {
     class ActivationFlagReset {
 
         @Test
-        void switchingActiveClearsLoadingButPreservesReady() {
+        void switchingActiveClearsLoadingButPreservesReady() throws Exception {
             String firstId = importAndAwait("first");
             CoverageRun first = tracker.byCoverageId(firstId);
             // Pretend EclEmma had finished analysis on first.
@@ -183,7 +183,7 @@ public class CoverageTrackerTest {
         }
 
         @Test
-        void switchingActiveClearsLoadingFromPreviousRun() {
+        void switchingActiveClearsLoadingFromPreviousRun() throws Exception {
             String firstId = importAndAwait("loading-first");
             CoverageRun first = tracker.byCoverageId(firstId);
             // EclEmma was mid-load when the user switched away.
@@ -205,7 +205,7 @@ public class CoverageTrackerTest {
     class Activation {
 
         @Test
-        void importedSessionBecomesActive() {
+        void importedSessionBecomesActive() throws Exception {
             String coverageId = importAndAwait("active-test");
             // Importer activates by default — see
             // SessionImporter.importSession.
@@ -213,7 +213,7 @@ public class CoverageTrackerTest {
         }
 
         @Test
-        void removeAllClearsActive() {
+        void removeAllClearsActive() throws Exception {
             importAndAwait("clear-test");
             CoverageTools.getSessionManager().removeAllSessions();
             assertNull(tracker.activeCoverageId());
@@ -245,19 +245,15 @@ public class CoverageTrackerTest {
      *  execution-data source, then block until the deferred
      *  classification job has run. Returns the assigned
      *  {@code coverageId}. */
-    private String importAndAwait(String description) {
+    private String importAndAwait(String description) throws Exception {
         ISessionImporter importer = CoverageTools.getImporter();
         importer.setDescription(description);
         importer.setScope(Set.of());
         importer.setExecutionDataSource(emptyDataSource());
         importer.setCopy(false);
-        try {
-            importer.importSession(new NullProgressMonitor());
-            Job.getJobManager().join(
-                    CoverageTracker.CLASSIFY_FAMILY, null);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        importer.importSession(new NullProgressMonitor());
+        Job.getJobManager().join(
+                CoverageTracker.CLASSIFY_FAMILY, null);
         // Find the run whose latest dump's description matches —
         // gives us the coverageId without depending on the
         // System.currentTimeMillis() value the tracker assigned.

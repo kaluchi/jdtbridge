@@ -13,6 +13,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIf;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -94,20 +95,9 @@ public class TestRunCoverageFlagTest {
         }
 
         @Test
+        @EnabledIf("io.github.kaluchi.jdtbridge.IntegrationGuards#canRunJunitCoverageLaunch")
         void coverageOneEnablesCoverage() throws Exception {
             // Spec accepts "true" or "1".
-            if (!CoverageTypes.isSupported(
-                    "org.eclipse.jdt.junit.launchconfig")) {
-                return;
-            }
-            org.osgi.framework.Bundle eclemmaUi =
-                    org.eclipse.core.runtime.Platform.getBundle(
-                            "org.eclipse.eclemma.ui");
-            if (eclemmaUi == null
-                    || eclemmaUi.getState()
-                            < org.osgi.framework.Bundle.ACTIVE) {
-                return;
-            }
             Map<String, String> params = new HashMap<>();
             params.put("class", "test.edge.SimpleTest");
             params.put("no-refresh", "");
@@ -150,24 +140,11 @@ public class TestRunCoverageFlagTest {
     class HappyPath {
 
         @Test
+        @EnabledIf("io.github.kaluchi.jdtbridge.IntegrationGuards#canRunJunitCoverageLaunch")
         void coverageTrueLaunchesInCoverageMode() throws Exception {
-            // Skip when the headless runtime can't actually drive
-            // a coverage launch end-to-end. Two preconditions:
-            // (a) JUnit type has a coverage delegate registered;
-            // (b) EclEmma UI bundle is activated (the launch path
-            //     goes through UIPreferences for default scope).
-            if (!CoverageTypes.isSupported(
-                    "org.eclipse.jdt.junit.launchconfig")) {
-                return;
-            }
-            org.osgi.framework.Bundle eclemmaUi =
-                    org.eclipse.core.runtime.Platform.getBundle(
-                            "org.eclipse.eclemma.ui");
-            if (eclemmaUi == null
-                    || eclemmaUi.getState()
-                            < org.osgi.framework.Bundle.ACTIVE) {
-                return;
-            }
+            // End-to-end coverage launch needs the JUnit coverage
+            // delegate registered AND the EclEmma UI bundle active —
+            // gated above.
             Map<String, String> params = new HashMap<>();
             params.put("class", "test.edge.SimpleTest");
             params.put("no-refresh", "");
