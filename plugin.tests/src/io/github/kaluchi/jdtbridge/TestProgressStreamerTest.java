@@ -55,6 +55,7 @@ public class TestProgressStreamerTest {
             }, "stream-test-worker");
 
             worker.start();
+            awaitInWait(worker, 2000);
             worker.interrupt();
             worker.join(5000);
 
@@ -84,6 +85,7 @@ public class TestProgressStreamerTest {
                 }
             }, "stream-test-failures");
             worker.start();
+            awaitInWait(worker, 2000);
             worker.interrupt();
             worker.join(5000);
 
@@ -124,6 +126,7 @@ public class TestProgressStreamerTest {
                 }
             }, "stream-test-ignored");
             worker.start();
+            awaitInWait(worker, 2000);
             worker.interrupt();
             worker.join(5000);
 
@@ -160,6 +163,7 @@ public class TestProgressStreamerTest {
                 }
             }, "stream-test-null-filter");
             worker.start();
+            awaitInWait(worker, 2000);
             worker.interrupt();
             worker.join(5000);
 
@@ -185,5 +189,20 @@ public class TestProgressStreamerTest {
         List<TestRunSession> sessions =
                 JUnitCorePlugin.getModel().getTestRunSessions();
         return sessions.isEmpty() ? null : sessions.get(0);
+    }
+
+    /** Spin until the worker enters WAITING (i.e. has reached
+     *  {@code done.await()} after replay completes) or timeout. */
+    private static void awaitInWait(Thread worker, long maxMs) {
+        long deadline = System.currentTimeMillis() + maxMs;
+        while (System.currentTimeMillis() < deadline) {
+            Thread.State s = worker.getState();
+            if (s == Thread.State.WAITING
+                    || s == Thread.State.TIMED_WAITING
+                    || s == Thread.State.TERMINATED) {
+                return;
+            }
+            Thread.onSpinWait();
+        }
     }
 }
