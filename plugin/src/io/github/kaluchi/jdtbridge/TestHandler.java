@@ -297,8 +297,7 @@ public class TestHandler {
             throws Exception {
         String target = params.get("target");
         if (target == null || target.isBlank()) {
-            return HttpServer.jsonError(
-                    "Missing 'target' parameter");
+            return HttpServer.missingParamError("target");
         }
         IJavaElement element = JdtUtils.resolveElement(target);
         if (element == null) {

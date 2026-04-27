@@ -32,8 +32,7 @@ class TestSessionHandler {
     String handleStatus(Map<String, String> params) {
         String testRunId = params.get("testRunId");
         if (testRunId == null || testRunId.isBlank()) {
-            return HttpServer.jsonError(
-                    "Missing 'testRunId' parameter");
+            return HttpServer.missingParamError("testRunId");
         }
 
         TestRunSession session = findSession(testRunId);

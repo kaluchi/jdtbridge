@@ -108,13 +108,9 @@ class LaunchHandler {
         return container.substring(lt + 1);
     }
 
-    private ILaunchManager launchManager() {
-        return LaunchAttrs.launchManager();
-    }
-
     String handleList(Map<String, String> params,
             ProjectScope scope) {
-        ILaunch[] launches = launchManager().getLaunches();
+        ILaunch[] launches = LaunchAttrs.launchManager().getLaunches();
         var arr = new JsonArray();
         // Reverse order: newest first
         reversedStream(launches)
@@ -171,7 +167,7 @@ class LaunchHandler {
             ProjectScope scope) {
         try {
             var allConfigs =
-                    launchManager().getLaunchConfigurations();
+                    LaunchAttrs.launchManager().getLaunchConfigurations();
             ILaunchConfiguration[] recent = getRecentConfigs();
 
             // Recent first, then remaining — deduplicated
@@ -196,8 +192,7 @@ class LaunchHandler {
     String handleConfig(Map<String, String> params) {
         String name = params.get("configId");
         if (name == null || name.isBlank()) {
-            return HttpServer.jsonError(
-                    "Missing 'configId' parameter");
+            return HttpServer.missingParamError("configId");
         }
         try {
             ILaunchConfiguration config = findConfig(name);
@@ -220,8 +215,7 @@ class LaunchHandler {
             String launchXmlContent) {
         String configId = params.get("configId");
         if (configId == null || configId.isBlank()) {
-            return HttpServer.jsonError(
-                    "Missing 'configId' parameter");
+            return HttpServer.missingParamError("configId");
         }
         if (launchXmlContent == null || launchXmlContent.isBlank()) {
             return HttpServer.jsonError(
@@ -282,8 +276,7 @@ class LaunchHandler {
     String handleConfigDelete(Map<String, String> params) {
         String configId = params.get("configId");
         if (configId == null || configId.isBlank()) {
-            return HttpServer.jsonError(
-                    "Missing 'configId' parameter");
+            return HttpServer.missingParamError("configId");
         }
         ILaunchConfiguration config = findConfig(configId);
         if (config == null) {
@@ -483,7 +476,7 @@ class LaunchHandler {
 
         Document doc = DocumentBuilderFactory.newInstance()
                 .newDocumentBuilder().parse(historyFile);
-        ILaunchManager lm = launchManager();
+        ILaunchManager lm = LaunchAttrs.launchManager();
         List<ILaunchConfiguration> out = new ArrayList<>();
         Set<String> seen = new HashSet<>();
 
@@ -539,7 +532,7 @@ class LaunchHandler {
 
     String handleClear(Map<String, String> params) {
         String nameOrId = params.get("launchId");
-        ILaunch[] launches = launchManager().getLaunches();
+        ILaunch[] launches = LaunchAttrs.launchManager().getLaunches();
         int removed = 0;
 
         for (ILaunch launch : launches) {
@@ -549,7 +542,7 @@ class LaunchHandler {
                 ILaunch found = findLaunch(nameOrId);
                 if (found != launch) continue;
             }
-            launchManager().removeLaunch(launch);
+            LaunchAttrs.launchManager().removeLaunch(launch);
             removed++;
         }
 
@@ -595,8 +588,7 @@ class LaunchHandler {
     String handleRun(Map<String, String> params) {
         String name = params.get("configId");
         if (name == null || name.isBlank()) {
-            return HttpServer.jsonError(
-                    "Missing 'configId' parameter");
+            return HttpServer.missingParamError("configId");
         }
         String mode = params.containsKey("debug")
                 ? ILaunchManager.DEBUG_MODE
@@ -633,8 +625,7 @@ class LaunchHandler {
     String handleStop(Map<String, String> params) {
         String name = params.get("launchId");
         if (name == null || name.isBlank()) {
-            return HttpServer.jsonError(
-                    "Missing 'launchId' parameter");
+            return HttpServer.missingParamError("launchId");
         }
         ILaunch target = findLaunch(name);
         if (target == null) {
@@ -662,7 +653,7 @@ class LaunchHandler {
     private ILaunchConfiguration findConfig(String name) {
         try {
             for (var config
-                    : launchManager()
+                    : LaunchAttrs.launchManager()
                             .getLaunchConfigurations()) {
                 if (name.equals(config.getName())) {
                     return config;
@@ -688,8 +679,7 @@ class LaunchHandler {
     String handleConsole(Map<String, String> params) {
         String name = params.get("launchId");
         if (name == null || name.isBlank()) {
-            return HttpServer.jsonError(
-                    "Missing 'launchId' parameter");
+            return HttpServer.missingParamError("launchId");
         }
 
         String tailStr = params.get("tail");
@@ -744,7 +734,7 @@ class LaunchHandler {
             }
         }
 
-        ILaunch[] launches = launchManager().getLaunches();
+        ILaunch[] launches = LaunchAttrs.launchManager().getLaunches();
         ILaunch fallback = null;
         for (int i = launches.length - 1; i >= 0; i--) {
             if (!configName.equals(launchName(launches[i])))

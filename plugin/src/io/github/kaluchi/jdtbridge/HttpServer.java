@@ -691,6 +691,14 @@ public class HttpServer {
         return obj.toString();
     }
 
+    /** {@code {"error": "Missing 'X' parameter"}} for required-but-
+     *  missing query parameters — the most common validation
+     *  failure across handlers. */
+    static String missingParamError(String paramName) {
+        return jsonError(
+                "Missing '" + paramName + "' parameter");
+    }
+
     private void sendError(Socket socket, int code, String message)
             throws IOException {
         String body = jsonError(message);

@@ -107,8 +107,7 @@ class EditorHandler {
         String methodName = params.get("method");
 
         if (fqn == null || fqn.isBlank()) {
-            return HttpServer.jsonError(
-                    "Missing 'class' parameter");
+            return HttpServer.missingParamError("class");
         }
 
         IType type = JdtUtils.findType(fqn);
