@@ -16,8 +16,7 @@ const SAMPLE_LIMIT = 5;
  */
 export async function preflightCompileErrors(args, { json = false } = {}) {
   const problems = await get("/problems");
-  const errors = (Array.isArray(problems) ? problems : [])
-    .filter((p) => p?.severity === "error");
+  const errors = problems.filter((p) => p.severity === "error");
   if (errors.length === 0) return true;
 
   if (args.includes(FLAG)) {
