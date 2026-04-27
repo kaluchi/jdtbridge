@@ -137,5 +137,54 @@ public class ProjectScopeTest {
             // No working dir set → passes (permissive)
             assertTrue(scope.containsConfig(config));
         }
+
+        @Test
+        void launchGroupTypeRoutesThroughGroupBranch()
+                throws Exception {
+            // Group type config — exercises isLaunchGroup() and
+            // launchGroupInScope(); empty group has no children
+            // so the result is false.
+            ILaunchManager mgr = DebugPlugin.getDefault()
+                    .getLaunchManager();
+            ILaunchConfigurationType groupType = mgr
+                    .getLaunchConfigurationType(
+                            "org.eclipse.debug.core.groups."
+                                    + "GroupLaunchConfigurationType");
+            if (groupType == null) return;
+            var scope = ProjectScope.of(Set.of("anything"));
+            var wc = groupType.newInstance(
+                    null, "test-empty-group");
+            assertFalse(scope.containsConfig(wc),
+                    "Empty group must be out of scope");
+        }
+    }
+
+    @Nested
+    class ContainsAnyOfRoots {
+
+        @Test
+        void allScopeAcceptsEvenNullSet() {
+            assertTrue(ProjectScope.ALL.containsAnyOfRoots(null));
+        }
+
+        @Test
+        void allScopeAcceptsEmptySet() {
+            assertTrue(ProjectScope.ALL.containsAnyOfRoots(
+                    Set.of()));
+        }
+
+        @Test
+        void filteredScopeRejectsNullSet() {
+            ProjectScope scope = ProjectScope.of(
+                    Set.of("project-a"));
+            assertFalse(scope.containsAnyOfRoots(null));
+        }
+
+        @Test
+        void filteredScopeRejectsEmptySet() {
+            ProjectScope scope = ProjectScope.of(
+                    Set.of("project-a"));
+            assertFalse(scope.containsAnyOfRoots(Set.of()));
+        }
     }
 }
