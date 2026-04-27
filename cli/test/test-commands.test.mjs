@@ -65,10 +65,10 @@ describe("test commands", () => {
 
   // --- test run ---
 
-  it("test run sends class param", async () => {
+  it("test run sends class FQN as target", async () => {
     await setupMock((req, res) => {
       if (req.url.includes("/test/run")) {
-        expect(req.url).toContain("class=com.example.FooTest");
+        expect(req.url).toContain("target=com.example.FooTest");
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true, configId: "FooTest", testRunId: "FooTest:1775000", launchId: "FooTest:100", pid: "100", reused: false, project: "my-project", runner: "JUnit 5" }));
       } else if (req.url.includes("/test/status")) {
@@ -81,10 +81,10 @@ describe("test commands", () => {
     expect(io.logs.some((l) => l.includes("FooTest"))).toBe(true);
   });
 
-  it("test run sends project param", async () => {
+  it("test run sends project name as target", async () => {
     await setupMock((req, res) => {
       if (req.url.includes("/test/run")) {
-        expect(req.url).toContain("project=my-project");
+        expect(req.url).toContain("target=my-project");
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true, configId: "my-project", testRunId: "my-project:1775001", launchId: "my-project:200", pid: "200", reused: false }));
       } else if (req.url.includes("/test/status")) {
@@ -93,7 +93,7 @@ describe("test commands", () => {
       }
     });
     const { testRun } = await import("../src/commands/test-run.mjs");
-    await testRun(["--project", "my-project", "-q"]);
+    await testRun(["my-project", "-q"]);
     expect(io.logs.some((l) => l.includes("my-project"))).toBe(true);
   });
 
@@ -132,11 +132,27 @@ describe("test commands", () => {
     expect(io.errors[0]).toContain("Something went wrong");
   });
 
-  it("test run sends method param with FQN#method", async () => {
+  it("test run sends --project as separate URL param alongside target", async () => {
     await setupMock((req, res) => {
       if (req.url.includes("/test/run")) {
-        expect(req.url).toContain("class=com.example.FooTest");
-        expect(req.url).toContain("method=testBar");
+        expect(req.url).toContain("target=com.example.FooTest");
+        expect(req.url).toContain("project=Build");
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, configId: "FooTest", testRunId: "FooTest:1775099", launchId: "FooTest:900", pid: "900", reused: false, project: "Build" }));
+      } else if (req.url.includes("/test/status")) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ total: 3 }));
+      }
+    });
+    const { testRun } = await import("../src/commands/test-run.mjs");
+    await testRun(["com.example.FooTest", "--project", "Build", "-q"]);
+  });
+
+  it("test run sends FQN#method form as target verbatim", async () => {
+    await setupMock((req, res) => {
+      if (req.url.includes("/test/run")) {
+        expect(req.url).toContain(
+            "target=com.example.FooTest%23testBar");
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true, configId: "FooTest", testRunId: "FooTest:1775003", launchId: "FooTest:400", pid: "400", reused: false }));
       } else if (req.url.includes("/test/status")) {
@@ -149,11 +165,10 @@ describe("test commands", () => {
     expect(io.logs.some((l) => l.includes("FooTest"))).toBe(true);
   });
 
-  it("test run sends package param", async () => {
+  it("test run sends package name as target", async () => {
     await setupMock((req, res) => {
       if (req.url.includes("/test/run")) {
-        expect(req.url).toContain("project=my-project");
-        expect(req.url).toContain("package=com.example.dao");
+        expect(req.url).toContain("target=com.example.dao");
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true, configId: "com.example.service", testRunId: "com.example.service:1775004", launchId: "com.example.service:500", pid: "500", reused: false }));
       } else if (req.url.includes("/test/status")) {
@@ -162,7 +177,7 @@ describe("test commands", () => {
       }
     });
     const { testRun } = await import("../src/commands/test-run.mjs");
-    await testRun(["--project", "my-project", "--package", "com.example.dao", "-q"]);
+    await testRun(["com.example.dao", "-q"]);
   });
 
   it("test run sends no-refresh param", async () => {
@@ -178,6 +193,34 @@ describe("test commands", () => {
     });
     const { testRun } = await import("../src/commands/test-run.mjs");
     await testRun(["com.example.FooTest", "--no-refresh", "-q"]);
+  });
+
+  it("test run -f prints aggregate summary line at end of stream", async () => {
+    await setupMock((req, res) => {
+      if (req.url.includes("/test/run")) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, configId: "SumTest", testRunId: "SumTest:1775101", launchId: "SumTest:1010", pid: "1010", reused: false }));
+      } else if (req.url.includes("/test/status/stream")) {
+        res.writeHead(200, { "Content-Type": "application/x-ndjson" });
+        res.write(JSON.stringify({ event: "finished", total: 5, passed: 4, failed: 1, errors: 0, ignored: 0, time: 1.5 }) + "\n");
+        res.end();
+      } else if (req.url.includes("/test/status")) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          configId: "SumTest", label: "SumTest",
+          total: 5, completed: 5, state: "finished",
+          passed: 4, failed: 1, errors: 0, ignored: 0,
+          time: 1.5,
+        }));
+      }
+    });
+    const { testRun } = await import("../src/commands/test-run.mjs");
+    await expect(testRun(["com.example.SumTest", "-f", "-q"])).rejects.toThrow("exit(1)");
+    const allLogs = io.logs.join("\n");
+    expect(allLogs).toContain("#### SumTest");
+    expect(allLogs).toContain("5/5");
+    expect(allLogs).toContain("4 passed");
+    expect(allLogs).toContain("1 failed");
   });
 
   it("test run -f exits 1 on test failures", async () => {

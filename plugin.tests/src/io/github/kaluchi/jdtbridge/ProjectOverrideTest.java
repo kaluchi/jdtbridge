@@ -106,7 +106,7 @@ public class ProjectOverrideTest {
     void nonexistentProjectOverrideReturnsError()
             throws Exception {
         Map<String, String> params = new HashMap<>();
-        params.put("class", "test.override.SimpleTest");
+        params.put("target", "test.override.SimpleTest");
         params.put("project", "nonexistent-xyz");
         params.put("no-refresh", "");
         String json = handler.handleTestRun(params);
@@ -117,7 +117,7 @@ public class ProjectOverrideTest {
     @Test
     void projectOverrideUsedInLaunch() throws Exception {
         Map<String, String> params = new HashMap<>();
-        params.put("class", "test.override.SimpleTest");
+        params.put("target", "test.override.SimpleTest");
         params.put("project", LAUNCHER_PROJECT);
         params.put("no-refresh", "");
         String json = handler.handleTestRun(params);
@@ -126,6 +126,21 @@ public class ProjectOverrideTest {
         assertTrue(json.contains(
                 "\"project\":\"" + LAUNCHER_PROJECT + "\""),
                 "Should use launcher project: " + json);
+    }
+
+    @Test
+    void targetWithoutProjectUsesEnclosing()
+            throws Exception {
+        Map<String, String> params = new HashMap<>();
+        params.put("target", "test.override.SimpleTest");
+        params.put("no-refresh", "");
+        String json = handler.handleTestRun(params);
+        assertTrue(json.contains("\"ok\":true"),
+                "Should launch: " + json);
+        assertTrue(json.contains(
+                "\"project\":\"" + SOURCE_PROJECT + "\""),
+                "Without override, project comes from enclosing"
+                + " project of resolved type: " + json);
     }
 
     // ---- helpers ----

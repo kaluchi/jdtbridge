@@ -14,8 +14,10 @@ import org.eclipse.debug.core.ILaunchConfigurationType;
 import org.eclipse.debug.core.ILaunchConfigurationWorkingCopy;
 import org.eclipse.debug.core.ILaunchManager;
 import org.eclipse.jdt.core.IClasspathEntry;
+import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IJavaProject;
+import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.IType;
@@ -25,6 +27,7 @@ import org.eclipse.jdt.junit.JUnitCore;
 import org.eclipse.jdt.launching.IJavaLaunchConfigurationConstants;
 import org.osgi.framework.Version;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.jar.Manifest;
 
@@ -90,6 +93,74 @@ public class TestHandler {
             boolean reused,
             String project,
             String runner) {}
+
+    /**
+     * Translate a resolved {@link IJavaElement} into the
+     * class/method/project/package shape consumed by
+     * {@link #prepareLaunch}. An explicit {@code project} entry in
+     * {@code params} wins over the element's enclosing project for
+     * IMethod / IType / IPackageFragment / ICompilationUnit; for
+     * IJavaProject targets the resolved project is authoritative.
+     */
+    private static Map<String, String> synthesizeFromTarget(
+            Map<String, String> params, IJavaElement element)
+            throws JavaModelException {
+        Map<String, String> out = new HashMap<>(params);
+        out.remove("target");
+        String override = out.get("project");
+        boolean hasOverride = override != null
+                && !override.isBlank();
+
+        if (element instanceof IMethod m) {
+            IType t = m.getDeclaringType();
+            out.put("class", t.getFullyQualifiedName('.'));
+            out.put("method", m.getElementName());
+            if (!hasOverride) {
+                out.put("project",
+                        t.getJavaProject().getElementName());
+            }
+        } else if (element instanceof IType t) {
+            out.put("class", t.getFullyQualifiedName('.'));
+            if (!hasOverride) {
+                out.put("project",
+                        t.getJavaProject().getElementName());
+            }
+        } else if (element instanceof IJavaProject p) {
+            out.put("project", p.getElementName());
+        } else if (element instanceof IPackageFragment pkg) {
+            out.put("package", pkg.getElementName());
+            if (!hasOverride) {
+                out.put("project",
+                        pkg.getJavaProject().getElementName());
+            }
+        } else if (element instanceof ICompilationUnit cu) {
+            IType primary = cu.findPrimaryType();
+            if (primary == null) {
+                throw new IllegalArgumentException(
+                        "compilation-unit-no-primary-type: "
+                        + cu.getElementName());
+            }
+            out.put("class",
+                    primary.getFullyQualifiedName('.'));
+            if (!hasOverride) {
+                out.put("project",
+                        cu.getJavaProject().getElementName());
+            }
+        } else {
+            throw new IllegalArgumentException(
+                    "unsupported-target-kind: "
+                    + element.getClass().getSimpleName());
+        }
+        return out;
+    }
+
+    private static String targetNotFoundError(String target) {
+        var err = new JsonObject();
+        err.addProperty("error", "target-not-found: " + target);
+        err.addProperty("kind", "target-not-found");
+        err.addProperty("target", target);
+        return err.toString();
+    }
 
     /**
      * Common launch preparation: refresh, create config,
@@ -224,10 +295,26 @@ public class TestHandler {
      */
     public String handleTestRun(Map<String, String> params)
             throws Exception {
-        boolean coverage = parseBool(params.get("coverage"));
+        String target = params.get("target");
+        if (target == null || target.isBlank()) {
+            return HttpServer.jsonError(
+                    "Missing 'target' parameter");
+        }
+        IJavaElement element = JdtUtils.resolveElement(target);
+        if (element == null) {
+            return targetNotFoundError(target);
+        }
+        Map<String, String> synth;
+        try {
+            synth = synthesizeFromTarget(params, element);
+        } catch (IllegalArgumentException e) {
+            return HttpServer.jsonError(e.getMessage());
+        }
+
+        boolean coverage = parseBool(synth.get("coverage"));
 
         String[] errorOut = { null };
-        PreparedLaunch pl = prepareLaunch(params, errorOut);
+        PreparedLaunch pl = prepareLaunch(synth, errorOut);
         if (pl == null) return errorOut[0];
 
         if (coverage) {
