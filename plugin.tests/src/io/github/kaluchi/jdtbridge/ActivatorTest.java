@@ -116,4 +116,45 @@ public class ActivatorTest {
         assertNotNull(parsed.get("location").getAsString());
     }
 
+    private static final Pattern HEX_12 =
+            Pattern.compile("^[0-9a-f]{12}$");
+
+    @Test
+    public void workspaceHashIsTwelveLowercaseHex() {
+        String h = Activator.workspaceHash("/some/path");
+        assertEquals(12, h.length());
+        assertTrue(HEX_12.matcher(h).matches(),
+                "Should be 12 hex chars: " + h);
+    }
+
+    @Test
+    public void workspaceHashIsDeterministic() {
+        assertEquals(
+                Activator.workspaceHash("/x"),
+                Activator.workspaceHash("/x"));
+    }
+
+    @Test
+    public void workspaceHashDiffersForDifferentInputs() {
+        assertNotEquals(
+                Activator.workspaceHash("/a"),
+                Activator.workspaceHash("/b"));
+    }
+
+    @Test
+    public void workspaceHashOfEmptyStringIsKnownPrefix() {
+        // SHA-256("") =
+        // e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+        // First 6 bytes hex-encoded:
+        assertEquals("e3b0c44298fc",
+                Activator.workspaceHash(""));
+    }
+
+    @Test
+    public void workspaceHashHandlesUtf8() {
+        // Non-ASCII input must round-trip through UTF-8 cleanly.
+        String h = Activator.workspaceHash("проект/тест");
+        assertEquals(12, h.length());
+        assertTrue(HEX_12.matcher(h).matches());
+    }
 }
