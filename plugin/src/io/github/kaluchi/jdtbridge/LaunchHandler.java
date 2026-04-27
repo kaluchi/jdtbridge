@@ -413,7 +413,7 @@ class LaunchHandler {
         var attrsObj = new JsonObject();
         for (var entry : attrs.entrySet()) {
             attrsObj.add(entry.getKey(),
-                    toJsonElement(entry.getValue()));
+                    JsonValues.toElement(entry.getValue()));
         }
         obj.add("attributes", attrsObj);
         return obj.toString();
@@ -451,40 +451,6 @@ class LaunchHandler {
                 .append(config.getName() + ".launch")
                 .toFile();
         return file.exists() ? file : null;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static com.google.gson.JsonElement toJsonElement(
-            Object value) {
-        if (value == null)
-            return com.google.gson.JsonNull.INSTANCE;
-        if (value instanceof String s)
-            return new JsonPrimitive(s);
-        if (value instanceof Boolean b)
-            return new JsonPrimitive(b);
-        if (value instanceof Number n)
-            return new JsonPrimitive(n);
-        if (value instanceof List<?> list) {
-            var arr = new JsonArray();
-            for (Object item : list)
-                arr.add(toJsonElement(item));
-            return arr;
-        }
-        if (value instanceof Set<?> set) {
-            var arr = new JsonArray();
-            for (Object item : set)
-                arr.add(toJsonElement(item));
-            return arr;
-        }
-        if (value instanceof Map<?, ?> map) {
-            var obj = new JsonObject();
-            for (var entry
-                    : ((Map<String, Object>) map).entrySet())
-                obj.add(entry.getKey(),
-                        toJsonElement(entry.getValue()));
-            return obj;
-        }
-        return new JsonPrimitive(value.toString());
     }
 
     /** Launch groups queried for recency, in fixed priority order.
