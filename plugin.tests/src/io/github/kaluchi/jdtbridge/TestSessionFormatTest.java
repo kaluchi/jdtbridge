@@ -20,6 +20,51 @@ import com.google.gson.JsonObject;
 public class TestSessionFormatTest {
 
     @Nested
+    class StreamerFilter {
+
+        @Test
+        void nullFilterIncludesEverything() {
+            assertTrue(TestSessionFormat.streamerFilter("PASS", null));
+            assertTrue(TestSessionFormat.streamerFilter("FAIL", null));
+            assertTrue(TestSessionFormat.streamerFilter("ERROR", null));
+            assertTrue(TestSessionFormat.streamerFilter("IGNORED", null));
+            assertTrue(TestSessionFormat.streamerFilter("UNKNOWN", null));
+        }
+
+        @Test
+        void allFilterIncludesEverything() {
+            assertTrue(TestSessionFormat.streamerFilter("PASS", "all"));
+            assertTrue(TestSessionFormat.streamerFilter("FAIL", "all"));
+            assertTrue(TestSessionFormat.streamerFilter("IGNORED", "all"));
+        }
+
+        @Test
+        void failuresFilterIncludesOnlyFailAndError() {
+            assertTrue(TestSessionFormat.streamerFilter("FAIL", "failures"));
+            assertTrue(TestSessionFormat.streamerFilter("ERROR", "failures"));
+            assertFalse(TestSessionFormat.streamerFilter("PASS", "failures"));
+            assertFalse(TestSessionFormat.streamerFilter("IGNORED", "failures"));
+            assertFalse(TestSessionFormat.streamerFilter("UNKNOWN", "failures"));
+        }
+
+        @Test
+        void ignoredFilterIncludesOnlyIgnored() {
+            assertTrue(TestSessionFormat.streamerFilter("IGNORED", "ignored"));
+            assertFalse(TestSessionFormat.streamerFilter("PASS", "ignored"));
+            assertFalse(TestSessionFormat.streamerFilter("FAIL", "ignored"));
+            assertFalse(TestSessionFormat.streamerFilter("ERROR", "ignored"));
+        }
+
+        @Test
+        void unknownFilterValueIncludesEverything() {
+            // Unrecognised filter falls through to "include" rather
+            // than rejecting all events — matches existing behaviour.
+            assertTrue(TestSessionFormat.streamerFilter("PASS", "garbage"));
+            assertTrue(TestSessionFormat.streamerFilter("FAIL", ""));
+        }
+    }
+
+    @Nested
     class StatusName {
 
         @Test

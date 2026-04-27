@@ -50,4 +50,17 @@ final class TestSessionFormat {
         if (ft.getActual() != null)
             obj.addProperty("actual", ft.getActual());
     }
+
+    /** Streamer-side filter: null/"all" includes everything,
+     *  "failures" → only FAIL/ERROR, "ignored" → only IGNORED,
+     *  any other value falls back to "include". */
+    static boolean streamerFilter(String status, String filter) {
+        if (filter == null || "all".equals(filter)) return true;
+        if ("failures".equals(filter))
+            return "FAIL".equals(status)
+                    || "ERROR".equals(status);
+        if ("ignored".equals(filter))
+            return "IGNORED".equals(status);
+        return true;
+    }
 }

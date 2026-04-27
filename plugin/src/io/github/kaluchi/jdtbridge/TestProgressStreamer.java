@@ -42,7 +42,7 @@ class TestProgressStreamer {
                 String status = TestSessionFormat.statusName(
                         testResult);
 
-                if (!matchesFilter(status, filter)) return;
+                if (!TestSessionFormat.streamerFilter(status, filter)) return;
 
                 String fqn = tc.getTestClassName()
                         + "#" + tc.getTestMethodName();
@@ -144,7 +144,7 @@ class TestProgressStreamer {
                         continue; // not finished yet
                     String status = TestSessionFormat.statusName(
                             result);
-                    if (!matchesFilter(status, filter))
+                    if (!TestSessionFormat.streamerFilter(status, filter))
                         continue;
 
                     String fqn = tc.getTestClassName()
@@ -173,18 +173,6 @@ class TestProgressStreamer {
         } catch (Exception e) {
             // tree may be incomplete
         }
-    }
-
-    private static boolean matchesFilter(String status,
-            String filter) {
-        if (filter == null || "all".equals(filter))
-            return true;
-        if ("failures".equals(filter))
-            return "FAIL".equals(status)
-                    || "ERROR".equals(status);
-        if ("ignored".equals(filter))
-            return "IGNORED".equals(status);
-        return true;
     }
 
     private static void writeLine(OutputStream out, String line)
