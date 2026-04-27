@@ -5,9 +5,7 @@ import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IProjectDescription;
 import org.eclipse.core.resources.IWorkspaceRoot;
 import org.eclipse.core.resources.ResourcesPlugin;
-import org.eclipse.core.runtime.FileLocator;
 import org.eclipse.core.runtime.Path;
-import org.eclipse.core.runtime.Platform;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.jdt.core.IClasspathEntry;
 import org.eclipse.jdt.core.IJavaProject;
@@ -471,12 +469,8 @@ public class TestFixture {
                 new Path("org.eclipse.jdt.launching.JRE_CONTAINER"));
         IClasspathEntry junitEntry = JavaCore.newContainerEntry(
                 new Path("org.eclipse.jdt.junit.JUNIT_CONTAINER/5"));
-
-        IClasspathEntry resEntry = bundleClasspathEntry(
-                "org.eclipse.core.resources");
-        IClasspathEntry[] cp = new IClasspathEntry[] {
-                srcEntry, jreEntry, junitEntry, resEntry };
-        javaProject.setRawClasspath(cp, null);
+        javaProject.setRawClasspath(new IClasspathEntry[] {
+                srcEntry, jreEntry, junitEntry }, null);
 
         // Initialize project preferences (needed by refactoring APIs)
         javaProject.setOption(JavaCore.COMPILER_SOURCE, "21");
@@ -556,48 +550,6 @@ public class TestFixture {
         // Wait for auto-build to finish
         Job.getJobManager().join(
                 ResourcesPlugin.FAMILY_AUTO_BUILD, null);
-    }
-
-    private static IClasspathEntry bundleClasspathEntry(
-            String bundleId) {
-        var bundle = Platform.getBundle(bundleId);
-        if (bundle == null) {
-            throw new IllegalStateException(
-                    "Test runtime missing required bundle: "
-                            + bundleId);
-        }
-        java.io.File file = FileLocator
-                .getBundleFileLocation(bundle).orElseThrow(() ->
-                        new IllegalStateException(
-                                "Bundle " + bundleId
-                                + " has no file location"));
-        return JavaCore.newLibraryEntry(
-                new Path(file.getAbsolutePath()),
-                sourceJarBesides(file), null);
-    }
-
-    /**
-     * Source jar of a deployed bundle is named
-     * {@code <baseName>.source_<version>.jar} in the same directory
-     * as the binary jar. Returns {@code null} when the file is
-     * absent (bundle deployed without source attachment).
-     */
-    private static Path sourceJarBesides(java.io.File binaryFile) {
-        java.io.File dir = binaryFile.getParentFile();
-        String name = binaryFile.getName();
-        int verIdx = name.indexOf('_');
-        if (dir == null || verIdx < 0) {
-            throw new IllegalStateException(
-                    "Bundle file does not match <name>_<version> "
-                    + "pattern: " + binaryFile);
-        }
-        java.io.File srcFile = new java.io.File(dir,
-                name.substring(0, verIdx)
-                + ".source"
-                + name.substring(verIdx));
-        return srcFile.exists()
-                ? new Path(srcFile.getAbsolutePath())
-                : null;
     }
 
     public static void destroy() throws Exception {
