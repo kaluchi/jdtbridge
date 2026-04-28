@@ -77,25 +77,12 @@ class LaunchHandler {
         this.tracker = tracker;
     }
 
-    private static String formatRunner(String testKind) {
-        if (testKind == null) return null;
-        return switch (testKind) {
-        case "org.eclipse.jdt.junit.loader.junit6" ->
-                "JUnit 6";
-        case "org.eclipse.jdt.junit.loader.junit5" ->
-                "JUnit 5";
-        case "org.eclipse.jdt.junit.loader.junit4" ->
-                "JUnit 4";
-        default -> testKind;
-        };
-    }
-
     /**
      * Extract package name from JUnit CONTAINER attribute.
      * Format: "=project/src\/test\/java=...=/<package.name"
      * Returns null for project-level containers ("=project").
      */
-    private static String parseContainerPackage(
+    static String parseContainerPackage(
             String container) {
         if (container == null || container.isBlank())
             return null;
@@ -341,7 +328,7 @@ class LaunchHandler {
                     JUnitLaunchConst.ATTR_TEST_NAME, (String) null);
             if (method != null && !method.isBlank())
                 obj.addProperty("method", method);
-            String runner = formatRunner(
+            String runner = JUnitLaunchConst.formatRunner(
                     config.getAttribute(
                             JUnitLaunchConst.ATTR_TEST_KIND,
                             (String) null));

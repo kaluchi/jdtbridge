@@ -42,4 +42,14 @@ final class JUnitLaunchConst {
             "org.eclipse.jdt.junit.loader.junit5";
     static final String KIND_JUNIT6 =
             "org.eclipse.jdt.junit.loader.junit6";
+
+    static String formatRunner(String testKind) {
+        if (testKind == null) return null;
+        return switch (testKind) {
+            case KIND_JUNIT6 -> "JUnit 6";
+            case KIND_JUNIT5 -> "JUnit 5";
+            case KIND_JUNIT4 -> "JUnit 4";
+            default -> testKind;
+        };
+    }
 }

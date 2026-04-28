@@ -969,6 +969,75 @@ public class LaunchHandlerTest {
     }
 
     @Nested
+    class FormatRunner {
+
+        @Test
+        void junit6Kind() {
+            assertEquals("JUnit 6",
+                    JUnitLaunchConst.formatRunner(
+                            "org.eclipse.jdt.junit.loader.junit6"));
+        }
+
+        @Test
+        void junit5Kind() {
+            assertEquals("JUnit 5",
+                    JUnitLaunchConst.formatRunner(
+                            "org.eclipse.jdt.junit.loader.junit5"));
+        }
+
+        @Test
+        void junit4Kind() {
+            assertEquals("JUnit 4",
+                    JUnitLaunchConst.formatRunner(
+                            "org.eclipse.jdt.junit.loader.junit4"));
+        }
+
+        @Test
+        void nullReturnsNull() {
+            assertEquals(null,
+                    JUnitLaunchConst.formatRunner(null));
+        }
+
+        @Test
+        void unknownReturnsVerbatim() {
+            assertEquals("some.custom.loader",
+                    JUnitLaunchConst.formatRunner(
+                            "some.custom.loader"));
+        }
+    }
+
+    @Nested
+    class ParseContainerPackage {
+
+        @Test
+        void nullReturnsNull() {
+            assertEquals(null,
+                    LaunchHandler.parseContainerPackage(null));
+        }
+
+        @Test
+        void blankReturnsNull() {
+            assertEquals(null,
+                    LaunchHandler.parseContainerPackage("  "));
+        }
+
+        @Test
+        void projectLevelReturnsNull() {
+            assertEquals(null,
+                    LaunchHandler.parseContainerPackage(
+                            "=my-project"));
+        }
+
+        @Test
+        void extractsPackageName() {
+            assertEquals("com.example.service",
+                    LaunchHandler.parseContainerPackage(
+                            "=my-project/src\\/test\\/java"
+                            + "<com.example.service"));
+        }
+    }
+
+    @Nested
     class ArgsAttribute {
 
         @Test

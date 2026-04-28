@@ -262,7 +262,8 @@ public class TestHandler {
         }
 
         return new PreparedLaunch(configName, config, reused,
-                resolvedProject, formatRunner(testKind));
+                resolvedProject,
+                JUnitLaunchConst.formatRunner(testKind));
     }
 
     /**
@@ -350,14 +351,6 @@ public class TestHandler {
         return "true".equalsIgnoreCase(raw) || "1".equals(raw);
     }
 
-
-    private String formatRunner(String testKind) {
-        if (testKind == null) return null;
-        if (JUnitLaunchConst.KIND_JUNIT6.equals(testKind)) return "JUnit 6";
-        if (JUnitLaunchConst.KIND_JUNIT5.equals(testKind)) return "JUnit 5";
-        if (JUnitLaunchConst.KIND_JUNIT4.equals(testKind)) return "JUnit 4";
-        return "JUnit";
-    }
 
     // ---- Launch configuration ----
 
