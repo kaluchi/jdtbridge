@@ -87,7 +87,7 @@ class RefactoringHandler {
             throws Exception {
         String filePath = params.get("file");
         if (filePath == null || filePath.isBlank()) {
-            return HttpServer.jsonError("Missing 'file' parameter");
+            return HttpServer.missingParamError("file");
         }
 
         ICompilationUnit cu = findCompilationUnit(filePath);
@@ -136,7 +136,7 @@ class RefactoringHandler {
     String handleFormat(Map<String, String> params) throws Exception {
         String filePath = params.get("file");
         if (filePath == null || filePath.isBlank()) {
-            return HttpServer.jsonError("Missing 'file' parameter");
+            return HttpServer.missingParamError("file");
         }
 
         ICompilationUnit cu = findCompilationUnit(filePath);
@@ -189,10 +189,10 @@ class RefactoringHandler {
         String newName = params.get("newName");
 
         if (fqn == null || fqn.isBlank()) {
-            return HttpServer.jsonError("Missing 'class' parameter");
+            return HttpServer.missingParamError("class");
         }
         if (newName == null || newName.isBlank()) {
-            return HttpServer.jsonError("Missing 'newName' parameter");
+            return HttpServer.missingParamError("newName");
         }
 
         IType type = JdtUtils.findType(fqn);
@@ -242,10 +242,10 @@ class RefactoringHandler {
         String targetPkg = params.get("target");
 
         if (fqn == null || fqn.isBlank()) {
-            return HttpServer.jsonError("Missing 'class' parameter");
+            return HttpServer.missingParamError("class");
         }
         if (targetPkg == null || targetPkg.isBlank()) {
-            return HttpServer.jsonError("Missing 'target' parameter");
+            return HttpServer.missingParamError("target");
         }
 
         IType type = JdtUtils.findType(fqn);

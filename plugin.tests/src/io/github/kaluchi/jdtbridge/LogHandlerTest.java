@@ -174,6 +174,49 @@ class LogHandlerTest {
     }
 
     @Test
+    void handleLogReturnsJsonArrayFromLiveWorkspace() {
+        // The PDE test workspace's own .metadata/.log exists by
+        // the time tests run — feed default tail=100 and assert
+        // the response is a valid JSON array.
+        LogHandler handler = new LogHandler();
+        String json = handler.handleLog(java.util.Map.of());
+        var parsed = com.google.gson.JsonParser.parseString(json);
+        assertTrue(parsed.isJsonArray(),
+                "handleLog must return a JSON array: " + json);
+    }
+
+    @Test
+    void handleLogClampsNegativeTailToDefault() {
+        LogHandler handler = new LogHandler();
+        String json = handler.handleLog(
+                java.util.Map.of("tail", "-5"));
+        var parsed = com.google.gson.JsonParser.parseString(json);
+        assertTrue(parsed.isJsonArray());
+    }
+
+    @Test
+    void handleLogIgnoresNonNumericTail() {
+        LogHandler handler = new LogHandler();
+        String json = handler.handleLog(
+                java.util.Map.of("tail", "not-a-number"));
+        var parsed = com.google.gson.JsonParser.parseString(json);
+        assertTrue(parsed.isJsonArray());
+    }
+
+    @Test
+    void handleLogRespectsTailLimit() {
+        LogHandler handler = new LogHandler();
+        // tail=1 yields at most one entry — even when the log file
+        // has more, the bound is honoured.
+        String json = handler.handleLog(
+                java.util.Map.of("tail", "1"));
+        var arr = com.google.gson.JsonParser.parseString(json)
+                .getAsJsonArray();
+        assertTrue(arr.size() <= 1,
+                "tail=1 must cap at 1: size=" + arr.size());
+    }
+
+    @Test
     void severityNameMapsToExpectedLabels() {
         String log = """
                 !ENTRY bundle.x 1 0 ts

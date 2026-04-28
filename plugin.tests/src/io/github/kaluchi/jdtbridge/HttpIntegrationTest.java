@@ -1,5 +1,7 @@
 package io.github.kaluchi.jdtbridge;
 
+import io.github.kaluchi.jdtbridge.support.TestFixture;
+
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.BufferedReader;

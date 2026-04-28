@@ -1,0 +1,15 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: JDT Bridge Tests (UI)
+Bundle-Vendor: kaluchi
+Bundle-SymbolicName: io.github.kaluchi.jdtbridge.tests.ui
+Bundle-Version: 2.6.0.qualifier
+Fragment-Host: io.github.kaluchi.jdtbridge
+Bundle-RequiredExecutionEnvironment: JavaSE-21
+Require-Bundle: junit-jupiter-api;bundle-version="5.14",
+ org.opentest4j,
+ io.github.kaluchi.jdtbridge.ui,
+ io.github.kaluchi.jdtbridge.tests.support,
+ org.eclipse.eclemma.core
+Import-Package: com.google.gson
+Automatic-Module-Name: io.github.kaluchi.jdtbridge.tests.ui

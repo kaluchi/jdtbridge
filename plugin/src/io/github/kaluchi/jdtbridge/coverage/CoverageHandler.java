@@ -3,11 +3,9 @@ package io.github.kaluchi.jdtbridge.coverage;
 import java.util.Map;
 
 import org.eclipse.core.runtime.CoreException;
-import org.eclipse.debug.core.DebugPlugin;
 import org.eclipse.debug.core.ILaunch;
 import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.debug.core.ILaunchConfigurationType;
-import org.eclipse.debug.core.ILaunchManager;
 import org.eclipse.debug.core.model.IProcess;
 import org.eclipse.eclemma.core.CoverageTools;
 import org.eclipse.eclemma.core.ICoverageSession;
@@ -53,7 +51,7 @@ class CoverageHandler {
             return error("coverage-config-not-found",
                     "Missing 'configId' parameter");
         }
-        ILaunchConfiguration config = findConfig(configId);
+        ILaunchConfiguration config = LaunchAttrs.findConfig(configId);
         if (config == null) {
             return error("coverage-config-not-found",
                     "Launch configuration not found: " + configId);
@@ -67,7 +65,7 @@ class CoverageHandler {
                             + e.getMessage());
         }
         if (!CoverageTypes.isSupported(typeId)) {
-            return modeNotSupported(typeId);
+            return CoverageTypes.modeNotSupportedJson(typeId);
         }
         try {
             ILaunch launch = config.launch(
@@ -167,25 +165,6 @@ class CoverageHandler {
         }
     }
 
-    // -- helpers --
-
-    private static ILaunchManager launchManager() {
-        return LaunchAttrs.launchManager();
-    }
-
-    private static ILaunchConfiguration findConfig(String name) {
-        try {
-            for (ILaunchConfiguration c
-                    : launchManager().getLaunchConfigurations()) {
-                if (name.equals(c.getName())) {
-                    return c;
-                }
-            }
-        } catch (CoreException e) {
-            return null;
-        }
-        return null;
-    }
 
     /** Build the response JSON for {@code /coverage/run} and
      *  {@code /coverage/relaunch}. */
@@ -246,18 +225,5 @@ class CoverageHandler {
         return obj.toString();
     }
 
-    private String modeNotSupported(String typeId) {
-        var obj = new JsonObject();
-        obj.addProperty("error", "coverage-mode-not-supported");
-        obj.addProperty("message",
-                "Launch type does not support coverage mode: "
-                        + typeId);
-        var arr = new JsonArray();
-        for (String supported : CoverageTypes.supported()) {
-            arr.add(supported);
-        }
-        obj.add("supportedTypeIds", arr);
-        return obj.toString();
-    }
 
 }

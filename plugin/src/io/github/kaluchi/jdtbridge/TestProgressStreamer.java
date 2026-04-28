@@ -12,7 +12,6 @@ import org.eclipse.jdt.internal.junit.model.TestElement;
 import org.eclipse.jdt.internal.junit.model.TestRunSession;
 import org.eclipse.jdt.junit.model.ITestCaseElement;
 import org.eclipse.jdt.junit.model.ITestElement;
-import org.eclipse.jdt.junit.model.ITestElement.FailureTrace;
 import org.eclipse.jdt.junit.model.ITestElementContainer;
 import org.eclipse.jdt.junit.model.ITestSuiteElement;
 
@@ -40,9 +39,10 @@ class TestProgressStreamer {
             @Override
             public void testEnded(TestCaseElement tc) {
                 var testResult = tc.getTestResult(false);
-                String status = mapStatus(testResult);
+                String status = TestSessionFormat.statusName(
+                        testResult);
 
-                if (!matchesFilter(status, filter)) return;
+                if (!TestSessionFormat.streamerFilter(status, filter)) return;
 
                 String fqn = tc.getTestClassName()
                         + "#" + tc.getTestMethodName();
@@ -63,18 +63,8 @@ class TestProgressStreamer {
 
                 if (testResult == ITestElement.Result.FAILURE
                         || testResult == ITestElement.Result.ERROR) {
-                    FailureTrace ft = tc.getFailureTrace();
-                    if (ft != null) {
-                        if (ft.getTrace() != null)
-                            event.addProperty("trace",
-                                    ft.getTrace());
-                        if (ft.getExpected() != null)
-                            event.addProperty("expected",
-                                    ft.getExpected());
-                        if (ft.getActual() != null)
-                            event.addProperty("actual",
-                                    ft.getActual());
-                    }
+                    TestSessionFormat.attachFailureTrace(
+                            event, tc.getFailureTrace());
                 }
 
                 try {
@@ -152,8 +142,9 @@ class TestProgressStreamer {
                     var result = tc.getTestResult(false);
                     if (result == ITestElement.Result.UNDEFINED)
                         continue; // not finished yet
-                    String status = mapStatus(result);
-                    if (!matchesFilter(status, filter))
+                    String status = TestSessionFormat.statusName(
+                            result);
+                    if (!TestSessionFormat.streamerFilter(status, filter))
                         continue;
 
                     String fqn = tc.getTestClassName()
@@ -169,18 +160,8 @@ class TestProgressStreamer {
 
                     if (result == ITestElement.Result.FAILURE
                             || result == ITestElement.Result.ERROR) {
-                        FailureTrace ft = tc.getFailureTrace();
-                        if (ft != null) {
-                            if (ft.getTrace() != null)
-                                event.addProperty("trace",
-                                        ft.getTrace());
-                            if (ft.getExpected() != null)
-                                event.addProperty("expected",
-                                        ft.getExpected());
-                            if (ft.getActual() != null)
-                                event.addProperty("actual",
-                                        ft.getActual());
-                        }
+                        TestSessionFormat.attachFailureTrace(
+                                event, tc.getFailureTrace());
                     }
 
                     writeLine(out, event.toString());
@@ -192,27 +173,6 @@ class TestProgressStreamer {
         } catch (Exception e) {
             // tree may be incomplete
         }
-    }
-
-    private static String mapStatus(
-            ITestElement.Result result) {
-        if (result == ITestElement.Result.OK) return "PASS";
-        if (result == ITestElement.Result.FAILURE) return "FAIL";
-        if (result == ITestElement.Result.ERROR) return "ERROR";
-        if (result == ITestElement.Result.IGNORED) return "IGNORED";
-        return "UNKNOWN";
-    }
-
-    private static boolean matchesFilter(String status,
-            String filter) {
-        if (filter == null || "all".equals(filter))
-            return true;
-        if ("failures".equals(filter))
-            return "FAIL".equals(status)
-                    || "ERROR".equals(status);
-        if ("ignored".equals(filter))
-            return "IGNORED".equals(status);
-        return true;
     }
 
     private static void writeLine(OutputStream out, String line)

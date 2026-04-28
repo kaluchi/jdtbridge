@@ -39,7 +39,9 @@
 
     <modules>
         <module>plugin</module>
+        <module>tests.support</module>
         <module>plugin.tests</module>
+        <module>plugin.tests.ui</module>
         <module>ui</module>
         <module>branding</module>
         <module>feature</module>
@@ -57,6 +59,39 @@
             <id>ci</id>
             <properties>
                 <target.file>jdtbridge-ci.target</target.file>
+            </properties>
+        </profile>
+        <profile>
+            <id>host-win32</id>
+            <activation>
+                <os><family>windows</family></os>
+            </activation>
+            <properties>
+                <host.os>win32</host.os>
+                <host.ws>win32</host.ws>
+                <host.arch>x86_64</host.arch>
+            </properties>
+        </profile>
+        <profile>
+            <id>host-linux</id>
+            <activation>
+                <os><family>unix</family><name>linux</name></os>
+            </activation>
+            <properties>
+                <host.os>linux</host.os>
+                <host.ws>gtk</host.ws>
+                <host.arch>x86_64</host.arch>
+            </properties>
+        </profile>
+        <profile>
+            <id>host-macosx</id>
+            <activation>
+                <os><family>mac</family></os>
+            </activation>
+            <properties>
+                <host.os>macosx</host.os>
+                <host.ws>cocoa</host.ws>
+                <host.arch>x86_64</host.arch>
             </properties>
         </profile>
     </profiles>

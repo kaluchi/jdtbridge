@@ -2,6 +2,9 @@ package io.github.kaluchi.jdtbridge;
 
 import com.google.gson.JsonObject;
 
+import org.eclipse.core.runtime.Platform;
+import org.osgi.framework.Bundle;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -31,7 +34,8 @@ public class HttpServer {
     private final MavenHandler maven = new MavenHandler();
     private final RefactoringHandler refactoring =
             new RefactoringHandler();
-    private final EditorHandler editor = new EditorHandler();
+    // lazy: EditorHandler links org.eclipse.ui — headless Tycho cannot resolve
+    private volatile EditorHandler editor;
     private final LaunchTracker launchTracker = new LaunchTracker();
     private final LaunchHandler launch =
             new LaunchHandler(launchTracker);
@@ -625,10 +629,14 @@ public class HttpServer {
                                 params, scope));
                 case "/test/clear" -> Response.json(
                         testSessionHandler.handleClear(params));
-                case "/editors" -> Response.json(
-                        editor.handleEditors(params, scope));
-                case "/open" -> Response.json(
-                        editor.handleOpen(params));
+                case "/editors" -> Response.json(workbenchActive()
+                        ? editor().handleEditors(params, scope)
+                        : jsonError(
+                                "Editor commands require a UI workbench"));
+                case "/open" -> Response.json(workbenchActive()
+                        ? editor().handleOpen(params)
+                        : jsonError(
+                                "Editor commands require a UI workbench"));
                 case "/launch/list" -> Response.json(
                         launch.handleList(params, scope));
                 case "/launch/configs" -> Response.json(
@@ -684,11 +692,37 @@ public class HttpServer {
         return params;
     }
 
+    private EditorHandler editor() {
+        EditorHandler local = editor;
+        if (local == null) {
+            synchronized (this) {
+                local = editor;
+                if (local == null) {
+                    editor = local = new EditorHandler();
+                }
+            }
+        }
+        return local;
+    }
+
+    private static boolean workbenchActive() {
+        Bundle b = Platform.getBundle("org.eclipse.ui.workbench");
+        return b != null && b.getState() == Bundle.ACTIVE;
+    }
+
     /** Build {"error":"message"} JSON string. */
     static String jsonError(String message) {
         var obj = new JsonObject();
         obj.addProperty("error", message);
         return obj.toString();
+    }
+
+    /** {@code {"error": "Missing 'X' parameter"}} for required-but-
+     *  missing query parameters — the most common validation
+     *  failure across handlers. */
+    static String missingParamError(String paramName) {
+        return jsonError(
+                "Missing '" + paramName + "' parameter");
     }
 
     private void sendError(Socket socket, int code, String message)

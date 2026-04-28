@@ -34,23 +34,23 @@ import org.eclipse.debug.core.model.IProcess;
 
 class LaunchHandler {
 
-    // Attribute keys for launch configuration types
+    // Literal copies — switch case labels require compile-time
+    // constants, and SDK-side ATTR_* / ID_* are computed at class
+    // init via plugin id concatenation, so we cannot alias them
+    // directly. Values are pinned to the SDK by
+    // LaunchAttrKeysTest, which fails if a future SDK upgrade
+    // shifts any of them.
     private static final String ATTR_PROJECT_NAME =
             "org.eclipse.jdt.launching.PROJECT_ATTR";
     private static final String ATTR_MAIN_TYPE_NAME =
             "org.eclipse.jdt.launching.MAIN_TYPE";
-    private static final String ATTR_TEST_KIND =
-            "org.eclipse.jdt.junit.TEST_KIND";
-    private static final String ATTR_TEST_NAME =
-            "org.eclipse.jdt.junit.TESTNAME";
-    private static final String ATTR_CONTAINER =
-            "org.eclipse.jdt.junit.CONTAINER";
-    private static final String JUNIT_LAUNCH_TYPE =
-            "org.eclipse.jdt.junit.launchconfig";
-    private static final String PDE_JUNIT_LAUNCH_TYPE =
-            "org.eclipse.pde.ui.JunitLaunchConfig";
+    private static final String ATTR_PROGRAM_ARGUMENTS =
+            "org.eclipse.jdt.launching.PROGRAM_ARGUMENTS";
+    private static final String ATTR_VM_ARGUMENTS =
+            "org.eclipse.jdt.launching.VM_ARGUMENTS";
     private static final String JAVA_APP_LAUNCH_TYPE =
             "org.eclipse.jdt.launching.localJavaApplication";
+
     private static final String MAVEN_LAUNCH_TYPE =
             "org.eclipse.m2e.Maven2LaunchConfigurationType";
     private static final String MAVEN_GOALS =
@@ -70,10 +70,6 @@ class LaunchHandler {
             + ".ProgramLaunchConfigurationType";
     private static final String ATTR_TOOL_ARGUMENTS =
             "org.eclipse.ui.externaltools.ATTR_TOOL_ARGUMENTS";
-    private static final String ATTR_PROGRAM_ARGUMENTS =
-            "org.eclipse.jdt.launching.PROGRAM_ARGUMENTS";
-    private static final String ATTR_VM_ARGUMENTS =
-            "org.eclipse.jdt.launching.VM_ARGUMENTS";
 
     private final LaunchTracker tracker;
 
@@ -108,13 +104,9 @@ class LaunchHandler {
         return container.substring(lt + 1);
     }
 
-    private ILaunchManager launchManager() {
-        return LaunchAttrs.launchManager();
-    }
-
     String handleList(Map<String, String> params,
             ProjectScope scope) {
-        ILaunch[] launches = launchManager().getLaunches();
+        ILaunch[] launches = LaunchAttrs.launchManager().getLaunches();
         var arr = new JsonArray();
         // Reverse order: newest first
         reversedStream(launches)
@@ -171,7 +163,7 @@ class LaunchHandler {
             ProjectScope scope) {
         try {
             var allConfigs =
-                    launchManager().getLaunchConfigurations();
+                    LaunchAttrs.launchManager().getLaunchConfigurations();
             ILaunchConfiguration[] recent = getRecentConfigs();
 
             // Recent first, then remaining — deduplicated
@@ -196,11 +188,10 @@ class LaunchHandler {
     String handleConfig(Map<String, String> params) {
         String name = params.get("configId");
         if (name == null || name.isBlank()) {
-            return HttpServer.jsonError(
-                    "Missing 'configId' parameter");
+            return HttpServer.missingParamError("configId");
         }
         try {
-            ILaunchConfiguration config = findConfig(name);
+            ILaunchConfiguration config = LaunchAttrs.findConfig(name);
             if (config == null) {
                 return HttpServer.jsonError(
                         "Launch configuration not found: "
@@ -220,8 +211,7 @@ class LaunchHandler {
             String launchXmlContent) {
         String configId = params.get("configId");
         if (configId == null || configId.isBlank()) {
-            return HttpServer.jsonError(
-                    "Missing 'configId' parameter");
+            return HttpServer.missingParamError("configId");
         }
         if (launchXmlContent == null || launchXmlContent.isBlank()) {
             return HttpServer.jsonError(
@@ -235,7 +225,7 @@ class LaunchHandler {
                     + "path separators or '..'");
         }
         // Check if configId already exists (API cache + file on disk)
-        if (findConfig(configId) != null
+        if (LaunchAttrs.findConfig(configId) != null
                 || launchFileExists(configId)) {
             return HttpServer.jsonError(
                     "Launch configuration \"" + configId
@@ -282,10 +272,9 @@ class LaunchHandler {
     String handleConfigDelete(Map<String, String> params) {
         String configId = params.get("configId");
         if (configId == null || configId.isBlank()) {
-            return HttpServer.jsonError(
-                    "Missing 'configId' parameter");
+            return HttpServer.missingParamError("configId");
         }
-        ILaunchConfiguration config = findConfig(configId);
+        ILaunchConfiguration config = LaunchAttrs.findConfig(configId);
         if (config == null) {
             return HttpServer.jsonError(
                     "Launch configuration not found: "
@@ -334,7 +323,8 @@ class LaunchHandler {
             ILaunchConfiguration config, String typeId)
             throws CoreException {
         switch (typeId) {
-        case JUNIT_LAUNCH_TYPE, PDE_JUNIT_LAUNCH_TYPE -> {
+        case JUnitLaunchConst.LAUNCH_TYPE,
+             JUnitLaunchConst.PDE_LAUNCH_TYPE -> {
             String mainType = config.getAttribute(
                     ATTR_MAIN_TYPE_NAME, (String) null);
             if (mainType != null && !mainType.isBlank())
@@ -342,18 +332,19 @@ class LaunchHandler {
             else {
                 String pkg = parseContainerPackage(
                         config.getAttribute(
-                                ATTR_CONTAINER,
+                                JUnitLaunchConst.ATTR_CONTAINER,
                                 (String) null));
                 if (pkg != null)
                     obj.addProperty("package", pkg);
             }
             String method = config.getAttribute(
-                    ATTR_TEST_NAME, (String) null);
+                    JUnitLaunchConst.ATTR_TEST_NAME, (String) null);
             if (method != null && !method.isBlank())
                 obj.addProperty("method", method);
             String runner = formatRunner(
                     config.getAttribute(
-                            ATTR_TEST_KIND, (String) null));
+                            JUnitLaunchConst.ATTR_TEST_KIND,
+                            (String) null));
             if (runner != null)
                 obj.addProperty("runner", runner);
         }
@@ -483,7 +474,7 @@ class LaunchHandler {
 
         Document doc = DocumentBuilderFactory.newInstance()
                 .newDocumentBuilder().parse(historyFile);
-        ILaunchManager lm = launchManager();
+        ILaunchManager lm = LaunchAttrs.launchManager();
         List<ILaunchConfiguration> out = new ArrayList<>();
         Set<String> seen = new HashSet<>();
 
@@ -539,7 +530,7 @@ class LaunchHandler {
 
     String handleClear(Map<String, String> params) {
         String nameOrId = params.get("launchId");
-        ILaunch[] launches = launchManager().getLaunches();
+        ILaunch[] launches = LaunchAttrs.launchManager().getLaunches();
         int removed = 0;
 
         for (ILaunch launch : launches) {
@@ -549,7 +540,7 @@ class LaunchHandler {
                 ILaunch found = findLaunch(nameOrId);
                 if (found != launch) continue;
             }
-            launchManager().removeLaunch(launch);
+            LaunchAttrs.launchManager().removeLaunch(launch);
             removed++;
         }
 
@@ -585,7 +576,8 @@ class LaunchHandler {
             case EXTERNAL_TOOLS_TYPE -> ATTR_TOOL_ARGUMENTS;
             case JAVA_APP_LAUNCH_TYPE -> ATTR_PROGRAM_ARGUMENTS;
             case MAVEN_LAUNCH_TYPE -> ATTR_TOOL_ARGUMENTS;
-            case JUNIT_LAUNCH_TYPE, PDE_JUNIT_LAUNCH_TYPE
+            case JUnitLaunchConst.LAUNCH_TYPE,
+                 JUnitLaunchConst.PDE_LAUNCH_TYPE
                     -> ATTR_VM_ARGUMENTS;
             case AGENT_LAUNCH_TYPE -> AGENT_ARGS;
             default -> ATTR_PROGRAM_ARGUMENTS;
@@ -595,14 +587,13 @@ class LaunchHandler {
     String handleRun(Map<String, String> params) {
         String name = params.get("configId");
         if (name == null || name.isBlank()) {
-            return HttpServer.jsonError(
-                    "Missing 'configId' parameter");
+            return HttpServer.missingParamError("configId");
         }
         String mode = params.containsKey("debug")
                 ? ILaunchManager.DEBUG_MODE
                 : ILaunchManager.RUN_MODE;
         try {
-            ILaunchConfiguration config = findConfig(name);
+            ILaunchConfiguration config = LaunchAttrs.findConfig(name);
             if (config == null) {
                 return HttpServer.jsonError(
                         "Launch configuration not found: "
@@ -633,8 +624,7 @@ class LaunchHandler {
     String handleStop(Map<String, String> params) {
         String name = params.get("launchId");
         if (name == null || name.isBlank()) {
-            return HttpServer.jsonError(
-                    "Missing 'launchId' parameter");
+            return HttpServer.missingParamError("launchId");
         }
         ILaunch target = findLaunch(name);
         if (target == null) {
@@ -659,18 +649,6 @@ class LaunchHandler {
         }
     }
 
-    private ILaunchConfiguration findConfig(String name) {
-        try {
-            for (var config
-                    : launchManager()
-                            .getLaunchConfigurations()) {
-                if (name.equals(config.getName())) {
-                    return config;
-                }
-            }
-        } catch (Exception e) { /* ignored */ }
-        return null;
-    }
 
     /** Check .launch file exists on disk (handles LaunchManager cache lag). */
     private boolean launchFileExists(String configId) {
@@ -688,8 +666,7 @@ class LaunchHandler {
     String handleConsole(Map<String, String> params) {
         String name = params.get("launchId");
         if (name == null || name.isBlank()) {
-            return HttpServer.jsonError(
-                    "Missing 'launchId' parameter");
+            return HttpServer.missingParamError("launchId");
         }
 
         String tailStr = params.get("tail");
@@ -744,7 +721,7 @@ class LaunchHandler {
             }
         }
 
-        ILaunch[] launches = launchManager().getLaunches();
+        ILaunch[] launches = LaunchAttrs.launchManager().getLaunches();
         ILaunch fallback = null;
         for (int i = launches.length - 1; i >= 0; i--) {
             if (!configName.equals(launchName(launches[i])))

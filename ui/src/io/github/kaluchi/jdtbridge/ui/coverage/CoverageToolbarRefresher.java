@@ -1,5 +1,6 @@
 package io.github.kaluchi.jdtbridge.ui.coverage;
 
+import org.eclipse.core.runtime.Platform;
 import org.eclipse.eclemma.core.CoverageTools;
 import org.eclipse.eclemma.core.ICoverageSession;
 import org.eclipse.eclemma.core.ISessionListener;
@@ -9,6 +10,7 @@ import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.IWorkbenchPage;
 import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.PlatformUI;
+import org.osgi.framework.Bundle;
 
 /**
  * Workaround for an EclEmma quirk: their toolbar handlers
@@ -41,6 +43,11 @@ public final class CoverageToolbarRefresher
     }
 
     public void uninstall() {
+        // EclEmma may stop before us; once gone, the listener is unreachable too
+        Bundle eclemma = Platform.getBundle("org.eclipse.eclemma.core");
+        if (eclemma == null || eclemma.getState() != Bundle.ACTIVE) {
+            return;
+        }
         CoverageTools.getSessionManager().removeSessionListener(this);
     }
 

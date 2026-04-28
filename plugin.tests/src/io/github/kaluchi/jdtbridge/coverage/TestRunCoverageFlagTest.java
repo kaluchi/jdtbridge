@@ -1,6 +1,7 @@
 package io.github.kaluchi.jdtbridge.coverage;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import io.github.kaluchi.jdtbridge.support.TestFixture;
+
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -13,21 +14,15 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIf;
 
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-
-import io.github.kaluchi.jdtbridge.TestFixture;
 import io.github.kaluchi.jdtbridge.TestHandler;
 
 /**
  * Tests for the {@code coverage=true} flag on {@code /test/run}
  * (handled in {@link TestHandler#handleTestRun}). Validation paths
- * are exercised against the {@link TestFixture} workspace project;
- * happy-path tests skip unless the local Eclipse runtime has a
- * coverage delegate registered for the JUnit launch type (which it
- * does whenever EclEmma is installed).
+ * exercised against the {@link TestFixture} workspace project — no
+ * launches involved. Live coverage launches live in
+ * {@code TestRunCoverageLiveTest} (UI runtime).
  */
 public class TestRunCoverageFlagTest {
 
@@ -93,19 +88,6 @@ public class TestRunCoverageFlagTest {
             assertFalse(json.contains("\"launchMode\""),
                     "coverage='' → no launchMode: " + json);
         }
-
-        @Test
-        @EnabledIf("io.github.kaluchi.jdtbridge.IntegrationGuards#canRunJunitCoverageLaunch")
-        void coverageOneEnablesCoverage() throws Exception {
-            // Spec accepts "true" or "1".
-            Map<String, String> params = new HashMap<>();
-            params.put("target", "test.edge.SimpleTest");
-            params.put("no-refresh", "");
-            params.put("coverage", "1");
-            String json = handler.handleTestRun(params);
-            assertTrue(json.contains("\"launchMode\":\"coverage\""),
-                    "coverage=1 must enable coverage mode: " + json);
-        }
     }
 
     @Nested
@@ -136,31 +118,4 @@ public class TestRunCoverageFlagTest {
         }
     }
 
-    @Nested
-    class HappyPath {
-
-        @Test
-        @EnabledIf("io.github.kaluchi.jdtbridge.IntegrationGuards#canRunJunitCoverageLaunch")
-        void coverageTrueLaunchesInCoverageMode() throws Exception {
-            // End-to-end coverage launch needs the JUnit coverage
-            // delegate registered AND the EclEmma UI bundle active —
-            // gated above.
-            Map<String, String> params = new HashMap<>();
-            params.put("target", "test.edge.SimpleTest");
-            params.put("no-refresh", "");
-            params.put("coverage", "true");
-            String json = handler.handleTestRun(params);
-            JsonObject obj = JsonParser.parseString(json)
-                    .getAsJsonObject();
-            assertTrue(obj.get("ok").getAsBoolean(),
-                    "Expected ok: " + json);
-            assertEquals("coverage",
-                    obj.get("launchMode").getAsString());
-            assertTrue(obj.has("coverageId"),
-                    "Expected coverageId: " + json);
-            assertEquals(obj.get("testRunId").getAsString(),
-                    obj.get("coverageId").getAsString(),
-                    "coverageId must equal testRunId byte-for-byte");
-        }
-    }
 }

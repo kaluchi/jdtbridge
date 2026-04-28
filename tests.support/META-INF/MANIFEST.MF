@@ -1,0 +1,13 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: JDT Bridge Tests Support
+Bundle-Vendor: kaluchi
+Bundle-SymbolicName: io.github.kaluchi.jdtbridge.tests.support
+Bundle-Version: 2.6.0.qualifier
+Bundle-RequiredExecutionEnvironment: JavaSE-21
+Require-Bundle: io.github.kaluchi.jdtbridge,
+ org.eclipse.core.resources,
+ org.eclipse.core.runtime,
+ org.eclipse.jdt.core
+Export-Package: io.github.kaluchi.jdtbridge.support
+Automatic-Module-Name: io.github.kaluchi.jdtbridge.tests.support

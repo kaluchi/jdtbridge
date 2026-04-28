@@ -1,7 +1,9 @@
 package io.github.kaluchi.jdtbridge;
 
+import org.eclipse.core.runtime.CoreException;
 import org.eclipse.debug.core.DebugPlugin;
 import org.eclipse.debug.core.ILaunch;
+import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.debug.core.ILaunchManager;
 import org.eclipse.debug.core.model.IProcess;
 
@@ -55,5 +57,22 @@ public final class LaunchAttrs {
     public static String launchIdOf(String configId, ILaunch launch) {
         String pid = firstPid(launch);
         return pid != null ? configId + ":" + pid : configId;
+    }
+
+    /** Find a launch configuration by its display name. Returns
+     *  {@code null} when none matches or when the launch manager
+     *  fails to enumerate configurations. */
+    public static ILaunchConfiguration findConfig(String name) {
+        try {
+            for (ILaunchConfiguration c
+                    : launchManager().getLaunchConfigurations()) {
+                if (name.equals(c.getName())) {
+                    return c;
+                }
+            }
+        } catch (CoreException e) {
+            Log.warn("findConfig(" + name + ") failed", e);
+        }
+        return null;
     }
 }

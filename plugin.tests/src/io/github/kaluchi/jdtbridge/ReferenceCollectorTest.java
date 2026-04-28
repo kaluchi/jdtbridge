@@ -1,5 +1,7 @@
 package io.github.kaluchi.jdtbridge;
 
+import io.github.kaluchi.jdtbridge.support.TestFixture;
+
 import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IType;
 import org.junit.jupiter.api.AfterAll;

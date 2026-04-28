@@ -22,6 +22,8 @@ jobs:
               - 'cli/**'
               - 'plugin/**'
               - 'plugin.tests/**'
+              - 'plugin.tests.ui/**'
+              - 'tests.support/**'
               - 'ui/**'
               - 'feature/**'
               - 'site/**'

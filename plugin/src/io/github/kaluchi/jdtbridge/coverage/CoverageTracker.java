@@ -161,7 +161,7 @@ final class CoverageTracker
             return;
         }
         started = true;
-        ILaunchManager mgr = launchManager();
+        ILaunchManager mgr = LaunchAttrs.launchManager();
         if (mgr != null) {
             mgr.addLaunchListener(this);
             // Retroactively pick up live coverage launches that
@@ -191,7 +191,7 @@ final class CoverageTracker
             return;
         }
         started = false;
-        ILaunchManager mgr = launchManager();
+        ILaunchManager mgr = LaunchAttrs.launchManager();
         if (mgr != null) {
             mgr.removeLaunchListener(this);
         }
@@ -302,7 +302,7 @@ final class CoverageTracker
             return;
         }
         String configId = cfg.getName();
-        Long timestamp = parseLaunchTimestamp(launch);
+        Long timestamp = LaunchAttrs.launchTimestamp(launch);
         if (timestamp == null) {
             // No timestamp attribute — bridge requires one to
             // form a stable coverageId, so we skip silently.
@@ -563,14 +563,6 @@ final class CoverageTracker
     }
 
     // -- helpers --
-
-    private static ILaunchManager launchManager() {
-        return LaunchAttrs.launchManager();
-    }
-
-    private static Long parseLaunchTimestamp(ILaunch launch) {
-        return LaunchAttrs.launchTimestamp(launch);
-    }
 
     /** State held while a non-live {@code sessionAdded} waits for
      *  classification. Mutated only inside listener callbacks (single

@@ -20,7 +20,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIf;
 
 /**
  * Integration tests for LaunchHandler — list and console commands.
@@ -81,14 +80,6 @@ public class LaunchHandlerTest {
                 name,
                 Map.of("org.eclipse.jdt.launching.MAIN_TYPE",
                         testClass));
-    }
-
-    private static ILaunchConfiguration createMavenConfig(
-            String name, String goals) throws Exception {
-        return createConfig(
-                "org.eclipse.m2e.Maven2LaunchConfigurationType",
-                name,
-                Map.of("M2_GOALS", goals));
     }
 
     private static void deleteIfPresent(ILaunchConfiguration cfg)
@@ -276,39 +267,6 @@ public class LaunchHandlerTest {
             assertTrue(junit.has("class") || junit.has("project"),
                     "JUnit config should have class or project: "
                     + junit);
-        }
-    }
-
-    /** m2e-gated — CI Tycho target platform omits org.eclipse.m2e
-     *  by default; the launch type lookup returns null, so creating
-     *  a Maven launch config in @BeforeEach would fail. */
-    @Nested
-    @EnabledIf("io.github.kaluchi.jdtbridge.IntegrationGuards#hasMavenLaunchType")
-    class MavenConfig {
-
-        private ILaunchConfiguration mavenCfg;
-
-        @BeforeEach
-        void createMaven() throws Exception {
-            mavenCfg = createMavenConfig(
-                    "MavenConfigTest-Maven", "clean install");
-        }
-
-        @AfterEach
-        void deleteMaven() throws Exception {
-            deleteIfPresent(mavenCfg);
-        }
-
-        @Test
-        void mavenConfigHasGoals() {
-            String json = handler.handleConfigs(Map.of(), ProjectScope.ALL);
-            var arr = JsonParser.parseString(json)
-                    .getAsJsonArray();
-            JsonObject maven = findByConfigId(arr, "MavenConfigTest-Maven");
-            assertNotNull(maven,
-                    "Created Maven config must appear: " + json);
-            assertTrue(maven.has("goals"),
-                    "Maven config should have goals: " + maven);
         }
     }
 

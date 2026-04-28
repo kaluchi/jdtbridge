@@ -124,18 +124,74 @@ public class ProjectScopeTest {
         @Test
         void configWithoutProjectPassesViaWorkingDir()
                 throws Exception {
-            // No PROJECT_ATTR, no WORKING_DIR → passes
+            // localJavaApplication is part of org.eclipse.jdt.launching
+            // (already a plugin dependency). With no PROJECT_ATTR and
+            // no WORKING_DIR, containsConfig must fall through to the
+            // permissive return-true branch.
             var scope = ProjectScope.of(Set.of("my-project"));
             ILaunchManager mgr = DebugPlugin.getDefault()
                     .getLaunchManager();
-            ILaunchConfigurationType mavenType = mgr
+            ILaunchConfigurationType javaType = mgr
                     .getLaunchConfigurationType(
-                            "org.eclipse.m2e.Maven2LaunchConfigurationType");
-            if (mavenType == null) return; // m2e not available
-            var config = mavenType.newInstance(
+                            "org.eclipse.jdt.launching."
+                                    + "localJavaApplication");
+            org.junit.jupiter.api.Assertions.assertNotNull(
+                    javaType);
+            var config = javaType.newInstance(
                     null, "test-no-project");
-            // No working dir set → passes (permissive)
             assertTrue(scope.containsConfig(config));
+        }
+
+        @Test
+        void launchGroupTypeRoutesThroughGroupBranch()
+                throws Exception {
+            // Group type config — exercises isLaunchGroup() and
+            // launchGroupInScope(); empty group has no children
+            // so the result is false.
+            ILaunchManager mgr = DebugPlugin.getDefault()
+                    .getLaunchManager();
+            ILaunchConfigurationType groupType = mgr
+                    .getLaunchConfigurationType(
+                            "org.eclipse.debug.core.groups."
+                                    + "GroupLaunchConfigurationType");
+            org.junit.jupiter.api.Assertions.assertNotNull(
+                    groupType,
+                    "Group launch type ships with debug.core "
+                            + "and must be present");
+            var scope = ProjectScope.of(Set.of("anything"));
+            var wc = groupType.newInstance(
+                    null, "test-empty-group");
+            assertFalse(scope.containsConfig(wc),
+                    "Empty group must be out of scope");
+        }
+    }
+
+    @Nested
+    class ContainsAnyOfRoots {
+
+        @Test
+        void allScopeAcceptsEvenNullSet() {
+            assertTrue(ProjectScope.ALL.containsAnyOfRoots(null));
+        }
+
+        @Test
+        void allScopeAcceptsEmptySet() {
+            assertTrue(ProjectScope.ALL.containsAnyOfRoots(
+                    Set.of()));
+        }
+
+        @Test
+        void filteredScopeRejectsNullSet() {
+            ProjectScope scope = ProjectScope.of(
+                    Set.of("project-a"));
+            assertFalse(scope.containsAnyOfRoots(null));
+        }
+
+        @Test
+        void filteredScopeRejectsEmptySet() {
+            ProjectScope scope = ProjectScope.of(
+                    Set.of("project-a"));
+            assertFalse(scope.containsAnyOfRoots(Set.of()));
         }
     }
 }

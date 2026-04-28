@@ -17,19 +17,20 @@ public class RequestTracker {
     /** Enqueue a formatted request log line. */
     public void logRequest(String session, String method,
             String path, int status, long durationMs) {
-        if (session == null || session.isEmpty()) return;
+        if (invalidSession(session)) return;
         enqueue(session, String.format("[BRIDGE] %s %s (%d, %dms)\n",
                 method, path, status, durationMs));
     }
 
     /** Enqueue raw CLI output text. */
     public void logTelemetry(String session, String text) {
-        if (session == null || session.isEmpty()) return;
+        if (invalidSession(session)) return;
         enqueue(session, text);
     }
 
     /** Drain all queued events for a session. */
     public String drain(String session) {
+        if (invalidSession(session)) return "";
         var queue = queues.get(session);
         if (queue == null || queue.isEmpty()) return "";
         var sb = new StringBuilder();
@@ -40,12 +41,17 @@ public class RequestTracker {
         return sb.toString();
     }
 
+    public void clearSession(String session) {
+        if (invalidSession(session)) return;
+        queues.remove(session);
+    }
+
     private void enqueue(String session, String text) {
         queues.computeIfAbsent(session,
                 k -> new ConcurrentLinkedQueue<>()).add(text);
     }
 
-    public void clearSession(String session) {
-        queues.remove(session);
+    private static boolean invalidSession(String session) {
+        return session == null || session.isEmpty();
     }
 }
