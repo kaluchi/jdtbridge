@@ -383,12 +383,7 @@ public class HttpServer {
         }
 
         String stream = params.get("stream");
-        int tail = -1;
-        String tailStr = params.get("tail");
-        if (tailStr != null) {
-            try { tail = Integer.parseInt(tailStr); }
-            catch (NumberFormatException e) { /* full */ }
-        }
+        int tail = Parsing.parseIntOr(params.get("tail"), -1);
 
         try {
             socket.setSoTimeout(0);
