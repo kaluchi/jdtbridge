@@ -635,6 +635,52 @@ public class NodeBuilderTest {
         throw new AssertionError("no source entry in fixture classpath");
     }
 
+    // ── javadocSummary ───────────────────────────────────────────────
+
+    @Test
+    void javadocSummaryExtractsFirstSentence() throws Exception {
+        String summary = NodeBuilder.javadocSummary(
+                type("test.edge.AbstractPet"));
+        assertNotNull(summary, "AbstractPet has javadoc");
+        assertEquals("An abstract pet with a name.", summary);
+    }
+
+    @Test
+    void javadocSummaryNullForTypeWithoutJavadoc() throws Exception {
+        assertNull(NodeBuilder.javadocSummary(
+                type("test.model.Dog")));
+    }
+
+    // ── isTestScope true path ──────────────────────────────────────
+
+    @Test
+    void isTestScopeTrueForTestAnnotatedType() throws Exception {
+        IType simpleTest = type("test.edge.SimpleTest");
+        assertTrue(NodeBuilder.isTestScope(simpleTest),
+                "SimpleTest has @Test methods → annotation fallback");
+    }
+
+    // ── annotationsOf with resolved FQN ────────────────────────────
+
+    @Test
+    void annotationsOfResolvesMarkerFqn() throws Exception {
+        IType enriched = type("test.service.EnrichedRefService");
+        JsonArray anns = NodeBuilder.annotationsOf(enriched, enriched);
+        assertEquals(1, anns.size());
+        assertEquals("test.edge.Marker",
+                anns.get(0).getAsString());
+    }
+
+    // ── isDeprecated branches ──────────────────────────────────────
+
+    @Test
+    void methodDetailMarksDeprecated() throws Exception {
+        IMethod speak = method("test.edge.AbstractPet", "speak", null);
+        JsonObject detail = NodeBuilder.methodDetail(speak);
+        assertTrue(detail.get("isDeprecated").getAsBoolean(),
+                "speak() is @Deprecated");
+    }
+
     // ── No spurious fields in skeleton ──────────────────────────────
 
     @Test

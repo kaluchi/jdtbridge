@@ -226,6 +226,21 @@ class NodeBuilder {
         return "class";
     }
 
+    private static JsonArray typeParametersOf(ITypeParameter[] params)
+            throws JavaModelException {
+        var arr = new JsonArray();
+        for (ITypeParameter tp : params) {
+            var tpObj = new JsonObject();
+            tpObj.addProperty("name", tp.getElementName());
+            String[] bounds = tp.getBounds();
+            if (bounds != null && bounds.length > 0) {
+                tpObj.addProperty("bound", bounds[0]);
+            }
+            arr.add(tpObj);
+        }
+        return arr;
+    }
+
     /** {@code :origin} discriminator: source | binary | synthetic. */
     static String originOf(IJavaElement element) {
         if (element instanceof IMember member) {
@@ -545,17 +560,8 @@ class NodeBuilder {
     static JsonObject typeDetail(IType type) throws JavaModelException {
         var obj = typeSkeleton(type);
 
-        var typeParameters = new JsonArray();
-        for (ITypeParameter tp : type.getTypeParameters()) {
-            var tpObj = new JsonObject();
-            tpObj.addProperty("name", tp.getElementName());
-            String[] bounds = tp.getBounds();
-            if (bounds != null && bounds.length > 0) {
-                tpObj.addProperty("bound", bounds[0]);
-            }
-            typeParameters.add(tpObj);
-        }
-        obj.add("typeParameters", typeParameters);
+        obj.add("typeParameters",
+                typeParametersOf(type.getTypeParameters()));
 
         IType declaring = type.getDeclaringType();
         if (declaring != null) {
@@ -627,17 +633,8 @@ class NodeBuilder {
         }
         obj.add("parameters", parameters);
 
-        var typeParameters = new JsonArray();
-        for (ITypeParameter tp : method.getTypeParameters()) {
-            var tpObj = new JsonObject();
-            tpObj.addProperty("name", tp.getElementName());
-            String[] bounds = tp.getBounds();
-            if (bounds != null && bounds.length > 0) {
-                tpObj.addProperty("bound", bounds[0]);
-            }
-            typeParameters.add(tpObj);
-        }
-        obj.add("typeParameters", typeParameters);
+        obj.add("typeParameters",
+                typeParametersOf(method.getTypeParameters()));
 
         var throwsArr = new JsonArray();
         for (String thrown : method.getExceptionTypes()) {

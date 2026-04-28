@@ -188,6 +188,9 @@ public class TestFixture {
 
             import test.model.Animal;
 
+            /** An abstract pet with a name.
+             * @param petName display name
+             */
             public abstract class AbstractPet implements Animal {
                 protected final String petName;
 
@@ -200,6 +203,7 @@ public class TestFixture {
                     return petName;
                 }
 
+                @Deprecated
                 public abstract void speak();
             }
             """;
