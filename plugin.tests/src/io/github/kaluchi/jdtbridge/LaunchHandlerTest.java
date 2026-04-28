@@ -686,6 +686,43 @@ public class LaunchHandlerTest {
         }
 
         @Test
+        void findLaunchByConfigIdPid() throws Exception {
+            ILaunchManager mgr =
+                    DebugPlugin.getDefault().getLaunchManager();
+            ILaunchConfiguration cfg = createJavaConfig(
+                    "FindByPid", "test.Main");
+            try {
+                ILaunch launch = new org.eclipse.debug.core.Launch(
+                        cfg, "run", null);
+                Process proc = new ProcessBuilder(
+                        "java", "-version").start();
+                proc.waitFor(5,
+                        java.util.concurrent.TimeUnit.SECONDS);
+                DebugPlugin.newProcess(launch, proc,
+                        "find-pid-test");
+                mgr.addLaunch(launch);
+                try {
+                    String pid = launch.getProcesses()[0]
+                            .getAttribute(
+                                    org.eclipse.debug.core.model
+                                            .IProcess
+                                            .ATTR_PROCESS_ID);
+                    String launchId = "FindByPid:" + pid;
+                    String json = handler.handleStop(
+                            Map.of("launchId", launchId));
+                    assertTrue(
+                            json.contains("Already terminated"),
+                            "terminated launch found by pid: "
+                            + json);
+                } finally {
+                    mgr.removeLaunch(launch);
+                }
+            } finally {
+                deleteIfPresent(cfg);
+            }
+        }
+
+        @Test
         void terminatedLaunchReturnsError() throws Exception {
             ILaunchManager mgr =
                     DebugPlugin.getDefault().getLaunchManager();
@@ -845,6 +882,18 @@ public class LaunchHandlerTest {
             assertTrue(obj.has("mode"));
             assertEquals("run",
                     obj.get("mode").getAsString());
+        }
+
+        @Test
+        void runWithExtraArgs() {
+            var params = new java.util.HashMap<String, String>();
+            params.put("configId", "RunSuccessTest");
+            params.put("args", "--port 9090");
+            String json = handler.handleRun(params);
+            var obj = JsonParser.parseString(json)
+                    .getAsJsonObject();
+            assertTrue(obj.get("ok").getAsBoolean(),
+                    "run with args must succeed: " + json);
         }
     }
 
