@@ -565,23 +565,30 @@ public class GraphHandlerTest {
 
     @Test
     void typesSourceOnlyExcludesBinary() {
+        // Wildcard pattern matches both binary java.lang.Object and
+        // the source TestFixture type test.edge.ObjectHolder. The
+        // sourceOnly run must keep ObjectHolder and drop Object.
         var arrAll = JsonParser.parseString(handler.handleTypes(
-                params("pattern", "Object"),
+                params("pattern", "*Object*"),
                 ProjectScope.ALL)).getAsJsonArray();
         var arrSrc = JsonParser.parseString(handler.handleTypes(
-                paramsMulti("pattern", "Object", "sourceOnly", ""),
+                paramsMulti("pattern", "*Object*", "sourceOnly", ""),
                 ProjectScope.ALL)).getAsJsonArray();
-        // java.lang.Object is binary — present in arrAll, absent in arrSrc
         boolean hasObjectAll = arrAll.asList().stream()
                 .anyMatch(e -> "java.lang.Object".equals(
                         e.getAsJsonObject().get("fqn").getAsString()));
         boolean hasObjectSrc = arrSrc.asList().stream()
                 .anyMatch(e -> "java.lang.Object".equals(
                         e.getAsJsonObject().get("fqn").getAsString()));
+        boolean hasObjectHolderSrc = arrSrc.asList().stream()
+                .anyMatch(e -> "test.edge.ObjectHolder".equals(
+                        e.getAsJsonObject().get("fqn").getAsString()));
         assertTrue(hasObjectAll,
                 "java.lang.Object must appear in unrestricted search");
         assertFalse(hasObjectSrc,
                 "java.lang.Object must NOT appear with sourceOnly");
+        assertTrue(hasObjectHolderSrc,
+                "source type ObjectHolder must appear with sourceOnly");
     }
 
     @Test
