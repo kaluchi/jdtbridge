@@ -386,14 +386,8 @@ public class HttpServer {
         int tail = Parsing.parseIntOr(params.get("tail"), -1);
 
         try {
-            socket.setSoTimeout(0);
-            OutputStream out = socket.getOutputStream();
-            out.write(("HTTP/1.1 200 OK\r\n"
-                    + "Content-Type: text/plain; charset=utf-8\r\n"
-                    + "Connection: close\r\n"
-                    + "Cache-Control: no-cache\r\n\r\n")
-                    .getBytes(StandardCharsets.UTF_8));
-
+            OutputStream out = beginStreamResponse(socket,
+                    "text/plain; charset=utf-8");
             ConsoleStreamer.stream(tl, out, stream, tail);
         } catch (IOException
                 | ConsoleStreamer.StreamClosedException e) {
@@ -435,15 +429,8 @@ public class HttpServer {
         String filter = params.get("filter");
 
         try {
-            socket.setSoTimeout(0);
-            OutputStream out = socket.getOutputStream();
-            out.write(("HTTP/1.1 200 OK\r\n"
-                    + "Content-Type: application/x-ndjson;"
-                    + " charset=utf-8\r\n"
-                    + "Connection: close\r\n"
-                    + "Cache-Control: no-cache\r\n\r\n")
-                    .getBytes(StandardCharsets.UTF_8));
-
+            OutputStream out = beginStreamResponse(socket,
+                    "application/x-ndjson; charset=utf-8");
             TestProgressStreamer.stream(session, out, filter);
         } catch (IOException
                 | TestProgressStreamer.StreamClosedException e) {
@@ -462,14 +449,8 @@ public class HttpServer {
             return;
         }
         try {
-            socket.setSoTimeout(0);
-            OutputStream out = socket.getOutputStream();
-            out.write(("HTTP/1.1 200 OK\r\n"
-                    + "Content-Type: application/x-ndjson;"
-                    + " charset=utf-8\r\n"
-                    + "Connection: close\r\n"
-                    + "Cache-Control: no-cache\r\n\r\n")
-                    .getBytes(StandardCharsets.UTF_8));
+            OutputStream out = beginStreamResponse(socket,
+                    "application/x-ndjson; charset=utf-8");
             coverageBridge.streamSession(out, coverageId);
         } catch (IOException
                 | io.github.kaluchi.jdtbridge.coverage
@@ -492,6 +473,18 @@ public class HttpServer {
             }
         }
         return null;
+    }
+
+    private static OutputStream beginStreamResponse(
+            Socket socket, String contentType) throws IOException {
+        socket.setSoTimeout(0);
+        OutputStream out = socket.getOutputStream();
+        out.write(("HTTP/1.1 200 OK\r\n"
+                + "Content-Type: " + contentType + "\r\n"
+                + "Connection: close\r\n"
+                + "Cache-Control: no-cache\r\n\r\n")
+                .getBytes(StandardCharsets.UTF_8));
+        return out;
     }
 
     private void sendResponse(Socket socket, Response resp)
