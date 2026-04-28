@@ -55,18 +55,12 @@ class RefactoringHandler {
     static void ensurePreferencesInitialized() {
         String nodeId = JavaManipulation.getPreferenceNodeId();
         if (nodeId != null) return;
-        // JDT UI not started yet. Check if the bundle exists
-        // (without activating it — activation may need SWT).
         var jdtUi = org.eclipse.core.runtime.Platform
                 .getBundle("org.eclipse.jdt.ui");
         if (jdtUi != null && jdtUi.getState()
-                != org.osgi.framework.Bundle.UNINSTALLED) {
-            // Bundle available — let it activate naturally
-            // on first class access. Don't race with
-            // JavaPlugin.start() setPreferenceNodeId().
+                == org.osgi.framework.Bundle.ACTIVE) {
             return;
         }
-        // Truly headless — JDT UI not available at all.
         nodeId = MANIPULATION_NODE;
         JavaManipulation.setPreferenceNodeId(nodeId);
         var defaults = DefaultScope.INSTANCE.getNode(nodeId);
