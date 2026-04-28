@@ -315,17 +315,7 @@ class NodeBuilder {
         if (root != null) {
             try {
                 IClasspathEntry entry = root.getRawClasspathEntry();
-                if (entry != null) {
-                    for (IClasspathAttribute attr
-                            : entry.getExtraAttributes()) {
-                        if (IClasspathAttribute.TEST.equals(
-                                attr.getName())
-                                && "true".equals(attr.getValue())) {
-                            return true;
-                        }
-                    }
-                    if (entry.isTest()) return true;
-                }
+                if (entry != null && isTestEntry(entry)) return true;
             } catch (JavaModelException ignored) { /* broken root */ }
         }
         IType type = (element instanceof IType t) ? t
@@ -554,8 +544,6 @@ class NodeBuilder {
 
     static JsonObject typeDetail(IType type) throws JavaModelException {
         var obj = typeSkeleton(type);
-        obj.addProperty("typeKind", typeKindOf(type));
-        obj.add("modifiers", modifiers(type.getFlags()));
 
         var typeParameters = new JsonArray();
         for (ITypeParameter tp : type.getTypeParameters()) {
@@ -572,11 +560,6 @@ class NodeBuilder {
         IType declaring = type.getDeclaringType();
         if (declaring != null) {
             obj.addProperty("containingType", fqnOf(declaring));
-        }
-
-        String packageName = type.getPackageFragment().getElementName();
-        if (!packageName.isEmpty()) {
-            obj.addProperty("containingPackage", packageName);
         }
 
         String superSig = type.getSuperclassTypeSignature();
@@ -629,7 +612,6 @@ class NodeBuilder {
 
     static JsonObject methodDetail(IMethod method) throws JavaModelException {
         var obj = methodSkeleton(method);
-        obj.addProperty("name", method.getElementName());
 
         var parameters = new JsonArray();
         String[] paramTypes = method.getParameterTypes();
@@ -644,13 +626,6 @@ class NodeBuilder {
             parameters.add(p);
         }
         obj.add("parameters", parameters);
-
-        if (!method.isConstructor()) {
-            obj.addProperty("returnType",
-                    resolveTypeName(method.getReturnType(), declaring));
-        }
-
-        obj.add("modifiers", modifiers(method.getFlags()));
 
         var typeParameters = new JsonArray();
         for (ITypeParameter tp : method.getTypeParameters()) {
@@ -669,11 +644,6 @@ class NodeBuilder {
             throwsArr.add(resolveTypeName(thrown, declaring));
         }
         obj.add("throws", throwsArr);
-
-        if (declaring != null) {
-            obj.addProperty("containingType", fqnOf(declaring));
-        }
-        obj.addProperty("signature", compactSignature(method));
 
         if (method.isConstructor()) {
             obj.addProperty("isConstructor", true);
@@ -915,12 +885,6 @@ class NodeBuilder {
                     root.getResource()
                             .getProjectRelativePath().toString());
         }
-
-        int typeCount = 0;
-        for (ICompilationUnit cu : pkg.getCompilationUnits()) {
-            typeCount += cu.getTypes().length;
-        }
-        obj.addProperty("typeCount", typeCount);
         return obj;
     }
 
@@ -945,11 +909,6 @@ class NodeBuilder {
 
     static JsonObject fileDetail(IFile file) {
         var obj = fileSkeleton(file);
-        String name = file.getName();
-        String language = name.endsWith(".java")
-                ? "java"
-                : name.endsWith(".class") ? "class" : "other";
-        obj.addProperty("language", language);
         try {
             String charset = file.getCharset();
             if (charset != null) obj.addProperty("charset", charset);
@@ -1214,12 +1173,8 @@ class NodeBuilder {
     }
 
     private static String originOfMatch(SearchMatch match) {
-        if (match.getElement() instanceof IMember member) {
-            try {
-                if (member.isBinary()) return "binary";
-            } catch (Exception ignored) { /* fall through */ }
-        }
-        return "source";
+        return match.getElement() instanceof IJavaElement el
+                ? originOf(el) : "source";
     }
 
     /** Convert a SearchMatch's offset/length into the canonical location shape. */
@@ -1255,16 +1210,6 @@ class NodeBuilder {
 
     static JsonObject fieldDetail(IField field) throws JavaModelException {
         var obj = fieldSkeleton(field);
-        obj.addProperty("name", field.getElementName());
-        IType declaring = field.getDeclaringType();
-        obj.addProperty("type",
-                resolveTypeName(field.getTypeSignature(), declaring));
-
-        if (declaring != null) {
-            obj.addProperty("containingType", fqnOf(declaring));
-        }
-
-        obj.add("modifiers", modifiers(field.getFlags()));
 
         if (Flags.isStatic(field.getFlags())
                 && Flags.isFinal(field.getFlags())) {
