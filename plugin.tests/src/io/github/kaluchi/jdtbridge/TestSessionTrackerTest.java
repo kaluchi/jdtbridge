@@ -6,6 +6,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.eclipse.jdt.internal.junit.JUnitCorePlugin;
 import org.eclipse.jdt.internal.junit.model.TestRunSession;
+import org.eclipse.jdt.junit.model.ITestElement.Result;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,13 +47,19 @@ public class TestSessionTrackerTest {
                 "handleTestRun must succeed: " + json);
         String testRunId = obj.get("testRunId").getAsString();
 
+        // Lifecycle flags (!isRunning && !isStarting) flip before
+        // per-case PASS/FAIL events from the child JVM stream are
+        // applied to the model — observable on slower CI runners,
+        // where assertions then see status=UNKNOWN. Wait for the
+        // aggregated result to leave UNDEFINED.
         long deadline = System.currentTimeMillis() + 60_000;
         while (System.currentTimeMillis() < deadline) {
             for (TestRunSession s : JUnitCorePlugin.getModel()
                     .getTestRunSessions()) {
                 if (testRunId.equals(
                         TestSessionHandler.testRunId(s))
-                        && !s.isRunning() && !s.isStarting()) {
+                        && !s.isRunning() && !s.isStarting()
+                        && s.getTestResult(true) != Result.UNDEFINED) {
                     finishedSession = s;
                     return;
                 }
