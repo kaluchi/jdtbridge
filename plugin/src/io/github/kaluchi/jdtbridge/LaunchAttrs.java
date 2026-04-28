@@ -71,7 +71,7 @@ public final class LaunchAttrs {
                 }
             }
         } catch (CoreException e) {
-            // fall through to null
+            Log.warn("findConfig(" + name + ") failed", e);
         }
         return null;
     }

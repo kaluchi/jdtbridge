@@ -45,7 +45,7 @@
                 <configuration>
                     <useUIHarness>true</useUIHarness>
                     <useUIThread>false</useUIThread>
-                    <argLine>-Xmx512m</argLine>
+                    <argLine>-Xmx1g</argLine>
                     <providerHint>junit5</providerHint>
                     <dependencies>
                         <dependency>

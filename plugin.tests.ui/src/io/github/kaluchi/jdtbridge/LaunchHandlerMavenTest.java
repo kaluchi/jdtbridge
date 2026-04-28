@@ -1,7 +1,7 @@
 package io.github.kaluchi.jdtbridge;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
 
@@ -69,7 +69,8 @@ public class LaunchHandlerMavenTest {
         }
         assertNotNull(maven,
                 "Created Maven config must appear: " + json);
-        assertTrue(maven.has("goals"),
-                "Maven config should have goals: " + maven);
+        assertEquals("clean install",
+                maven.get("goals").getAsString(),
+                "Maven goals must round-trip: " + maven);
     }
 }

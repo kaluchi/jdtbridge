@@ -40,10 +40,6 @@ public class TestHandler {
     public TestHandler() {
     }
 
-    private static final String JUNIT_LAUNCH_TYPE =
-            JUnitLaunchConst.LAUNCH_TYPE;
-    private static final String PDE_JUNIT_LAUNCH_TYPE =
-            JUnitLaunchConst.PDE_LAUNCH_TYPE;
     private static final String PDE_PLUGIN_NATURE =
             "org.eclipse.pde.PluginNature";
     private static final String PDE_RUN_IN_UI_THREAD =
@@ -62,18 +58,6 @@ public class TestHandler {
             "default_start_level";
     private static final String PDE_INCLUDE_OPTIONAL =
             "includeOptional";
-    private static final String ATTR_TEST_KIND =
-            JUnitLaunchConst.ATTR_TEST_KIND;
-    private static final String ATTR_TEST_NAME =
-            JUnitLaunchConst.ATTR_TEST_NAME;
-    private static final String ATTR_TEST_CONTAINER =
-            JUnitLaunchConst.ATTR_CONTAINER;
-    private static final String JUNIT6_KIND =
-            JUnitLaunchConst.KIND_JUNIT6;
-    private static final String JUNIT5_KIND =
-            JUnitLaunchConst.KIND_JUNIT5;
-    private static final String JUNIT4_KIND =
-            JUnitLaunchConst.KIND_JUNIT4;
     private static final String JUNIT_PLATFORM_COMMONS_PREFIX =
             "junit-platform-commons";
     private static final String JUNIT_PLATFORM_SUITE_API_PREFIX =
@@ -201,7 +185,7 @@ public class TestHandler {
                         manager.generateLaunchConfigurationName(
                                 configName));
 
-        if (PDE_JUNIT_LAUNCH_TYPE.equals(launchTypeId)) {
+        if (JUnitLaunchConst.PDE_LAUNCH_TYPE.equals(launchTypeId)) {
             // Headless: no workbench, no UI thread
             wc.setAttribute(PDE_RUN_IN_UI_THREAD, false);
             wc.setAttribute(PDE_APPLICATION, PDE_CORE_TEST_APP);
@@ -369,9 +353,9 @@ public class TestHandler {
 
     private String formatRunner(String testKind) {
         if (testKind == null) return null;
-        if (JUNIT6_KIND.equals(testKind)) return "JUnit 6";
-        if (JUNIT5_KIND.equals(testKind)) return "JUnit 5";
-        if (JUNIT4_KIND.equals(testKind)) return "JUnit 4";
+        if (JUnitLaunchConst.KIND_JUNIT6.equals(testKind)) return "JUnit 6";
+        if (JUnitLaunchConst.KIND_JUNIT5.equals(testKind)) return "JUnit 5";
+        if (JUnitLaunchConst.KIND_JUNIT4.equals(testKind)) return "JUnit 4";
         return "JUnit";
     }
 
@@ -416,11 +400,11 @@ public class TestHandler {
                     IJavaLaunchConfigurationConstants
                             .ATTR_MAIN_TYPE_NAME,
                     fqn);
-            wc.setAttribute(ATTR_TEST_KIND,
+            wc.setAttribute(JUnitLaunchConst.ATTR_TEST_KIND,
                     detectTestKind(jp));
 
             if (methodName != null && !methodName.isBlank()) {
-                wc.setAttribute(ATTR_TEST_NAME, methodName);
+                wc.setAttribute(JUnitLaunchConst.ATTR_TEST_NAME, methodName);
             }
         } else if (projectName != null && !projectName.isBlank()) {
             var model = JavaCore.create(
@@ -443,7 +427,7 @@ public class TestHandler {
                     IJavaLaunchConfigurationConstants
                             .ATTR_PROJECT_NAME,
                     projectName);
-            wc.setAttribute(ATTR_TEST_KIND, detectTestKind(jp));
+            wc.setAttribute(JUnitLaunchConst.ATTR_TEST_KIND, detectTestKind(jp));
 
             if (packageName != null && !packageName.isBlank()) {
                 IPackageFragment pkg =
@@ -452,10 +436,10 @@ public class TestHandler {
                     return HttpServer.jsonError(
                             "Package not found: " + packageName);
                 }
-                wc.setAttribute(ATTR_TEST_CONTAINER,
+                wc.setAttribute(JUnitLaunchConst.ATTR_CONTAINER,
                         pkg.getHandleIdentifier());
             } else {
-                wc.setAttribute(ATTR_TEST_CONTAINER,
+                wc.setAttribute(JUnitLaunchConst.ATTR_CONTAINER,
                         jp.getHandleIdentifier());
             }
         } else {
@@ -511,14 +495,14 @@ public class TestHandler {
             if (project != null && project.exists()
                     && project.hasNature(PDE_PLUGIN_NATURE)) {
                 if (manager.getLaunchConfigurationType(
-                        PDE_JUNIT_LAUNCH_TYPE) != null) {
-                    return PDE_JUNIT_LAUNCH_TYPE;
+                        JUnitLaunchConst.PDE_LAUNCH_TYPE) != null) {
+                    return JUnitLaunchConst.PDE_LAUNCH_TYPE;
                 }
             }
         } catch (Exception e) {
             Log.warn("Failed to detect PDE nature", e);
         }
-        return JUNIT_LAUNCH_TYPE;
+        return JUnitLaunchConst.LAUNCH_TYPE;
     }
 
     String detectTestKind(IType type) {
@@ -531,25 +515,25 @@ public class TestHandler {
                     JUnitCore.JUNIT3_CONTAINER_PATH,
                     JUnitCore.JUNIT4_CONTAINER_PATH,
                     JUnitCore.JUNIT5_CONTAINER_PATH)) {
-                return JUNIT6_KIND;
+                return JUnitLaunchConst.KIND_JUNIT6;
             }
             // JUnit 5 platform bundles use version 1.x (range [1.0,2.0))
             if (hasJUnitJupiterMajor(project, 1,
                     JUnitCore.JUNIT3_CONTAINER_PATH,
                     JUnitCore.JUNIT4_CONTAINER_PATH,
                     JUnitCore.JUNIT6_CONTAINER_PATH)) {
-                return JUNIT5_KIND;
+                return JUnitLaunchConst.KIND_JUNIT5;
             }
             // Fallback: Jupiter API on classpath but platform
             // marker not resolvable (common with M2Eclipse)
             if (project.findType(
                     "org.junit.jupiter.api.Test") != null) {
-                return JUNIT5_KIND;
+                return JUnitLaunchConst.KIND_JUNIT5;
             }
         } catch (JavaModelException e) {
             Log.warn("detectTestKind failed", e);
         }
-        return JUNIT4_KIND;
+        return JUnitLaunchConst.KIND_JUNIT4;
     }
 
     private boolean hasJUnitJupiterMajor(IJavaProject project,
@@ -684,10 +668,10 @@ public class TestHandler {
             ILaunchManager manager) throws CoreException {
         String[] keys = {
             IJavaLaunchConfigurationConstants.ATTR_PROJECT_NAME,
-            ATTR_TEST_CONTAINER,
+            JUnitLaunchConst.ATTR_CONTAINER,
             IJavaLaunchConfigurationConstants
                     .ATTR_MAIN_TYPE_NAME,
-            ATTR_TEST_NAME,
+            JUnitLaunchConst.ATTR_TEST_NAME,
         };
         for (ILaunchConfiguration config
                 : manager.getLaunchConfigurations(wc.getType())) {

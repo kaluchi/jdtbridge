@@ -43,12 +43,7 @@ public final class CoverageToolbarRefresher
     }
 
     public void uninstall() {
-        // OSGi shutdown can stop the EclEmma bundle before our UI
-        // bundle. CoverageTools.getSessionManager() then dereferences
-        // a null EclEmmaCorePlugin instance and throws NPE. The
-        // session manager and our listener live inside that bundle's
-        // classloader, so once it's gone the listener is unreachable
-        // anyway — there is nothing to remove.
+        // EclEmma may stop before us; once gone, the listener is unreachable too
         Bundle eclemma = Platform.getBundle("org.eclipse.eclemma.core");
         if (eclemma == null || eclemma.getState() != Bundle.ACTIVE) {
             return;

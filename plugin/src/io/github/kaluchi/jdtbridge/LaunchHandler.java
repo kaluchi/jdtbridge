@@ -51,16 +51,6 @@ class LaunchHandler {
     private static final String JAVA_APP_LAUNCH_TYPE =
             "org.eclipse.jdt.launching.localJavaApplication";
 
-    private static final String ATTR_TEST_KIND =
-            JUnitLaunchConst.ATTR_TEST_KIND;
-    private static final String ATTR_TEST_NAME =
-            JUnitLaunchConst.ATTR_TEST_NAME;
-    private static final String ATTR_CONTAINER =
-            JUnitLaunchConst.ATTR_CONTAINER;
-    private static final String JUNIT_LAUNCH_TYPE =
-            JUnitLaunchConst.LAUNCH_TYPE;
-    private static final String PDE_JUNIT_LAUNCH_TYPE =
-            JUnitLaunchConst.PDE_LAUNCH_TYPE;
     private static final String MAVEN_LAUNCH_TYPE =
             "org.eclipse.m2e.Maven2LaunchConfigurationType";
     private static final String MAVEN_GOALS =
@@ -333,7 +323,8 @@ class LaunchHandler {
             ILaunchConfiguration config, String typeId)
             throws CoreException {
         switch (typeId) {
-        case JUNIT_LAUNCH_TYPE, PDE_JUNIT_LAUNCH_TYPE -> {
+        case JUnitLaunchConst.LAUNCH_TYPE,
+             JUnitLaunchConst.PDE_LAUNCH_TYPE -> {
             String mainType = config.getAttribute(
                     ATTR_MAIN_TYPE_NAME, (String) null);
             if (mainType != null && !mainType.isBlank())
@@ -341,18 +332,19 @@ class LaunchHandler {
             else {
                 String pkg = parseContainerPackage(
                         config.getAttribute(
-                                ATTR_CONTAINER,
+                                JUnitLaunchConst.ATTR_CONTAINER,
                                 (String) null));
                 if (pkg != null)
                     obj.addProperty("package", pkg);
             }
             String method = config.getAttribute(
-                    ATTR_TEST_NAME, (String) null);
+                    JUnitLaunchConst.ATTR_TEST_NAME, (String) null);
             if (method != null && !method.isBlank())
                 obj.addProperty("method", method);
             String runner = formatRunner(
                     config.getAttribute(
-                            ATTR_TEST_KIND, (String) null));
+                            JUnitLaunchConst.ATTR_TEST_KIND,
+                            (String) null));
             if (runner != null)
                 obj.addProperty("runner", runner);
         }
@@ -584,7 +576,8 @@ class LaunchHandler {
             case EXTERNAL_TOOLS_TYPE -> ATTR_TOOL_ARGUMENTS;
             case JAVA_APP_LAUNCH_TYPE -> ATTR_PROGRAM_ARGUMENTS;
             case MAVEN_LAUNCH_TYPE -> ATTR_TOOL_ARGUMENTS;
-            case JUNIT_LAUNCH_TYPE, PDE_JUNIT_LAUNCH_TYPE
+            case JUnitLaunchConst.LAUNCH_TYPE,
+                 JUnitLaunchConst.PDE_LAUNCH_TYPE
                     -> ATTR_VM_ARGUMENTS;
             case AGENT_LAUNCH_TYPE -> AGENT_ARGS;
             default -> ATTR_PROGRAM_ARGUMENTS;

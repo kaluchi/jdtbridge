@@ -2,6 +2,9 @@ package io.github.kaluchi.jdtbridge;
 
 import com.google.gson.JsonObject;
 
+import org.eclipse.core.runtime.Platform;
+import org.osgi.framework.Bundle;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -31,10 +34,7 @@ public class HttpServer {
     private final MavenHandler maven = new MavenHandler();
     private final RefactoringHandler refactoring =
             new RefactoringHandler();
-    // EditorHandler imports org.eclipse.ui.* which triggers
-    // org.eclipse.ui.workbench activation. Headless test runtimes
-    // (useUIHarness=false) cannot start that bundle, so we
-    // instantiate the handler only when an /editor* request lands.
+    // lazy: EditorHandler links org.eclipse.ui — headless Tycho cannot resolve
     private volatile EditorHandler editor;
     private final LaunchTracker launchTracker = new LaunchTracker();
     private final LaunchHandler launch =
@@ -629,10 +629,14 @@ public class HttpServer {
                                 params, scope));
                 case "/test/clear" -> Response.json(
                         testSessionHandler.handleClear(params));
-                case "/editors" -> Response.json(
-                        editor().handleEditors(params, scope));
-                case "/open" -> Response.json(
-                        editor().handleOpen(params));
+                case "/editors" -> Response.json(workbenchActive()
+                        ? editor().handleEditors(params, scope)
+                        : jsonError(
+                                "Editor commands require a UI workbench"));
+                case "/open" -> Response.json(workbenchActive()
+                        ? editor().handleOpen(params)
+                        : jsonError(
+                                "Editor commands require a UI workbench"));
                 case "/launch/list" -> Response.json(
                         launch.handleList(params, scope));
                 case "/launch/configs" -> Response.json(
@@ -699,6 +703,11 @@ public class HttpServer {
             }
         }
         return local;
+    }
+
+    private static boolean workbenchActive() {
+        Bundle b = Platform.getBundle("org.eclipse.ui.workbench");
+        return b != null && b.getState() == Bundle.ACTIVE;
     }
 
     /** Build {"error":"message"} JSON string. */
