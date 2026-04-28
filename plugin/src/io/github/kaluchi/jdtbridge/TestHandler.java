@@ -708,11 +708,6 @@ public class TestHandler {
     }
 
     int parseTimeout(String s, int defaultVal) {
-        if (s == null) return defaultVal;
-        try {
-            return Integer.parseInt(s);
-        } catch (NumberFormatException e) {
-            return defaultVal;
-        }
+        return Parsing.parseIntOr(s, defaultVal);
     }
 }

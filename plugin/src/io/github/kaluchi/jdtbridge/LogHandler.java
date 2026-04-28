@@ -169,13 +169,11 @@ class LogHandler {
             String entryLine = lines[i++];
             if (!entryLine.startsWith("!ENTRY ")) continue;
             String[] parts = entryLine.substring(7).split(" ", 4);
-            int severity = 0;
-            int code = 0;
             String bundle = parts.length > 0 ? parts[0] : "";
-            try { severity = Integer.parseInt(parts[1]); }
-            catch (Exception ignored) {}
-            try { code = Integer.parseInt(parts[2]); }
-            catch (Exception ignored) {}
+            int severity = parts.length > 1
+                    ? Parsing.parseIntOr(parts[1], 0) : 0;
+            int code = parts.length > 2
+                    ? Parsing.parseIntOr(parts[2], 0) : 0;
             String timestamp = parts.length > 3 ? parts[3] : "";
 
             String message = "";

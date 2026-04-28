@@ -709,14 +709,13 @@ public class CoverageSessionHandlerTest {
         return (IJavaProject) Proxy.newProxyInstance(
                 IJavaProject.class.getClassLoader(),
                 new Class<?>[] { IJavaProject.class },
-                (proxy, method, args) -> {
-                    return switch (method.getName()) {
-                        case "equals" -> proxy == args[0];
-                        case "hashCode" ->
-                                System.identityHashCode(proxy);
-                        case "toString" -> "fake-project";
-                        default -> null;
-                    };
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "equals" -> proxy == args[0];
+                    case "hashCode" ->
+                            System.identityHashCode(proxy);
+                    default -> throw new UnsupportedOperationException(
+                            "fakeProject method not mocked: "
+                                    + method.getName());
                 });
     }
 

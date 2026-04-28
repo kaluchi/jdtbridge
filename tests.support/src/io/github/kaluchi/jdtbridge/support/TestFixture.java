@@ -7,6 +7,7 @@ import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IProjectDescription;
 import org.eclipse.core.resources.IWorkspaceRoot;
 import org.eclipse.core.resources.ResourcesPlugin;
+import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.Path;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.jdt.core.IClasspathEntry;
@@ -249,6 +250,18 @@ public class TestFixture {
             }
             """;
 
+    // Source type whose name matches the substring "Object" — anchors
+    // tests that drive `pattern=Object` against `sourceOnly` to
+    // confirm the binary `java.lang.Object` is filtered out while
+    // a bona-fide source match is still returned.
+    private static final String OBJECT_HOLDER_SRC = """
+            package test.edge;
+
+            public class ObjectHolder {
+                public Object value;
+            }
+            """;
+
     // ---- Enriched ref testing ----
 
     private static final String ENRICHED_SERVICE_SRC = """
@@ -461,10 +474,18 @@ public class TestFixture {
         // Create source folder
         IFolder srcFolder = project.getFolder("src");
         srcFolder.create(true, true, null);
+        IFolder binFolder = project.getFolder("bin");
+        binFolder.create(true, true, null);
 
-        // Set classpath: src + JRE + JUnit 5
-        IClasspathEntry srcEntry =
-                JavaCore.newSourceEntry(srcFolder.getFullPath());
+        // Set classpath: src + JRE + JUnit 5. The src entry carries
+        // an explicit output location so tests asserting that
+        // overrides serialise as absolute paths have a fixture to
+        // exercise (Eclipse projects without overrides emit no
+        // outputLocation field).
+        IClasspathEntry srcEntry = JavaCore.newSourceEntry(
+                srcFolder.getFullPath(),
+                new IPath[0], new IPath[0],
+                binFolder.getFullPath());
         IClasspathEntry jreEntry = JavaCore.newContainerEntry(
                 new Path("org.eclipse.jdt.launching.JRE_CONTAINER"));
         IClasspathEntry junitEntry = JavaCore.newContainerEntry(
@@ -534,6 +555,8 @@ public class TestFixture {
                 "Repository.java", GENERIC_SRC, true, null);
         edgePkg.createCompilationUnit(
                 "SimpleTest.java", SIMPLE_TEST_SRC, true, null);
+        edgePkg.createCompilationUnit(
+                "ObjectHolder.java", OBJECT_HOLDER_SRC, true, null);
 
         // Refactoring targets
         IPackageFragment refactorPkg =

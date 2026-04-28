@@ -371,27 +371,19 @@ public class HttpServer {
             Map<String, String> params) {
         String name = params.get("launchId");
         if (name == null || name.isBlank()) {
-            try { sendError(socket, 400, "Missing launchId"); }
-            catch (IOException e) { /* ignore */ }
+            sendErrorQuietly(socket, 400, "Missing launchId");
             return;
         }
 
         LaunchTracker.TrackedLaunch tl = awaitLaunch(name);
         if (tl == null) {
-            try {
-                sendError(socket, 404,
-                        "Launch not found: " + name);
-            } catch (IOException e) { /* ignore */ }
+            sendErrorQuietly(socket, 404,
+                    "Launch not found: " + name);
             return;
         }
 
         String stream = params.get("stream");
-        int tail = -1;
-        String tailStr = params.get("tail");
-        if (tailStr != null) {
-            try { tail = Integer.parseInt(tailStr); }
-            catch (NumberFormatException e) { /* full */ }
-        }
+        int tail = Parsing.parseIntOr(params.get("tail"), -1);
 
         try {
             socket.setSoTimeout(0);
@@ -417,8 +409,7 @@ public class HttpServer {
             Map<String, String> params) {
         String testRunId = params.get("testRunId");
         if (testRunId == null || testRunId.isBlank()) {
-            try { sendError(socket, 400, "Missing testRunId"); }
-            catch (IOException e) { /* ignore */ }
+            sendErrorQuietly(socket, 400, "Missing testRunId");
             return;
         }
 
@@ -436,10 +427,8 @@ public class HttpServer {
             }
         }
         if (session == null) {
-            try {
-                sendError(socket, 404,
-                        "Test run not found: " + testRunId);
-            } catch (IOException e) { /* ignore */ }
+            sendErrorQuietly(socket, 404,
+                    "Test run not found: " + testRunId);
             return;
         }
 
@@ -469,8 +458,7 @@ public class HttpServer {
             Map<String, String> params) {
         String coverageId = params.get("coverageId");
         if (coverageId == null || coverageId.isBlank()) {
-            try { sendError(socket, 400, "Missing coverageId"); }
-            catch (IOException e) { /* ignore */ }
+            sendErrorQuietly(socket, 400, "Missing coverageId");
             return;
         }
         try {
@@ -737,6 +725,20 @@ public class HttpServer {
         out.write(header.getBytes(StandardCharsets.UTF_8));
         out.write(bodyBytes);
         out.flush();
+    }
+
+    /** Send an error and swallow the IOException — the streaming
+     *  endpoints already had nothing useful to do if the peer closed
+     *  before the response landed. Five identical try/catch blocks
+     *  in handleConsoleStream / handleTestStatusStream /
+     *  handleCoverageSessionStream now collapse to one. */
+    private void sendErrorQuietly(Socket socket, int code,
+            String message) {
+        try {
+            sendError(socket, code, message);
+        } catch (IOException ignored) {
+            // Peer already gone.
+        }
     }
 
 }

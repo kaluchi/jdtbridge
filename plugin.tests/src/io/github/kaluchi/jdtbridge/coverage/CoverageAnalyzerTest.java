@@ -151,8 +151,7 @@ public class CoverageAnalyzerTest {
         return CoverageTools.getSessionManager().getSessions().stream()
                 .filter(s -> description.equals(s.getDescription()))
                 .findFirst()
-                .orElseThrow(() -> new AssertionError(
-                        "No session " + description));
+                .orElseThrow();
     }
 
     private static IExecutionDataSource emptyDataSource() {
