@@ -63,6 +63,7 @@ public class TestFixture {
 
             public interface Animal {
                 String name();
+                default String kind() { return "animal"; }
             }
             """;
 

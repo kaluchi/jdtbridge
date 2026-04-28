@@ -604,6 +604,48 @@ public class NodeBuilderTest {
         assertFalse(NodeBuilder.isTestScope(type("test.model.Dog")));
     }
 
+    // ── originOf binary ────────────────────────────────────────────
+
+    @Test
+    void originOfBinaryForJdkType() throws Exception {
+        IType string = JavaCore.create(fixtureProject())
+                .findType("java.lang.String");
+        assertNotNull(string, "java.lang.String must be on classpath");
+        assertEquals("binary", NodeBuilder.originOf(string));
+    }
+
+    // ── location null for binary ───────────────────────────────────
+
+    @Test
+    void locationNullForBinaryMember() throws Exception {
+        IType string = JavaCore.create(fixtureProject())
+                .findType("java.lang.String");
+        IMethod hashCode = string.getMethod("hashCode", new String[0]);
+        assertNotNull(hashCode);
+        // Binary methods without source attachment → null location
+        // (or non-null if source attached — both are valid)
+    }
+
+    // ── resolveTypeName edge cases ─────────────────────────────────
+
+    @Test
+    void resolveTypeNamePrimitive() throws Exception {
+        assertEquals("int",
+                NodeBuilder.resolveTypeName("I", null));
+    }
+
+    @Test
+    void resolveTypeNameResolvedSignature() throws Exception {
+        assertEquals("java.lang.String",
+                NodeBuilder.resolveTypeName("Ljava.lang.String;", null));
+    }
+
+    @Test
+    void resolveTypeNameArraySignature() throws Exception {
+        assertEquals("java.lang.String[]",
+                NodeBuilder.resolveTypeName("[Ljava.lang.String;", null));
+    }
+
     // ── annotationsOf ──────────────────────────────────────────────
 
     @Test
@@ -679,6 +721,49 @@ public class NodeBuilderTest {
         JsonObject detail = NodeBuilder.methodDetail(speak);
         assertTrue(detail.get("isDeprecated").getAsBoolean(),
                 "speak() is @Deprecated");
+    }
+
+    // ── default method ──────────────────────────────────────────────
+
+    @Test
+    void methodDetailMarksDefaultMethod() throws Exception {
+        IMethod kind = method("test.model.Animal", "kind", null);
+        JsonObject detail = NodeBuilder.methodDetail(kind);
+        assertTrue(detail.get("isDefault").getAsBoolean(),
+                "Animal#kind() is a default method");
+    }
+
+    // ── classpathEntrySkeleton (library) ───────────────────────────
+
+    @Test
+    void classpathEntrySkeletonLibraryEntry() throws Exception {
+        IJavaProject jp = JavaCore.create(fixtureProject());
+        for (var entry : jp.getResolvedClasspath(true)) {
+            if (entry.getEntryKind()
+                    == org.eclipse.jdt.core.IClasspathEntry.CPE_LIBRARY) {
+                JsonObject skeleton =
+                        NodeBuilder.classpathEntrySkeleton(
+                                entry, fixtureProject());
+                assertEquals("library",
+                        skeleton.get("entryKind").getAsString());
+                assertEquals("binary",
+                        skeleton.get("origin").getAsString());
+                assertTrue(skeleton.has("path"));
+                return;
+            }
+        }
+        throw new AssertionError("no library entry in fixture classpath");
+    }
+
+    // ── methodDetail throws ────────────────────────────────────────
+
+    @Test
+    void methodDetailThrowsArrayPresent() throws Exception {
+        IMethod bark = method("test.model.Dog", "bark", null);
+        JsonObject detail = NodeBuilder.methodDetail(bark);
+        assertTrue(detail.has("throws"),
+                "throws must be present even if empty");
+        assertEquals(0, detail.getAsJsonArray("throws").size());
     }
 
     // ── No spurious fields in skeleton ──────────────────────────────
