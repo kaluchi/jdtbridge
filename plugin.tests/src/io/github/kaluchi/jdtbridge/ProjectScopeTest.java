@@ -1,22 +1,37 @@
 package io.github.kaluchi.jdtbridge;
 
+import io.github.kaluchi.jdtbridge.support.TestFixture;
+
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.debug.core.DebugPlugin;
+import org.eclipse.debug.core.ILaunch;
 import org.eclipse.debug.core.ILaunchConfigurationType;
 import org.eclipse.debug.core.ILaunchConfigurationWorkingCopy;
 import org.eclipse.debug.core.ILaunchManager;
+import org.eclipse.jdt.core.IJavaProject;
+import org.eclipse.jdt.core.IPackageFragmentRoot;
+import org.eclipse.jdt.core.JavaCore;
+import org.eclipse.jdt.core.search.IJavaSearchScope;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashSet;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Unit tests for {@link ProjectScope}.
  */
 public class ProjectScopeTest {
+
+    @BeforeAll
+    static void setUp() throws Exception {
+        TestFixture.create();
+    }
 
     @Nested
     class AllScope {
@@ -192,6 +207,104 @@ public class ProjectScopeTest {
             ProjectScope scope = ProjectScope.of(
                     Set.of("project-a"));
             assertFalse(scope.containsAnyOfRoots(Set.of()));
+        }
+
+        @Test
+        void filteredScopeAcceptsMatchingRoot() throws Exception {
+            IJavaProject jp = JavaCore.create(
+                    org.eclipse.core.resources.ResourcesPlugin
+                            .getWorkspace().getRoot()
+                            .getProject(TestFixture.PROJECT_NAME));
+            var roots = new HashSet<IPackageFragmentRoot>();
+            for (IPackageFragmentRoot r
+                    : jp.getPackageFragmentRoots()) {
+                if (r.getKind()
+                        == IPackageFragmentRoot.K_SOURCE) {
+                    roots.add(r);
+                }
+            }
+            ProjectScope scope = ProjectScope.of(
+                    Set.of(TestFixture.PROJECT_NAME));
+            assertTrue(scope.containsAnyOfRoots(roots),
+                    "fixture source roots must match fixture scope");
+        }
+
+        @Test
+        void filteredScopeRejectsNonMatchingRoot() throws Exception {
+            IJavaProject jp = JavaCore.create(
+                    org.eclipse.core.resources.ResourcesPlugin
+                            .getWorkspace().getRoot()
+                            .getProject(TestFixture.PROJECT_NAME));
+            var roots = new HashSet<IPackageFragmentRoot>();
+            for (IPackageFragmentRoot r
+                    : jp.getPackageFragmentRoots()) {
+                if (r.getKind()
+                        == IPackageFragmentRoot.K_SOURCE) {
+                    roots.add(r);
+                }
+            }
+            ProjectScope scope = ProjectScope.of(
+                    Set.of("completely-different-project"));
+            assertFalse(scope.containsAnyOfRoots(roots));
+        }
+    }
+
+    @Nested
+    class ContainsLaunch {
+
+        @Test
+        void allScopeAcceptsLaunchWithoutConfig() {
+            ILaunch launch = new org.eclipse.debug.core.Launch(
+                    null, "run", null);
+            assertTrue(ProjectScope.ALL.containsLaunch(launch));
+        }
+
+        @Test
+        void filteredScopeAcceptsLaunchWithNullConfig() {
+            ILaunch launch = new org.eclipse.debug.core.Launch(
+                    null, "run", null);
+            ProjectScope scope = ProjectScope.of(
+                    Set.of("anything"));
+            assertTrue(scope.containsLaunch(launch),
+                    "null config → permissive");
+        }
+
+        @Test
+        void filteredScopeAcceptsLaunchWithMatchingProject()
+                throws Exception {
+            ILaunchManager mgr = DebugPlugin.getDefault()
+                    .getLaunchManager();
+            ILaunchConfigurationType type = mgr
+                    .getLaunchConfigurationType(
+                            "org.eclipse.jdt.junit.launchconfig");
+            var wc = type.newInstance(null, "scope-launch-test");
+            wc.setAttribute(
+                    "org.eclipse.jdt.launching.PROJECT_ATTR",
+                    "my-project");
+            ILaunch launch = new org.eclipse.debug.core.Launch(
+                    wc, "run", null);
+            ProjectScope scope = ProjectScope.of(
+                    Set.of("my-project"));
+            assertTrue(scope.containsLaunch(launch));
+        }
+    }
+
+    @Nested
+    class SearchScope {
+
+        @Test
+        void allScopeCreatesWorkspaceScope() {
+            IJavaSearchScope scope =
+                    ProjectScope.ALL.searchScope();
+            assertNotNull(scope);
+        }
+
+        @Test
+        void filteredScopeCreatesProjectScope() {
+            ProjectScope scope = ProjectScope.of(
+                    Set.of(TestFixture.PROJECT_NAME));
+            IJavaSearchScope searchScope = scope.searchScope();
+            assertNotNull(searchScope);
         }
     }
 }

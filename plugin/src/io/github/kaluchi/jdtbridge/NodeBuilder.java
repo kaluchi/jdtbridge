@@ -581,14 +581,7 @@ class NodeBuilder {
         obj.add("interfaces", interfaces);
 
         if (type.isAnonymous())  obj.addProperty("isAnonymous", true);
-        if (Flags.isDeprecated(type.getFlags())) {
-            obj.addProperty("isDeprecated", true);
-        }
-
-        String javadocSummary = javadocSummary(type);
-        if (javadocSummary != null) {
-            obj.addProperty("javadocSummary", javadocSummary);
-        }
+        addDeprecatedAndJavadoc(obj, type);
         return obj;
     }
 
@@ -651,14 +644,7 @@ class NodeBuilder {
         if (Flags.isDefaultMethod(method.getFlags())) {
             obj.addProperty("isDefault", true);
         }
-        if (Flags.isDeprecated(method.getFlags())) {
-            obj.addProperty("isDeprecated", true);
-        }
-
-        String javadocSummary = javadocSummary(method);
-        if (javadocSummary != null) {
-            obj.addProperty("javadocSummary", javadocSummary);
-        }
+        addDeprecatedAndJavadoc(obj, method);
         return obj;
     }
 
@@ -1015,6 +1001,17 @@ class NodeBuilder {
         return resource.getLocation().toOSString();
     }
 
+    private static void addDeprecatedAndJavadoc(JsonObject obj,
+            IMember member) throws JavaModelException {
+        if (Flags.isDeprecated(member.getFlags())) {
+            obj.addProperty("isDeprecated", true);
+        }
+        String summary = javadocSummary(member);
+        if (summary != null) {
+            obj.addProperty("javadocSummary", summary);
+        }
+    }
+
     // ── Source text extraction ─────────────────────────────────────
 
     /**
@@ -1212,14 +1209,7 @@ class NodeBuilder {
                 && Flags.isFinal(field.getFlags())) {
             obj.addProperty("isConstant", true);
         }
-        if (Flags.isDeprecated(field.getFlags())) {
-            obj.addProperty("isDeprecated", true);
-        }
-
-        String javadocSummary = javadocSummary(field);
-        if (javadocSummary != null) {
-            obj.addProperty("javadocSummary", javadocSummary);
-        }
+        addDeprecatedAndJavadoc(obj, field);
         return obj;
     }
 }
