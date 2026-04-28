@@ -732,6 +732,81 @@ public class LaunchHandlerTest {
     }
 
     @Nested
+    class ConfigDelete {
+
+        @Test
+        void missingConfigIdReturnsError() {
+            String json = handler.handleConfigDelete(Map.of());
+            assertTrue(json.contains("Missing"));
+        }
+
+        @Test
+        void unknownConfigReturnsError() {
+            String json = handler.handleConfigDelete(
+                    Map.of("configId", "no-such-xyz"));
+            assertTrue(json.contains("not found"));
+        }
+
+        @Test
+        void deletesExistingLocalConfig() throws Exception {
+            ILaunchConfiguration cfg = createJavaConfig(
+                    "DeleteMe-Test", "test.Main");
+            String json = handler.handleConfigDelete(
+                    Map.of("configId", "DeleteMe-Test"));
+            var obj = JsonParser.parseString(json)
+                    .getAsJsonObject();
+            assertTrue(obj.get("ok").getAsBoolean());
+            assertEquals("DeleteMe-Test",
+                    obj.get("configId").getAsString());
+        }
+    }
+
+    @Nested
+    class Import {
+
+        @Test
+        void missingConfigIdReturnsError() {
+            String json = handler.handleImport(Map.of(), "<xml/>");
+            assertTrue(json.contains("Missing"));
+        }
+
+        @Test
+        void missingBodyReturnsError() {
+            String json = handler.handleImport(
+                    Map.of("configId", "test"), null);
+            assertTrue(json.contains("Missing"));
+        }
+
+        @Test
+        void pathTraversalRejected() {
+            String json = handler.handleImport(
+                    Map.of("configId", "../evil"), "<xml/>");
+            assertTrue(json.contains("Invalid"));
+        }
+
+        @Test
+        void slashInConfigIdRejected() {
+            String json = handler.handleImport(
+                    Map.of("configId", "foo/bar"), "<xml/>");
+            assertTrue(json.contains("Invalid"));
+        }
+
+        @Test
+        void duplicateConfigIdRejected() throws Exception {
+            ILaunchConfiguration cfg = createJavaConfig(
+                    "ImportDupe", "test.Main");
+            try {
+                String json = handler.handleImport(
+                        Map.of("configId", "ImportDupe"),
+                        "<xml/>");
+                assertTrue(json.contains("already exists"));
+            } finally {
+                deleteIfPresent(cfg);
+            }
+        }
+    }
+
+    @Nested
     class ArgsAttribute {
 
         @Test
