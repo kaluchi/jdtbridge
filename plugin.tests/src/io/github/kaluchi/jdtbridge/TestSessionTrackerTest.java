@@ -69,10 +69,6 @@ public class TestSessionTrackerTest {
                     .removeTestRunSession(finishedSession);
             finishedSession = null;
         }
-        // Delete the SimpleTest launch config — see
-        // TestProgressStreamerTest.tearDown for the same rationale.
-        var cfg = LaunchAttrs.findConfig("SimpleTest");
-        if (cfg != null && cfg.isLocal()) cfg.delete();
         TestFixture.destroy();
     }
 
@@ -281,8 +277,13 @@ public class TestSessionTrackerTest {
                     Map.of("testRunId", testRunId));
             JsonObject obj = JsonParser.parseString(json)
                     .getAsJsonObject();
-            assertEquals("SimpleTest",
-                    obj.get("configId").getAsString());
+            // Eclipse may name the config "SimpleTest" or
+            // "SimpleTest (N)" depending on whether sibling test
+            // classes already created one in this run.
+            assertTrue(obj.get("configId").getAsString()
+                            .startsWith("SimpleTest"),
+                    "configId must start with SimpleTest: "
+                            + obj.get("configId"));
             assertEquals("finished",
                     obj.get("state").getAsString());
             assertEquals(1, obj.get("total").getAsInt());
