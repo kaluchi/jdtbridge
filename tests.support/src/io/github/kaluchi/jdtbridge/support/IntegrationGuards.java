@@ -1,4 +1,4 @@
-package io.github.kaluchi.jdtbridge;
+package io.github.kaluchi.jdtbridge.support;
 
 import org.eclipse.core.runtime.Platform;
 import org.eclipse.debug.core.DebugPlugin;

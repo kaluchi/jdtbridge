@@ -1,5 +1,7 @@
 package io.github.kaluchi.jdtbridge;
 
+import io.github.kaluchi.jdtbridge.support.TestFixture;
+
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.eclipse.jdt.internal.junit.JUnitCorePlugin;

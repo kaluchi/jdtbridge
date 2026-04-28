@@ -1,5 +1,7 @@
 package io.github.kaluchi.jdtbridge.coverage;
 
+import io.github.kaluchi.jdtbridge.support.TestFixture;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -36,7 +38,6 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import io.github.kaluchi.jdtbridge.ProjectScope;
-import io.github.kaluchi.jdtbridge.TestFixture;
 
 /**
  * Tests for {@link CoverageSessionHandler}. Drives state through
