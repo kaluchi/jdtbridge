@@ -294,7 +294,7 @@ Errors:
 ```bash
 jdt test run com.example.MyTest --coverage
 jdt test run com.example.MyTest#testFoo --coverage -f
-jdt test run --project my-tests --coverage
+jdt test run my-tests --coverage
 ```
 
 When `--coverage` is set:
