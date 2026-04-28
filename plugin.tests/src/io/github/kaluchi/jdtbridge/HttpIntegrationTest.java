@@ -215,7 +215,114 @@ public class HttpIntegrationTest {
         return response.substring(bodyStart + 4);
     }
 
-    // /editors requires Display thread — tested live, not in headless CI
+    // ---- Status (no auth) ----
+
+    @Test
+    public void statusEndpointNoAuth() throws Exception {
+        String response = rawRequest("GET /status HTTP/1.1",
+                "Host: localhost");
+        assertTrue(response.startsWith("HTTP/1.1 200"),
+                "/status should not require auth: " + response);
+        assertTrue(response.contains("text/html"),
+                "Should be HTML: " + response);
+    }
+
+    @Test
+    public void statusDismissPost() throws Exception {
+        String response = rawRequest("POST /status/dismiss HTTP/1.1",
+                "Host: localhost",
+                "Content-Length: 0");
+        assertTrue(response.startsWith("HTTP/1.1 200"),
+                "dismiss POST: " + response);
+        assertTrue(response.contains("\"ok\":true"),
+                "Should return ok: " + response);
+    }
+
+    // ---- POST with body ----
+
+    @Test
+    public void postBodyParsedCorrectly() throws Exception {
+        String body = "{\"configId\":\"http-test-import\"}";
+        String response = rawRequestWithBody(
+                "POST /launch/import HTTP/1.1", body,
+                "Host: localhost",
+                "Authorization: Bearer " + TOKEN);
+        assertTrue(response.startsWith("HTTP/1.1 200"),
+                "POST with body: " + response);
+    }
+
+    // ---- Session header ----
+
+    @Test
+    public void sessionHeaderDoesNotBreakRequest() throws Exception {
+        String response = rawRequest("GET /projects HTTP/1.1",
+                "Host: localhost",
+                "Authorization: Bearer " + TOKEN,
+                "X-Bridge-Session: test-session-abc");
+        assertTrue(response.startsWith("HTTP/1.1 200"),
+                "Session header should be accepted: " + response);
+    }
+
+    // ---- Telemetry ----
+
+    @Test
+    public void telemetryPostReturnsOk() throws Exception {
+        String body = "{\"event\":\"test\"}";
+        String response = rawRequestWithBody(
+                "POST /telemetry HTTP/1.1", body,
+                "Host: localhost",
+                "Authorization: Bearer " + TOKEN,
+                "X-Bridge-Session: tel-session");
+        assertTrue(response.startsWith("HTTP/1.1 200"),
+                "telemetry POST: " + response);
+        assertTrue(response.contains("\"ok\":true"),
+                "telemetry ok: " + response);
+    }
+
+    @Test
+    public void telemetryGetDrains() throws Exception {
+        String response = rawRequest(
+                "GET /telemetry?session=tel-session HTTP/1.1",
+                "Host: localhost",
+                "Authorization: Bearer " + TOKEN);
+        assertTrue(response.startsWith("HTTP/1.1 200"),
+                "telemetry GET: " + response);
+    }
+
+    // ---- Helpers ----
+
+    private String rawRequestWithBody(String requestLine,
+            String body, String... headers) throws Exception {
+        try (Socket socket = new Socket("localhost", port)) {
+            socket.setSoTimeout(15_000);
+            OutputStream out = socket.getOutputStream();
+            byte[] bodyBytes =
+                    body.getBytes(StandardCharsets.UTF_8);
+            StringBuilder req = new StringBuilder();
+            req.append(requestLine).append("\r\n");
+            for (String h : headers) {
+                req.append(h).append("\r\n");
+            }
+            req.append("Content-Length: ")
+                    .append(bodyBytes.length).append("\r\n");
+            req.append("\r\n");
+            out.write(req.toString()
+                    .getBytes(StandardCharsets.UTF_8));
+            out.write(bodyBytes);
+            out.flush();
+
+            BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(
+                            socket.getInputStream(),
+                            StandardCharsets.UTF_8));
+            StringBuilder response = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                response.append(line).append("\r\n");
+            }
+            return response.toString();
+        }
+    }
 
     private String rawRequest(String requestLine, String... headers)
             throws Exception {
