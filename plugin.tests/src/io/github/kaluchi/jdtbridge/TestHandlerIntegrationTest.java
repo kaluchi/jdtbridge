@@ -3,6 +3,7 @@ package io.github.kaluchi.jdtbridge;
 import io.github.kaluchi.jdtbridge.support.TestFixture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
@@ -78,8 +79,78 @@ public class TestHandlerIntegrationTest {
     }
 
     @Test
+    public void targetByMethod() throws Exception {
+        Map<String, String> params = new HashMap<>();
+        params.put("target", "test.edge.SimpleTest#onePlusOne");
+        params.put("no-refresh", "");
+        String json = handler.handleTestRun(params);
+        var obj = com.google.gson.JsonParser.parseString(json)
+                .getAsJsonObject();
+        assertTrue(obj.get("ok").getAsBoolean(),
+                "method target must launch: " + json);
+        terminateLaunch(obj.get("configId").getAsString());
+    }
+
+    @Test
+    public void targetByProject() throws Exception {
+        Map<String, String> params = new HashMap<>();
+        params.put("target", "jdtbridge-test");
+        params.put("no-refresh", "");
+        String json = handler.handleTestRun(params);
+        var obj = com.google.gson.JsonParser.parseString(json)
+                .getAsJsonObject();
+        assertTrue(obj.get("ok").getAsBoolean(),
+                "project target must launch: " + json);
+        terminateLaunch(obj.get("configId").getAsString());
+    }
+
+    @Test
+    public void targetByPackageWithProjectOverride() throws Exception {
+        Map<String, String> params = new HashMap<>();
+        params.put("target", "test.edge");
+        params.put("project", "jdtbridge-test");
+        params.put("no-refresh", "");
+        String json = handler.handleTestRun(params);
+        var obj = com.google.gson.JsonParser.parseString(json)
+                .getAsJsonObject();
+        assertTrue(obj.get("ok").getAsBoolean(),
+                "package target with project override must launch: "
+                + json);
+        terminateLaunch(obj.get("configId").getAsString());
+    }
+
+    @Test
+    public void targetByPackageInfersProject() throws Exception {
+        Map<String, String> params = new HashMap<>();
+        params.put("target", "test.edge");
+        params.put("no-refresh", "");
+        String json = handler.handleTestRun(params);
+        var obj = com.google.gson.JsonParser.parseString(json)
+                .getAsJsonObject();
+        assertTrue(obj.get("ok").getAsBoolean(),
+                "package target without project must infer: " + json);
+        terminateLaunch(obj.get("configId").getAsString());
+    }
+
+    @Test
+    public void targetByCompilationUnit() throws Exception {
+        var root = org.eclipse.core.resources.ResourcesPlugin
+                .getWorkspace().getRoot();
+        var file = root.getProject("jdtbridge-test")
+                .getFile("src/test/edge/SimpleTest.java");
+        Map<String, String> params = new HashMap<>();
+        params.put("target", file.getLocation().toOSString());
+        params.put("no-refresh", "");
+        String json = handler.handleTestRun(params);
+        var obj = com.google.gson.JsonParser.parseString(json)
+                .getAsJsonObject();
+        assertTrue(obj.get("ok").getAsBoolean(),
+                "file target must launch: " + json);
+        terminateLaunch(obj.get("configId").getAsString());
+    }
+
+    @Test
     public void detectTestKindJunit5() throws Exception {
-        // test project has JUnit 5 on classpath
         var type = JdtUtils.findType("test.model.Dog");
         String kind = handler.detectTestKind(type);
         assertEquals("org.eclipse.jdt.junit.loader.junit5", kind);
@@ -87,9 +158,6 @@ public class TestHandlerIntegrationTest {
 
     @Test
     public void successfulLaunchOnTestFixtureClass() throws Exception {
-        // test.edge.SimpleTest is a real JUnit 5 test class created
-        // by TestFixture. Driving handleTestRun against it covers
-        // the full happy path: synthesize → prepareLaunch → launch.
         Map<String, String> params = new HashMap<>();
         params.put("target", "test.edge.SimpleTest");
         params.put("no-refresh", "");
@@ -102,12 +170,38 @@ public class TestHandlerIntegrationTest {
                 "Response must carry launchId: " + json);
         assertTrue(obj.has("testRunId"),
                 "Response must carry testRunId: " + json);
-        // runner is the human-readable name produced by formatRunner.
         assertEquals("JUnit 5", obj.get("runner").getAsString(),
                 "Runner must resolve to JUnit 5 for SimpleTest: " + json);
+        terminateLaunch(obj.get("configId").getAsString());
+    }
 
-        // Tear down the launch so subsequent tests don't see it.
-        String configId = obj.get("configId").getAsString();
+    @Test
+    public void coverageFalseDoesNotEnableCoverage() throws Exception {
+        Map<String, String> params = new HashMap<>();
+        params.put("target", "test.edge.SimpleTest");
+        params.put("no-refresh", "");
+        params.put("coverage", "false");
+        String json = handler.handleTestRun(params);
+        var obj = com.google.gson.JsonParser.parseString(json)
+                .getAsJsonObject();
+        assertTrue(obj.get("ok").getAsBoolean(),
+                "coverage=false must still launch: " + json);
+        assertFalse(obj.has("coverageId"),
+                "coverage=false must not produce coverageId: " + json);
+        terminateLaunch(obj.get("configId").getAsString());
+    }
+
+    @Test
+    public void emptyTargetReturnsError() throws Exception {
+        Map<String, String> params = new HashMap<>();
+        params.put("target", "   ");
+        String json = handler.handleTestRun(params);
+        assertTrue(json.contains("Missing"),
+                "blank target must fail: " + json);
+    }
+
+    private static void terminateLaunch(String configId)
+            throws org.eclipse.debug.core.DebugException {
         var mgr = org.eclipse.debug.core.DebugPlugin
                 .getDefault().getLaunchManager();
         for (var launch : mgr.getLaunches()) {

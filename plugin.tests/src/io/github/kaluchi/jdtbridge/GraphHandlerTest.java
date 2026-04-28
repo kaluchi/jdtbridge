@@ -174,12 +174,15 @@ public class GraphHandlerTest {
     }
 
     @Test
-    void methodRejectsMissingHash() {
+    void methodRejectsTypeSubject() {
         JsonObject result = parse(handler.handleMethod(
                 params("of", "test.model.Dog")));
         assertTrue(isError(result));
-        assertEquals("invalid-fqn",
+        assertEquals("wrong-subject-kind",
                 errorOf(result).get("kind").getAsString());
+        assertEquals("method",
+                errorOf(result).getAsJsonObject("context")
+                .get("expected").getAsString());
     }
 
     @Test
@@ -211,6 +214,18 @@ public class GraphHandlerTest {
         assertEquals("field", result.get("kind").getAsString());
         assertEquals("age", result.get("name").getAsString());
         assertEquals("int", result.get("type").getAsString());
+    }
+
+    @Test
+    void fieldRejectsMethodFqn() {
+        JsonObject result = parse(handler.handleField(
+                params("of", "test.model.Dog#bark")));
+        assertTrue(isError(result));
+        assertEquals("wrong-subject-kind",
+                errorOf(result).get("kind").getAsString());
+        assertEquals("field",
+                errorOf(result).getAsJsonObject("context")
+                .get("expected").getAsString());
     }
 
     @Test
@@ -972,6 +987,59 @@ public class GraphHandlerTest {
         assertTrue(names.contains("test.service"));
         assertTrue(names.contains("test.edge"));
         assertTrue(names.contains("test.refactor"));
+    }
+
+    // ── /file ────────────────────────────────────────────────────────
+
+    @Test
+    void fileReturnsDetailForAbsolutePath() throws Exception {
+        var root = org.eclipse.core.resources.ResourcesPlugin
+                .getWorkspace().getRoot();
+        var file = root.getProject("jdtbridge-test")
+                .getFile("src/test/model/Dog.java");
+        String absPath = file.getLocation().toOSString();
+
+        JsonObject result = parse(handler.handleFile(
+                params("of", absPath)));
+        assertEquals("file", result.get("kind").getAsString());
+        assertEquals("java", result.get("language").getAsString());
+        assertEquals("jdtbridge-test",
+                result.get("containingProject").getAsString());
+    }
+
+    @Test
+    void fileErrorForUnknownPath() {
+        JsonObject result = parse(handler.handleFile(
+                params("of", "D:/no/such/file.java")));
+        assertTrue(isError(result));
+        assertEquals("file-not-found",
+                errorOf(result).get("kind").getAsString());
+    }
+
+    // ── /typesInFile ────────────────────────────────────────────────
+
+    @Test
+    void typesInFileListsTypesFromAbsolutePath() throws Exception {
+        var root = org.eclipse.core.resources.ResourcesPlugin
+                .getWorkspace().getRoot();
+        var file = root.getProject("jdtbridge-test")
+                .getFile("src/test/model/Dog.java");
+        String absPath = file.getLocation().toOSString();
+
+        var arr = JsonParser.parseString(handler.handleTypesInFile(
+                params("of", absPath))).getAsJsonArray();
+        assertEquals(1, arr.size(), "Dog.java has one top-level type");
+        assertEquals("test.model.Dog",
+                arr.get(0).getAsJsonObject().get("fqn").getAsString());
+    }
+
+    @Test
+    void typesInFileErrorForUnknownPath() {
+        JsonObject result = parse(handler.handleTypesInFile(
+                params("of", "D:/no/such/file.java")));
+        assertTrue(isError(result));
+        assertEquals("file-not-found",
+                errorOf(result).get("kind").getAsString());
     }
 
     // ── /source ──────────────────────────────────────────────────────

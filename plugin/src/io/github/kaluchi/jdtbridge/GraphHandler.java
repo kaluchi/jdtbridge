@@ -87,47 +87,14 @@ class GraphHandler {
             return ErrorDescriptor.missingParameter("of").toJsonString();
         }
         try {
-            // Composite synthetic fqns (lambda / anonymous) carry the
-            // enclosing method's `(` in their suffix; the first-# split
-            // in the regular branch is unsafe. Route through the
-            // unified parser which skips the overload-ambiguity check —
-            // SAM method names inside synthetic types are unambiguous.
-            if (JdtUtils.isCompositeFqn(fqn)) {
-                IJavaElement resolved = JdtUtils.resolveElement(fqn);
-                return resolved instanceof IMethod m
-                        ? NodeBuilder.methodDetail(m).toString()
-                        : ErrorDescriptor.methodNotFound(fqn).toJsonString();
+            ResolvedTarget target = resolveTarget(fqn, params);
+            if (target.errorJson != null) return target.errorJson;
+            if (!(target.element instanceof IMethod method)) {
+                return ErrorDescriptor.wrongSubjectKind(
+                        "/method", "method",
+                        elementKindOf(target.element)).toJsonString();
             }
-            int hash = fqn.indexOf('#');
-            if (hash < 0) {
-                return ErrorDescriptor.invalidFqn(fqn).toJsonString();
-            }
-            String typeFqn = fqn.substring(0, hash);
-            String memberPart = fqn.substring(hash + 1);
-            int paren = memberPart.indexOf('(');
-            String methodName = paren < 0
-                    ? memberPart : memberPart.substring(0, paren);
-            String paramTypesParam = params.get("paramTypes");
-            if (paramTypesParam == null && paren >= 0) {
-                int closeParen = memberPart.lastIndexOf(')');
-                paramTypesParam = closeParen > paren
-                        ? memberPart.substring(paren + 1, closeParen)
-                        : memberPart.substring(paren + 1);
-            }
-            IType type = JdtUtils.findType(typeFqn);
-            if (type == null) {
-                return ErrorDescriptor.typeNotFound(typeFqn).toJsonString();
-            }
-            var matches = JdtUtils.findMethods(type, methodName,
-                    paramTypesParam);
-            if (matches.isEmpty()) {
-                return ErrorDescriptor.methodNotFound(fqn).toJsonString();
-            }
-            if (matches.size() > 1) {
-                return ErrorDescriptor.ambiguousMatch(fqn,
-                        fqnsOf(matches)).toJsonString();
-            }
-            return NodeBuilder.methodDetail(matches.get(0)).toString();
+            return NodeBuilder.methodDetail(method).toString();
         } catch (Exception e) {
             Log.warn("/method failed for " + fqn, e);
             return ErrorDescriptor.jdtInternalError(
@@ -142,42 +109,34 @@ class GraphHandler {
             return ErrorDescriptor.missingParameter("of").toJsonString();
         }
         try {
-            if (JdtUtils.isCompositeFqn(fqn)) {
-                IJavaElement resolved = JdtUtils.resolveElement(fqn);
-                return resolved instanceof IField f
-                        ? NodeBuilder.fieldDetail(f).toString()
-                        : ErrorDescriptor.fieldNotFound(fqn).toJsonString();
+            if (!JdtUtils.isCompositeFqn(fqn)) {
+                int hash = fqn.indexOf('#');
+                if (hash >= 0 && fqn.substring(hash + 1).contains("(")) {
+                    return ErrorDescriptor.invalidFqn(fqn)
+                            .with("reason",
+                                    "field FQN must not contain parens")
+                            .toJsonString();
+                }
             }
-            return handleFieldRegular(fqn);
+            ResolvedTarget target = resolveTarget(fqn, params);
+            if (target.errorJson != null) {
+                if (target.errorJson.contains("method-not-found")) {
+                    return ErrorDescriptor.fieldNotFound(fqn)
+                            .toJsonString();
+                }
+                return target.errorJson;
+            }
+            if (!(target.element instanceof IField field)) {
+                return ErrorDescriptor.wrongSubjectKind(
+                        "/field", "field",
+                        elementKindOf(target.element)).toJsonString();
+            }
+            return NodeBuilder.fieldDetail(field).toString();
         } catch (Exception e) {
             Log.warn("/field failed for " + fqn, e);
             return ErrorDescriptor.jdtInternalError(
                     "Failed to resolve field: " + fqn, e).toJsonString();
         }
-    }
-
-    private String handleFieldRegular(String fqn)
-            throws JavaModelException {
-        int hash = fqn.indexOf('#');
-        if (hash < 0) {
-            return ErrorDescriptor.invalidFqn(fqn).toJsonString();
-        }
-        String typeFqn = fqn.substring(0, hash);
-        String fieldName = fqn.substring(hash + 1);
-        if (fieldName.contains("(")) {
-            return ErrorDescriptor.invalidFqn(fqn)
-                    .with("reason", "field FQN must not contain parens")
-                    .toJsonString();
-        }
-        IType type = JdtUtils.findType(typeFqn);
-        if (type == null) {
-            return ErrorDescriptor.typeNotFound(typeFqn).toJsonString();
-        }
-        IField field = type.getField(fieldName);
-        if (field == null || !field.exists()) {
-            return ErrorDescriptor.fieldNotFound(fqn).toJsonString();
-        }
-        return NodeBuilder.fieldDetail(field).toString();
     }
 
     // ── Down-navigation: direct contents of a type ──────────────────
@@ -200,33 +159,18 @@ class GraphHandler {
     }
 
     String handleMethods(Map<String, String> params) {
-        return listForType(params, "/methods", type -> {
-            var arr = new JsonArray();
-            for (IMethod m : type.getMethods()) {
-                arr.add(NodeBuilder.methodSkeleton(m));
-            }
-            return arr;
-        });
+        return listForType(params, "/methods", type ->
+                mapToArray(type.getMethods(), NodeBuilder::methodSkeleton));
     }
 
     String handleFields(Map<String, String> params) {
-        return listForType(params, "/fields", type -> {
-            var arr = new JsonArray();
-            for (IField f : type.getFields()) {
-                arr.add(NodeBuilder.fieldSkeleton(f));
-            }
-            return arr;
-        });
+        return listForType(params, "/fields", type ->
+                mapToArray(type.getFields(), NodeBuilder::fieldSkeleton));
     }
 
     String handleInnerTypes(Map<String, String> params) {
-        return listForType(params, "/innerTypes", type -> {
-            var arr = new JsonArray();
-            for (IType inner : type.getTypes()) {
-                arr.add(NodeBuilder.typeSkeleton(inner));
-            }
-            return arr;
-        });
+        return listForType(params, "/innerTypes", type ->
+                mapToArray(type.getTypes(), NodeBuilder::typeSkeleton));
     }
 
     // ── Hierarchy: direct supers and subtypes ───────────────────────
@@ -1175,7 +1119,21 @@ class GraphHandler {
         return out;
     }
 
-    // ── Common helper: validate :of param, resolve type, build Vec ──
+    // ── Common helpers ──────────────────────────────────────────────
+
+    @FunctionalInterface
+    private interface ThrowingFunction<T, R> {
+        R apply(T t) throws Exception;
+    }
+
+    private static <T> JsonArray mapToArray(T[] elements,
+            ThrowingFunction<T, JsonObject> mapper) throws Exception {
+        var arr = new JsonArray();
+        for (T element : elements) {
+            arr.add(mapper.apply(element));
+        }
+        return arr;
+    }
 
     @FunctionalInterface
     private interface TypeListBuilder {

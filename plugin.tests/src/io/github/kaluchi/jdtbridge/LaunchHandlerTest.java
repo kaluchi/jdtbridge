@@ -686,6 +686,43 @@ public class LaunchHandlerTest {
         }
 
         @Test
+        void findLaunchByConfigIdPid() throws Exception {
+            ILaunchManager mgr =
+                    DebugPlugin.getDefault().getLaunchManager();
+            ILaunchConfiguration cfg = createJavaConfig(
+                    "FindByPid", "test.Main");
+            try {
+                ILaunch launch = new org.eclipse.debug.core.Launch(
+                        cfg, "run", null);
+                Process proc = new ProcessBuilder(
+                        "java", "-version").start();
+                proc.waitFor(5,
+                        java.util.concurrent.TimeUnit.SECONDS);
+                DebugPlugin.newProcess(launch, proc,
+                        "find-pid-test");
+                mgr.addLaunch(launch);
+                try {
+                    String pid = launch.getProcesses()[0]
+                            .getAttribute(
+                                    org.eclipse.debug.core.model
+                                            .IProcess
+                                            .ATTR_PROCESS_ID);
+                    String launchId = "FindByPid:" + pid;
+                    String json = handler.handleStop(
+                            Map.of("launchId", launchId));
+                    assertTrue(
+                            json.contains("Already terminated"),
+                            "terminated launch found by pid: "
+                            + json);
+                } finally {
+                    mgr.removeLaunch(launch);
+                }
+            } finally {
+                deleteIfPresent(cfg);
+            }
+        }
+
+        @Test
         void terminatedLaunchReturnsError() throws Exception {
             ILaunchManager mgr =
                     DebugPlugin.getDefault().getLaunchManager();
@@ -728,6 +765,324 @@ public class LaunchHandlerTest {
             var params = HttpServer.parseQuery(
                     "name=My%20Test%20Config");
             assertEquals("My Test Config", params.get("name"));
+        }
+    }
+
+    @Nested
+    class ConfigDelete {
+
+        @Test
+        void missingConfigIdReturnsError() {
+            String json = handler.handleConfigDelete(Map.of());
+            assertTrue(json.contains("Missing"));
+        }
+
+        @Test
+        void unknownConfigReturnsError() {
+            String json = handler.handleConfigDelete(
+                    Map.of("configId", "no-such-xyz"));
+            assertTrue(json.contains("not found"));
+        }
+
+        @Test
+        void deletesExistingLocalConfig() throws Exception {
+            ILaunchConfiguration cfg = createJavaConfig(
+                    "DeleteMe-Test", "test.Main");
+            String json = handler.handleConfigDelete(
+                    Map.of("configId", "DeleteMe-Test"));
+            var obj = JsonParser.parseString(json)
+                    .getAsJsonObject();
+            assertTrue(obj.get("ok").getAsBoolean());
+            assertEquals("DeleteMe-Test",
+                    obj.get("configId").getAsString());
+        }
+    }
+
+    @Nested
+    class Import {
+
+        @Test
+        void missingConfigIdReturnsError() {
+            String json = handler.handleImport(Map.of(), "<xml/>");
+            assertTrue(json.contains("Missing"));
+        }
+
+        @Test
+        void missingBodyReturnsError() {
+            String json = handler.handleImport(
+                    Map.of("configId", "test"), null);
+            assertTrue(json.contains("Missing"));
+        }
+
+        @Test
+        void pathTraversalRejected() {
+            String json = handler.handleImport(
+                    Map.of("configId", "../evil"), "<xml/>");
+            assertTrue(json.contains("Invalid"));
+        }
+
+        @Test
+        void slashInConfigIdRejected() {
+            String json = handler.handleImport(
+                    Map.of("configId", "foo/bar"), "<xml/>");
+            assertTrue(json.contains("Invalid"));
+        }
+
+        @Test
+        void duplicateConfigIdRejected() throws Exception {
+            ILaunchConfiguration cfg = createJavaConfig(
+                    "ImportDupe", "test.Main");
+            try {
+                String json = handler.handleImport(
+                        Map.of("configId", "ImportDupe"),
+                        "<xml/>");
+                assertTrue(json.contains("already exists"));
+            } finally {
+                deleteIfPresent(cfg);
+            }
+        }
+    }
+
+    @Nested
+    class RunSuccess {
+
+        private ILaunchConfiguration javaCfg;
+
+        @BeforeEach
+        void create() throws Exception {
+            javaCfg = createJavaConfig(
+                    "RunSuccessTest", "test.Main");
+        }
+
+        @AfterEach
+        void cleanup() throws Exception {
+            ILaunchManager mgr =
+                    DebugPlugin.getDefault().getLaunchManager();
+            for (ILaunch l : mgr.getLaunches()) {
+                var cfg = l.getLaunchConfiguration();
+                if (cfg != null && "RunSuccessTest".equals(
+                        cfg.getName())) {
+                    mgr.removeLaunch(l);
+                }
+            }
+            deleteIfPresent(javaCfg);
+        }
+
+        @Test
+        void launchesAndReturnsIdentityFields() {
+            String json = handler.handleRun(
+                    Map.of("configId", "RunSuccessTest"));
+            var obj = JsonParser.parseString(json)
+                    .getAsJsonObject();
+            assertTrue(obj.get("ok").getAsBoolean(),
+                    "run must succeed: " + json);
+            assertEquals("RunSuccessTest",
+                    obj.get("configId").getAsString());
+            assertTrue(obj.has("launchId"));
+            assertTrue(obj.has("mode"));
+            assertEquals("run",
+                    obj.get("mode").getAsString());
+        }
+
+        @Test
+        void runWithExtraArgs() {
+            var params = new java.util.HashMap<String, String>();
+            params.put("configId", "RunSuccessTest");
+            params.put("args", "--port 9090");
+            String json = handler.handleRun(params);
+            var obj = JsonParser.parseString(json)
+                    .getAsJsonObject();
+            assertTrue(obj.get("ok").getAsBoolean(),
+                    "run with args must succeed: " + json);
+        }
+    }
+
+    @Nested
+    class ConfigSummaryFields {
+
+        private ILaunchConfiguration junitCfg;
+        private ILaunchConfiguration javaCfg;
+
+        @BeforeEach
+        void create() throws Exception {
+            javaCfg = createJavaConfig(
+                    "SumJava", "com.example.Main");
+            junitCfg = createConfig(
+                    "org.eclipse.jdt.junit.launchconfig",
+                    "SumJUnit",
+                    Map.of("org.eclipse.jdt.launching.MAIN_TYPE",
+                            "com.example.FooTest",
+                           "org.eclipse.jdt.junit.TEST_KIND",
+                            "org.eclipse.jdt.junit.loader.junit5"));
+        }
+
+        @AfterEach
+        void cleanup() throws Exception {
+            deleteIfPresent(javaCfg);
+            deleteIfPresent(junitCfg);
+        }
+
+        @Test
+        void javaAppSummaryHasMainClass() {
+            var arr = JsonParser.parseString(
+                    handler.handleConfigs(Map.of(),
+                            ProjectScope.ALL)).getAsJsonArray();
+            JsonObject java = findByConfigId(arr, "SumJava");
+            assertEquals("com.example.Main",
+                    java.get("mainClass").getAsString());
+        }
+
+        @Test
+        void junitSummaryHasClassAndRunner() {
+            var arr = JsonParser.parseString(
+                    handler.handleConfigs(Map.of(),
+                            ProjectScope.ALL)).getAsJsonArray();
+            JsonObject junit = findByConfigId(arr, "SumJUnit");
+            assertEquals("com.example.FooTest",
+                    junit.get("class").getAsString());
+            assertEquals("JUnit 5",
+                    junit.get("runner").getAsString());
+        }
+
+        @Test
+        void mavenSummaryHasGoalsAndProfiles() throws Exception {
+            ILaunchManager mgr =
+                    DebugPlugin.getDefault().getLaunchManager();
+            if (mgr.getLaunchConfigurationType(
+                    "org.eclipse.m2e.Maven2LaunchConfigurationType")
+                    == null) {
+                return;
+            }
+            ILaunchConfiguration mavenCfg = createConfig(
+                    "org.eclipse.m2e.Maven2LaunchConfigurationType",
+                    "SumMaven",
+                    Map.of("M2_GOALS", "clean verify",
+                           "M2_PROFILES", "ci"));
+            try {
+                var arr = JsonParser.parseString(
+                        handler.handleConfigs(Map.of(),
+                                ProjectScope.ALL)).getAsJsonArray();
+                JsonObject maven = findByConfigId(arr, "SumMaven");
+                assertEquals("clean verify",
+                        maven.get("goals").getAsString());
+                assertEquals("ci",
+                        maven.get("profiles").getAsString());
+            } finally {
+                deleteIfPresent(mavenCfg);
+            }
+        }
+    }
+
+    @Nested
+    class AppendArgs {
+
+        private ILaunchConfiguration javaCfg;
+
+        @BeforeEach
+        void create() throws Exception {
+            javaCfg = createJavaConfig(
+                    "AppendArgsTest", "test.Main");
+        }
+
+        @AfterEach
+        void cleanup() throws Exception {
+            deleteIfPresent(javaCfg);
+        }
+
+        @Test
+        void appendsToEmptyAttribute() throws Exception {
+            var wc = handler.appendArgs(javaCfg, "--port 8080");
+            String value = wc.getAttribute(
+                    "org.eclipse.jdt.launching.PROGRAM_ARGUMENTS",
+                    "");
+            assertEquals("--port 8080", value);
+        }
+
+        @Test
+        void appendsToExistingAttribute() throws Exception {
+            var original = javaCfg.getWorkingCopy();
+            original.setAttribute(
+                    "org.eclipse.jdt.launching.PROGRAM_ARGUMENTS",
+                    "--host localhost");
+            var saved = original.doSave();
+            try {
+                var wc = handler.appendArgs(saved, "--port 8080");
+                String value = wc.getAttribute(
+                        "org.eclipse.jdt.launching.PROGRAM_ARGUMENTS",
+                        "");
+                assertEquals("--host localhost --port 8080", value);
+            } finally {
+                deleteIfPresent(saved);
+            }
+        }
+    }
+
+    @Nested
+    class FormatRunner {
+
+        @Test
+        void junit6Kind() {
+            assertEquals("JUnit 6",
+                    JUnitLaunchConst.formatRunner(
+                            "org.eclipse.jdt.junit.loader.junit6"));
+        }
+
+        @Test
+        void junit5Kind() {
+            assertEquals("JUnit 5",
+                    JUnitLaunchConst.formatRunner(
+                            "org.eclipse.jdt.junit.loader.junit5"));
+        }
+
+        @Test
+        void junit4Kind() {
+            assertEquals("JUnit 4",
+                    JUnitLaunchConst.formatRunner(
+                            "org.eclipse.jdt.junit.loader.junit4"));
+        }
+
+        @Test
+        void nullReturnsNull() {
+            assertEquals(null,
+                    JUnitLaunchConst.formatRunner(null));
+        }
+
+        @Test
+        void unknownReturnsVerbatim() {
+            assertEquals("some.custom.loader",
+                    JUnitLaunchConst.formatRunner(
+                            "some.custom.loader"));
+        }
+    }
+
+    @Nested
+    class ParseContainerPackage {
+
+        @Test
+        void nullReturnsNull() {
+            assertEquals(null,
+                    LaunchHandler.parseContainerPackage(null));
+        }
+
+        @Test
+        void blankReturnsNull() {
+            assertEquals(null,
+                    LaunchHandler.parseContainerPackage("  "));
+        }
+
+        @Test
+        void projectLevelReturnsNull() {
+            assertEquals(null,
+                    LaunchHandler.parseContainerPackage(
+                            "=my-project"));
+        }
+
+        @Test
+        void extractsPackageName() {
+            assertEquals("com.example.service",
+                    LaunchHandler.parseContainerPackage(
+                            "=my-project/src\\/test\\/java"
+                            + "<com.example.service"));
         }
     }
 
