@@ -152,8 +152,14 @@ See [README.md](README.md) for full overview. Key directories:
 - `cli/src/format/` — output formatters (table, hierarchy, references, etc.)
 - `cli/test/` — CLI tests (vitest, 515+ tests)
 - `plugin/src/` — Eclipse plugin (Java, OSGi, EGit, JGit)
-- `plugin.tests/src/` — Plugin tests (JUnit 5, Fragment-Host of plugin)
+- `plugin.tests/src/` — Plugin tests (JUnit 6, Fragment-Host of plugin)
+- `plugin.tests.ui/src/` — UI-runtime tests (JUnit 6, needs workbench)
+- `tests.support/src/` — Shared test support (TestFixture, TestAwait)
 - `ui/` — Eclipse UI contributions (toolbar, preferences)
+- `branding/` — Plugin branding (about info, icons)
+- `feature/` — Eclipse feature (bundles plugin + ui + branding)
+- `site/` — p2 update site
+- `launches/` — Shared Eclipse launch configs (committed to repo)
 - `scripts/release.mjs` — release automation
 
 ## Development workflow
@@ -262,8 +268,8 @@ CI context, or specific flags not expressible via launch), explain why.
 ### Running plugin tests
 
 **Prefer running individual test classes or methods**, not the full suite.
-Full suite (677 tests) takes ~4 minutes and runs in a separate Eclipse
-runtime. Individual tests take 5-15 seconds.
+Full suite (832 plugin + 28 UI = 860 tests) takes ~2 minutes and runs
+in a separate Eclipse runtime. Individual tests take 5-15 seconds.
 
 ```bash
 # Single test method — fastest feedback
@@ -272,8 +278,21 @@ jdt test run com.example.FooTest#myMethod -f -q
 # Single test class
 jdt test run com.example.FooTest -f -q
 
-# Full suite — only before commit or when unsure what broke
+# Full plugin suite (headless PDE runtime, no workbench)
 jdt test run --project io.github.kaluchi.jdtbridge.tests -f -q
+
+# Full UI suite (workbench PDE runtime — editors, coverage)
+jdt test run --project io.github.kaluchi.jdtbridge.tests.ui -f -q
+```
+
+Both suites use shared launch configs from `launches/`. If a config
+is missing or broken, restore from the repo:
+```bash
+jdt launch config --delete "io.github.kaluchi.jdtbridge.tests"
+jdt launch config --import launches/io.github.kaluchi.jdtbridge.tests.launch
+
+jdt launch config --delete "io.github.kaluchi.jdtbridge.tests.ui"
+jdt launch config --import launches/io.github.kaluchi.jdtbridge.tests.ui.launch
 ```
 
 Important:
@@ -329,8 +348,34 @@ workspace metadata — `jdt launch config --delete` does not touch them.
 
 To add a new shared launch config: create `.launch` XML in `launches/`,
 `jdt refresh` the project. Eclipse picks it up automatically.
-Use `${system_path:node}` and `${workspace_loc:...}` variables for
-cross-platform paths — no absolute paths in committed .launch files.
+Use `${system_path:node}`, `${workspace_loc:...}`, and
+`${system_property:java.io.tmpdir}` variables for cross-platform
+paths — no absolute paths in committed .launch files.
+
+Available launch configs in `launches/`:
+
+| File | Type | What |
+|---|---|---|
+| `jdtbridge-verify.launch` | Maven Build | `clean verify` — full Tycho build + tests |
+| `jdtbridge-package.launch` | Maven Build | `clean package` — Tycho build, no tests |
+| `npm-test.launch` | Program | CLI vitest suite |
+| `io.github.kaluchi.jdtbridge.tests.launch` | JUnit Plug-in Test | Plugin tests (832 tests, headless PDE runtime) |
+| `io.github.kaluchi.jdtbridge.tests.ui.launch` | JUnit Plug-in Test | UI tests (28 tests, workbench PDE runtime) |
+
+PDE test launch configs carry explicit bundle lists for the test
+runtime. Key constraints for the UI config:
+- `org.eclipse.debug.ui`, `org.eclipse.eclemma.ui`,
+  `org.eclipse.help.ui` must be `@default:false` (not auto-started) —
+  their `start()` methods call `PlatformUI.getWorkbench()` which
+  throws before the workbench is created.
+- JUnit 5 bundles (`*5.14.3`, `*1.14.3`) are required alongside
+  JUnit 6 — `TestFixture` creates projects with `JUNIT_CONTAINER/5`.
+
+To restore a launch config from the repo:
+```bash
+jdt launch config --delete "io.github.kaluchi.jdtbridge.tests.ui"
+jdt launch config --import launches/io.github.kaluchi.jdtbridge.tests.ui.launch
+```
 
 ## Releasing
 

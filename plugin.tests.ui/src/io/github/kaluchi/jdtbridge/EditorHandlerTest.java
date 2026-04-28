@@ -7,7 +7,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.ui.PlatformUI;
@@ -177,23 +177,31 @@ public class EditorHandlerTest {
     public void handleEditorsCallableFromNonUiThread()
             throws Exception {
         // Worker thread drives the Display.syncExec branch of
-        // handleEditors. plugin.tests.ui runs under tycho-surefire
-        // useUIHarness=true useUIThread=false — workbench thread
-        // owns the Display and pumps the worker's syncExec on its
-        // own, so the test thread blocks on future.get and the
-        // result lands once the worker's call completes.
+        // handleEditors. The body runs on the UI thread via
+        // syncExec so readAndDispatch is always called from the
+        // Display owner — works under both tycho-surefire
+        // useUIThread=false (test thread is non-UI worker, body
+        // hops onto workbench UI thread) and the local PDE launch
+        // run_in_ui_thread=true (test thread IS the UI thread, body
+        // runs inline). Either way, a separate ExecutorService
+        // worker calls handleEditors from off-UI, the UI body pumps
+        // until the worker's syncExec'd runnable lands and the
+        // future completes via Future.resultNow.
         handler.handleOpen(Map.of("class", "test.model.Dog"));
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        try {
-            Future<String> future = executor.submit(() ->
+        AtomicReference<String> result = new AtomicReference<>();
+        Display display = Display.getDefault();
+        display.syncExec(() -> {
+            ExecutorService exec =
+                    Executors.newSingleThreadExecutor();
+            Future<String> future = exec.submit(() ->
                     handler.handleEditors(
                             Map.of(), ProjectScope.ALL));
-            String result = future.get(10, TimeUnit.SECONDS);
-            assertTrue(result.contains("Dog"),
-                    "Off-thread call must return Dog: " + result);
-        } finally {
-            executor.shutdown();
-        }
+            while (!future.isDone()) display.readAndDispatch();
+            result.set(future.resultNow());
+            exec.shutdown();
+        });
+        assertTrue(result.get().contains("Dog"),
+                "Off-thread call must return Dog: " + result.get());
     }
 
     private static int countOccurrences(String haystack,
