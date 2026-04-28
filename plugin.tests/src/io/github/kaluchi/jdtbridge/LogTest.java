@@ -107,10 +107,9 @@ public class LogTest {
     }
 
     private IStatus lastForLevel(int severity) {
-        for (int i = captured.size() - 1; i >= 0; i--) {
-            IStatus s = captured.get(i);
-            if (s.getSeverity() == severity) return s;
-        }
-        return null;
+        return captured.stream()
+                .filter(s -> s.getSeverity() == severity)
+                .reduce((a, b) -> b)
+                .orElseThrow();
     }
 }

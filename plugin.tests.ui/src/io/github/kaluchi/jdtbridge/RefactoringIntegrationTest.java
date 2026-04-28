@@ -69,8 +69,7 @@ public class RefactoringIntegrationTest {
     public void a3_organizeImportsFileNotFound() throws Exception {
         String json = handler.handleOrganizeImports(
                 Map.of("file", "/no/such/File.java"));
-        assertTrue(json.contains("error"),
-                "Should return error: " + json);
+        assertJsonError(json, "Java file not found");
     }
 
     // ---- Format ----
@@ -100,8 +99,7 @@ public class RefactoringIntegrationTest {
     public void b3_formatFileNotFound() throws Exception {
         String json = handler.handleFormat(
                 Map.of("file", "/no/such/File.java"));
-        assertTrue(json.contains("error"),
-                "Should return error: " + json);
+        assertJsonError(json, "Java file not found");
     }
 
     // ---- Rename method ----
@@ -200,31 +198,41 @@ public class RefactoringIntegrationTest {
     public void e1_renameMissingClass() throws Exception {
         String json = handler.handleRename(
                 Map.of("newName", "Foo"));
-        assertTrue(json.contains("error"),
-                "Should return error: " + json);
+        assertJsonError(json, "Missing 'class' parameter");
     }
 
     @Test
     public void e2_renameMissingNewName() throws Exception {
         String json = handler.handleRename(
                 Map.of("class", "test.model.Dog"));
-        assertTrue(json.contains("error"),
-                "Should return error: " + json);
+        assertJsonError(json, "Missing 'newName' parameter");
     }
 
     @Test
     public void e3_renameTypeNotFound() throws Exception {
         String json = handler.handleRename(
                 Map.of("class", "no.such.Type", "newName", "X"));
-        assertTrue(json.contains("error"),
-                "Should return error: " + json);
+        assertJsonError(json, "Type not found");
     }
 
     @Test
     public void e4_moveMissingTarget() throws Exception {
         String json = handler.handleMove(
                 Map.of("class", "test.model.Dog"));
-        assertTrue(json.contains("error"),
-                "Should return error: " + json);
+        assertJsonError(json, "Missing 'target' parameter");
+    }
+
+    private static void assertJsonError(
+            String json, String expectedFragment) {
+        var obj = com.google.gson.JsonParser.parseString(json)
+                .getAsJsonObject();
+        org.junit.jupiter.api.Assertions.assertTrue(
+                obj.has("error"),
+                "Expected error field: " + json);
+        String error = obj.get("error").getAsString();
+        org.junit.jupiter.api.Assertions.assertTrue(
+                error.contains(expectedFragment),
+                "Expected '" + expectedFragment + "' in error: "
+                        + error);
     }
 }

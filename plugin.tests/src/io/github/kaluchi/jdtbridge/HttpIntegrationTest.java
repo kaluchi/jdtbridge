@@ -206,12 +206,13 @@ public class HttpIntegrationTest {
         String response = rawRequest("GET " + path + " HTTP/1.1",
                 "Host: localhost",
                 "Authorization: Bearer " + TOKEN);
-        // Extract body (after blank line)
         int bodyStart = response.indexOf("\r\n\r\n");
-        if (bodyStart >= 0) {
-            return response.substring(bodyStart + 4);
+        if (bodyStart < 0) {
+            throw new AssertionError(
+                    "HTTP response missing header/body separator: "
+                            + response);
         }
-        return response;
+        return response.substring(bodyStart + 4);
     }
 
     // /editors requires Display thread — tested live, not in headless CI

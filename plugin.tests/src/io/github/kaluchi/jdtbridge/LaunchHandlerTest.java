@@ -272,13 +272,13 @@ public class LaunchHandlerTest {
 
     private static JsonObject findByConfigId(
             com.google.gson.JsonArray arr, String configId) {
-        for (var el : arr) {
-            var obj = el.getAsJsonObject();
-            if (configId.equals(obj.get("configId").getAsString())) {
-                return obj;
-            }
-        }
-        return null;
+        return java.util.stream.StreamSupport
+                .stream(arr.spliterator(), false)
+                .map(com.google.gson.JsonElement::getAsJsonObject)
+                .filter(o -> configId.equals(
+                        o.get("configId").getAsString()))
+                .findFirst()
+                .orElseThrow();
     }
 
     @Nested

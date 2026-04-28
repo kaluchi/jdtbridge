@@ -94,10 +94,6 @@ public class MavenIntegrationTest {
         IWorkspaceRoot root =
                 ResourcesPlugin.getWorkspace().getRoot();
         IProject project = root.getProject(name);
-        if (project.exists()) {
-            project.delete(true, true, null);
-        }
-
         project.create(null);
         project.open(null);
 
