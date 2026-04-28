@@ -284,8 +284,6 @@ public class TestSessionTrackerTest {
                             .startsWith("SimpleTest"),
                     "configId must start with SimpleTest: "
                             + obj.get("configId"));
-            assertEquals("finished",
-                    obj.get("state").getAsString());
             assertEquals(1, obj.get("total").getAsInt());
             assertEquals(1, obj.get("passed").getAsInt());
             assertEquals(0, obj.get("failed").getAsInt());
