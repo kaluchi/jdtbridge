@@ -201,4 +201,18 @@ public class ErrorDescriptorTest {
         assertTrue(jsonString.contains("\"TypeNotFound\""));
         assertTrue(jsonString.contains("\"com.example.X\""));
     }
+
+    @Test
+    void messageAccessorReturnsRawMessage() {
+        var d = ErrorDescriptor.ioError("disk full");
+        assertEquals("disk full", d.message());
+    }
+
+    @Test
+    void contextAccessorReturnsImmutableCopy() {
+        var d = ErrorDescriptor.typeNotFound("com.example.X");
+        var ctx = d.context();
+        assertNotNull(ctx);
+        assertTrue(ctx.containsKey("fqn"));
+    }
 }
