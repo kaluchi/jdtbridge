@@ -149,4 +149,71 @@ public class EditorHandlerTest {
         assertEquals("[]", json,
                 "Out-of-scope editor must be dropped: " + json);
     }
+
+    @Test
+    public void handleEditorsListsMultipleNonActiveEditors()
+            throws Exception {
+        // Open three types — list should contain all three with
+        // exactly one marked active. Drives the non-active branch
+        // of the editor-references loop (skipped on the
+        // single-editor test). EditorJson.entry omits the active
+        // field for inactive editors, so the assertion counts
+        // entries via the always-present "file" key.
+        handler.handleOpen(Map.of("class", "test.model.Dog"));
+        handler.handleOpen(Map.of("class", "test.model.Cat"));
+        handler.handleOpen(Map.of("class", "test.model.Animal"));
+        String json = handler.handleEditors(
+                Map.of(), ProjectScope.ALL);
+        assertTrue(json.contains("Dog"), "Dog open: " + json);
+        assertTrue(json.contains("Cat"), "Cat open: " + json);
+        assertTrue(json.contains("Animal"), "Animal open: " + json);
+        int entries = countOccurrences(json, "\"file\":");
+        int activeTrue = countOccurrences(json, "\"active\":true");
+        assertEquals(3, entries, "Three editor entries: " + json);
+        assertEquals(1, activeTrue,
+                "Exactly one active editor: " + json);
+    }
+
+    @Test
+    public void handleEditorsCallableFromNonUiThread()
+            throws Exception {
+        // Drives the Display.syncExec branch from a worker thread.
+        // The test thread owns the Display in coretestapplication
+        // mode, so it must pump readAndDispatch while waiting —
+        // otherwise the worker's syncExec deadlocks. In tycho-
+        // surefire useUIThread=false the workbench thread pumps
+        // events itself, but the same code path here still works.
+        handler.handleOpen(Map.of("class", "test.model.Dog"));
+        java.util.concurrent.atomic.AtomicReference<String> out =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        Thread t = new Thread(() -> {
+            try {
+                out.set(handler.handleEditors(
+                        Map.of(), ProjectScope.ALL));
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+        t.start();
+        Display display = Display.getDefault();
+        long deadline = System.currentTimeMillis() + 10_000;
+        while (t.isAlive()
+                && System.currentTimeMillis() < deadline) {
+            if (!display.readAndDispatch()) Thread.yield();
+        }
+        t.join(1_000);
+        assertTrue(out.get() != null && out.get().contains("Dog"),
+                "Off-thread call must return Dog: " + out.get());
+    }
+
+    private static int countOccurrences(String haystack,
+            String needle) {
+        int count = 0;
+        int idx = 0;
+        while ((idx = haystack.indexOf(needle, idx)) != -1) {
+            count++;
+            idx += needle.length();
+        }
+        return count;
+    }
 }
