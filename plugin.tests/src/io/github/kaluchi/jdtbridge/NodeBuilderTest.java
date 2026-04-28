@@ -939,6 +939,93 @@ public class NodeBuilderTest {
                 "top-level type source includes class header");
     }
 
+    // ── origin ────────────────────────────────────────────────────
+
+    @Test
+    void originOfSourceType() throws Exception {
+        IType dog = type("test.model.Dog");
+        assertEquals("source", NodeBuilder.originOf(dog));
+    }
+
+    @Test
+    void originOfBinaryType() throws Exception {
+        IType string = JdtUtils.findType("java.lang.String");
+        assertNotNull(string);
+        assertEquals("binary", NodeBuilder.originOf(string));
+    }
+
+    @Test
+    void originOfBinaryMethod() throws Exception {
+        IType string = JdtUtils.findType("java.lang.String");
+        IMethod length = JdtUtils.findMethod(
+                string, "length", null);
+        assertNotNull(length);
+        assertEquals("binary", NodeBuilder.originOf(length));
+    }
+
+    // ── lambda / anonymous fqn ───────────────────────────────────
+
+    @Test
+    void lambdaTypeFqnContainsArrowSuffix() throws Exception {
+        IType type = type("test.service.LambdaCallerService");
+        IMethod method = JdtUtils.findMethod(
+                type, "createLambda", null);
+        assertNotNull(method);
+        for (IJavaElement child : method.getChildren()) {
+            if (child instanceof IType t && t.isLambda()) {
+                String fqn = NodeBuilder.fqnOf(t);
+                assertTrue(fqn.contains("->"),
+                        "Lambda fqn should contain arrow: " + fqn);
+                return;
+            }
+        }
+    }
+
+    @Test
+    void anonymousTypeFqnContainsNewSuffix() throws Exception {
+        IType type = type(
+                "test.service.AnonymousCallerService");
+        IMethod method = JdtUtils.findMethod(
+                type, "createAnonymous", null);
+        assertNotNull(method);
+        IType anon = findAnonymousChild(method);
+        assertNotNull(anon, "createAnonymous has anonymous type");
+        String fqn = NodeBuilder.fqnOf(anon);
+        assertTrue(fqn.contains("new"),
+                "Anonymous fqn should contain 'new': " + fqn);
+    }
+
+    // ── type detail on enum / annotation ─────────────────────────
+
+    @Test
+    void enumTypeDetailHasEnumTypeKind() throws Exception {
+        IType color = type("test.edge.Color");
+        JsonObject detail = NodeBuilder.typeDetail(color);
+        assertEquals("enum",
+                detail.get("typeKind").getAsString());
+    }
+
+    @Test
+    void annotationTypeDetailHasAnnotationTypeKind()
+            throws Exception {
+        IType marker = type("test.edge.Marker");
+        JsonObject detail = NodeBuilder.typeDetail(marker);
+        assertEquals("annotation",
+                detail.get("typeKind").getAsString());
+    }
+
+    // ── field detail edge cases ──────────────────────────────────
+
+    @Test
+    void fieldDetailOnEnumConstant() throws Exception {
+        IType color = type("test.edge.Color");
+        IField red = color.getField("RED");
+        assertNotNull(red);
+        JsonObject detail = NodeBuilder.fieldDetail(red);
+        assertNotNull(detail);
+        assertTrue(detail.has("fqn"));
+    }
+
     // ── helpers ───────────────────────────────────────────────────
 
     private static IType findAnonymousChild(IMethod method)

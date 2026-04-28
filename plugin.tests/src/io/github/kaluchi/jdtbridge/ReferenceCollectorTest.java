@@ -336,4 +336,109 @@ public class ReferenceCollectorTest {
                     ReferenceCollector.paramSig(method));
         }
     }
+
+    @Nested
+    class ClassTypeFieldResolution {
+
+        @Test
+        void fieldWithClassTypeCarriesResolvedFqnAndKind()
+                throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.service.CallerService");
+            IMethod method = JdtUtils.findMethod(
+                    type, "callProcess", null);
+            assertNotNull(method);
+            var refs = ReferenceCollector.collect(method);
+            var serviceRef = refs.get(
+                    "test.service.CallerService#service");
+            assertNotNull(serviceRef,
+                    "callProcess() reads field 'service': "
+                    + refs.keySet());
+            assertEquals(ReferenceCollector.RefKind.FIELD,
+                    serviceRef.kind());
+            assertNotNull(serviceRef.resolvedTypeFqn(),
+                    "class-type field should have resolvedTypeFqn");
+            assertTrue(serviceRef.resolvedTypeFqn()
+                    .contains("AnimalService"),
+                    "field type should be AnimalService: "
+                    + serviceRef.resolvedTypeFqn());
+            assertNotNull(serviceRef.resolvedTypeKind(),
+                    "class-type field should have resolvedTypeKind");
+        }
+    }
+
+    @Nested
+    class MethodWithParamsResolution {
+
+        @Test
+        void calledMethodHasParamSignature() throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.service.CallerService");
+            IMethod method = JdtUtils.findMethod(
+                    type, "callProcess", null);
+            assertNotNull(method);
+            var refs = ReferenceCollector.collect(method);
+            var processRef = refs.get(
+                    "test.service.AnimalService#process(Animal)");
+            assertNotNull(processRef,
+                    "callProcess() calls process(Animal): "
+                    + refs.keySet());
+            assertEquals(ReferenceCollector.RefKind.METHOD,
+                    processRef.kind());
+        }
+
+        @Test
+        void returnTypeRefOnCallerMethod() throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.service.CallerService");
+            IMethod method = JdtUtils.findMethod(
+                    type, "callCreateDog", null);
+            assertNotNull(method);
+            var refs = ReferenceCollector.collect(method);
+            var createDogRef = refs.get(
+                    "test.service.AnimalService#createDog()");
+            assertNotNull(createDogRef,
+                    "callCreateDog() calls createDog(): "
+                    + refs.keySet());
+        }
+    }
+
+    @Nested
+    class GenericMethodResolution {
+
+        @Test
+        void methodReturningTypeVariableCarriesBound()
+                throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.service.GenericService");
+            IMethod method = JdtUtils.findMethod(
+                    type, "name", null);
+            assertNotNull(method);
+            var refs = ReferenceCollector.collect(method);
+            var itemRef = refs.get(
+                    "test.service.GenericService#item");
+            assertNotNull(itemRef,
+                    "name() reads field 'item': "
+                    + refs.keySet());
+            assertTrue(itemRef.isTypeVariable());
+        }
+
+        @Test
+        void methodCallOnGenericFieldResolvesCorrectly()
+                throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.service.GenericService");
+            IMethod method = JdtUtils.findMethod(
+                    type, "name", null);
+            assertNotNull(method);
+            var refs = ReferenceCollector.collect(method);
+            var nameRef = refs.values().stream()
+                    .filter(r -> r.fqn().contains("#name("))
+                    .filter(r -> r.fqn().contains("Animal"))
+                    .findFirst().orElse(null);
+            assertNotNull(nameRef,
+                    "name() calls item.name() → Animal#name(): "
+                    + refs.keySet());
+        }
+    }
 }
