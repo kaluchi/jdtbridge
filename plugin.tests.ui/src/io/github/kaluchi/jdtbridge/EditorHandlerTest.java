@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.ui.PlatformUI;
@@ -175,23 +176,19 @@ public class EditorHandlerTest {
     @Test
     public void handleEditorsCallableFromNonUiThread()
             throws Exception {
-        // Drives the Display.syncExec branch from a worker thread.
-        // The test main thread owns the Display in
-        // coretestapplication mode, so it pumps readAndDispatch
-        // until the worker's future completes. tycho-surefire
-        // useUIThread=false has a real workbench UI thread doing
-        // the pumping, but the same body still resolves correctly.
+        // Worker thread drives the Display.syncExec branch of
+        // handleEditors. plugin.tests.ui runs under tycho-surefire
+        // useUIHarness=true useUIThread=false — workbench thread
+        // owns the Display and pumps the worker's syncExec on its
+        // own, so the test thread blocks on future.get and the
+        // result lands once the worker's call completes.
         handler.handleOpen(Map.of("class", "test.model.Dog"));
         ExecutorService executor = Executors.newSingleThreadExecutor();
         try {
             Future<String> future = executor.submit(() ->
                     handler.handleEditors(
                             Map.of(), ProjectScope.ALL));
-            Display display = Display.getDefault();
-            while (!future.isDone()) {
-                display.readAndDispatch();
-            }
-            String result = future.get();
+            String result = future.get(10, TimeUnit.SECONDS);
             assertTrue(result.contains("Dog"),
                     "Off-thread call must return Dog: " + result);
         } finally {
