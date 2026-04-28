@@ -228,6 +228,40 @@ public class RefactoringHandlerTest {
         }
 
         @Test
+        void doubleFormatIsNoOp() throws Exception {
+            var root = ResourcesPlugin.getWorkspace().getRoot();
+            var project = JavaCore.create(
+                    root.getProject(TestFixture.PROJECT_NAME));
+            var srcRoot = project.getPackageFragmentRoot(
+                    root.getProject(TestFixture.PROJECT_NAME)
+                            .getFolder("src"));
+            var pkg = srcRoot.getPackageFragment("test.refactor");
+            pkg.createCompilationUnit("FormatOnce.java", """
+                    package test.refactor;
+                    public class FormatOnce {
+                    public    void   messy()  {   int x=1;  }
+                    }
+                    """, true, null);
+            org.eclipse.core.runtime.jobs.Job.getJobManager().join(
+                    ResourcesPlugin.FAMILY_AUTO_BUILD, null);
+            String path = fixturePath(
+                    "test.refactor", "FormatOnce.java");
+            try {
+                handler.handleFormat(Map.of("file", path));
+                String json2 = handler.handleFormat(
+                        Map.of("file", path));
+                var obj = parseJson(json2);
+                assertFalse(obj.has("error"),
+                        "second format must not error: " + json2);
+                assertFalse(obj.get("modified").getAsBoolean(),
+                        "second format should be no-op: " + json2);
+            } finally {
+                var cu = pkg.getCompilationUnit("FormatOnce.java");
+                if (cu.exists()) cu.delete(true, null);
+            }
+        }
+
+        @Test
         void noOpOnAlreadyFormatted() throws Exception {
             String path = fixturePath(
                     "test.model", "Animal.java");
