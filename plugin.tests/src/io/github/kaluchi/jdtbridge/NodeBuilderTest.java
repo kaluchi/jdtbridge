@@ -362,6 +362,91 @@ public class NodeBuilderTest {
         assertTrue(detail.get("isConstant").getAsBoolean());
     }
 
+    // ── shortNature ──────────────────────────────────────────────────
+
+    @Test
+    void shortNatureJava() {
+        assertEquals("java",
+                NodeBuilder.shortNature("org.eclipse.jdt.core.javanature"));
+    }
+
+    @Test
+    void shortNatureMaven() {
+        assertEquals("maven",
+                NodeBuilder.shortNature("org.eclipse.m2e.core.maven2Nature"));
+    }
+
+    @Test
+    void shortNaturePde() {
+        assertEquals("pde",
+                NodeBuilder.shortNature("org.eclipse.pde.PluginNature"));
+    }
+
+    @Test
+    void shortNatureGradle() {
+        assertEquals("gradle",
+                NodeBuilder.shortNature(
+                        "org.eclipse.buildship.core.gradleprojectnature"));
+    }
+
+    @Test
+    void shortNatureUnknownFallsBackToTerminalSegment() {
+        assertEquals("myNature",
+                NodeBuilder.shortNature("com.example.custom.myNature"));
+    }
+
+    @Test
+    void shortNatureNoDotReturnsAsIs() {
+        assertEquals("plainId",
+                NodeBuilder.shortNature("plainId"));
+    }
+
+    // ── firstJavadocSentence ───────────────────────────────────────
+
+    @Test
+    void firstJavadocSentenceExtractsFirstSentence() {
+        String javadoc = "/**\n * First sentence.\n * @param x ignored\n */";
+        assertEquals("First sentence.",
+                NodeBuilder.firstJavadocSentence(javadoc));
+    }
+
+    @Test
+    void firstJavadocSentenceStopsAtAtTag() {
+        String javadoc = "/**\n * Summary line.\n * @author dev\n */";
+        assertEquals("Summary line.",
+                NodeBuilder.firstJavadocSentence(javadoc));
+    }
+
+    @Test
+    void firstJavadocSentenceBlankStarLineJoinsNext() {
+        // A bare " *\n" line has its \n consumed by the \s? in the
+        // star-stripping regex, so it does NOT produce an empty line
+        // break — the parser joins it with the next paragraph.
+        String javadoc = "/**\n * First.\n *\n * Second.\n */";
+        assertEquals("First. Second.",
+                NodeBuilder.firstJavadocSentence(javadoc));
+    }
+
+    @Test
+    void firstJavadocSentenceStopsAtParagraph() {
+        String javadoc = "/**\n * Summary.\n * <p>\n * Details.\n */";
+        assertEquals("Summary.",
+                NodeBuilder.firstJavadocSentence(javadoc));
+    }
+
+    @Test
+    void firstJavadocSentenceJoinsMultipleLines() {
+        String javadoc = "/**\n * Line one\n * continues here.\n */";
+        assertEquals("Line one continues here.",
+                NodeBuilder.firstJavadocSentence(javadoc));
+    }
+
+    @Test
+    void firstJavadocSentenceEmptyReturnsNull() {
+        assertEquals(null,
+                NodeBuilder.firstJavadocSentence("/** */"));
+    }
+
     // ── No spurious fields in skeleton ──────────────────────────────
 
     @Test

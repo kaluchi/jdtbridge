@@ -741,7 +741,7 @@ class NodeBuilder {
         } catch (Exception e) { return null; }
     }
 
-    private static String firstJavadocSentence(String javadoc) {
+    static String firstJavadocSentence(String javadoc) {
         String text = javadoc
                 .replaceAll("^/\\*\\*\\s*", "")
                 .replaceAll("\\s*\\*/$", "")
