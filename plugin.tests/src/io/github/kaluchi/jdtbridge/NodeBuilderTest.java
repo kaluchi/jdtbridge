@@ -14,9 +14,15 @@ import java.util.Set;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
+import org.eclipse.core.resources.IFile;
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.jdt.core.IField;
+import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IMethod;
+import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.core.JavaCore;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -445,6 +451,188 @@ public class NodeBuilderTest {
     void firstJavadocSentenceEmptyReturnsNull() {
         assertEquals(null,
                 NodeBuilder.firstJavadocSentence("/** */"));
+    }
+
+    // ── projectSkeleton / projectDetail ────────────────────────────
+
+    private static IProject fixtureProject() {
+        return ResourcesPlugin.getWorkspace().getRoot()
+                .getProject(TestFixture.PROJECT_NAME);
+    }
+
+    @Test
+    void projectSkeletonHasHeaderAndNatures() {
+        JsonObject skeleton = NodeBuilder.projectSkeleton(
+                fixtureProject());
+        assertEquals(TestFixture.PROJECT_NAME,
+                skeleton.get("fqn").getAsString());
+        assertEquals("project",
+                skeleton.get("kind").getAsString());
+        assertEquals("source",
+                skeleton.get("origin").getAsString());
+        assertTrue(skeleton.has("natures"));
+        assertTrue(skeleton.has("isTestScope"));
+        assertTrue(skeleton.has("rootPath"));
+    }
+
+    @Test
+    void projectSkeletonNaturesContainsJava() {
+        JsonObject skeleton = NodeBuilder.projectSkeleton(
+                fixtureProject());
+        JsonArray natures = skeleton.getAsJsonArray("natures");
+        boolean hasJava = false;
+        for (var el : natures) {
+            if ("java".equals(el.getAsString())) hasJava = true;
+        }
+        assertTrue(hasJava, "fixture project must have java nature");
+    }
+
+    @Test
+    void projectDetailAddsClasspathAndSourceRoots() throws Exception {
+        JsonObject detail = NodeBuilder.projectDetail(
+                fixtureProject());
+        assertTrue(detail.has("classpathEntries"));
+        assertTrue(detail.getAsJsonArray("classpathEntries").size() > 0);
+        assertTrue(detail.has("sourceRoots"));
+        assertTrue(detail.getAsJsonArray("sourceRoots").size() > 0);
+        assertTrue(detail.has("javaVersion"));
+    }
+
+    // ── packageSkeleton / packageDetail ────────────────────────────
+
+    private static IPackageFragment fixturePackage(String name)
+            throws Exception {
+        IJavaProject jp = JavaCore.create(fixtureProject());
+        for (var root : jp.getPackageFragmentRoots()) {
+            if (root.getKind()
+                    != org.eclipse.jdt.core.IPackageFragmentRoot
+                            .K_SOURCE) {
+                continue;
+            }
+            IPackageFragment frag = root.getPackageFragment(name);
+            if (frag != null && frag.exists()) return frag;
+        }
+        throw new AssertionError("package not found: " + name);
+    }
+
+    @Test
+    void packageSkeletonHasHeaderAndTypeCount() throws Exception {
+        JsonObject skeleton = NodeBuilder.packageSkeleton(
+                fixturePackage("test.model"));
+        assertEquals("test.model",
+                skeleton.get("fqn").getAsString());
+        assertEquals("package",
+                skeleton.get("kind").getAsString());
+        assertEquals("source",
+                skeleton.get("origin").getAsString());
+        assertEquals(TestFixture.PROJECT_NAME,
+                skeleton.get("containingProject").getAsString());
+        assertTrue(skeleton.get("typeCount").getAsInt() >= 3,
+                "test.model has Animal, Dog, Cat");
+    }
+
+    @Test
+    void packageDetailAddsSourceRoot() throws Exception {
+        JsonObject detail = NodeBuilder.packageDetail(
+                fixturePackage("test.model"));
+        assertTrue(detail.has("sourceRoot"));
+    }
+
+    // ── fileSkeleton / fileDetail ──────────────────────────────────
+
+    @Test
+    void fileSkeletonHasLanguageAndProject() throws Exception {
+        IType dog = type("test.model.Dog");
+        IFile file = (IFile) dog.getResource();
+        assertNotNull(file, "Dog.java must have an IFile resource");
+        JsonObject skeleton = NodeBuilder.fileSkeleton(file);
+        assertEquals("file",
+                skeleton.get("kind").getAsString());
+        assertEquals("source",
+                skeleton.get("origin").getAsString());
+        assertEquals("java",
+                skeleton.get("language").getAsString());
+        assertEquals(TestFixture.PROJECT_NAME,
+                skeleton.get("containingProject").getAsString());
+    }
+
+    @Test
+    void fileDetailAddsCharset() throws Exception {
+        IType dog = type("test.model.Dog");
+        IFile file = (IFile) dog.getResource();
+        JsonObject detail = NodeBuilder.fileDetail(file);
+        assertTrue(detail.has("charset"));
+    }
+
+    // ── memberSkeleton dispatch ────────────────────────────────────
+
+    @Test
+    void memberSkeletonDispatchesType() throws Exception {
+        JsonObject skeleton = NodeBuilder.memberSkeleton(
+                type("test.model.Dog"));
+        assertEquals("type", skeleton.get("kind").getAsString());
+    }
+
+    @Test
+    void memberSkeletonDispatchesMethod() throws Exception {
+        IMethod bark = method("test.model.Dog", "bark", null);
+        JsonObject skeleton = NodeBuilder.memberSkeleton(bark);
+        assertEquals("method", skeleton.get("kind").getAsString());
+    }
+
+    @Test
+    void memberSkeletonDispatchesField() throws Exception {
+        IField age = type("test.model.Dog").getField("age");
+        JsonObject skeleton = NodeBuilder.memberSkeleton(age);
+        assertEquals("field", skeleton.get("kind").getAsString());
+    }
+
+    @Test
+    void memberSkeletonNullReturnsNull() throws Exception {
+        assertNull(NodeBuilder.memberSkeleton(null));
+    }
+
+    // ── isTestScope ────────────────────────────────────────────────
+
+    @Test
+    void isTestScopeNullReturnsFalse() {
+        assertFalse(NodeBuilder.isTestScope(null));
+    }
+
+    @Test
+    void isTestScopeProductionTypeReturnsFalse() throws Exception {
+        assertFalse(NodeBuilder.isTestScope(type("test.model.Dog")));
+    }
+
+    // ── annotationsOf ──────────────────────────────────────────────
+
+    @Test
+    void annotationsOfUnannotatedTypeReturnsEmpty() throws Exception {
+        JsonArray anns = NodeBuilder.annotationsOf(
+                type("test.model.Dog"), type("test.model.Dog"));
+        assertEquals(0, anns.size());
+    }
+
+    // ── classpathEntrySkeleton ─────────────────────────────────────
+
+    @Test
+    void classpathEntrySkeletonSourceEntry() throws Exception {
+        IJavaProject jp = JavaCore.create(fixtureProject());
+        for (var entry : jp.getResolvedClasspath(true)) {
+            if (entry.getEntryKind()
+                    == org.eclipse.jdt.core.IClasspathEntry.CPE_SOURCE) {
+                JsonObject skeleton =
+                        NodeBuilder.classpathEntrySkeleton(
+                                entry, fixtureProject());
+                assertEquals("source",
+                        skeleton.get("entryKind").getAsString());
+                assertEquals("source",
+                        skeleton.get("origin").getAsString());
+                assertTrue(skeleton.has("path"));
+                return;
+            }
+        }
+        throw new AssertionError("no source entry in fixture classpath");
     }
 
     // ── No spurious fields in skeleton ──────────────────────────────
