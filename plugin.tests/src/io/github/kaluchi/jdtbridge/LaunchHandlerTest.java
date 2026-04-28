@@ -885,6 +885,20 @@ public class LaunchHandlerTest {
         }
 
         @Test
+        void debugModeSetsCorrectMode() {
+            var params = new java.util.HashMap<String, String>();
+            params.put("configId", "RunSuccessTest");
+            params.put("debug", "true");
+            String json = handler.handleRun(params);
+            var obj = JsonParser.parseString(json)
+                    .getAsJsonObject();
+            if (obj.has("ok")) {
+                assertEquals("debug",
+                        obj.get("mode").getAsString());
+            }
+        }
+
+        @Test
         void runWithExtraArgs() {
             var params = new java.util.HashMap<String, String>();
             params.put("configId", "RunSuccessTest");
@@ -942,6 +956,50 @@ public class LaunchHandlerTest {
                     junit.get("class").getAsString());
             assertEquals("JUnit 5",
                     junit.get("runner").getAsString());
+        }
+
+        @Test
+        void junitContainerSummaryHasPackage() throws Exception {
+            ILaunchConfiguration containerCfg = createConfig(
+                    "org.eclipse.jdt.junit.launchconfig",
+                    "SumContainerJUnit",
+                    Map.of("org.eclipse.jdt.junit.CONTAINER",
+                            "=my-project/src<com.example.service"));
+            try {
+                var arr = JsonParser.parseString(
+                        handler.handleConfigs(Map.of(),
+                                ProjectScope.ALL)).getAsJsonArray();
+                JsonObject junit = findByConfigId(arr,
+                        "SumContainerJUnit");
+                assertFalse(junit.has("class"),
+                        "container config has no mainType: " + junit);
+                assertEquals("com.example.service",
+                        junit.get("package").getAsString());
+            } finally {
+                deleteIfPresent(containerCfg);
+            }
+        }
+
+        @Test
+        void junitSummaryIncludesMethodName() throws Exception {
+            ILaunchConfiguration methodCfg = createConfig(
+                    "org.eclipse.jdt.junit.launchconfig",
+                    "SumMethodJUnit",
+                    Map.of("org.eclipse.jdt.launching.MAIN_TYPE",
+                            "com.example.FooTest",
+                           "org.eclipse.jdt.junit.TESTNAME",
+                            "testSomething"));
+            try {
+                var arr = JsonParser.parseString(
+                        handler.handleConfigs(Map.of(),
+                                ProjectScope.ALL)).getAsJsonArray();
+                JsonObject junit = findByConfigId(arr,
+                        "SumMethodJUnit");
+                assertEquals("testSomething",
+                        junit.get("method").getAsString());
+            } finally {
+                deleteIfPresent(methodCfg);
+            }
         }
 
         @Test
