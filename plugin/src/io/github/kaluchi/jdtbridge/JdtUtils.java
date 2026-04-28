@@ -493,13 +493,6 @@ public class JdtUtils {
         return base + suffix;
     }
 
-    static String typeKind(IType type) throws JavaModelException {
-        if (type.isAnnotation()) return "annotation";
-        if (type.isEnum()) return "enum";
-        if (type.isInterface()) return "interface";
-        return "class";
-    }
-
     /**
      * Wait for Eclipse auto-build to finish, with a 2-minute
      * safety timeout to prevent indefinite hangs.
@@ -542,19 +535,6 @@ public class JdtUtils {
         return count;
     }
 
-    static String compactSignature(IMethod m) throws JavaModelException {
-        StringBuilder sig = new StringBuilder();
-        sig.append(m.getElementName()).append("(");
-        String[] paramTypes = m.getParameterTypes();
-        for (int i = 0; i < paramTypes.length; i++) {
-            if (i > 0) sig.append(", ");
-            sig.append(Signature.toString(
-                    Signature.getTypeErasure(paramTypes[i])));
-        }
-        sig.append(")");
-        return sig.toString();
-    }
-
     /**
      * Find all implementations of an interface/abstract method
      * via type hierarchy. Returns FQN → IMethod map. Callers:
@@ -591,7 +571,7 @@ public class JdtUtils {
                             .equals(paramSig)) continue;
                     result.put(
                             sub.getFullyQualifiedName()
-                            + "#" + compactSignature(m),
+                            + "#" + NodeBuilder.compactSignature(m),
                             m);
                     break;
                 }

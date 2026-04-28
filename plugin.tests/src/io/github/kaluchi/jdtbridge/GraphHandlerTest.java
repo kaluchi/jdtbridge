@@ -174,12 +174,15 @@ public class GraphHandlerTest {
     }
 
     @Test
-    void methodRejectsMissingHash() {
+    void methodRejectsTypeSubject() {
         JsonObject result = parse(handler.handleMethod(
                 params("of", "test.model.Dog")));
         assertTrue(isError(result));
-        assertEquals("invalid-fqn",
+        assertEquals("wrong-subject-kind",
                 errorOf(result).get("kind").getAsString());
+        assertEquals("method",
+                errorOf(result).getAsJsonObject("context")
+                .get("expected").getAsString());
     }
 
     @Test
