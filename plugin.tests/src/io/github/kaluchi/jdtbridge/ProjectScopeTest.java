@@ -160,9 +160,6 @@ public class ProjectScopeTest {
         @Test
         void launchGroupTypeRoutesThroughGroupBranch()
                 throws Exception {
-            // Group type config — exercises isLaunchGroup() and
-            // launchGroupInScope(); empty group has no children
-            // so the result is false.
             ILaunchManager mgr = DebugPlugin.getDefault()
                     .getLaunchManager();
             ILaunchConfigurationType groupType = mgr
@@ -178,6 +175,80 @@ public class ProjectScopeTest {
                     null, "test-empty-group");
             assertFalse(scope.containsConfig(wc),
                     "Empty group must be out of scope");
+        }
+
+        @Test
+        void launchGroupWithMatchingChildInScope()
+                throws Exception {
+            ILaunchManager mgr = DebugPlugin.getDefault()
+                    .getLaunchManager();
+            var childCfg = createConfig("group-child");
+            childCfg.setAttribute(
+                    "org.eclipse.jdt.launching.PROJECT_ATTR",
+                    "my-project");
+            var saved = childCfg.doSave();
+            try {
+                ILaunchConfigurationType groupType = mgr
+                        .getLaunchConfigurationType(
+                                "org.eclipse.debug.core.groups."
+                                        + "GroupLaunchConfigurationType");
+                var group = groupType.newInstance(
+                        null, "test-group-with-child");
+                group.setAttribute(
+                        "org.eclipse.debug.core.launchGroup.0.name",
+                        "group-child");
+                var scope = ProjectScope.of(Set.of("my-project"));
+                assertTrue(scope.containsConfig(group),
+                        "Group with matching child should be in scope");
+            } finally {
+                saved.delete();
+            }
+        }
+
+        @Test
+        void configWithWorkingDirMatchesProject()
+                throws Exception {
+            var project = org.eclipse.core.resources.ResourcesPlugin
+                    .getWorkspace().getRoot()
+                    .getProject(TestFixture.PROJECT_NAME);
+            String projectPath = project.getLocation().toOSString();
+            ILaunchManager mgr = DebugPlugin.getDefault()
+                    .getLaunchManager();
+            ILaunchConfigurationType javaType = mgr
+                    .getLaunchConfigurationType(
+                            "org.eclipse.jdt.launching."
+                                    + "localJavaApplication");
+            var config = javaType.newInstance(
+                    null, "test-workdir-match");
+            config.setAttribute(
+                    "org.eclipse.jdt.launching.WORKING_DIRECTORY",
+                    projectPath);
+            var scope = ProjectScope.of(
+                    Set.of(TestFixture.PROJECT_NAME));
+            assertTrue(scope.containsConfig(config),
+                    "Working dir matching project location "
+                            + "should be in scope");
+        }
+
+        @Test
+        void configWithWorkingDirNotMatchingProjectExcluded()
+                throws Exception {
+            ILaunchManager mgr = DebugPlugin.getDefault()
+                    .getLaunchManager();
+            ILaunchConfigurationType javaType = mgr
+                    .getLaunchConfigurationType(
+                            "org.eclipse.jdt.launching."
+                                    + "localJavaApplication");
+            var config = javaType.newInstance(
+                    null, "test-workdir-nomatch");
+            config.setAttribute(
+                    "org.eclipse.jdt.launching.WORKING_DIRECTORY",
+                    "/some/completely/unrelated/path");
+            var scope = ProjectScope.of(
+                    Set.of(TestFixture.PROJECT_NAME));
+            assertFalse(scope.containsConfig(config),
+                    "Working dir not matching any project "
+                            + "should be out of scope");
         }
     }
 
