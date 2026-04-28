@@ -100,6 +100,70 @@ public class DiagnosticsIntegrationTest {
     }
 
     @Test
+    public void errorsFileNotFound() throws Exception {
+        Map<String, String> params = new HashMap<>();
+        params.put("file", "/no/such/path/Foo.java");
+        String json = handler.handleProblems(params, ProjectScope.ALL);
+        JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
+        assertTrue(obj.has("error"),
+                "Missing file should error: " + obj);
+        assertTrue(obj.get("error").getAsString()
+                        .contains("Resource not found"),
+                "Error mentions missing resource: " + obj);
+    }
+
+    @Test
+    public void errorsWorkspaceWideAggregatesAllProjects()
+            throws Exception {
+        // No project, no file → root-resource scope: aggregates
+        // every error in the workspace, including BrokenClass in
+        // the fixture project.
+        String json = handler.handleProblems(
+                new HashMap<>(), ProjectScope.ALL);
+        JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
+        boolean hasBrokenClass = false;
+        for (var e : arr) {
+            if (e.getAsJsonObject().get("file").getAsString()
+                    .contains("BrokenClass")) {
+                hasBrokenClass = true;
+                break;
+            }
+        }
+        assertTrue(hasBrokenClass,
+                "Workspace-wide scope must surface BrokenClass: "
+                        + arr);
+    }
+
+    @Test
+    public void buildIncrementalWithoutProjectRunsWorkspaceWide()
+            throws Exception {
+        // No project + no clean → workspace-wide INCREMENTAL_BUILD.
+        Map<String, String> params = new HashMap<>();
+        String json = handler.handleBuild(params);
+        JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
+        assertNull(obj.get("error"),
+                "Workspace incremental must not error: " + obj);
+        assertNotNull(obj.get("errors"),
+                "Should report errors count");
+    }
+
+    @Test
+    public void errorsAllAttachesMarkerOrigin() throws Exception {
+        // The `all` flag widens the marker scope from JDT-only to
+        // every IMarker.PROBLEM (covers the includeSource branch
+        // that decorates each entry with its marker type).
+        Map<String, String> params = new HashMap<>();
+        params.put("project", TestFixture.PROJECT_NAME);
+        params.put("all", "");
+        String json = handler.handleProblems(params, ProjectScope.ALL);
+        JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
+        assertTrue(arr.size() > 0, "expected fixture errors");
+        JsonObject first = arr.get(0).getAsJsonObject();
+        assertTrue(first.has("source"),
+                "all flag must attach marker origin: " + first);
+    }
+
+    @Test
     public void buildIncremental() throws Exception {
         Map<String, String> params = new HashMap<>();
         params.put("project", TestFixture.PROJECT_NAME);
