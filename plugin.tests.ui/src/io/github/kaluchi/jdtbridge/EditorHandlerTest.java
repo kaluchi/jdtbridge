@@ -4,9 +4,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import org.eclipse.swt.widgets.Display;
-import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.PlatformUI;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -42,13 +44,9 @@ public class EditorHandlerTest {
 
     @BeforeEach
     void closeAllEditors() {
-        Display.getDefault().syncExec(() -> {
-            IWorkbenchWindow w = PlatformUI.getWorkbench()
-                    .getActiveWorkbenchWindow();
-            if (w != null && w.getActivePage() != null) {
-                w.getActivePage().closeAllEditors(false);
-            }
-        });
+        Display.getDefault().syncExec(() ->
+                PlatformUI.getWorkbench().getActiveWorkbenchWindow()
+                        .getActivePage().closeAllEditors(false));
     }
 
     @Test
@@ -98,7 +96,7 @@ public class EditorHandlerTest {
                 Map.of("class", "test.model.Dog"));
         JsonObject obj = JsonParser.parseString(json)
                 .getAsJsonObject();
-        assertTrue(obj.has("ok") && obj.get("ok").getAsBoolean(),
+        assertTrue(obj.get("ok").getAsBoolean(),
                 "Expected ok=true: " + json);
     }
 
@@ -109,7 +107,7 @@ public class EditorHandlerTest {
                 "method", "bark"));
         JsonObject obj = JsonParser.parseString(json)
                 .getAsJsonObject();
-        assertTrue(obj.has("ok") && obj.get("ok").getAsBoolean(),
+        assertTrue(obj.get("ok").getAsBoolean(),
                 "Expected ok=true: " + json);
     }
 
@@ -122,7 +120,7 @@ public class EditorHandlerTest {
                 "method", "noSuchMethod"));
         JsonObject obj = JsonParser.parseString(json)
                 .getAsJsonObject();
-        assertTrue(obj.has("ok") && obj.get("ok").getAsBoolean(),
+        assertTrue(obj.get("ok").getAsBoolean(),
                 "Expected ok=true even with missing method: " + json);
     }
 
@@ -178,32 +176,27 @@ public class EditorHandlerTest {
     public void handleEditorsCallableFromNonUiThread()
             throws Exception {
         // Drives the Display.syncExec branch from a worker thread.
-        // The test thread owns the Display in coretestapplication
-        // mode, so it must pump readAndDispatch while waiting —
-        // otherwise the worker's syncExec deadlocks. In tycho-
-        // surefire useUIThread=false the workbench thread pumps
-        // events itself, but the same code path here still works.
+        // The test main thread owns the Display in
+        // coretestapplication mode, so it pumps readAndDispatch
+        // until the worker's future completes. tycho-surefire
+        // useUIThread=false has a real workbench UI thread doing
+        // the pumping, but the same body still resolves correctly.
         handler.handleOpen(Map.of("class", "test.model.Dog"));
-        java.util.concurrent.atomic.AtomicReference<String> out =
-                new java.util.concurrent.atomic.AtomicReference<>();
-        Thread t = new Thread(() -> {
-            try {
-                out.set(handler.handleEditors(
-                        Map.of(), ProjectScope.ALL));
-            } catch (Exception e) {
-                throw new RuntimeException(e);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            Future<String> future = executor.submit(() ->
+                    handler.handleEditors(
+                            Map.of(), ProjectScope.ALL));
+            Display display = Display.getDefault();
+            while (!future.isDone()) {
+                display.readAndDispatch();
             }
-        });
-        t.start();
-        Display display = Display.getDefault();
-        long deadline = System.currentTimeMillis() + 10_000;
-        while (t.isAlive()
-                && System.currentTimeMillis() < deadline) {
-            if (!display.readAndDispatch()) Thread.yield();
+            String result = future.get();
+            assertTrue(result.contains("Dog"),
+                    "Off-thread call must return Dog: " + result);
+        } finally {
+            executor.shutdown();
         }
-        t.join(1_000);
-        assertTrue(out.get() != null && out.get().contains("Dog"),
-                "Off-thread call must return Dog: " + out.get());
     }
 
     private static int countOccurrences(String haystack,
