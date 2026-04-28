@@ -1209,6 +1209,134 @@ public class GraphHandlerTest {
         }
     }
 
+    // ── Composite FQN resolution (lambda / anonymous) ───────────
+
+    @Test
+    void typeResolvesAnonymousComposite() {
+        String fqn = "test.service.AnonymousCallerService"
+                + "#createAnonymous().new Animal() {...}";
+        JsonObject result = parse(
+                handler.handleType(params("of", fqn)));
+        assertFalse(isError(result),
+                "should resolve anonymous type: " + result);
+        assertEquals("type", result.get("kind").getAsString());
+    }
+
+    @Test
+    void methodResolvesAnonymousComposite() {
+        String fqn = "test.service.AnonymousCallerService"
+                + "#createAnonymous().new Animal() {...}#name()";
+        JsonObject result = parse(
+                handler.handleMethod(params("of", fqn)));
+        assertFalse(isError(result),
+                "should resolve anonymous method: " + result);
+        assertEquals("method", result.get("kind").getAsString());
+        assertEquals("name", result.get("name").getAsString());
+    }
+
+    @Test
+    void typeResolvesLambdaComposite() {
+        String fqn = "test.service.LambdaCallerService"
+                + "#createLambda().() -> {...} Runnable";
+        JsonObject result = parse(
+                handler.handleType(params("of", fqn)));
+        assertFalse(isError(result),
+                "should resolve lambda type: " + result);
+        assertEquals("type", result.get("kind").getAsString());
+    }
+
+    @Test
+    void typeErrorForUnknownComposite() {
+        String fqn = "test.service.AnonymousCallerService"
+                + "#noSuchMethod().new Animal() {...}";
+        JsonObject result = parse(
+                handler.handleType(params("of", fqn)));
+        assertTrue(isError(result),
+                "should error for unknown composite: " + result);
+    }
+
+    @Test
+    void sourceResolvesAnonymousComposite() {
+        String fqn = "test.service.AnonymousCallerService"
+                + "#createAnonymous().new Animal() {...}";
+        String json = handler.handleSource(params("of", fqn));
+        assertFalse(json.contains("_error"),
+                "source should resolve anonymous: " + json);
+        assertTrue(json.contains("Anonymous"),
+                "source should contain method body: " + json);
+    }
+
+    // ── Missing parameter errors for workspace handlers ───────────
+
+    @Test
+    void projectErrorWhenOfMissing() {
+        JsonObject result = parse(
+                handler.handleProject(Map.of()));
+        assertTrue(isError(result));
+        assertEquals("missing-parameter",
+                errorOf(result).get("kind").getAsString());
+    }
+
+    @Test
+    void classpathErrorWhenOfMissing() {
+        JsonObject result = parse(
+                handler.handleClasspath(Map.of()));
+        assertTrue(isError(result));
+        assertEquals("missing-parameter",
+                errorOf(result).get("kind").getAsString());
+    }
+
+    @Test
+    void classpathErrorForNonJavaProject() throws Exception {
+        TestFixture.createNonJavaProject();
+        try {
+            JsonObject result = parse(
+                    handler.handleClasspath(
+                            params("of", TestFixture.NON_JAVA_PROJECT_NAME)));
+            assertTrue(isError(result));
+            assertTrue(errorOf(result).toString().contains("not a Java"),
+                    "should say not a Java project: " + result);
+        } finally {
+            TestFixture.destroy();
+            TestFixture.create();
+        }
+    }
+
+    @Test
+    void packageErrorWhenOfMissing() {
+        JsonObject result = parse(
+                handler.handlePackage(Map.of()));
+        assertTrue(isError(result));
+    }
+
+    @Test
+    void fileErrorWhenOfMissing() {
+        JsonObject result = parse(
+                handler.handleFile(Map.of()));
+        assertTrue(isError(result));
+    }
+
+    @Test
+    void typesInFileErrorWhenOfMissing() {
+        JsonObject result = parse(
+                handler.handleTypesInFile(Map.of()));
+        assertTrue(isError(result));
+    }
+
+    @Test
+    void packagesInProjectErrorWhenOfMissing() {
+        JsonObject result = parse(
+                handler.handlePackagesInProject(Map.of()));
+        assertTrue(isError(result));
+    }
+
+    @Test
+    void typesInPackageErrorWhenOfMissing() {
+        JsonObject result = parse(
+                handler.handleTypesInPackage(Map.of()));
+        assertTrue(isError(result));
+    }
+
     // ── Cross-cutting: every error carries origin :jdt/plugin ───────
 
     @Test
