@@ -1,7 +1,8 @@
 package io.github.kaluchi.jdtbridge;
 
+import org.eclipse.core.runtime.Platform;
 import org.eclipse.debug.core.DebugPlugin;
-import org.eclipse.ui.PlatformUI;
+import org.osgi.framework.Bundle;
 
 /**
  * Capability probes for {@code @EnabledIf} test gating. Each method
@@ -20,19 +21,16 @@ public final class IntegrationGuards {
     private IntegrationGuards() { }
 
     /**
-     * True iff a UI workbench is up. CI Tycho headless tests run
-     * without one; calls into {@code org.eclipse.core.resources
-     * .ProjectScope#getNode} (used by JDT manipulation APIs:
-     * organize-imports, rename-field, move-cu) throw
-     * {@link IllegalArgumentException} without it.
+     * True iff a UI workbench is up. Probe via OSGi bundle state —
+     * referencing PlatformUI directly would force the UI bundle to
+     * link in headless Tycho and crash with NoClassDefFoundError
+     * before any try/catch could catch it.
      */
     public static boolean isWorkbenchRunning() {
-        try {
-            PlatformUI.getWorkbench();
-            return true;
-        } catch (IllegalStateException e) {
-            return false;
-        }
+        Bundle bundle = Platform.getBundle(
+                "org.eclipse.ui.workbench");
+        return bundle != null
+                && bundle.getState() == Bundle.ACTIVE;
     }
 
     /**
