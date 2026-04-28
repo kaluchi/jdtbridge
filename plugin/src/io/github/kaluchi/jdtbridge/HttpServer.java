@@ -509,7 +509,7 @@ public class HttpServer {
         out.flush();
     }
 
-    private Response dispatchStatus(String path, String method,
+    Response dispatchStatus(String path, String method,
             String body) {
         try {
             if ("/status".equals(path) && "GET".equals(method)) {
@@ -530,7 +530,7 @@ public class HttpServer {
         }
     }
 
-    private Response dispatch(String path,
+    Response dispatch(String path,
             Map<String, String> params, String requestBody,
             ProjectScope scope) {
         try {
