@@ -31,7 +31,11 @@ public class HttpServer {
     private final MavenHandler maven = new MavenHandler();
     private final RefactoringHandler refactoring =
             new RefactoringHandler();
-    private final EditorHandler editor = new EditorHandler();
+    // EditorHandler imports org.eclipse.ui.* which triggers
+    // org.eclipse.ui.workbench activation. Headless test runtimes
+    // (useUIHarness=false) cannot start that bundle, so we
+    // instantiate the handler only when an /editor* request lands.
+    private volatile EditorHandler editor;
     private final LaunchTracker launchTracker = new LaunchTracker();
     private final LaunchHandler launch =
             new LaunchHandler(launchTracker);
@@ -626,9 +630,9 @@ public class HttpServer {
                 case "/test/clear" -> Response.json(
                         testSessionHandler.handleClear(params));
                 case "/editors" -> Response.json(
-                        editor.handleEditors(params, scope));
+                        editor().handleEditors(params, scope));
                 case "/open" -> Response.json(
-                        editor.handleOpen(params));
+                        editor().handleOpen(params));
                 case "/launch/list" -> Response.json(
                         launch.handleList(params, scope));
                 case "/launch/configs" -> Response.json(
@@ -682,6 +686,19 @@ public class HttpServer {
             }
         }
         return params;
+    }
+
+    private EditorHandler editor() {
+        EditorHandler local = editor;
+        if (local == null) {
+            synchronized (this) {
+                local = editor;
+                if (local == null) {
+                    editor = local = new EditorHandler();
+                }
+            }
+        }
+        return local;
     }
 
     /** Build {"error":"message"} JSON string. */
