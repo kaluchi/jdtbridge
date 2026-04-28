@@ -191,7 +191,7 @@ For CI without local Eclipse: `mvn clean verify -Pci`.
    ```bash
    jdt build --project io.github.kaluchi.jdtbridge
    jdt build --project io.github.kaluchi.jdtbridge.tests
-   jdt test run --project io.github.kaluchi.jdtbridge.tests -f
+   jdt test run io.github.kaluchi.jdtbridge.tests -f
    ```
 4. **Full Tycho build** — `jdt launch run jdtbridge-verify` then
    `jdt launch logs jdtbridge-verify -f | tail -20` to wait
@@ -258,7 +258,7 @@ CI context, or specific flags not expressible via launch), explain why.
 - **CLI tests:** `jdt launch run npm-test -f` (preferred) or
   `cd cli && npm test` (fallback). Single file:
   `jdt launch run npm-test -f -- test/paths.test.mjs`
-- **Plugin unit tests:** `jdt test run --project io.github.kaluchi.jdtbridge.tests -f`
+- **Plugin unit tests:** `jdt test run io.github.kaluchi.jdtbridge.tests -f`
 - **Integration tests:** full Tycho build only (`jdt launch run jdtbridge-verify`) — use `@EnabledIfSystemProperty(named = "jdtbridge.integration-tests", matches = "true")`
 - **Test fixture:** `TestFixture.java` creates a project with known classes —
   `test.model.Animal`, `Dog`, `Cat`, `test.edge.Calculator` (overloads),
@@ -279,10 +279,10 @@ jdt test run com.example.FooTest#myMethod -f -q
 jdt test run com.example.FooTest -f -q
 
 # Full plugin suite (headless PDE runtime, no workbench)
-jdt test run --project io.github.kaluchi.jdtbridge.tests -f -q
+jdt test run io.github.kaluchi.jdtbridge.tests -f -q
 
 # Full UI suite (workbench PDE runtime — editors, coverage)
-jdt test run --project io.github.kaluchi.jdtbridge.tests.ui -f -q
+jdt test run io.github.kaluchi.jdtbridge.tests.ui -f -q
 ```
 
 Both suites use shared launch configs from `launches/`. If a config

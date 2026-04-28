@@ -9,8 +9,7 @@ protocol: [bridge-test-spec](bridge-test-spec.md).
 
 ## Commands
 
-### `jdt test run <FQN>[#method] [--project <name>] [-f] [-q] [--json]`
-### `jdt test run --project <name> [--package <pkg>] [-f] [-q] [--json]`
+### `jdt test run <target> [--project <name>] [-f] [-q] [--json]`
 
 Launch tests by FQN — class, method, package, or project scope.
 Non-blocking by default. With `-f`, streams test progress until done.

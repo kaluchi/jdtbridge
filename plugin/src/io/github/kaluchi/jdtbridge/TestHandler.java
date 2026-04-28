@@ -267,7 +267,7 @@ public class TestHandler {
 
     /**
      * Non-blocking test launch. Returns immediately with session
-     * info. Progress tracked by {@link TestSessionTracker}.
+     * info. Progress tracked via JUnitModel's TestRunSession.
      * <p>
      * When {@code coverage=true} is present in {@code params},
      * the launch is started in EclEmma's coverage mode instead of
