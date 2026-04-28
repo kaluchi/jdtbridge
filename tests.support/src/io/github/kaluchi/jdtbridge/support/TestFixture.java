@@ -43,6 +43,7 @@ import org.eclipse.jdt.core.JavaCore;
  *   AbstractPet / Parrot — abstract hierarchy
  *   Repository           — generic erasure (List, Map signatures)
  *   SimpleTest           — JUnit 5 test class (for test-runner tests)
+ *   EdgeCaseMembers      — deprecated field, throws, javadoc (coverage edge cases)
  *
  * test.broken
  *   BrokenClass          — intentional compile error (UnknownType)
@@ -264,6 +265,27 @@ public class TestFixture {
 
             public class ObjectHolder {
                 public Object value;
+            }
+            """;
+
+    private static final String EDGE_MEMBERS_SRC = """
+            package test.edge;
+
+            /** Edge-case members for coverage of deprecated, throws, and javadoc paths. */
+            public class EdgeCaseMembers {
+                /** The count of items. */
+                @Deprecated
+                private int count;
+
+                /**
+                 * Processes the input.
+                 * @param input the data
+                 * @throws IllegalArgumentException if input is null
+                 */
+                public void process(String input) throws IllegalArgumentException {
+                    if (input == null) throw new IllegalArgumentException("null");
+                    count++;
+                }
             }
             """;
 
@@ -562,6 +584,9 @@ public class TestFixture {
                 "SimpleTest.java", SIMPLE_TEST_SRC, true, null);
         edgePkg.createCompilationUnit(
                 "ObjectHolder.java", OBJECT_HOLDER_SRC, true, null);
+        edgePkg.createCompilationUnit(
+                "EdgeCaseMembers.java",
+                EDGE_MEMBERS_SRC, true, null);
 
         // Refactoring targets
         IPackageFragment refactorPkg =

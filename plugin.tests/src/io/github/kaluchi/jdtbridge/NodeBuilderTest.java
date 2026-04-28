@@ -18,6 +18,7 @@ import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.jdt.core.IField;
+import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IPackageFragment;
@@ -841,4 +842,111 @@ public class NodeBuilderTest {
                     ":method detail missing :" + key);
         }
     }
+
+    // ── typeDetail javadoc / anonymous ─────────────────────────────
+
+    @Test
+    void typeDetailCarriesJavadocSummary() throws Exception {
+        JsonObject detail = NodeBuilder.typeDetail(
+                type("test.edge.AbstractPet"));
+        assertTrue(detail.has("javadocSummary"),
+                "AbstractPet has javadoc → detail must carry :javadocSummary");
+        assertEquals("An abstract pet with a name.",
+                detail.get("javadocSummary").getAsString());
+    }
+
+    @Test
+    void typeDetailMarksAnonymousType() throws Exception {
+        IType anonCaller = type("test.service.AnonymousCallerService");
+        IMethod createAnonymous = anonCaller.getMethod(
+                "createAnonymous", new String[0]);
+        IType anonType = findAnonymousChild(createAnonymous);
+        assertNotNull(anonType, "anonymous Animal must exist in createAnonymous()");
+        JsonObject detail = NodeBuilder.typeDetail(anonType);
+        assertTrue(detail.get("isAnonymous").getAsBoolean());
+    }
+
+    // ── methodDetail throws / javadoc ─────────────────────────────
+
+    @Test
+    void methodDetailCarriesNonEmptyThrows() throws Exception {
+        IMethod process = method("test.edge.EdgeCaseMembers",
+                "process", "String");
+        JsonObject detail = NodeBuilder.methodDetail(process);
+        JsonArray thrown = detail.getAsJsonArray("throws");
+        assertTrue(thrown.size() > 0,
+                "process(String) declares throws IllegalArgumentException");
+        assertEquals("java.lang.IllegalArgumentException",
+                thrown.get(0).getAsString());
+    }
+
+    @Test
+    void methodDetailCarriesJavadocSummary() throws Exception {
+        IMethod process = method("test.edge.EdgeCaseMembers",
+                "process", "String");
+        JsonObject detail = NodeBuilder.methodDetail(process);
+        assertTrue(detail.has("javadocSummary"),
+                "process() has javadoc → detail must carry :javadocSummary");
+        assertEquals("Processes the input.",
+                detail.get("javadocSummary").getAsString());
+    }
+
+    // ── fieldDetail deprecated / javadoc ──────────────────────────
+
+    @Test
+    void fieldDetailMarksDeprecated() throws Exception {
+        IType edgeMembers = type("test.edge.EdgeCaseMembers");
+        IField count = edgeMembers.getField("count");
+        JsonObject detail = NodeBuilder.fieldDetail(count);
+        assertTrue(detail.get("isDeprecated").getAsBoolean(),
+                "count is @Deprecated");
+    }
+
+    @Test
+    void fieldDetailCarriesJavadocSummary() throws Exception {
+        IType edgeMembers = type("test.edge.EdgeCaseMembers");
+        IField count = edgeMembers.getField("count");
+        JsonObject detail = NodeBuilder.fieldDetail(count);
+        assertTrue(detail.has("javadocSummary"),
+                "count has javadoc → detail must carry :javadocSummary");
+        assertEquals("The count of items.",
+                detail.get("javadocSummary").getAsString());
+    }
+
+    // ── sourceTextOf ──────────────────────────────────────────────
+
+    @Test
+    void sourceTextOfMethodReturnsSlicedLines() throws Exception {
+        IMethod bark = method("test.model.Dog", "bark", null);
+        String source = NodeBuilder.sourceTextOf(bark);
+        assertNotNull(source);
+        assertTrue(source.contains("bark"),
+                "sliced source must contain method name");
+        assertTrue(source.contains("Woof"),
+                "sliced source must contain method body");
+        assertFalse(source.contains("class Dog"),
+                "sliced source must NOT contain the class header");
+    }
+
+    @Test
+    void sourceTextOfTopLevelTypeReturnsFullUnit() throws Exception {
+        IType dog = type("test.model.Dog");
+        String source = NodeBuilder.sourceTextOf(dog);
+        assertNotNull(source);
+        assertTrue(source.contains("package test.model"),
+                "top-level type source starts with package declaration");
+        assertTrue(source.contains("class Dog"),
+                "top-level type source includes class header");
+    }
+
+    // ── helpers ───────────────────────────────────────────────────
+
+    private static IType findAnonymousChild(IMethod method)
+            throws Exception {
+        for (IJavaElement child : method.getChildren()) {
+            if (child instanceof IType t && t.isAnonymous()) return t;
+        }
+        return null;
+    }
+
 }
