@@ -209,9 +209,7 @@ public class ProjectOverrideTest {
                 + bundleId);
         java.io.File file = FileLocator
                 .getBundleFileLocation(bundle)
-                .orElseThrow(() -> new AssertionError(
-                        "Bundle " + bundleId
-                        + " has no file location"));
+                .orElseThrow();
         cp.add(JavaCore.newLibraryEntry(
                 new Path(file.getAbsolutePath()),
                 null, null));

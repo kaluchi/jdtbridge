@@ -261,8 +261,7 @@ public class CoverageTrackerTest {
                 .filter(r -> description.equals(r.description))
                 .map(r -> r.coverageId)
                 .findFirst()
-                .orElseThrow(() -> new AssertionError(
-                        "No run with description " + description));
+                .orElseThrow();
     }
 
     /** Empty {@link IExecutionDataSource} — emits no data and no
