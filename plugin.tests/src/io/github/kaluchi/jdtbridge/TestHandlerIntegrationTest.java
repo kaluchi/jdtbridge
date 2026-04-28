@@ -105,7 +105,7 @@ public class TestHandlerIntegrationTest {
     }
 
     @Test
-    public void targetByPackage() throws Exception {
+    public void targetByPackageWithProjectOverride() throws Exception {
         Map<String, String> params = new HashMap<>();
         params.put("target", "test.edge");
         params.put("project", "jdtbridge-test");
@@ -114,7 +114,38 @@ public class TestHandlerIntegrationTest {
         var obj = com.google.gson.JsonParser.parseString(json)
                 .getAsJsonObject();
         assertTrue(obj.get("ok").getAsBoolean(),
-                "package target must launch: " + json);
+                "package target with project override must launch: "
+                + json);
+        terminateLaunch(obj.get("configId").getAsString());
+    }
+
+    @Test
+    public void targetByPackageInfersProject() throws Exception {
+        Map<String, String> params = new HashMap<>();
+        params.put("target", "test.edge");
+        params.put("no-refresh", "");
+        String json = handler.handleTestRun(params);
+        var obj = com.google.gson.JsonParser.parseString(json)
+                .getAsJsonObject();
+        assertTrue(obj.get("ok").getAsBoolean(),
+                "package target without project must infer: " + json);
+        terminateLaunch(obj.get("configId").getAsString());
+    }
+
+    @Test
+    public void targetByCompilationUnit() throws Exception {
+        var root = org.eclipse.core.resources.ResourcesPlugin
+                .getWorkspace().getRoot();
+        var file = root.getProject("jdtbridge-test")
+                .getFile("src/test/edge/SimpleTest.java");
+        Map<String, String> params = new HashMap<>();
+        params.put("target", file.getLocation().toOSString());
+        params.put("no-refresh", "");
+        String json = handler.handleTestRun(params);
+        var obj = com.google.gson.JsonParser.parseString(json)
+                .getAsJsonObject();
+        assertTrue(obj.get("ok").getAsBoolean(),
+                "file target must launch: " + json);
         terminateLaunch(obj.get("configId").getAsString());
     }
 
