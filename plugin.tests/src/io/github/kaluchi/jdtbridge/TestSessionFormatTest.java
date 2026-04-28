@@ -56,11 +56,12 @@ public class TestSessionFormatTest {
         }
 
         @Test
-        void unknownFilterValueIncludesEverything() {
-            // Unrecognised filter falls through to "include" rather
-            // than rejecting all events — matches existing behaviour.
-            assertTrue(TestSessionFormat.streamerFilter("PASS", "garbage"));
-            assertTrue(TestSessionFormat.streamerFilter("FAIL", ""));
+        void unknownFilterValueExcludes() {
+            // fail-closed for typos — silent flood is worse than
+            // an empty stream the caller can spot immediately.
+            assertFalse(TestSessionFormat.streamerFilter("PASS", "garbage"));
+            assertFalse(TestSessionFormat.streamerFilter("FAIL", ""));
+            assertFalse(TestSessionFormat.streamerFilter("IGNORED", "skipped"));
         }
     }
 
@@ -161,11 +162,11 @@ public class TestSessionFormatTest {
         }
 
         @Test
-        void canGoNegative() {
-            // Bridge does not clamp — caller's responsibility
-            // when bookkeeping disagrees with started count.
-            assertEquals(-1,
+        void clampsAtZeroWhenBucketsExceedStarted() {
+            assertEquals(0,
                     TestSessionFormat.passedCount(0, 1, 0, 0));
+            assertEquals(0,
+                    TestSessionFormat.passedCount(2, 5, 0, 0));
         }
     }
 

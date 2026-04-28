@@ -52,7 +52,7 @@ public class TestProgressStreamerTest {
                 "handleTestRun must succeed: " + json);
         String testRunId = obj.get("testRunId").getAsString();
 
-        session = awaitFinishedSession(testRunId, 60_000);
+        session = TestSessionAwait.awaitFinished(testRunId, 60_000);
         assertNotNull(session,
                 "Launched session must finish within 60s: "
                         + testRunId);
@@ -116,24 +116,4 @@ public class TestProgressStreamerTest {
         assertEquals("PASS", event.get("status").getAsString());
     }
 
-    /** Spin-poll JUnit's session model until the session whose
-     *  testRunId matches finishes (not running, not starting),
-     *  or the deadline expires. Returns the session or null on
-     *  timeout. */
-    private static TestRunSession awaitFinishedSession(
-            String testRunId, long maxMs) {
-        long deadline = System.currentTimeMillis() + maxMs;
-        while (System.currentTimeMillis() < deadline) {
-            for (TestRunSession s : JUnitCorePlugin.getModel()
-                    .getTestRunSessions()) {
-                if (testRunId.equals(
-                        TestSessionHandler.testRunId(s))
-                        && !s.isRunning() && !s.isStarting()) {
-                    return s;
-                }
-            }
-            Thread.onSpinWait();
-        }
-        return null;
-    }
 }

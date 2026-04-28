@@ -219,6 +219,27 @@ public class TestHandlerTest {
         assertEquals(JUNIT4_KIND, handler.detectTestKind(project));
     }
 
+    // ---- Unparseable jar name → manifest + classpath fallback ----
+
+    @Test
+    public void jarWithoutVersionFallsThroughToClasspathCheck() {
+        // jar name has no parseable version (extractVersion → null).
+        // resolveJUnitMajor then calls readManifestVersion, which
+        // reflectively probes PACKAGE_FRAGMENT_ROOT.getManifest()
+        // — the mock has no such method, so the reflective lookup
+        // throws and the version stays null. detectTestKind falls
+        // back to the classpath-path exclusion check; the mock
+        // entry path "/libs/stripped.jar" matches none of
+        // JUnit 3/4/5 container paths, so JUnit 6 (newest) wins.
+        // This mirrors Eclipse CoreTestSearchEngine's "unknown
+        // version on a non-excluded classpath" handling.
+        IJavaProject project = fakeProjectWithMarker(
+                TESTABLE, "stripped.jar");
+
+        assertEquals(JUNIT6_KIND, handler.detectTestKind(project));
+    }
+
+
     // ---- parseTimeout ----
 
     @Test
@@ -348,8 +369,7 @@ public class TestHandlerTest {
                             if ("getPath".equals(method.getName())) {
                                 return rawClasspathPath;
                             }
-                            return defaultValue(
-                                    method.getReturnType());
+                            throw notMocked(method);
                         });
 
         IPackageFragmentRoot root = (IPackageFragmentRoot)
@@ -361,8 +381,7 @@ public class TestHandlerTest {
                                     method.getName())) {
                                 return entry;
                             }
-                            return defaultValue(
-                                    method.getReturnType());
+                            throw notMocked(method);
                         });
 
         IPath binaryPath = new Path("/repo/" + jarName);
@@ -386,8 +405,14 @@ public class TestHandlerTest {
                                     .equals(args[0])) {
                         return root;
                     }
-                    return defaultValue(method.getReturnType());
+                    throw notMocked(method);
                 });
+    }
+
+    private static UnsupportedOperationException notMocked(
+            java.lang.reflect.Method method) {
+        return new UnsupportedOperationException(
+                "method not mocked: " + method.getName());
     }
 
     private Object defaultValue(Class<?> returnType) {

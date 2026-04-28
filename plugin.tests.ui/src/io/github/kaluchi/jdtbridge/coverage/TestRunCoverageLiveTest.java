@@ -19,6 +19,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import io.github.kaluchi.jdtbridge.TestHandler;
+import io.github.kaluchi.jdtbridge.support.TestAwait;
 import io.github.kaluchi.jdtbridge.support.TestFixture;
 
 /**
@@ -49,31 +50,24 @@ public class TestRunCoverageLiveTest {
         TestFixture.destroy();
     }
 
-    /** Each coverage test launches a child JVM via CoverageLauncher.
-     *  handleTestRun returns immediately (non-blocking) with the
-     *  testRunId; the child JVM keeps holding bin/*.class file
-     *  handles until it exits. Wait here so each @Test leaves no
-     *  leaked process — match the launch by ATTR_LAUNCH_TIMESTAMP
-     *  encoded as the suffix of testRunId
-     *  ({@code configId:timestamp}, see TestHandler.handleTestRun). */
-    private static void awaitLaunchTerminated(String testRunId)
-            throws Exception {
+    /** handleTestRun returns immediately with the testRunId; the
+     *  child JVM keeps holding jdtbridge-test/bin/*.class until it
+     *  exits. Match the launch by ATTR_LAUNCH_TIMESTAMP suffix of
+     *  testRunId ({@code configId:timestamp}, see TestHandler). */
+    private static void awaitLaunchTerminated(String testRunId) {
         String timestamp = testRunId.substring(
                 testRunId.indexOf(':') + 1);
         var mgr = DebugPlugin.getDefault().getLaunchManager();
-        long deadline = System.currentTimeMillis() + 30_000;
-        while (System.currentTimeMillis() < deadline) {
+        TestAwait.pollUntil(30_000, () -> {
             for (ILaunch l : mgr.getLaunches()) {
                 if (timestamp.equals(l.getAttribute(
                         DebugPlugin.ATTR_LAUNCH_TIMESTAMP))
                         && l.isTerminated()) {
-                    return;
+                    return true;
                 }
             }
-            Thread.onSpinWait();
-        }
-        throw new AssertionError(
-                "Launch did not terminate within 30s: " + testRunId);
+            return false;
+        }, "Launch did not terminate within 30s: " + testRunId);
     }
 
     @AfterEach

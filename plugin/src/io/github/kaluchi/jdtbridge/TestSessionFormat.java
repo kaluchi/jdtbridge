@@ -33,10 +33,13 @@ final class TestSessionFormat {
     }
 
     /** Bridge-side {@code passed} count: started minus every
-     *  non-passing bucket (failures, errors, assumption failures). */
+     *  non-passing bucket (failures, errors, assumption failures).
+     *  Clamped at 0 — over-counting buckets must not surface a
+     *  negative wire field. */
     static int passedCount(int started, int failures, int errors,
             int assumptionFailures) {
-        return started - failures - errors - assumptionFailures;
+        return Math.max(0,
+                started - failures - errors - assumptionFailures);
     }
 
     /** Attach {@code trace}/{@code expected}/{@code actual} to
@@ -52,8 +55,9 @@ final class TestSessionFormat {
     }
 
     /** Streamer-side filter: null/"all" includes everything,
-     *  "failures" → only FAIL/ERROR, "ignored" → only IGNORED,
-     *  any other value falls back to "include". */
+     *  "failures" → only FAIL/ERROR, "ignored" → only IGNORED.
+     *  Unknown filter values are fail-closed (excluded) — fail-open
+     *  silently floods the stream when a typo reaches the bridge. */
     static boolean streamerFilter(String status, String filter) {
         if (filter == null || "all".equals(filter)) return true;
         if ("failures".equals(filter))
@@ -61,6 +65,6 @@ final class TestSessionFormat {
                     || "ERROR".equals(status);
         if ("ignored".equals(filter))
             return "IGNORED".equals(status);
-        return true;
+        return false;
     }
 }

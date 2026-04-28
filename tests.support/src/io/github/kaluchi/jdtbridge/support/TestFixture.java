@@ -365,8 +365,6 @@ public class TestFixture {
             }
             """;
 
-    // ---- Refactoring targets (separate classes that can be renamed/moved) ----
-
     // ---- Generic erasure testing ----
 
     private static final String GENERIC_CALLER_SRC = """
