@@ -1,8 +1,6 @@
 package io.github.kaluchi.jdtbridge;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.eclipse.jdt.core.IJavaElement;
@@ -10,7 +8,6 @@ import org.eclipse.jdt.core.IMember;
 import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.ISourceRange;
 import org.eclipse.jdt.core.IType;
-import org.eclipse.jdt.core.ITypeHierarchy;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTParser;
@@ -52,15 +49,6 @@ class ReferenceCollector {
             String inheritedFrom,
             String implementationOf) {
 
-        /** Return a copy with implementationOf set. */
-        Ref withImplementationOf(String implOf) {
-            return new Ref(fqn, element, kind,
-                    declaringTypeKind, isStatic,
-                    resolvedType, resolvedTypeFqn,
-                    resolvedTypeKind, isTypeVariable,
-                    typeBound, isInherited, inheritedFrom,
-                    implOf);
-        }
     }
 
     enum RefKind { FIELD, METHOD, TYPE, CONSTANT }
@@ -118,133 +106,6 @@ class ReferenceCollector {
         });
 
         return refs;
-    }
-
-    /**
-     * For each outgoing interface method call, resolve workspace +
-     * classpath implementations and add them as refs with
-     * implementationOf linking back to the interface method.
-     */
-    static void resolveImplementations(
-            Map<String, Ref> refs) {
-        List<Ref> implRefs = new ArrayList<>();
-        for (Ref ref : refs.values()) {
-            if (ref.kind() != RefKind.METHOD) continue;
-            if (!"interface".equals(ref.declaringTypeKind()))
-                continue;
-            if (ref.element() == null) continue;
-
-            try {
-                IMethod ifaceMethod = (IMethod) ref.element();
-                IType ifaceType = ifaceMethod.getDeclaringType();
-                if (ifaceType == null) continue;
-
-                String methodName =
-                        ifaceMethod.getElementName();
-                String ifaceSig =
-                        paramSig(ifaceMethod);
-                ITypeHierarchy hierarchy =
-                        ifaceType.newTypeHierarchy(null);
-
-                for (IType sub
-                        : hierarchy.getAllSubtypes(ifaceType)) {
-                    if (sub.isAnonymous()) continue;
-                    for (IMethod m : sub.getMethods()) {
-                        if (!m.getElementName()
-                                .equals(methodName)) continue;
-                        if (!paramSig(m).equals(ifaceSig))
-                            continue;
-
-                        String subFqn =
-                                sub.getFullyQualifiedName();
-                        if (isJdkType(subFqn)) continue;
-                        String implFqn = subFqn + "#"
-                                + methodName + "("
-                                + paramSig(m) + ")";
-                        if (refs.containsKey(implFqn)) break;
-
-                        String typeKind = sub.isInterface()
-                                ? "interface"
-                                : sub.isEnum() ? "enum"
-                                : sub.isAnnotation()
-                                ? "annotation" : "class";
-
-                        implRefs.add(new Ref(implFqn, m,
-                                RefKind.METHOD, typeKind,
-                                false, null, null, null,
-                                false, null, false, null,
-                                ref.fqn()));
-                        break;
-                    }
-                }
-            } catch (Exception e) { /* skip */ }
-        }
-        for (Ref impl : implRefs) {
-            refs.put(impl.fqn(), impl);
-        }
-    }
-
-    /**
-     * For each outgoing interface/abstract type ref, resolve
-     * direct subtypes and add them as refs with implementationOf
-     * linking back to the interface type FQN. If a subtype
-     * already exists in refs, updates it with the link.
-     */
-    static void resolveTypeSubtypes(
-            Map<String, Ref> refs) {
-        List<Ref> subtypeRefs = new ArrayList<>();
-        for (Ref ref : refs.values()) {
-            if (ref.kind() != RefKind.TYPE) continue;
-            String dk = ref.declaringTypeKind();
-            if (!"interface".equals(dk)
-                    && !"class".equals(dk)) continue;
-            if (ref.element() == null) continue;
-
-            try {
-                IType type = (IType) ref.element();
-                // Only resolve for interfaces and abstract classes
-                if (!type.isInterface()
-                        && !java.lang.reflect.Modifier.isAbstract(
-                                type.getFlags()))
-                    continue;
-
-                ITypeHierarchy hierarchy =
-                        type.newTypeHierarchy(null);
-                for (IType sub : hierarchy.getSubtypes(type)) {
-                    String subFqn =
-                            sub.getFullyQualifiedName();
-                    if (isJdkType(subFqn)) continue;
-
-                    // If subtype already in refs (e.g. used as
-                    // a local var type), update it with the
-                    // implementationOf link instead of skipping
-                    Ref existing = refs.get(subFqn);
-                    if (existing != null) {
-                        if (existing.implementationOf() == null) {
-                            subtypeRefs.add(existing
-                                    .withImplementationOf(
-                                            ref.fqn()));
-                        }
-                        continue;
-                    }
-
-                    String typeKind = sub.isInterface()
-                            ? "interface"
-                            : sub.isEnum() ? "enum"
-                            : sub.isAnnotation()
-                            ? "annotation" : "class";
-
-                    subtypeRefs.add(new Ref(subFqn, sub,
-                            RefKind.TYPE, typeKind,
-                            false, null, null, null,
-                            false, null, false, null,
-                            ref.fqn()));
-                }
-            } catch (Exception e) { /* skip */ }
-        }
-        for (Ref st : subtypeRefs) {
-            refs.put(st.fqn(), st);
-        }
     }
 
     static String paramSig(IMethod m)

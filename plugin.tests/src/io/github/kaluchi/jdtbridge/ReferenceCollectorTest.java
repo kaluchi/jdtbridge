@@ -222,6 +222,77 @@ public class ReferenceCollectorTest {
     }
 
     @Nested
+    class FieldTypeResolution {
+
+        @Test
+        void typeVariableFieldCarriesBound() throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.service.GenericService");
+            IMethod method = JdtUtils.findMethod(
+                    type, "get", null);
+            assertNotNull(method);
+
+            var refs = ReferenceCollector.collect(method);
+            var itemRef = refs.get(
+                    "test.service.GenericService#item");
+            assertNotNull(itemRef,
+                    "get() reads field 'item': "
+                    + refs.keySet());
+            assertEquals(ReferenceCollector.RefKind.FIELD,
+                    itemRef.kind());
+            assertTrue(itemRef.isTypeVariable(),
+                    "item is T → isTypeVariable");
+            assertNotNull(itemRef.typeBound(),
+                    "T extends Animal → typeBound");
+            assertTrue(itemRef.typeBound().contains("Animal"),
+                    "bound should be Animal: "
+                    + itemRef.typeBound());
+        }
+
+        @Test
+        void constantFieldHasConstantKind() throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.service.EnrichedRefService");
+            IMethod method = JdtUtils.findMethod(
+                    type, "getStaticValue", null);
+            assertNotNull(method);
+
+            var refs = ReferenceCollector.collect(method);
+            var valRef = refs.get(
+                    "test.edge.Outer.StaticNested#VALUE");
+            assertNotNull(valRef,
+                    "getStaticValue() reads VALUE: "
+                    + refs.keySet());
+            assertEquals(ReferenceCollector.RefKind.CONSTANT,
+                    valRef.kind());
+            assertTrue(valRef.isStatic());
+        }
+    }
+
+    @Nested
+    class InheritedMethodDetection {
+
+        @Test
+        void methodCalledOnSubtypeIsInherited() throws Exception {
+            IType type = JdtUtils.findType(
+                    "test.service.EnrichedRefService");
+            IMethod method = JdtUtils.findMethod(
+                    type, "getParrotName", "Parrot");
+            assertNotNull(method);
+
+            var refs = ReferenceCollector.collect(method);
+            var nameRef = refs.values().stream()
+                    .filter(r -> r.fqn().contains("#name("))
+                    .findFirst().orElse(null);
+            assertNotNull(nameRef,
+                    "getParrotName() calls name(): "
+                    + refs.keySet());
+            assertEquals(ReferenceCollector.RefKind.METHOD,
+                    nameRef.kind());
+        }
+    }
+
+    @Nested
     class PureHelpers {
 
         @Test
