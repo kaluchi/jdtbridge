@@ -16,6 +16,7 @@ import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.eclemma.core.CoverageTools;
 import org.eclipse.eclemma.core.IExecutionDataSource;
 import org.eclipse.eclemma.core.ISessionImporter;
+import io.github.kaluchi.jdtbridge.support.TestAwait;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -461,25 +462,14 @@ public class CoverageProgressStreamerTest {
     }
 
     private void awaitAnalysisSettled(String coverageId) {
-        // 30s — empty-data analysis is sub-millisecond locally, but
         // CI runners can stall the EclEmma LoadSessionJob behind
-        // other jobs in the manager queue.
-        long deadline = System.currentTimeMillis() + 30_000;
-        while (System.currentTimeMillis() < deadline) {
+        // other jobs in the manager queue — local runs settle
+        // sub-millisecond.
+        TestAwait.pollUntil(30_000, () -> {
             CoverageRun run = tracker.byCoverageId(coverageId);
-            if (run == null || !run.analysisLoading) {
-                return;
-            }
-            try {
-                Thread.sleep(10);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return;
-            }
-        }
-        throw new AssertionError(
-                "LoadSessionJob did not settle within 30s for "
-                        + coverageId);
+            return run == null || !run.analysisLoading;
+        }, "LoadSessionJob did not settle within 30s for "
+                + coverageId);
     }
 
     private static IExecutionDataSource emptyDataSource() {
@@ -489,35 +479,28 @@ public class CoverageProgressStreamerTest {
     }
 
     /** Wait for the streamer's listener to register before firing
-     *  events. 5s budget — test-only, real flow doesn't need this. */
-    private void awaitListener(String coverageId)
-            throws InterruptedException {
-        for (int i = 0; i < 5000
-                && !tracker.eventBus().hasListeners(coverageId); i++) {
-            Thread.sleep(1);
-        }
-        if (!tracker.eventBus().hasListeners(coverageId)) {
-            throw new AssertionError(
-                    "Streamer never subscribed for " + coverageId);
-        }
+     *  events — test-only, real flow doesn't need this. */
+    private void awaitListener(String coverageId) {
+        TestAwait.pollUntil(5_000,
+                () -> tracker.eventBus().hasListeners(coverageId),
+                "Streamer never subscribed for " + coverageId);
     }
 
     /** Locate the first JSONL line in {@code out} whose {@code event}
-     *  field equals {@code name}. Returns {@code null} when absent.
-     *  Lines are produced by the streamer itself — controlled JSON,
-     *  no parse-failure path. */
+     *  field equals {@code name}. Throws if absent — callers always
+     *  expect a hit. Lines are produced by the streamer itself, so
+     *  there is no parse-failure path to handle. */
     private static JsonObject findEvent(ByteArrayOutputStream out,
             String name) {
-        for (String line : lines(out)) {
-            if (line.isEmpty()) continue;
-            JsonObject obj = JsonParser.parseString(line)
-                    .getAsJsonObject();
-            if (obj.has("event")
-                    && name.equals(obj.get("event").getAsString())) {
-                return obj;
-            }
-        }
-        return null;
+        return java.util.Arrays.stream(lines(out))
+                .filter(line -> !line.isEmpty())
+                .map(line -> JsonParser.parseString(line)
+                        .getAsJsonObject())
+                .filter(obj -> obj.has("event")
+                        && name.equals(
+                                obj.get("event").getAsString()))
+                .findFirst()
+                .orElseThrow();
     }
 
     private static int countLines(String body) {
