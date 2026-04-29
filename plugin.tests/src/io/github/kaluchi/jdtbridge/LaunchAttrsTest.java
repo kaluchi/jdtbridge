@@ -83,7 +83,7 @@ public class LaunchAttrsTest {
     class FindConfig {
 
         @Test
-        void unknownNameReturnsNull() {
+        void unknownNameReturnsNull() throws Exception {
             assertNull(LaunchAttrs.findConfig(
                     "never-registered-"
                             + java.util.UUID.randomUUID()));

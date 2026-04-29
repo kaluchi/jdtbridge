@@ -18,8 +18,7 @@ public final class LaunchAttrs {
     }
 
     public static ILaunchManager launchManager() {
-        DebugPlugin debug = DebugPlugin.getDefault();
-        return debug != null ? debug.getLaunchManager() : null;
+        return DebugPlugin.getDefault().getLaunchManager();
     }
 
     /** First process PID under the launch, or {@code null} when no
@@ -60,18 +59,14 @@ public final class LaunchAttrs {
     }
 
     /** Find a launch configuration by its display name. Returns
-     *  {@code null} when none matches or when the launch manager
-     *  fails to enumerate configurations. */
-    public static ILaunchConfiguration findConfig(String name) {
-        try {
-            for (ILaunchConfiguration c
-                    : launchManager().getLaunchConfigurations()) {
-                if (name.equals(c.getName())) {
-                    return c;
-                }
+     *  {@code null} when none matches. */
+    public static ILaunchConfiguration findConfig(String name)
+            throws CoreException {
+        for (ILaunchConfiguration c
+                : launchManager().getLaunchConfigurations()) {
+            if (name.equals(c.getName())) {
+                return c;
             }
-        } catch (CoreException e) {
-            Log.warn("findConfig(" + name + ") failed", e);
         }
         return null;
     }

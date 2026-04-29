@@ -88,19 +88,14 @@ class LaunchTracker implements ILaunchesListener2 {
 
     void start() {
         ILaunchManager mgr = launchManager();
-        if (mgr == null) return;
         mgr.addLaunchListener(this);
-        // Retroactively track existing launches
         for (ILaunch launch : mgr.getLaunches()) {
             track(launch);
         }
     }
 
     void stop() {
-        ILaunchManager mgr = launchManager();
-        if (mgr != null) {
-            mgr.removeLaunchListener(this);
-        }
+        launchManager().removeLaunchListener(this);
         tracked.clear();
     }
 

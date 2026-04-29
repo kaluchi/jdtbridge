@@ -171,7 +171,8 @@ class LaunchHandler {
     }
 
 
-    String handleConfig(Map<String, String> params) {
+    String handleConfig(Map<String, String> params)
+            throws Exception {
         String name = params.get("configId");
         if (name == null || name.isBlank()) {
             return HttpServer.missingParamError("configId");
@@ -194,7 +195,7 @@ class LaunchHandler {
 
     @SuppressWarnings("restriction")
     String handleImport(Map<String, String> params,
-            String launchXmlContent) {
+            String launchXmlContent) throws Exception {
         String configId = params.get("configId");
         if (configId == null || configId.isBlank()) {
             return HttpServer.missingParamError("configId");
@@ -255,7 +256,8 @@ class LaunchHandler {
         }
     }
 
-    String handleConfigDelete(Map<String, String> params) {
+    String handleConfigDelete(Map<String, String> params)
+            throws Exception {
         String configId = params.get("configId");
         if (configId == null || configId.isBlank()) {
             return HttpServer.missingParamError("configId");
@@ -569,7 +571,8 @@ class LaunchHandler {
         };
     }
 
-    String handleRun(Map<String, String> params) {
+    String handleRun(Map<String, String> params)
+            throws Exception {
         String name = params.get("configId");
         if (name == null || name.isBlank()) {
             return HttpServer.missingParamError("configId");

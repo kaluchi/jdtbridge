@@ -312,7 +312,7 @@ public class LaunchHandlerTest {
         }
 
         @Test
-        void missingNameReturnsError() {
+        void missingNameReturnsError() throws Exception {
             String json = handler.handleConfig(Map.of());
             assertTrue(json.contains("error"),
                     "Should return error: " + json);
@@ -321,7 +321,7 @@ public class LaunchHandlerTest {
         }
 
         @Test
-        void unknownConfigReturnsError() {
+        void unknownConfigReturnsError() throws Exception {
             String json = handler.handleConfig(
                     Map.of("configId", "no-such-config-xyz-999"));
             assertTrue(json.contains("error"),
@@ -331,7 +331,7 @@ public class LaunchHandlerTest {
         }
 
         @Test
-        void knownConfigReturnsAttributes() {
+        void knownConfigReturnsAttributes() throws Exception {
             String json = handler.handleConfig(
                     Map.of("configId", "ConfigTest-Java"));
             assertFalse(json.contains("\"error\""),
@@ -351,7 +351,7 @@ public class LaunchHandlerTest {
         }
 
         @Test
-        void xmlFormatReturnsXmlContent() {
+        void xmlFormatReturnsXmlContent() throws Exception {
             String json = handler.handleConfig(
                     Map.of("configId", "ConfigTest-Java",
                             "format", "xml"));
@@ -372,7 +372,7 @@ public class LaunchHandlerTest {
         }
 
         @Test
-        void attributesContainExpectedKeys() {
+        void attributesContainExpectedKeys() throws Exception {
             String json = handler.handleConfig(
                     Map.of("configId", "ConfigTest-JUnit"));
             var obj = JsonParser.parseString(json)
@@ -388,7 +388,7 @@ public class LaunchHandlerTest {
         }
 
         @Test
-        void attributeTypesPreserved() {
+        void attributeTypesPreserved() throws Exception {
             String json = handler.handleConfig(
                     Map.of("configId", "ConfigTest-Java"));
             var obj = JsonParser.parseString(json)
@@ -660,14 +660,14 @@ public class LaunchHandlerTest {
     class Run {
 
         @Test
-        void missingNameReturnsError() {
+        void missingNameReturnsError() throws Exception {
             String json = handler.handleRun(Map.of());
             assertTrue(json.contains("error"),
                     "Should return error: " + json);
         }
 
         @Test
-        void unknownConfigReturnsError() {
+        void unknownConfigReturnsError() throws Exception {
             String json = handler.handleRun(
                     Map.of("configId", "no-such-config-xyz"));
             assertTrue(json.contains("error"),
@@ -782,13 +782,13 @@ public class LaunchHandlerTest {
     class ConfigDelete {
 
         @Test
-        void missingConfigIdReturnsError() {
+        void missingConfigIdReturnsError() throws Exception {
             String json = handler.handleConfigDelete(Map.of());
             assertTrue(json.contains("Missing"));
         }
 
         @Test
-        void unknownConfigReturnsError() {
+        void unknownConfigReturnsError() throws Exception {
             String json = handler.handleConfigDelete(
                     Map.of("configId", "no-such-xyz"));
             assertTrue(json.contains("not found"));
@@ -812,27 +812,27 @@ public class LaunchHandlerTest {
     class Import {
 
         @Test
-        void missingConfigIdReturnsError() {
+        void missingConfigIdReturnsError() throws Exception {
             String json = handler.handleImport(Map.of(), "<xml/>");
             assertTrue(json.contains("Missing"));
         }
 
         @Test
-        void missingBodyReturnsError() {
+        void missingBodyReturnsError() throws Exception {
             String json = handler.handleImport(
                     Map.of("configId", "test"), null);
             assertTrue(json.contains("Missing"));
         }
 
         @Test
-        void pathTraversalRejected() {
+        void pathTraversalRejected() throws Exception {
             String json = handler.handleImport(
                     Map.of("configId", "../evil"), "<xml/>");
             assertTrue(json.contains("Invalid"));
         }
 
         @Test
-        void slashInConfigIdRejected() {
+        void slashInConfigIdRejected() throws Exception {
             String json = handler.handleImport(
                     Map.of("configId", "foo/bar"), "<xml/>");
             assertTrue(json.contains("Invalid"));
@@ -879,7 +879,7 @@ public class LaunchHandlerTest {
         }
 
         @Test
-        void launchesAndReturnsIdentityFields() {
+        void launchesAndReturnsIdentityFields() throws Exception {
             String json = handler.handleRun(
                     Map.of("configId", "RunSuccessTest"));
             var obj = JsonParser.parseString(json)
@@ -895,7 +895,7 @@ public class LaunchHandlerTest {
         }
 
         @Test
-        void debugModeSetsCorrectMode() {
+        void debugModeSetsCorrectMode() throws Exception {
             var params = new java.util.HashMap<String, String>();
             params.put("configId", "RunSuccessTest");
             params.put("debug", "true");
@@ -909,7 +909,7 @@ public class LaunchHandlerTest {
         }
 
         @Test
-        void runWithExtraArgs() {
+        void runWithExtraArgs() throws Exception {
             var params = new java.util.HashMap<String, String>();
             params.put("configId", "RunSuccessTest");
             params.put("args", "--port 9090");

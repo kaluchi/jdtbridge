@@ -1,6 +1,5 @@
 package io.github.kaluchi.jdtbridge;
 
-import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import io.github.kaluchi.jdtbridge.coverage.CoverageTypes;
 import org.eclipse.core.resources.ResourcesPlugin;

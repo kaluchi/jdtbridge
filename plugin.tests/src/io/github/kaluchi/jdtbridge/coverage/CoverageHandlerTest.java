@@ -54,14 +54,14 @@ public class CoverageHandlerTest {
     class HandleRun {
 
         @Test
-        void missingConfigIdReturnsConfigNotFound() {
+        void missingConfigIdReturnsConfigNotFound() throws Exception {
             JsonObject obj = parseObj(handler.handleRun(Map.of()));
             assertEquals("coverage-config-not-found",
                     obj.get("error").getAsString());
         }
 
         @Test
-        void blankConfigIdReturnsConfigNotFound() {
+        void blankConfigIdReturnsConfigNotFound() throws Exception {
             JsonObject obj = parseObj(handler.handleRun(
                     Map.of("configId", "   ")));
             assertEquals("coverage-config-not-found",
@@ -69,7 +69,7 @@ public class CoverageHandlerTest {
         }
 
         @Test
-        void unknownConfigReturnsConfigNotFound() {
+        void unknownConfigReturnsConfigNotFound() throws Exception {
             JsonObject obj = parseObj(handler.handleRun(Map.of(
                     "configId", "definitely-not-a-real-config-xyz-9z")));
             assertEquals("coverage-config-not-found",
@@ -248,7 +248,7 @@ public class CoverageHandlerTest {
     class ErrorJsonShape {
 
         @Test
-        void everyErrorHasErrorAndMessage() {
+        void everyErrorHasErrorAndMessage() throws Exception {
             // Iterate the validation paths that don't require a
             // real launch and assert the error JSON shape.
             String[] errorJsons = {

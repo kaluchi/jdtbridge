@@ -12,7 +12,6 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.jobs.Job;
-import org.eclipse.debug.core.DebugPlugin;
 import org.eclipse.debug.core.ILaunch;
 import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.debug.core.ILaunchConfigurationType;
@@ -162,15 +161,11 @@ final class CoverageTracker
         }
         started = true;
         ILaunchManager mgr = LaunchAttrs.launchManager();
-        if (mgr != null) {
-            mgr.addLaunchListener(this);
-            // Retroactively pick up live coverage launches that
-            // started before the listener was attached.
-            for (ILaunch launch : mgr.getLaunches()) {
-                if (launch instanceof ICoverageLaunch
-                        && !launch.isTerminated()) {
-                    registerLiveLaunch(launch);
-                }
+        mgr.addLaunchListener(this);
+        for (ILaunch launch : mgr.getLaunches()) {
+            if (launch instanceof ICoverageLaunch
+                    && !launch.isTerminated()) {
+                registerLiveLaunch(launch);
             }
         }
         ISessionManager sm = CoverageTools.getSessionManager();
@@ -191,10 +186,7 @@ final class CoverageTracker
             return;
         }
         started = false;
-        ILaunchManager mgr = LaunchAttrs.launchManager();
-        if (mgr != null) {
-            mgr.removeLaunchListener(this);
-        }
+        LaunchAttrs.launchManager().removeLaunchListener(this);
         CoverageTools.getSessionManager().removeSessionListener(this);
         CoverageTools.removeJavaCoverageListener(this);
         runs.clear();

@@ -45,7 +45,8 @@ class CoverageHandler {
 
     /** {@code GET /coverage/run?configId=...} — start a new
      *  coverage launch. */
-    String handleRun(Map<String, String> params) {
+    String handleRun(Map<String, String> params)
+            throws Exception {
         String configId = params.get("configId");
         if (configId == null || configId.isBlank()) {
             return error("coverage-config-not-found",

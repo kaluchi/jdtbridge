@@ -65,7 +65,7 @@ public class CoverageBridge {
      * touching any EclEmma class.
      */
     public String dispatch(String path, Map<String, String> params,
-            String body, ProjectScope scope) {
+            String body, ProjectScope scope) throws Exception {
         if (!AVAILABLE) {
             return notInstalledError();
         }
