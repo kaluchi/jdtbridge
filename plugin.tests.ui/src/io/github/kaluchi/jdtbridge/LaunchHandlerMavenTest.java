@@ -108,6 +108,19 @@ public class LaunchHandlerMavenTest {
     }
 
     @Test
+    void debugModeSetsCorrectMode() throws Exception {
+        String json = handler.handleRun(
+                java.util.Map.of("configId",
+                        "MavenConfigTest-Maven",
+                        "debug", "true"));
+        var obj = JsonParser.parseString(json).getAsJsonObject();
+        assertNotNull(obj.get("mode"),
+                "run must return mode: " + json);
+        assertEquals("debug",
+                obj.get("mode").getAsString());
+    }
+
+    @Test
     void agentConfigHasProviderAndAgent() throws Exception {
         ILaunchManager mgr = DebugPlugin.getDefault()
                 .getLaunchManager();

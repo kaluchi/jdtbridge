@@ -274,9 +274,8 @@ public class LaunchHandlerTest {
             JsonObject junit = findByConfigId(arr, "ConfigsTest-JUnit");
             assertNotNull(junit,
                     "Created JUnit config must appear: " + json);
-            assertTrue(junit.has("class") || junit.has("project"),
-                    "JUnit config should have class or project: "
-                    + junit);
+            assertTrue(junit.has("class"),
+                    "JUnit config should have class: " + junit);
         }
     }
 
@@ -891,20 +890,6 @@ public class LaunchHandlerTest {
             assertTrue(obj.has("mode"));
             assertEquals("run",
                     obj.get("mode").getAsString());
-        }
-
-        @Test
-        void debugModeSetsCorrectMode() throws Exception {
-            var params = new java.util.HashMap<String, String>();
-            params.put("configId", "RunSuccessTest");
-            params.put("debug", "true");
-            String json = handler.handleRun(params);
-            var obj = JsonParser.parseString(json)
-                    .getAsJsonObject();
-            if (obj.has("ok")) {
-                assertEquals("debug",
-                        obj.get("mode").getAsString());
-            }
         }
 
         @Test

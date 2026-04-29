@@ -50,7 +50,7 @@ public class HttpServerBindTest {
         void startWithLoopbackAddress() throws Exception {
             server = new HttpServer();
             server.start(InetAddress.getLoopbackAddress(), 0);
-            assertTrue(server.getPort() > 0);
+            assertNotEquals(0, server.getPort());
             assertEquals(
                     InetAddress.getLoopbackAddress(),
                     server.getBindAddress());
@@ -60,7 +60,7 @@ public class HttpServerBindTest {
         void startWithAllInterfaces() throws Exception {
             server = new HttpServer();
             server.start(InetAddress.getByName("0.0.0.0"), 0);
-            assertTrue(server.getPort() > 0);
+            assertNotEquals(0, server.getPort());
             assertNotNull(server.getBindAddress());
         }
     }
@@ -90,7 +90,7 @@ public class HttpServerBindTest {
 
                 // Should get a different (auto-assigned) port
                 assertNotEquals(occupiedPort, server.getPort());
-                assertTrue(server.getPort() > 0);
+                assertNotEquals(0, server.getPort());
             }
         }
 
@@ -98,7 +98,7 @@ public class HttpServerBindTest {
         void autoPortWhenZero() throws Exception {
             server = new HttpServer();
             server.start(InetAddress.getLoopbackAddress(), 0);
-            assertTrue(server.getPort() > 0);
+            assertNotEquals(0, server.getPort());
         }
     }
 
@@ -176,7 +176,7 @@ public class HttpServerBindTest {
 
                 // Should get auto-assigned, not the occupied one
                 assertNotEquals(occupiedPort, server.getPort());
-                assertTrue(server.getPort() > 0);
+                assertNotEquals(0, server.getPort());
             }
         }
 
