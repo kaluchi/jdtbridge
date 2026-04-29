@@ -489,11 +489,9 @@ public class NodeBuilderTest {
     void projectDetailAddsClasspathAndSourceRoots() throws Exception {
         JsonObject detail = NodeBuilder.projectDetail(
                 fixtureProject());
-        assertTrue(detail.has("classpathEntries"));
-        assertTrue(detail.getAsJsonArray("classpathEntries").size() > 0);
-        assertTrue(detail.has("sourceRoots"));
-        assertTrue(detail.getAsJsonArray("sourceRoots").size() > 0);
-        assertTrue(detail.has("javaVersion"));
+        assertTrue(detail.getAsJsonArray("classpathEntries").size() >= 3);
+        assertEquals(1, detail.getAsJsonArray("sourceRoots").size());
+        assertNotNull(detail.get("javaVersion"));
     }
 
     // ── packageSkeleton / packageDetail ────────────────────────────
@@ -518,8 +516,7 @@ public class NodeBuilderTest {
                 skeleton.get("origin").getAsString());
         assertEquals(TestFixture.PROJECT_NAME,
                 skeleton.get("containingProject").getAsString());
-        assertTrue(skeleton.get("typeCount").getAsInt() >= 3,
-                "test.model has Animal, Dog, Cat");
+        assertEquals(3, skeleton.get("typeCount").getAsInt());
     }
 
     @Test
@@ -860,8 +857,7 @@ public class NodeBuilderTest {
                 "process", "String");
         JsonObject detail = NodeBuilder.methodDetail(process);
         JsonArray thrown = detail.getAsJsonArray("throws");
-        assertTrue(thrown.size() > 0,
-                "process(String) declares throws IllegalArgumentException");
+        assertEquals(1, thrown.size());
         assertEquals("java.lang.IllegalArgumentException",
                 thrown.get(0).getAsString());
     }
