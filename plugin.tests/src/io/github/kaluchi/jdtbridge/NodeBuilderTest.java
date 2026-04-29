@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -966,19 +967,16 @@ public class NodeBuilderTest {
     // ── lambda / anonymous fqn ───────────────────────────────────
 
     @Test
-    void lambdaTypeFqnContainsArrowSuffix() throws Exception {
-        IType type = type("test.service.LambdaCallerService");
-        IMethod method = JdtUtils.findMethod(
-                type, "createLambda", null);
-        assertNotNull(method);
-        for (IJavaElement child : method.getChildren()) {
-            if (child instanceof IType t && t.isLambda()) {
-                String fqn = NodeBuilder.fqnOf(t);
-                assertTrue(fqn.contains("->"),
-                        "Lambda fqn should contain arrow: " + fqn);
-                return;
-            }
-        }
+    void lambdaTypeFqnResolvesViaComposite() throws Exception {
+        String compositeFqn = "test.service.LambdaCallerService"
+                + "#createLambda().() -> {...} Runnable";
+        IJavaElement resolved = JdtUtils.resolveElement(compositeFqn);
+        assertNotNull(resolved,
+                "composite lambda fqn must resolve: " + compositeFqn);
+        assertTrue(resolved instanceof IType);
+        String roundTrip = NodeBuilder.fqnOf((IType) resolved);
+        assertTrue(roundTrip.contains("->"),
+                "Lambda fqn should contain arrow: " + roundTrip);
     }
 
     @Test

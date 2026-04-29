@@ -30,15 +30,6 @@ public class HttpServerDispatchTest {
         server = new HttpServer();
     }
 
-    private static boolean isJson(String s) {
-        try {
-            JsonParser.parseString(s);
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
     @Nested
     class GraphRoutes {
 
@@ -48,7 +39,7 @@ public class HttpServerDispatchTest {
                     Map.of("of", "test.model.Dog"),
                     null, ProjectScope.ALL);
             assertEquals("application/json", resp.contentType());
-            assertTrue(isJson(resp.body()));
+            JsonParser.parseString(resp.body());
             assertFalse(resp.body().contains("\"error\""),
                     "Valid type should not error: " + resp.body());
         }

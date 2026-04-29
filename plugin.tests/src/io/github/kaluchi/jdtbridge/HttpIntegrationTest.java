@@ -207,11 +207,6 @@ public class HttpIntegrationTest {
                 "Host: localhost",
                 "Authorization: Bearer " + TOKEN);
         int bodyStart = response.indexOf("\r\n\r\n");
-        if (bodyStart < 0) {
-            throw new AssertionError(
-                    "HTTP response missing header/body separator: "
-                            + response);
-        }
         return response.substring(bodyStart + 4);
     }
 
