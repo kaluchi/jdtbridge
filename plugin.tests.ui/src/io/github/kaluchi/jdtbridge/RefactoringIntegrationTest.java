@@ -222,6 +222,119 @@ public class RefactoringIntegrationTest {
         assertJsonError(json, "Missing 'target' parameter");
     }
 
+    // ---- Standalone rename/move on temp types ----
+
+    @Test
+    public void f1_renameStandaloneType() throws Exception {
+        createTempCU("StandaloneRename", """
+                package test.refactor;
+                public class StandaloneRename {}
+                """);
+        String json = handler.handleRename(Map.of(
+                "class", "test.refactor.StandaloneRename",
+                "newName", "StandaloneRenamed"));
+        assertTrue(json.contains("\"ok\":true"),
+                "rename must succeed: " + json);
+        Job.getJobManager().join(
+                ResourcesPlugin.FAMILY_AUTO_BUILD, null);
+        deleteTempCU("test.refactor", "StandaloneRenamed.java");
+    }
+
+    @Test
+    public void f2_renameStandaloneField() throws Exception {
+        createTempCU("FieldRenameTemp", """
+                package test.refactor;
+                public class FieldRenameTemp {
+                    int oldField = 0;
+                }
+                """);
+        String json = handler.handleRename(Map.of(
+                "class", "test.refactor.FieldRenameTemp",
+                "field", "oldField",
+                "newName", "renamedField"));
+        assertTrue(json.contains("\"ok\":true"),
+                "field rename must succeed: " + json);
+        Job.getJobManager().join(
+                ResourcesPlugin.FAMILY_AUTO_BUILD, null);
+        deleteTempCU("test.refactor", "FieldRenameTemp.java");
+    }
+
+    @Test
+    public void f3_renameStandaloneMethod() throws Exception {
+        createTempCU("MethodRenameTemp", """
+                package test.refactor;
+                public class MethodRenameTemp {
+                    public void oldMethod() {}
+                }
+                """);
+        String json = handler.handleRename(Map.of(
+                "class", "test.refactor.MethodRenameTemp",
+                "method", "oldMethod",
+                "newName", "renamedMethod"));
+        assertTrue(json.contains("\"ok\":true"),
+                "method rename must succeed: " + json);
+        Job.getJobManager().join(
+                ResourcesPlugin.FAMILY_AUTO_BUILD, null);
+        deleteTempCU("test.refactor", "MethodRenameTemp.java");
+    }
+
+    @Test
+    public void f4_moveStandaloneType() throws Exception {
+        createTempCU("MoveTemp", """
+                package test.refactor;
+                public class MoveTemp {}
+                """);
+        String json = handler.handleMove(Map.of(
+                "class", "test.refactor.MoveTemp",
+                "target", "test.moved"));
+        assertTrue(json.contains("\"ok\":true"),
+                "move must succeed: " + json);
+        Job.getJobManager().join(
+                ResourcesPlugin.FAMILY_AUTO_BUILD, null);
+        deleteTempCU("test.moved", "MoveTemp.java");
+        deleteTempPkg("test.moved");
+    }
+
+    private static void createTempCU(
+            String name, String source) throws Exception {
+        var root = ResourcesPlugin.getWorkspace().getRoot();
+        var project = org.eclipse.jdt.core.JavaCore.create(
+                root.getProject(TestFixture.PROJECT_NAME));
+        var srcRoot = project.getPackageFragmentRoot(
+                root.getProject(TestFixture.PROJECT_NAME)
+                        .getFolder("src"));
+        var pkg = srcRoot.getPackageFragment("test.refactor");
+        pkg.createCompilationUnit(
+                name + ".java", source, true, null);
+        Job.getJobManager().join(
+                ResourcesPlugin.FAMILY_AUTO_BUILD, null);
+    }
+
+    private static void deleteTempCU(
+            String pkgName, String fileName) throws Exception {
+        var root = ResourcesPlugin.getWorkspace().getRoot();
+        var project = org.eclipse.jdt.core.JavaCore.create(
+                root.getProject(TestFixture.PROJECT_NAME));
+        var srcRoot = project.getPackageFragmentRoot(
+                root.getProject(TestFixture.PROJECT_NAME)
+                        .getFolder("src"));
+        var pkg = srcRoot.getPackageFragment(pkgName);
+        var cu = pkg.getCompilationUnit(fileName);
+        if (cu.exists()) cu.delete(true, null);
+    }
+
+    private static void deleteTempPkg(String pkgName)
+            throws Exception {
+        var root = ResourcesPlugin.getWorkspace().getRoot();
+        var project = org.eclipse.jdt.core.JavaCore.create(
+                root.getProject(TestFixture.PROJECT_NAME));
+        var srcRoot = project.getPackageFragmentRoot(
+                root.getProject(TestFixture.PROJECT_NAME)
+                        .getFolder("src"));
+        var pkg = srcRoot.getPackageFragment(pkgName);
+        if (pkg.exists()) pkg.delete(true, null);
+    }
+
     private static void assertJsonError(
             String json, String expectedFragment) {
         var obj = com.google.gson.JsonParser.parseString(json)
