@@ -191,7 +191,7 @@ For CI without local Eclipse: `mvn clean verify -Pci`.
    ```bash
    jdt build --project io.github.kaluchi.jdtbridge
    jdt build --project io.github.kaluchi.jdtbridge.tests
-   jdt test run io.github.kaluchi.jdtbridge.tests -f
+   jdt test run io.github.kaluchi.jdtbridge.tests --coverage -f
    ```
 4. **Full Tycho build** — `jdt launch run jdtbridge-verify` then
    `jdt launch logs jdtbridge-verify -f | tail -20` to wait
@@ -258,7 +258,7 @@ CI context, or specific flags not expressible via launch), explain why.
 - **CLI tests:** `jdt launch run npm-test -f` (preferred) or
   `cd cli && npm test` (fallback). Single file:
   `jdt launch run npm-test -f -- test/paths.test.mjs`
-- **Plugin unit tests:** `jdt test run io.github.kaluchi.jdtbridge.tests -f`
+- **Plugin unit tests:** `jdt test run io.github.kaluchi.jdtbridge.tests --coverage -f`
 - **Integration tests:** full Tycho build only (`jdt launch run jdtbridge-verify`) — use `@EnabledIfSystemProperty(named = "jdtbridge.integration-tests", matches = "true")`
 - **Test fixture:** `TestFixture.java` creates a project with known classes —
   `test.model.Animal`, `Dog`, `Cat`, `test.edge.Calculator` (overloads),
@@ -273,16 +273,16 @@ in a separate Eclipse runtime. Individual tests take 5-15 seconds.
 
 ```bash
 # Single test method — fastest feedback
-jdt test run com.example.FooTest#myMethod -f -q
+jdt test run com.example.FooTest#myMethod --coverage -f -q
 
 # Single test class
-jdt test run com.example.FooTest -f -q
+jdt test run com.example.FooTest --coverage -f -q
 
 # Full plugin suite (headless PDE runtime, no workbench)
-jdt test run io.github.kaluchi.jdtbridge.tests -f -q
+jdt test run io.github.kaluchi.jdtbridge.tests --coverage -f -q
 
 # Full UI suite (workbench PDE runtime — editors, coverage)
-jdt test run io.github.kaluchi.jdtbridge.tests.ui -f -q
+jdt test run io.github.kaluchi.jdtbridge.tests.ui --coverage -f -q
 ```
 
 Both suites use shared launch configs from `launches/`. If a config
@@ -393,6 +393,45 @@ with human-written release notes. Show the draft to the user for
 approval before publishing. Use `gh release edit vX.Y.Z --notes "..."`.
 See previous releases for style (feature paragraphs, not bullet lists
 of commits).
+
+## Test requirements
+
+Tests are code. Same quality bar as production — no fallbacks,
+no dead branches, no defensive patterns "just in case."
+
+**100% test-file coverage.** Every line and branch inside a test
+file must be exercised. If JaCoCo shows a missed branch in your
+test, you wrote a branching construct that doesn't belong there.
+
+**No branching in tests.** A test is a deterministic sequence:
+set up → call → assert. No `if`, no `for` with filter predicates,
+no `try/catch`, no `stream().filter().findFirst().orElseThrow()`.
+Each of these creates branches JaCoCo must cover — and the
+"other" branch is unreachable by design, tanking coverage.
+
+- Direct index access (`entries[0]`) not loop + filter
+- Direct cast (`(IType) children[0]`) not `instanceof` scan
+- `JsonArray.contains(new JsonPrimitive("x"))` not loop + flag
+- `assertNotNull(x)` then use `x` — not `if (x != null)`
+
+**No conditional test execution.** No `if (!available()) return`,
+no `@EnabledIf`, no `Assumptions.assumeTrue`. A test either runs
+its assertions or fails loud. If a test needs a runtime capability
+(UI bundle, specific launch type), put it in the correct suite
+from the start — `plugin.tests` (headless) vs `plugin.tests.ui`
+(workbench).
+
+**No null from test helpers.** A helper that looks something up
+either finds it or throws `AssertionError`. Never return null
+and check at the call site.
+
+**Shared infrastructure goes in `tests.support`.** TestFixture,
+TestAwait, and any reusable lookup/factory helpers belong in the
+`tests.support` module — not duplicated across test files.
+
+**No defensive cleanup.** `cu.delete(true, null)` not
+`if (cu.exists()) cu.delete(...)`. The test created the resource;
+it must exist. If it doesn't, the test is broken — let it fail.
 
 ## Conventions
 

@@ -713,9 +713,8 @@ public class CoverageSessionHandlerTest {
                     case "equals" -> proxy == args[0];
                     case "hashCode" ->
                             System.identityHashCode(proxy);
-                    default -> throw new UnsupportedOperationException(
-                            "fakeProject method not mocked: "
-                                    + method.getName());
+                    case "toString" -> "fakeProject";
+                    default -> null;
                 });
     }
 

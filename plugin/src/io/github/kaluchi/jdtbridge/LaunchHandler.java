@@ -2,7 +2,6 @@ package io.github.kaluchi.jdtbridge;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonPrimitive;
 
 import java.io.File;
 import java.io.IOException;
@@ -380,7 +379,7 @@ class LaunchHandler {
         obj.addProperty("configTypeId",
                 config.getType().getIdentifier());
 
-        java.io.File launchFile = resolveLaunchFile(config);
+        java.io.File launchFile = resolveLaunchFile(config.getName());
         if (launchFile != null) {
             obj.addProperty("file",
                     launchFile.getAbsolutePath());
@@ -399,8 +398,8 @@ class LaunchHandler {
 
     private String configXml(ILaunchConfiguration config)
             throws CoreException {
-        java.io.File launchFile = resolveLaunchFile(config);
-        if (launchFile == null || !launchFile.exists()) {
+        java.io.File launchFile = resolveLaunchFile(config.getName());
+        if (launchFile == null) {
             return HttpServer.jsonError(
                     "No .launch file for: "
                     + config.getName());
@@ -421,12 +420,11 @@ class LaunchHandler {
         }
     }
 
-    private static java.io.File resolveLaunchFile(
-            ILaunchConfiguration config) {
+    static java.io.File resolveLaunchFile(String configName) {
         java.io.File file = DebugPlugin.getDefault()
                 .getStateLocation()
                 .append(".launches")
-                .append(config.getName() + ".launch")
+                .append(configName + ".launch")
                 .toFile();
         return file.exists() ? file : null;
     }
@@ -478,7 +476,7 @@ class LaunchHandler {
                 .toFile();
     }
 
-    private static void collectSection(Document doc, String groupId,
+    static void collectSection(Document doc, String groupId,
             String sectionName, ILaunchManager lm,
             List<ILaunchConfiguration> out, Set<String> seen)
             throws CoreException {
@@ -496,7 +494,7 @@ class LaunchHandler {
         }
     }
 
-    private static Element findLaunchGroup(Document doc, String id) {
+    static Element findLaunchGroup(Document doc, String id) {
         var groups = doc.getElementsByTagName("launchGroup");
         for (int i = 0; i < groups.getLength(); i++) {
             Element g = (Element) groups.item(i);
@@ -505,7 +503,7 @@ class LaunchHandler {
         return null;
     }
 
-    private static Element childElement(Element parent, String name) {
+    static Element childElement(Element parent, String name) {
         var children = parent.getChildNodes();
         for (int i = 0; i < children.getLength(); i++) {
             Node n = children.item(i);
@@ -637,17 +635,8 @@ class LaunchHandler {
     }
 
 
-    /** Check .launch file exists on disk (handles LaunchManager cache lag). */
     private boolean launchFileExists(String configId) {
-        try {
-            java.nio.file.Path launchFile = DebugPlugin.getDefault()
-                    .getStateLocation().toPath()
-                    .resolve(".launches")
-                    .resolve(configId + ".launch");
-            return Files.exists(launchFile);
-        } catch (Exception e) {
-            return false;
-        }
+        return resolveLaunchFile(configId) != null;
     }
 
     String handleConsole(Map<String, String> params) {

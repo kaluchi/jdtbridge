@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -208,15 +209,13 @@ public class NodeBuilderTest {
     void locationCarriesFileLineRangeAndNameOffsets() throws Exception {
         IMethod barkMethod = method("test.model.Dog", "bark", null);
         JsonObject loc = NodeBuilder.location(barkMethod);
-        assertNotNull(loc, "bark() must have a location in source fixture");
+        assertNotNull(loc);
         assertTrue(loc.get("file").getAsString().endsWith("Dog.java"));
-        assertTrue(loc.get("startLine").getAsInt() > 0);
-        assertTrue(loc.get("endLine").getAsInt()
-                >= loc.get("startLine").getAsInt());
-        assertTrue(loc.has("nameStart"));
-        assertTrue(loc.has("nameEnd"));
-        assertTrue(loc.get("nameEnd").getAsInt()
-                > loc.get("nameStart").getAsInt());
+        assertEquals(11, loc.get("startLine").getAsInt());
+        assertEquals(13, loc.get("endLine").getAsInt());
+        assertEquals(3, loc.get("lineCount").getAsInt());
+        assertEquals(166, loc.get("nameStart").getAsInt());
+        assertEquals(170, loc.get("nameEnd").getAsInt());
     }
 
     @Test
@@ -481,39 +480,28 @@ public class NodeBuilderTest {
         JsonObject skeleton = NodeBuilder.projectSkeleton(
                 fixtureProject());
         JsonArray natures = skeleton.getAsJsonArray("natures");
-        boolean hasJava = false;
-        for (var el : natures) {
-            if ("java".equals(el.getAsString())) hasJava = true;
-        }
-        assertTrue(hasJava, "fixture project must have java nature");
+        assertTrue(natures.contains(
+                new com.google.gson.JsonPrimitive("java")),
+                "fixture project must have java nature: " + natures);
     }
 
     @Test
     void projectDetailAddsClasspathAndSourceRoots() throws Exception {
         JsonObject detail = NodeBuilder.projectDetail(
                 fixtureProject());
-        assertTrue(detail.has("classpathEntries"));
-        assertTrue(detail.getAsJsonArray("classpathEntries").size() > 0);
-        assertTrue(detail.has("sourceRoots"));
-        assertTrue(detail.getAsJsonArray("sourceRoots").size() > 0);
-        assertTrue(detail.has("javaVersion"));
+        assertEquals(18, detail.getAsJsonArray("classpathEntries").size());
+        assertEquals(1, detail.getAsJsonArray("sourceRoots").size());
+        assertNotNull(detail.get("javaVersion"));
     }
 
     // ── packageSkeleton / packageDetail ────────────────────────────
 
-    private static IPackageFragment fixturePackage(String name)
-            throws Exception {
+    private static IPackageFragment fixturePackage(String name) {
         IJavaProject jp = JavaCore.create(fixtureProject());
-        for (var root : jp.getPackageFragmentRoots()) {
-            if (root.getKind()
-                    != org.eclipse.jdt.core.IPackageFragmentRoot
-                            .K_SOURCE) {
-                continue;
-            }
-            IPackageFragment frag = root.getPackageFragment(name);
-            if (frag != null && frag.exists()) return frag;
-        }
-        throw new AssertionError("package not found: " + name);
+        org.eclipse.jdt.core.IPackageFragmentRoot srcRoot =
+                jp.getPackageFragmentRoot(
+                fixtureProject().getFolder("src"));
+        return srcRoot.getPackageFragment(name);
     }
 
     @Test
@@ -528,8 +516,7 @@ public class NodeBuilderTest {
                 skeleton.get("origin").getAsString());
         assertEquals(TestFixture.PROJECT_NAME,
                 skeleton.get("containingProject").getAsString());
-        assertTrue(skeleton.get("typeCount").getAsInt() >= 3,
-                "test.model has Animal, Dog, Cat");
+        assertEquals(3, skeleton.get("typeCount").getAsInt());
     }
 
     @Test
@@ -661,21 +648,19 @@ public class NodeBuilderTest {
     @Test
     void classpathEntrySkeletonSourceEntry() throws Exception {
         IJavaProject jp = JavaCore.create(fixtureProject());
-        for (var entry : jp.getResolvedClasspath(true)) {
-            if (entry.getEntryKind()
-                    == org.eclipse.jdt.core.IClasspathEntry.CPE_SOURCE) {
-                JsonObject skeleton =
-                        NodeBuilder.classpathEntrySkeleton(
-                                entry, fixtureProject());
-                assertEquals("source",
-                        skeleton.get("entryKind").getAsString());
-                assertEquals("source",
-                        skeleton.get("origin").getAsString());
-                assertTrue(skeleton.has("path"));
-                return;
-            }
-        }
-        throw new AssertionError("no source entry in fixture classpath");
+        var entries = jp.getResolvedClasspath(true);
+        var sourceEntry = entries[0];
+        assertEquals(
+                org.eclipse.jdt.core.IClasspathEntry.CPE_SOURCE,
+                sourceEntry.getEntryKind());
+        JsonObject skeleton =
+                NodeBuilder.classpathEntrySkeleton(
+                        sourceEntry, fixtureProject());
+        assertEquals("source",
+                skeleton.get("entryKind").getAsString());
+        assertEquals("source",
+                skeleton.get("origin").getAsString());
+        assertTrue(skeleton.has("path"));
     }
 
     // ── javadocSummary ───────────────────────────────────────────────
@@ -739,21 +724,19 @@ public class NodeBuilderTest {
     @Test
     void classpathEntrySkeletonLibraryEntry() throws Exception {
         IJavaProject jp = JavaCore.create(fixtureProject());
-        for (var entry : jp.getResolvedClasspath(true)) {
-            if (entry.getEntryKind()
-                    == org.eclipse.jdt.core.IClasspathEntry.CPE_LIBRARY) {
-                JsonObject skeleton =
-                        NodeBuilder.classpathEntrySkeleton(
-                                entry, fixtureProject());
-                assertEquals("library",
-                        skeleton.get("entryKind").getAsString());
-                assertEquals("binary",
-                        skeleton.get("origin").getAsString());
-                assertTrue(skeleton.has("path"));
-                return;
-            }
-        }
-        throw new AssertionError("no library entry in fixture classpath");
+        var entries = jp.getResolvedClasspath(true);
+        var libEntry = entries[1];
+        assertEquals(
+                org.eclipse.jdt.core.IClasspathEntry.CPE_LIBRARY,
+                libEntry.getEntryKind());
+        JsonObject skeleton =
+                NodeBuilder.classpathEntrySkeleton(
+                        libEntry, fixtureProject());
+        assertEquals("library",
+                skeleton.get("entryKind").getAsString());
+        assertEquals("binary",
+                skeleton.get("origin").getAsString());
+        assertTrue(skeleton.has("path"));
     }
 
     // ── methodDetail throws ────────────────────────────────────────
@@ -860,8 +843,8 @@ public class NodeBuilderTest {
         IType anonCaller = type("test.service.AnonymousCallerService");
         IMethod createAnonymous = anonCaller.getMethod(
                 "createAnonymous", new String[0]);
-        IType anonType = findAnonymousChild(createAnonymous);
-        assertNotNull(anonType, "anonymous Animal must exist in createAnonymous()");
+        IType anonType = (IType) createAnonymous.getChildren()[0];
+        assertTrue(anonType.isAnonymous());
         JsonObject detail = NodeBuilder.typeDetail(anonType);
         assertTrue(detail.get("isAnonymous").getAsBoolean());
     }
@@ -874,8 +857,7 @@ public class NodeBuilderTest {
                 "process", "String");
         JsonObject detail = NodeBuilder.methodDetail(process);
         JsonArray thrown = detail.getAsJsonArray("throws");
-        assertTrue(thrown.size() > 0,
-                "process(String) declares throws IllegalArgumentException");
+        assertEquals(1, thrown.size());
         assertEquals("java.lang.IllegalArgumentException",
                 thrown.get(0).getAsString());
     }
@@ -939,14 +921,88 @@ public class NodeBuilderTest {
                 "top-level type source includes class header");
     }
 
-    // ── helpers ───────────────────────────────────────────────────
+    // ── origin ────────────────────────────────────────────────────
 
-    private static IType findAnonymousChild(IMethod method)
+    @Test
+    void originOfSourceType() throws Exception {
+        IType dog = type("test.model.Dog");
+        assertEquals("source", NodeBuilder.originOf(dog));
+    }
+
+    @Test
+    void originOfBinaryType() throws Exception {
+        IType string = JdtUtils.findType("java.lang.String");
+        assertNotNull(string);
+        assertEquals("binary", NodeBuilder.originOf(string));
+    }
+
+    @Test
+    void originOfBinaryMethod() throws Exception {
+        IType string = JdtUtils.findType("java.lang.String");
+        IMethod length = JdtUtils.findMethod(
+                string, "length", null);
+        assertNotNull(length);
+        assertEquals("binary", NodeBuilder.originOf(length));
+    }
+
+    // ── lambda / anonymous fqn ───────────────────────────────────
+
+    @Test
+    void lambdaTypeFqnResolvesViaComposite() throws Exception {
+        String compositeFqn = "test.service.LambdaCallerService"
+                + "#createLambda().() -> {...} Runnable";
+        IJavaElement resolved = JdtUtils.resolveElement(compositeFqn);
+        assertNotNull(resolved,
+                "composite lambda fqn must resolve: " + compositeFqn);
+        assertTrue(resolved instanceof IType);
+        String roundTrip = NodeBuilder.fqnOf((IType) resolved);
+        assertTrue(roundTrip.contains("->"),
+                "Lambda fqn should contain arrow: " + roundTrip);
+    }
+
+    @Test
+    void anonymousTypeFqnContainsNewSuffix() throws Exception {
+        IType type = type(
+                "test.service.AnonymousCallerService");
+        IMethod method = JdtUtils.findMethod(
+                type, "createAnonymous", null);
+        assertNotNull(method);
+        IType anon = (IType) method.getChildren()[0];
+        assertTrue(anon.isAnonymous());
+        String fqn = NodeBuilder.fqnOf(anon);
+        assertTrue(fqn.contains("new"),
+                "Anonymous fqn should contain 'new': " + fqn);
+    }
+
+    // ── type detail on enum / annotation ─────────────────────────
+
+    @Test
+    void enumTypeDetailHasEnumTypeKind() throws Exception {
+        IType color = type("test.edge.Color");
+        JsonObject detail = NodeBuilder.typeDetail(color);
+        assertEquals("enum",
+                detail.get("typeKind").getAsString());
+    }
+
+    @Test
+    void annotationTypeDetailHasAnnotationTypeKind()
             throws Exception {
-        for (IJavaElement child : method.getChildren()) {
-            if (child instanceof IType t && t.isAnonymous()) return t;
-        }
-        return null;
+        IType marker = type("test.edge.Marker");
+        JsonObject detail = NodeBuilder.typeDetail(marker);
+        assertEquals("annotation",
+                detail.get("typeKind").getAsString());
+    }
+
+    // ── field detail edge cases ──────────────────────────────────
+
+    @Test
+    void fieldDetailOnEnumConstant() throws Exception {
+        IType color = type("test.edge.Color");
+        IField red = color.getField("RED");
+        assertNotNull(red);
+        JsonObject detail = NodeBuilder.fieldDetail(red);
+        assertNotNull(detail);
+        assertTrue(detail.has("fqn"));
     }
 
 }

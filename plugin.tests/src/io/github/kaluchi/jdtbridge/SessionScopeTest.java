@@ -180,5 +180,44 @@ public class SessionScopeTest {
             assertTrue(isAllScope(scope),
                     "Empty workingDir + scope disabled → ALL");
         }
+
+        @Test
+        void scopeEnabledNoWorkingDirReturnsAll()
+                throws Exception {
+            writeSession("scope-no-workdir-test",
+                    "{\"provider\":\"local\","
+                    + "\"agent\":\"claude\","
+                    + "\"projectScope\":true,"
+                    + "\"bridgePort\":12345}");
+            ProjectScope scope = sessionScope.resolve(
+                    "scope-no-workdir-test");
+            assertTrue(isAllScope(scope),
+                    "projectScope:true but no workingDir → ALL");
+        }
+
+        @Test
+        void scopeEnabledBlankWorkingDirReturnsAll()
+                throws Exception {
+            writeSession("scope-no-workdir-test",
+                    "{\"provider\":\"local\","
+                    + "\"agent\":\"claude\","
+                    + "\"workingDir\":\"  \","
+                    + "\"projectScope\":true,"
+                    + "\"bridgePort\":12345}");
+            ProjectScope scope = sessionScope.resolve(
+                    "scope-no-workdir-test");
+            assertTrue(isAllScope(scope),
+                    "projectScope:true but blank workingDir → ALL");
+        }
+
+        @Test
+        void malformedJsonReturnsAll() throws Exception {
+            writeSession("scope-no-workdir-test",
+                    "not valid json {{{");
+            ProjectScope scope = sessionScope.resolve(
+                    "scope-no-workdir-test");
+            assertTrue(isAllScope(scope),
+                    "Malformed session JSON → ALL");
+        }
     }
 }

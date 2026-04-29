@@ -3,9 +3,19 @@ package io.github.kaluchi.jdtbridge;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+
+import javax.xml.parsers.DocumentBuilderFactory;
+
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -105,7 +115,7 @@ public class LaunchHandlerTest {
     }
 
     @Nested
-    class List {
+    class ListLaunches {
 
         @Test
         void returnsArray() {
@@ -1205,6 +1215,336 @@ public class LaunchHandlerTest {
                     "org.eclipse.jdt.launching.PROGRAM_ARGUMENTS",
                     LaunchHandler.argsAttribute(
                             "some.unknown.type"));
+        }
+    }
+
+    // ---- XML history parsing helpers ----
+
+    private static Document newDocument() throws Exception {
+        return DocumentBuilderFactory.newInstance()
+                .newDocumentBuilder().newDocument();
+    }
+
+    private static Document buildHistoryDoc(
+            String groupId, String section,
+            String... mementos) throws Exception {
+        Document doc = newDocument();
+        Element root = doc.createElement("root");
+        doc.appendChild(root);
+        Element group = doc.createElement("launchGroup");
+        group.setAttribute("id", groupId);
+        root.appendChild(group);
+        Element sec = doc.createElement(section);
+        group.appendChild(sec);
+        for (String m : mementos) {
+            Element launch = doc.createElement("launch");
+            launch.setAttribute("memento", m);
+            sec.appendChild(launch);
+        }
+        return doc;
+    }
+
+    @Nested
+    class XmlHistory {
+
+        @Test
+        void findLaunchGroupReturnsMatchingGroup() throws Exception {
+            Document doc = buildHistoryDoc(
+                    "org.eclipse.debug.ui.launchGroup.run",
+                    "favorites");
+            Element group = LaunchHandler.findLaunchGroup(doc,
+                    "org.eclipse.debug.ui.launchGroup.run");
+            assertNotNull(group);
+            assertEquals("org.eclipse.debug.ui.launchGroup.run",
+                    group.getAttribute("id"));
+        }
+
+        @Test
+        void findLaunchGroupReturnsNullForMissing() throws Exception {
+            Document doc = buildHistoryDoc(
+                    "org.eclipse.debug.ui.launchGroup.run",
+                    "favorites");
+            assertNull(LaunchHandler.findLaunchGroup(doc,
+                    "no-such-group"));
+        }
+
+        @Test
+        void findLaunchGroupWithMultipleGroups() throws Exception {
+            Document doc = newDocument();
+            Element root = doc.createElement("root");
+            doc.appendChild(root);
+            for (String id : java.util.List.of(
+                    "org.eclipse.debug.ui.launchGroup.run",
+                    "org.eclipse.debug.ui.launchGroup.debug")) {
+                Element g = doc.createElement("launchGroup");
+                g.setAttribute("id", id);
+                root.appendChild(g);
+            }
+            Element debug = LaunchHandler.findLaunchGroup(doc,
+                    "org.eclipse.debug.ui.launchGroup.debug");
+            assertNotNull(debug);
+            assertEquals("org.eclipse.debug.ui.launchGroup.debug",
+                    debug.getAttribute("id"));
+        }
+
+        @Test
+        void childElementReturnsMatchingChild() throws Exception {
+            Document doc = buildHistoryDoc(
+                    "org.eclipse.debug.ui.launchGroup.run",
+                    "favorites");
+            Element group = LaunchHandler.findLaunchGroup(doc,
+                    "org.eclipse.debug.ui.launchGroup.run");
+            Element fav = LaunchHandler.childElement(
+                    group, "favorites");
+            assertNotNull(fav);
+            assertEquals("favorites", fav.getTagName());
+        }
+
+        @Test
+        void childElementReturnsNullForMissing() throws Exception {
+            Document doc = buildHistoryDoc(
+                    "org.eclipse.debug.ui.launchGroup.run",
+                    "favorites");
+            Element group = LaunchHandler.findLaunchGroup(doc,
+                    "org.eclipse.debug.ui.launchGroup.run");
+            assertNull(LaunchHandler.childElement(
+                    group, "mruHistory"));
+        }
+
+        @Test
+        void childElementSkipsTextNodes() throws Exception {
+            Document doc = buildHistoryDoc(
+                    "org.eclipse.debug.ui.launchGroup.run",
+                    "favorites");
+            Element group = LaunchHandler.findLaunchGroup(doc,
+                    "org.eclipse.debug.ui.launchGroup.run");
+            group.insertBefore(
+                    doc.createTextNode("  "),
+                    group.getFirstChild());
+            Element fav = LaunchHandler.childElement(
+                    group, "favorites");
+            assertNotNull(fav,
+                    "Should find element despite text nodes");
+        }
+
+        @Test
+        void collectSectionResolvesConfigMemento()
+                throws Exception {
+            ILaunchConfiguration cfg = createJavaConfig(
+                    "HistTest", "test.Main");
+            try {
+                String memento = cfg.getMemento();
+                Document doc = buildHistoryDoc(
+                        "org.eclipse.debug.ui.launchGroup.run",
+                        "favorites", memento);
+
+                List<ILaunchConfiguration> out = new ArrayList<>();
+                Set<String> seen = new HashSet<>();
+                LaunchHandler.collectSection(doc,
+                        "org.eclipse.debug.ui.launchGroup.run",
+                        "favorites",
+                        LaunchAttrs.launchManager(), out, seen);
+
+                assertEquals(1, out.size());
+                assertEquals("HistTest", out.get(0).getName());
+            } finally {
+                deleteIfPresent(cfg);
+            }
+        }
+
+        @Test
+        void collectSectionDeduplicatesByName() throws Exception {
+            ILaunchConfiguration cfg = createJavaConfig(
+                    "DedupTest", "test.Main");
+            try {
+                String memento = cfg.getMemento();
+                Document doc = buildHistoryDoc(
+                        "org.eclipse.debug.ui.launchGroup.run",
+                        "favorites", memento, memento);
+
+                List<ILaunchConfiguration> out = new ArrayList<>();
+                Set<String> seen = new HashSet<>();
+                LaunchHandler.collectSection(doc,
+                        "org.eclipse.debug.ui.launchGroup.run",
+                        "favorites",
+                        LaunchAttrs.launchManager(), out, seen);
+
+                assertEquals(1, out.size(),
+                        "Duplicate memento should be deduped");
+            } finally {
+                deleteIfPresent(cfg);
+            }
+        }
+
+        @Test
+        void collectSectionSkipsMissingGroup() throws Exception {
+            Document doc = buildHistoryDoc(
+                    "org.eclipse.debug.ui.launchGroup.run",
+                    "favorites");
+            List<ILaunchConfiguration> out = new ArrayList<>();
+            Set<String> seen = new HashSet<>();
+            LaunchHandler.collectSection(doc,
+                    "no.such.group", "favorites",
+                    LaunchAttrs.launchManager(), out, seen);
+            assertTrue(out.isEmpty());
+        }
+
+        @Test
+        void collectSectionSkipsMissingSection() throws Exception {
+            Document doc = buildHistoryDoc(
+                    "org.eclipse.debug.ui.launchGroup.run",
+                    "favorites");
+            List<ILaunchConfiguration> out = new ArrayList<>();
+            Set<String> seen = new HashSet<>();
+            LaunchHandler.collectSection(doc,
+                    "org.eclipse.debug.ui.launchGroup.run",
+                    "mruHistory",
+                    LaunchAttrs.launchManager(), out, seen);
+            assertTrue(out.isEmpty());
+        }
+
+        @Test
+        void collectSectionThrowsOnInvalidMemento() {
+            org.junit.jupiter.api.Assertions.assertThrows(
+                    org.eclipse.core.runtime.CoreException.class,
+                    () -> {
+                Document doc = buildHistoryDoc(
+                        "org.eclipse.debug.ui.launchGroup.run",
+                        "favorites", "invalid-memento-xyz");
+                List<ILaunchConfiguration> out = new ArrayList<>();
+                Set<String> seen = new HashSet<>();
+                LaunchHandler.collectSection(doc,
+                        "org.eclipse.debug.ui.launchGroup.run",
+                        "favorites",
+                        LaunchAttrs.launchManager(), out, seen);
+            });
+        }
+    }
+
+    @Nested
+    class StopRunning {
+
+        @Test
+        void stopNonTerminatedLaunchReturnsOk() throws Exception {
+            ILaunchConfiguration cfg = createJavaConfig(
+                    "StopRunningTest", "test.Main");
+            ILaunchManager mgr =
+                    DebugPlugin.getDefault().getLaunchManager();
+            ILaunch launch = new org.eclipse.debug.core.Launch(
+                    cfg, "run", null);
+            mgr.addLaunch(launch);
+            try {
+                assertFalse(launch.isTerminated(),
+                        "Empty launch should not be terminated");
+                String json = handler.handleStop(
+                        Map.of("launchId", "StopRunningTest"));
+                var obj = JsonParser.parseString(json)
+                        .getAsJsonObject();
+                assertTrue(obj.get("ok").getAsBoolean(),
+                        "stop must succeed: " + json);
+                assertEquals("StopRunningTest",
+                        obj.get("configId").getAsString());
+            } finally {
+                mgr.removeLaunch(launch);
+                deleteIfPresent(cfg);
+            }
+        }
+    }
+
+    @Nested
+    class ResolveLaunchFile {
+
+        @Test
+        void returnsNullForNonExistentConfig() {
+            assertNull(
+                    LaunchHandler.resolveLaunchFile(
+                            "no-such-config-file-xyz-999"));
+        }
+
+        @Test
+        void returnsFileForExistingLocalConfig() throws Exception {
+            ILaunchConfiguration cfg = createJavaConfig(
+                    "ResolveFileTest", "test.Main");
+            try {
+                java.io.File file =
+                        LaunchHandler.resolveLaunchFile(
+                                "ResolveFileTest");
+                assertNotNull(file,
+                        "Local config should have .launch file");
+                assertTrue(file.getName().endsWith(".launch"));
+                assertTrue(file.exists());
+            } finally {
+                deleteIfPresent(cfg);
+            }
+        }
+    }
+
+    @Nested
+    class ConfigXmlErrors {
+
+        @Test
+        void xmlFormatWithNoLaunchFileReturnsError()
+                throws Exception {
+            ILaunchConfiguration cfg = createJavaConfig(
+                    "XmlNoFile", "test.Main");
+            try {
+                java.io.File file =
+                        LaunchHandler.resolveLaunchFile("XmlNoFile");
+                assertNotNull(file);
+                assertTrue(file.delete(),
+                        "Should delete .launch file");
+
+                String json = handler.handleConfig(
+                        Map.of("configId", "XmlNoFile",
+                                "format", "xml"));
+                assertTrue(json.contains("error"),
+                        "Should error: " + json);
+                assertTrue(json.contains("No .launch file"),
+                        "Should say no launch file: " + json);
+            } finally {
+                deleteIfPresent(cfg);
+            }
+        }
+    }
+
+    @Nested
+    class NonLocalConfigDelete {
+
+        @Test
+        void deleteNonLocalConfigReturnsError() throws Exception {
+            io.github.kaluchi.jdtbridge.support
+                    .TestFixture.create();
+            var root = org.eclipse.core.resources.ResourcesPlugin
+                    .getWorkspace().getRoot();
+            var project = root.getProject(
+                    io.github.kaluchi.jdtbridge.support
+                            .TestFixture.PROJECT_NAME);
+            ILaunchManager mgr =
+                    DebugPlugin.getDefault().getLaunchManager();
+            ILaunchConfigurationType type =
+                    mgr.getLaunchConfigurationType(
+                            "org.eclipse.jdt.launching"
+                            + ".localJavaApplication");
+            assertNotNull(type);
+            ILaunchConfigurationWorkingCopy wc =
+                    type.newInstance(project, "NonLocalDel");
+            wc.setAttribute(
+                    "org.eclipse.jdt.launching.MAIN_TYPE",
+                    "test.Main");
+            ILaunchConfiguration cfg = wc.doSave();
+            try {
+                assertFalse(cfg.isLocal(),
+                        "Project-stored config should not be local");
+                String json = handler.handleConfigDelete(
+                        Map.of("configId", "NonLocalDel"));
+                assertTrue(json.contains("error"),
+                        "Should error: " + json);
+                assertTrue(
+                        json.contains("Not found in workspace metadata"),
+                        "Should say not in metadata: " + json);
+            } finally {
+                cfg.delete();
+            }
         }
     }
 }

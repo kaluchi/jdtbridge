@@ -34,39 +34,20 @@ import org.eclipse.ltk.core.refactoring.RefactoringCore;
 import org.eclipse.ltk.core.refactoring.RefactoringStatus;
 import org.eclipse.text.edits.TextEdit;
 
-/**
- * Handlers for refactoring operations: organize-imports, format,
- * rename, move.
- */
 class RefactoringHandler {
 
     private static final String MANIPULATION_NODE =
             "org.eclipse.jdt.core.manipulation";
 
-    /**
-     * Ensure import order defaults exist. In headless PDE,
-     * JDT UI may not start and ProjectScope.getNode(null)
-     * hangs if no preference node ID is set.
-     *
-     * We only set the node ID when it's null — if JDT UI
-     * is available, its JavaPlugin.start() sets it first
-     * and we leave it alone.
-     */
     static void ensurePreferencesInitialized() {
         String nodeId = JavaManipulation.getPreferenceNodeId();
         if (nodeId != null) return;
-        // JDT UI not started yet. Check if the bundle exists
-        // (without activating it — activation may need SWT).
         var jdtUi = org.eclipse.core.runtime.Platform
                 .getBundle("org.eclipse.jdt.ui");
         if (jdtUi != null && jdtUi.getState()
-                != org.osgi.framework.Bundle.UNINSTALLED) {
-            // Bundle available — let it activate naturally
-            // on first class access. Don't race with
-            // JavaPlugin.start() setPreferenceNodeId().
+                == org.osgi.framework.Bundle.ACTIVE) {
             return;
         }
-        // Truly headless — JDT UI not available at all.
         nodeId = MANIPULATION_NODE;
         JavaManipulation.setPreferenceNodeId(nodeId);
         var defaults = DefaultScope.INSTANCE.getNode(nodeId);
@@ -85,103 +66,80 @@ class RefactoringHandler {
 
     String handleOrganizeImports(Map<String, String> params)
             throws Exception {
-        String filePath = params.get("file");
-        if (filePath == null || filePath.isBlank()) {
-            return HttpServer.missingParamError("file");
-        }
+        return resolveUnit(params).then(cu -> {
+            ensurePreferencesInitialized();
 
-        ICompilationUnit cu = findCompilationUnit(filePath);
-        if (cu == null) {
-            return HttpServer.jsonError("Java file not found: " + filePath);
-        }
+            OrganizeImportsOperation.IChooseImportQuery query =
+                    (openChoices, ranges) -> {
+                        TypeNameMatch[] result =
+                                new TypeNameMatch[openChoices.length];
+                        for (int i = 0; i < openChoices.length; i++) {
+                            result[i] = openChoices[i][0];
+                        }
+                        return result;
+                    };
 
-        cu.getResource().refreshLocal(IResource.DEPTH_ZERO, null);
-        ensurePreferencesInitialized();
+            String source = cu.getSource();
+            OrganizeImportsOperation op =
+                    new OrganizeImportsOperation(
+                            cu, null, true, false, true, query);
+            TextEdit edit = op.createTextEdit(null);
 
-        OrganizeImportsOperation.IChooseImportQuery query =
-                (openChoices, ranges) -> {
-                    TypeNameMatch[] result =
-                            new TypeNameMatch[openChoices.length];
-                    for (int i = 0; i < openChoices.length; i++) {
-                        result[i] = openChoices[i][0];
-                    }
-                    return result;
-                };
+            int added = op.getNumberOfImportsAdded();
+            int removed = op.getNumberOfImportsRemoved();
 
-        // Don't use working copy — IBuffer.setContents() goes
-        // through DocumentAdapter → Display.syncExec() which
-        // deadlocks in headless PDE test runtime. Instead,
-        // compute the edit and write the file directly.
-        String source = cu.getSource();
-        OrganizeImportsOperation op =
-                new OrganizeImportsOperation(
-                        cu, null, true, false, true, query);
-        TextEdit edit = op.createTextEdit(null);
+            if (edit != null && (added > 0 || removed > 0)) {
+                Document doc = new Document(source);
+                edit.apply(doc);
+                writeSource(cu, doc.get());
+            }
 
-        int added = op.getNumberOfImportsAdded();
-        int removed = op.getNumberOfImportsRemoved();
-
-        if (edit != null && (added > 0 || removed > 0)) {
-            Document doc = new Document(source);
-            edit.apply(doc);
-            writeSource(cu, doc.get());
-        }
-
-        var r = new JsonObject();
-        r.addProperty("added", added);
-        r.addProperty("removed", removed);
-        return r.toString();
+            var r = new JsonObject();
+            r.addProperty("added", added);
+            r.addProperty("removed", removed);
+            return r.toString();
+        });
     }
 
     String handleFormat(Map<String, String> params) throws Exception {
-        String filePath = params.get("file");
-        if (filePath == null || filePath.isBlank()) {
-            return HttpServer.missingParamError("file");
-        }
+        return resolveUnit(params).then(cu -> {
+            String source = cu.getSource();
+            Map<String, String> options =
+                    cu.getJavaProject().getOptions(true);
 
-        ICompilationUnit cu = findCompilationUnit(filePath);
-        if (cu == null) {
-            return HttpServer.jsonError("Java file not found: " + filePath);
-        }
+            String lineSep = source.contains("\r\n") ? "\r\n" : "\n";
+            CodeFormatter formatter =
+                    ToolFactory.createCodeFormatter(options);
+            TextEdit edit = formatter.format(
+                    CodeFormatter.K_COMPILATION_UNIT,
+                    source, 0, source.length(),
+                    0, lineSep);
 
-        cu.getResource().refreshLocal(IResource.DEPTH_ZERO, null);
+            if (edit == null) {
+                var r = new JsonObject();
+                r.addProperty("modified", false);
+                r.addProperty("reason",
+                        "formatter returned no edits"
+                        + " (syntax error?)");
+                return r.toString();
+            }
 
-        String source = cu.getSource();
-        Map<String, String> options =
-                cu.getJavaProject().getOptions(true);
+            Document document = new Document(source);
+            edit.apply(document);
+            String formatted = document.get();
 
-        String lineSep = source.contains("\r\n") ? "\r\n" : "\n";
-        CodeFormatter formatter =
-                ToolFactory.createCodeFormatter(options);
-        TextEdit edit = formatter.format(
-                CodeFormatter.K_COMPILATION_UNIT,
-                source, 0, source.length(),
-                0, lineSep);
+            if (formatted.equals(source)) {
+                var r = new JsonObject();
+                r.addProperty("modified", false);
+                return r.toString();
+            }
 
-        if (edit == null) {
+            writeSource(cu, formatted);
+
             var r = new JsonObject();
-            r.addProperty("modified", false);
-            r.addProperty("reason",
-                    "formatter returned no edits"
-                    + " (syntax error?)");
+            r.addProperty("modified", true);
             return r.toString();
-        }
-
-        Document document = new Document(source);
-        edit.apply(document);
-        String formatted = document.get();
-
-        if (formatted.equals(source)) {
-            var r = new JsonObject();
-            r.addProperty("modified", false);
-            return r.toString();
-        }
-
-        writeSource(cu, formatted);
-
-        var r = new JsonObject();
-        r.addProperty("modified", true);
-        return r.toString();
+        });
     }
 
     String handleRename(Map<String, String> params) throws Exception {
@@ -195,45 +153,44 @@ class RefactoringHandler {
             return HttpServer.missingParamError("newName");
         }
 
-        IType type = JdtUtils.findType(fqn);
-        if (type == null) {
-            return HttpServer.jsonError("Type not found: " + fqn);
-        }
+        return resolveType(fqn).then(type -> {
+            String methodName = params.get("method");
+            String fieldName = params.get("field");
 
-        String methodName = params.get("method");
-        String fieldName = params.get("field");
+            IJavaElement element;
+            String refactoringId;
 
-        IJavaElement element;
-        String refactoringId;
-
-        if (fieldName != null && !fieldName.isBlank()) {
-            IField field = type.getField(fieldName);
-            if (field == null || !field.exists()) {
-                return HttpServer.jsonError("Field not found: " + fieldName
-                        + " in " + fqn);
+            if (fieldName != null && !fieldName.isBlank()) {
+                IField field = type.getField(fieldName);
+                if (field == null || !field.exists()) {
+                    return HttpServer.jsonError(
+                            "Field not found: " + fieldName
+                            + " in " + fqn);
+                }
+                element = field;
+                refactoringId = IJavaRefactorings.RENAME_FIELD;
+            } else if (methodName != null && !methodName.isBlank()) {
+                IMethod method = JdtUtils.findMethod(type,
+                        methodName, params.get("paramTypes"));
+                if (method == null) {
+                    return HttpServer.jsonError(
+                            "Method not found: " + methodName
+                            + " in " + fqn);
+                }
+                element = method;
+                refactoringId = IJavaRefactorings.RENAME_METHOD;
+            } else {
+                element = type;
+                refactoringId = IJavaRefactorings.RENAME_TYPE;
             }
-            element = field;
-            refactoringId = IJavaRefactorings.RENAME_FIELD;
-        } else if (methodName != null && !methodName.isBlank()) {
-            IMethod method = JdtUtils.findMethod(type, methodName,
-                    params.get("paramTypes"));
-            if (method == null) {
-                return HttpServer.jsonError("Method not found: " + methodName
-                        + " in " + fqn);
-            }
-            element = method;
-            refactoringId = IJavaRefactorings.RENAME_METHOD;
-        } else {
-            element = type;
-            refactoringId = IJavaRefactorings.RENAME_TYPE;
-        }
 
-        return performRefactoring(refactoringId, descriptor -> {
-            RenameJavaElementDescriptor rd =
-                    (RenameJavaElementDescriptor) descriptor;
-            rd.setJavaElement(element);
-            rd.setNewName(newName);
-            rd.setUpdateReferences(true);
+            return performRefactoring(refactoringId, descriptor -> {
+                RenameJavaElementDescriptor rd =
+                        (RenameJavaElementDescriptor) descriptor;
+                rd.setJavaElement(element);
+                rd.setNewName(newName);
+                rd.setUpdateReferences(true);
+            });
         });
     }
 
@@ -248,46 +205,43 @@ class RefactoringHandler {
             return HttpServer.missingParamError("target");
         }
 
-        IType type = JdtUtils.findType(fqn);
-        if (type == null) {
-            return HttpServer.jsonError("Type not found: " + fqn);
-        }
+        return resolveType(fqn).then(type -> {
+            ICompilationUnit cu = type.getCompilationUnit();
+            if (cu == null) {
+                return HttpServer.jsonError(
+                        "Cannot move binary type");
+            }
 
-        ICompilationUnit cu = type.getCompilationUnit();
-        if (cu == null) {
-            return HttpServer.jsonError("Cannot move binary type");
-        }
+            IPackageFragmentRoot sourceRoot =
+                    (IPackageFragmentRoot) cu.getAncestor(
+                            IJavaElement.PACKAGE_FRAGMENT_ROOT);
+            IPackageFragment dest =
+                    sourceRoot.getPackageFragment(targetPkg);
+            if (!dest.exists()) {
+                dest = sourceRoot.createPackageFragment(
+                        targetPkg, true,
+                        new NullProgressMonitor());
+            }
 
-        IPackageFragmentRoot sourceRoot = (IPackageFragmentRoot)
-                cu.getAncestor(IJavaElement.PACKAGE_FRAGMENT_ROOT);
-        IPackageFragment dest =
-                sourceRoot.getPackageFragment(targetPkg);
-        if (!dest.exists()) {
-            dest = sourceRoot.createPackageFragment(
-                    targetPkg, true, new NullProgressMonitor());
-        }
-
-        final IPackageFragment targetDest = dest;
-        return performRefactoring(IJavaRefactorings.MOVE,
-                descriptor -> {
-                    MoveDescriptor md = (MoveDescriptor) descriptor;
-                    md.setMoveResources(
-                            new IFile[0],
-                            new org.eclipse.core.resources.IFolder[0],
-                            new ICompilationUnit[]{cu});
-                    md.setDestination(targetDest);
-                    md.setUpdateReferences(true);
-                    md.setUpdateQualifiedNames(true);
-                });
+            final IPackageFragment targetDest = dest;
+            return performRefactoring(IJavaRefactorings.MOVE,
+                    descriptor -> {
+                        MoveDescriptor md =
+                                (MoveDescriptor) descriptor;
+                        md.setMoveResources(
+                                new IFile[0],
+                                new org.eclipse.core.resources
+                                        .IFolder[0],
+                                new ICompilationUnit[]{cu});
+                        md.setDestination(targetDest);
+                        md.setUpdateReferences(true);
+                        md.setUpdateQualifiedNames(true);
+                    });
+        });
     }
 
     // ---- Helpers ----
 
-    /**
-     * Write source to a compilation unit's file directly,
-     * bypassing working copy / DocumentAdapter which uses
-     * Display.syncExec() and deadlocks in headless runtime.
-     */
     private void writeSource(ICompilationUnit cu, String source)
             throws Exception {
         IFile file = (IFile) cu.getResource();
@@ -330,24 +284,15 @@ class RefactoringHandler {
         RefactoringStatus status = new RefactoringStatus();
         Refactoring refactoring =
                 descriptor.createRefactoring(status);
-        if (status.hasFatalError()) {
-            return HttpServer.jsonError(status.getMessageMatchingSeverity(
-                    RefactoringStatus.FATAL));
-        }
+        if (status.hasFatalError()) return fatalErrorJson(status);
 
         status.merge(refactoring.checkInitialConditions(
                 new NullProgressMonitor()));
-        if (status.hasFatalError()) {
-            return HttpServer.jsonError(status.getMessageMatchingSeverity(
-                    RefactoringStatus.FATAL));
-        }
+        if (status.hasFatalError()) return fatalErrorJson(status);
 
         status.merge(refactoring.checkFinalConditions(
                 new NullProgressMonitor()));
-        if (status.hasFatalError()) {
-            return HttpServer.jsonError(status.getMessageMatchingSeverity(
-                    RefactoringStatus.FATAL));
-        }
+        if (status.hasFatalError()) return fatalErrorJson(status);
 
         Change change = refactoring.createChange(
                 new NullProgressMonitor());
@@ -369,5 +314,60 @@ class RefactoringHandler {
             result.add("warnings", warnings);
         }
         return result.toString();
+    }
+
+    private static String fatalErrorJson(RefactoringStatus status) {
+        return HttpServer.jsonError(
+                status.getMessageMatchingSeverity(
+                        RefactoringStatus.FATAL));
+    }
+
+    @FunctionalInterface
+    interface ThrowingFunction<T, R> {
+        R apply(T value) throws Exception;
+    }
+
+    sealed interface Resolved<T> {
+        record Ok<T>(T value) implements Resolved<T> {
+            @Override
+            public String then(ThrowingFunction<T, String> body)
+                    throws Exception {
+                return body.apply(value);
+            }
+        }
+        record Fail<T>(String error) implements Resolved<T> {
+            @Override
+            public String then(ThrowingFunction<T, String> body) {
+                return error;
+            }
+        }
+        String then(ThrowingFunction<T, String> body)
+                throws Exception;
+    }
+
+    private Resolved<ICompilationUnit> resolveUnit(
+            Map<String, String> params) throws Exception {
+        String filePath = params.get("file");
+        if (filePath == null || filePath.isBlank()) {
+            return new Resolved.Fail<>(
+                    HttpServer.missingParamError("file"));
+        }
+        ICompilationUnit cu = findCompilationUnit(filePath);
+        if (cu == null) {
+            return new Resolved.Fail<>(HttpServer.jsonError(
+                    "Java file not found: " + filePath));
+        }
+        cu.getResource().refreshLocal(IResource.DEPTH_ZERO, null);
+        return new Resolved.Ok<>(cu);
+    }
+
+    private static Resolved<IType> resolveType(String fqn)
+            throws Exception {
+        IType type = JdtUtils.findType(fqn);
+        if (type == null) {
+            return new Resolved.Fail<>(HttpServer.jsonError(
+                    "Type not found: " + fqn));
+        }
+        return new Resolved.Ok<>(type);
     }
 }
