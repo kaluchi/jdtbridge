@@ -7,7 +7,6 @@ import java.lang.reflect.Proxy;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.Path;
 import org.eclipse.jdt.core.IClasspathEntry;
-import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.IType;
@@ -315,116 +314,66 @@ public class TestHandlerTest {
                         "  ", "com.example", "my-server"));
     }
 
-    /**
-     * Project where platform markers are NOT resolvable,
-     * but an optional fallback type IS (e.g. Jupiter API
-     * present without junit-platform-commons).
-     */
+    private static final java.util.Map<Class<?>, Object>
+            PRIMITIVE_DEFAULTS = java.util.Map.of(
+            Boolean.TYPE, false, Byte.TYPE, (byte) 0,
+            Short.TYPE, (short) 0, Integer.TYPE, 0,
+            Long.TYPE, 0L, Float.TYPE, 0f,
+            Double.TYPE, 0d, Character.TYPE, '\0');
+
+    @SuppressWarnings("unchecked")
+    private static <T> T proxy(Class<T> iface,
+            java.util.Map<String, Object> responses) {
+        return (T) Proxy.newProxyInstance(
+                iface.getClassLoader(),
+                new Class<?>[] { iface },
+                (p, method, args) -> responses.getOrDefault(
+                        method.getName(),
+                        PRIMITIVE_DEFAULTS.get(
+                                method.getReturnType())));
+    }
+
     private IJavaProject fakeProjectWithFallbackOnly(
             String fallbackFqn) {
-        return (IJavaProject) Proxy.newProxyInstance(
-                IJavaProject.class.getClassLoader(),
-                new Class<?>[] { IJavaProject.class },
-                (proxy, method, args) -> {
-                    if ("findType".equals(method.getName())
-                            && args != null
-                            && args.length == 1
-                            && fallbackFqn != null
-                            && fallbackFqn.equals(args[0])) {
-                        return fakeType(fallbackFqn,
+        java.util.Map<String, IType> types = fallbackFqn != null
+                ? java.util.Map.of(fallbackFqn,
+                        fakeType(fallbackFqn,
                                 "junit-jupiter-api-5.12.1.jar",
                                 new Path("/libs/junit-jupiter-api"
-                                        + "-5.12.1.jar"));
-                    }
-                    return defaultValue(method.getReturnType());
-                });
+                                        + "-5.12.1.jar")))
+                : java.util.Map.of();
+        return fakeProject(types);
     }
 
     private IJavaProject fakeProjectWithMarker(String markerFqn,
             String jarName) {
-        IPath rawClasspathPath = new Path("/libs/" + jarName);
-        IType marker = fakeType(markerFqn, jarName, rawClasspathPath);
+        IType marker = fakeType(markerFqn, jarName,
+                new Path("/libs/" + jarName));
+        return fakeProject(java.util.Map.of(markerFqn, marker));
+    }
 
+    @SuppressWarnings("unchecked")
+    private IJavaProject fakeProject(
+            java.util.Map<String, IType> types) {
         return (IJavaProject) Proxy.newProxyInstance(
                 IJavaProject.class.getClassLoader(),
                 new Class<?>[] { IJavaProject.class },
-                (proxy, method, args) -> {
-                    if ("findType".equals(method.getName())
-                            && args != null
-                            && args.length == 1
-                            && markerFqn.equals(args[0])) {
-                        return marker;
-                    }
-                    return defaultValue(method.getReturnType());
-                });
+                (p, method, args) -> java.util.Optional
+                        .ofNullable(args)
+                        .map(a -> types.get((String) a[0]))
+                        .orElse(null));
     }
 
     private IType fakeType(String fqn, String jarName,
             IPath rawClasspathPath) {
-        IClasspathEntry entry = (IClasspathEntry)
-                Proxy.newProxyInstance(
-                        IClasspathEntry.class.getClassLoader(),
-                        new Class<?>[] { IClasspathEntry.class },
-                        (proxy, method, args) -> {
-                            if ("getPath".equals(method.getName())) {
-                                return rawClasspathPath;
-                            }
-                            throw notMocked(method);
-                        });
-
-        IPackageFragmentRoot root = (IPackageFragmentRoot)
-                Proxy.newProxyInstance(
-                        IPackageFragmentRoot.class.getClassLoader(),
-                        new Class<?>[] { IPackageFragmentRoot.class },
-                        (proxy, method, args) -> {
-                            if ("getRawClasspathEntry".equals(
-                                    method.getName())) {
-                                return entry;
-                            }
-                            throw notMocked(method);
-                        });
-
-        IPath binaryPath = new Path("/repo/" + jarName);
-        return (IType) Proxy.newProxyInstance(
-                IType.class.getClassLoader(),
-                new Class<?>[] { IType.class },
-                (proxy, method, args) -> {
-                    if ("getPath".equals(method.getName())) {
-                        return binaryPath;
-                    }
-                    if ("getFullyQualifiedName".equals(
-                            method.getName())) {
-                        return fqn;
-                    }
-                    if ("getAncestor".equals(method.getName())
-                            && args != null
-                            && args.length == 1
-                            && Integer.valueOf(
-                                    IJavaElement
-                                            .PACKAGE_FRAGMENT_ROOT)
-                                    .equals(args[0])) {
-                        return root;
-                    }
-                    throw notMocked(method);
-                });
-    }
-
-    private static UnsupportedOperationException notMocked(
-            java.lang.reflect.Method method) {
-        return new UnsupportedOperationException(
-                "method not mocked: " + method.getName());
-    }
-
-    private Object defaultValue(Class<?> returnType) {
-        if (returnType == Void.TYPE) return null;
-        if (returnType == Boolean.TYPE) return false;
-        if (returnType == Byte.TYPE) return (byte) 0;
-        if (returnType == Short.TYPE) return (short) 0;
-        if (returnType == Integer.TYPE) return 0;
-        if (returnType == Long.TYPE) return 0L;
-        if (returnType == Float.TYPE) return 0f;
-        if (returnType == Double.TYPE) return 0d;
-        if (returnType == Character.TYPE) return '\0';
-        return null;
+        IClasspathEntry entry = proxy(IClasspathEntry.class,
+                java.util.Map.of("getPath", rawClasspathPath));
+        IPackageFragmentRoot root = proxy(
+                IPackageFragmentRoot.class,
+                java.util.Map.of("getRawClasspathEntry", entry));
+        return proxy(IType.class, java.util.Map.of(
+                "getPath", new Path("/repo/" + jarName),
+                "getFullyQualifiedName", fqn,
+                "getAncestor", root));
     }
 }
