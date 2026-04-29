@@ -10,8 +10,9 @@ import org.eclipse.debug.core.ILaunchConfigurationType;
 import org.eclipse.debug.core.ILaunchConfigurationWorkingCopy;
 import org.eclipse.debug.core.ILaunchManager;
 import org.eclipse.eclemma.core.CoverageTools;
-import org.eclipse.eclemma.core.IExecutionDataSource;
 import org.eclipse.eclemma.core.ISessionImporter;
+
+import io.github.kaluchi.jdtbridge.support.TestCoverageStubs;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -288,7 +289,8 @@ public class CoverageHandlerTest {
 		ISessionImporter importer = CoverageTools.getImporter();
         importer.setDescription(description);
         importer.setScope(Set.of());
-        importer.setExecutionDataSource(emptyDataSource());
+        importer.setExecutionDataSource(
+                TestCoverageStubs.emptyDataSource());
         importer.setCopy(false);
         importer.importSession(new NullProgressMonitor());
         Job.getJobManager().join(
@@ -298,12 +300,5 @@ public class CoverageHandlerTest {
                 .map(r -> r.coverageId)
                 .findFirst()
                 .orElseThrow();
-    }
-
-    @SuppressWarnings("restriction")
-	private static IExecutionDataSource emptyDataSource() {
-        return (execVisitor, sessionInfoVisitor) -> {
-            // Intentionally empty.
-        };
     }
 }
