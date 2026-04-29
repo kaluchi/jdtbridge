@@ -394,6 +394,45 @@ approval before publishing. Use `gh release edit vX.Y.Z --notes "..."`.
 See previous releases for style (feature paragraphs, not bullet lists
 of commits).
 
+## Test requirements
+
+Tests are code. Same quality bar as production — no fallbacks,
+no dead branches, no defensive patterns "just in case."
+
+**100% test-file coverage.** Every line and branch inside a test
+file must be exercised. If JaCoCo shows a missed branch in your
+test, you wrote a branching construct that doesn't belong there.
+
+**No branching in tests.** A test is a deterministic sequence:
+set up → call → assert. No `if`, no `for` with filter predicates,
+no `try/catch`, no `stream().filter().findFirst().orElseThrow()`.
+Each of these creates branches JaCoCo must cover — and the
+"other" branch is unreachable by design, tanking coverage.
+
+- Direct index access (`entries[0]`) not loop + filter
+- Direct cast (`(IType) children[0]`) not `instanceof` scan
+- `JsonArray.contains(new JsonPrimitive("x"))` not loop + flag
+- `assertNotNull(x)` then use `x` — not `if (x != null)`
+
+**No conditional test execution.** No `if (!available()) return`,
+no `@EnabledIf`, no `Assumptions.assumeTrue`. A test either runs
+its assertions or fails loud. If a test needs a runtime capability
+(UI bundle, specific launch type), put it in the correct suite
+from the start — `plugin.tests` (headless) vs `plugin.tests.ui`
+(workbench).
+
+**No null from test helpers.** A helper that looks something up
+either finds it or throws `AssertionError`. Never return null
+and check at the call site.
+
+**Shared infrastructure goes in `tests.support`.** TestFixture,
+TestAwait, and any reusable lookup/factory helpers belong in the
+`tests.support` module — not duplicated across test files.
+
+**No defensive cleanup.** `cu.delete(true, null)` not
+`if (cu.exists()) cu.delete(...)`. The test created the resource;
+it must exist. If it doesn't, the test is broken — let it fail.
+
 ## Conventions
 
 - Java: Eclipse formatter (`jdt format <file>`)
