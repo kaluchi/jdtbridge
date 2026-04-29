@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IType;
@@ -51,14 +50,11 @@ public class SyntheticFqnTest {
 
     private static IType syntheticAnonymousChild(IMethod enclosing)
             throws Exception {
-        // Anonymous types — but not lambdas — appear in
-        // IParent.getChildren(). Used for the anonymous-specific
-        // fqnOf emission test; lambda tests go through
-        // resolveElement (AST-resolved).
         for (IJavaElement child : enclosing.getChildren()) {
             if (child instanceof IType t && t.isAnonymous()) return t;
         }
-        return null;
+        throw new AssertionError(
+                "no anonymous child in " + enclosing.getElementName());
     }
 
     /**
@@ -80,9 +76,9 @@ public class SyntheticFqnTest {
     private static String fqnOf(IJavaElement e) throws JavaModelException {
         if (e instanceof IType t) return NodeBuilder.fqnOf(t);
         if (e instanceof IMethod m) return NodeBuilder.fqnOf(m);
-        if (e instanceof IField f) return NodeBuilder.fqnOf(f);
-        throw new IllegalArgumentException(
-                "unsupported kind: " + e.getClass().getSimpleName());
+        throw new AssertionError(
+                "expected IType or IMethod, got "
+                + e.getClass().getSimpleName());
     }
 
     // ── NodeBuilder.fqnOf emits composite FQNs ──────────────────────
