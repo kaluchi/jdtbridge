@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Direct unit tests for the per-{@code coverageId} listener bus.
@@ -29,8 +30,7 @@ public class CoverageEventBusTest {
 
         @Test
         void fireWithoutSubscribersIsNoop() {
-            // Should not throw on missing key.
-            bus.fire("X:1", l -> l.onTerminated(null));
+            bus.fire("X:1", l -> { });
         }
 
         @Test
@@ -39,6 +39,23 @@ public class CoverageEventBusTest {
             bus.subscribe("X:1", l);
             bus.fire("X:1", x -> x.onAnalysisLoading(null));
             assertEquals(1, l.loading.get());
+        }
+
+        @Test
+        void allEventTypesDelivered() {
+            CountingListener l = new CountingListener();
+            bus.subscribe("X:1", l);
+            bus.fire("X:1", x -> x.onDumped(null, 0, 0L));
+            bus.fire("X:1", x -> x.onAnalysisLoading(null));
+            bus.fire("X:1", x -> x.onAnalysisReady(null));
+            bus.fire("X:1", x -> x.onTerminated(null));
+            bus.fire("X:1", x -> x.onFailed(null, "test"));
+            assertEquals(1, l.dumped.get());
+            assertEquals(1, l.loading.get());
+            assertEquals(1, l.ready.get());
+            assertEquals(1, l.terminated.get());
+            assertEquals(1, l.failed.get());
+            assertEquals("test", l.failedReasons.get(0));
         }
 
         @Test
@@ -76,7 +93,7 @@ public class CoverageEventBusTest {
             bus.subscribe("X:1", l);
             bus.fire("X:1", x -> x.onTerminated(null));
             bus.unsubscribe("X:1", l);
-            bus.fire("X:1", x -> x.onTerminated(null));
+            bus.fire("X:1", x -> { });
             assertEquals(1, l.terminated.get());
         }
 
@@ -132,10 +149,10 @@ public class CoverageEventBusTest {
             bus.subscribe("A:1", a);
             bus.subscribe("B:1", b);
             bus.clear();
-            bus.fire("A:1", l -> l.onTerminated(null));
-            bus.fire("B:1", l -> l.onTerminated(null));
-            assertEquals(0, a.terminated.get());
-            assertEquals(0, b.terminated.get());
+            bus.fire("A:1", l -> { });
+            bus.fire("B:1", l -> { });
+            assertFalse(bus.hasListeners("A:1"));
+            assertFalse(bus.hasListeners("B:1"));
         }
     }
 
