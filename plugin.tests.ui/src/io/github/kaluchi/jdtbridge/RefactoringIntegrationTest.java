@@ -316,15 +316,15 @@ public class RefactoringIntegrationTest {
 
     private static void deleteTempCU(
             String pkgName, String fileName) throws Exception {
-        var cu = srcRoot().getPackageFragment(pkgName)
-                .getCompilationUnit(fileName);
-        if (cu.exists()) cu.delete(true, null);
+        srcRoot().getPackageFragment(pkgName)
+                .getCompilationUnit(fileName)
+                .delete(true, null);
     }
 
     private static void deleteTempPkg(String pkgName)
             throws Exception {
-        var pkg = srcRoot().getPackageFragment(pkgName);
-        if (pkg.exists()) pkg.delete(true, null);
+        srcRoot().getPackageFragment(pkgName)
+                .delete(true, null);
     }
 
     private static void assertJsonError(

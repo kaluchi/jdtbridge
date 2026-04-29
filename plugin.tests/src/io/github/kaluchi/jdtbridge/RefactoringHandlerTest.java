@@ -253,7 +253,7 @@ public class RefactoringHandlerTest {
                         "second format should be no-op: " + json2);
             } finally {
                 var cu = pkg.getCompilationUnit("FormatOnce.java");
-                if (cu.exists()) cu.delete(true, null);
+                cu.delete(true, null);
             }
         }
 
