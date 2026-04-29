@@ -180,8 +180,8 @@ public class RefactoringHandlerTest {
             assertTrue(obj.has("removed"),
                     "should have removed: " + json);
             int removed = obj.get("removed").getAsInt();
-            assertTrue(removed >= 2,
-                    "Map + Set should be removed: removed=" + removed);
+            assertEquals(2, removed,
+                    "Map + Set should be removed");
         }
 
         @Test

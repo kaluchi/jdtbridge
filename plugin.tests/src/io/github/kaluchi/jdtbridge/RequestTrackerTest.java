@@ -179,16 +179,12 @@ public class RequestTrackerTest {
             for (int i = 0; i < producers; i++) {
                 pool.submit(() -> {
                     ready.countDown();
-                    try {
-                        start.await();
-                        for (int j = 0; j < perProducer; j++) {
-                            tracker.logTelemetry("S", "x");
-                        }
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    } finally {
-                        done.countDown();
+                    start.await();
+                    for (int j = 0; j < perProducer; j++) {
+                        tracker.logTelemetry("S", "x");
                     }
+                    done.countDown();
+                    return null;
                 });
             }
             assertTrue(ready.await(2, TimeUnit.SECONDS));

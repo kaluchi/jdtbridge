@@ -2,6 +2,7 @@ package io.github.kaluchi.jdtbridge;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -133,10 +134,7 @@ public class LaunchHandlerTest {
             mgr.removeLaunches(existing);
             String json = handler.handleList(Map.of(), ProjectScope.ALL);
             assertEquals("[]", json);
-            // Restore
-            for (ILaunch l : existing) {
-                mgr.addLaunch(l);
-            }
+            mgr.addLaunches(existing);
         }
 
         @Test
@@ -563,9 +561,10 @@ public class LaunchHandlerTest {
 
                 assertNotNull(fullOut, "Should have full output");
                 assertNotNull(tailOut, "Should have tail output");
-                assertTrue(
-                        tailOut.length() <= fullOut.length(),
-                        "Tail should be <= full");
+                io.github.kaluchi.jdtbridge.support.TestAwait
+                        .assertAtMost(fullOut.length(),
+                                tailOut.length(),
+                                "Tail should be <= full");
             } finally {
                 mgr.removeLaunch(launch);
             }
@@ -1355,20 +1354,33 @@ public class LaunchHandlerTest {
         }
 
         @Test
-        void collectSectionThrowsOnInvalidMemento() {
-            org.junit.jupiter.api.Assertions.assertThrows(
+        void collectSectionThrowsOnInvalidMemento()
+                throws Exception {
+            ILaunchConfiguration cfg = createJavaConfig(
+                    "ThrowTest", "test.Main");
+            assertNull(collectSectionException(cfg.getMemento()));
+            deleteIfPresent(cfg);
+            assertEquals(
                     org.eclipse.core.runtime.CoreException.class,
-                    () -> {
-                Document doc = buildHistoryDoc(
-                        "org.eclipse.debug.ui.launchGroup.run",
-                        "favorites", "invalid-memento-xyz");
-                List<ILaunchConfiguration> out = new ArrayList<>();
-                Set<String> seen = new HashSet<>();
+                    collectSectionException("invalid-memento-xyz"));
+        }
+
+        private static Class<?> collectSectionException(
+                String memento) throws Exception {
+            Document doc = buildHistoryDoc(
+                    "org.eclipse.debug.ui.launchGroup.run",
+                    "favorites", memento);
+            List<ILaunchConfiguration> out = new ArrayList<>();
+            Set<String> seen = new HashSet<>();
+            try {
                 LaunchHandler.collectSection(doc,
                         "org.eclipse.debug.ui.launchGroup.run",
                         "favorites",
                         LaunchAttrs.launchManager(), out, seen);
-            });
+                return null;
+            } catch (org.eclipse.core.runtime.CoreException e) {
+                return e.getClass();
+            }
         }
     }
 
