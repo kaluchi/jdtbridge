@@ -201,6 +201,11 @@ For CI without local Eclipse: `mvn clean verify -Pci`.
    - `cli/src/commands/*.mjs` (per-command help)
    - `README.md`, `cli/README.md`, `plugin/README.md`, this file
 7. **Commit → push → PR → squash merge → delete branch**
+8. **After merge** — switch to master, pull, clean build:
+   ```bash
+   git checkout master && git pull
+   jdt build --clean
+   ```
 
 ### Pull requests
 
@@ -235,6 +240,10 @@ Never use `sleep` loops to poll CI status.
 
 ### Important details
 
+- **Clean build after branch switch or merge.** `git checkout`, `git pull`,
+  squash merge — all rewrite `.class` files that Eclipse's incremental
+  builder may not invalidate. Run `jdt build --clean` to avoid phantom
+  errors and stale bytecode. This also applies after `git pull` on master.
 - **New Java files invisible until build.** `jdt test run` says "Type not found"
   → run `jdt build` for the project first.
 - **Build order matters.** `plugin.tests` is a Fragment-Host of `plugin` —
