@@ -289,6 +289,74 @@ public class HttpIntegrationTest {
                 "telemetry GET: " + response);
     }
 
+    // ---- Streaming endpoint error paths ----
+
+    @Test
+    public void consoleStreamMissingLaunchIdReturns400()
+            throws Exception {
+        String response = rawRequest(
+                "GET /launch/console/stream HTTP/1.1",
+                "Host: localhost",
+                "Authorization: Bearer " + TOKEN);
+        assertTrue(response.contains("400"),
+                "missing launchId → 400: " + response);
+    }
+
+    @Test
+    public void consoleStreamUnknownLaunchReturns404()
+            throws Exception {
+        String response = rawRequest(
+                "GET /launch/console/stream?launchId=no-such HTTP/1.1",
+                "Host: localhost",
+                "Authorization: Bearer " + TOKEN);
+        assertTrue(response.contains("404"),
+                "unknown launch → 404: " + response);
+    }
+
+    @Test
+    public void testStatusStreamMissingIdReturns400()
+            throws Exception {
+        String response = rawRequest(
+                "GET /test/status/stream HTTP/1.1",
+                "Host: localhost",
+                "Authorization: Bearer " + TOKEN);
+        assertTrue(response.contains("400"),
+                "missing testRunId → 400: " + response);
+    }
+
+    @Test
+    public void testStatusStreamUnknownIdReturns404()
+            throws Exception {
+        String response = rawRequest(
+                "GET /test/status/stream?testRunId=no-such HTTP/1.1",
+                "Host: localhost",
+                "Authorization: Bearer " + TOKEN);
+        assertTrue(response.contains("404"),
+                "unknown testRunId → 404: " + response);
+    }
+
+    @Test
+    public void coverageStreamMissingIdReturns400()
+            throws Exception {
+        String response = rawRequest(
+                "GET /coverage/session/stream HTTP/1.1",
+                "Host: localhost",
+                "Authorization: Bearer " + TOKEN);
+        assertTrue(response.contains("400"),
+                "missing coverageId → 400: " + response);
+    }
+
+    @Test
+    public void coverageStreamUnknownIdReturnsFailedEvent()
+            throws Exception {
+        String response = rawRequest(
+                "GET /coverage/session/stream?coverageId=no-such HTTP/1.1",
+                "Host: localhost",
+                "Authorization: Bearer " + TOKEN);
+        assertTrue(response.contains("coverage-not-found"),
+                "unknown coverageId → failed event: " + response);
+    }
+
     // ---- Helpers ----
 
     private String rawRequestWithBody(String requestLine,
