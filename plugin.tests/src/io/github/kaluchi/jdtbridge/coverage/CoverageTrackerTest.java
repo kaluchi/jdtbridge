@@ -169,7 +169,7 @@ public class CoverageTrackerTest {
             first.analysisLoading = false;
             first.analysisReady = true;
 
-            String secondId = importAndAwait("second");
+            importAndAwait("second");
             // Importing a second session activates it; the
             // first is no longer the loader's target, but its
             // analysis result lives in CoverageAnalyzer cache.

@@ -796,8 +796,7 @@ public class LaunchHandlerTest {
 
         @Test
         void deletesExistingLocalConfig() throws Exception {
-            ILaunchConfiguration cfg = createJavaConfig(
-                    "DeleteMe-Test", "test.Main");
+            createJavaConfig("DeleteMe-Test", "test.Main");
             String json = handler.handleConfigDelete(
                     Map.of("configId", "DeleteMe-Test"));
             var obj = JsonParser.parseString(json)
