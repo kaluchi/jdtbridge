@@ -3,7 +3,6 @@ package io.github.kaluchi.jdtbridge;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
-import java.util.Arrays;
 import java.util.Map;
 
 import org.eclipse.core.resources.IFile;
@@ -65,13 +64,14 @@ class DiagnosticsHandler {
                 : IMarker.SEVERITY_ERROR;
 
         var arr = new JsonArray();
-        Arrays.stream(markers)
-                .filter(m -> m.getAttribute(
-                        IMarker.SEVERITY, -1) >= minSeverity)
-                .filter(m -> projectScope.containsProject(
-                        m.getResource().getProject().getName()))
-                .map(m -> toMarkerJson(m, all))
-                .forEach(arr::add);
+        for (IMarker m : markers) {
+            if (m.getAttribute(IMarker.SEVERITY, -1) < minSeverity)
+                continue;
+            if (!projectScope.containsProject(
+                    m.getResource().getProject().getName()))
+                continue;
+            arr.add(toMarkerJson(m, all));
+        }
         return arr.toString();
     }
 
@@ -216,14 +216,11 @@ class DiagnosticsHandler {
     }
 
     private JsonObject toMarkerJson(IMarker marker,
-            boolean includeSource) {
+            boolean includeSource) throws Exception {
         int severity = marker.getAttribute(
                 IMarker.SEVERITY, -1);
-        String sevStr = switch (severity) {
-            case IMarker.SEVERITY_ERROR -> "ERROR";
-            case IMarker.SEVERITY_WARNING -> "WARNING";
-            default -> "INFO";
-        };
+        String sevStr = severity == IMarker.SEVERITY_ERROR
+                ? "ERROR" : "WARNING";
         var entry = new JsonObject();
         var loc = marker.getResource().getLocation();
         entry.addProperty("file", loc != null
@@ -236,10 +233,8 @@ class DiagnosticsHandler {
         entry.addProperty("message", marker.getAttribute(
                 IMarker.MESSAGE, ""));
         if (includeSource) {
-            try {
-                entry.addProperty("source",
-                        shortMarkerType(marker.getType()));
-            } catch (Exception ignored) { }
+            entry.addProperty("source",
+                    shortMarkerType(marker.getType()));
         }
         return entry;
     }
