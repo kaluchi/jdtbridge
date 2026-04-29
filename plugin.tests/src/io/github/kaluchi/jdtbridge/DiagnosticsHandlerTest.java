@@ -39,4 +39,21 @@ public class DiagnosticsHandlerTest {
     public void shortMarkerTypeNull() {
         assertEquals("unknown", handler.shortMarkerType(null));
     }
+
+    @Test
+    public void shortMarkerTypeMavenOnly() {
+        assertEquals("maven", handler.shortMarkerType(
+                "org.apache.maven.core.problem"));
+    }
+
+    @Test
+    public void shortMarkerTypeNoDot() {
+        assertEquals("problem", handler.shortMarkerType("problem"));
+    }
+
+    @Test
+    public void shortMarkerTypeCheckstyleByName() {
+        assertEquals("checkstyle", handler.shortMarkerType(
+                "com.example.checkstyle.violation"));
+    }
 }

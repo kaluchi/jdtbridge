@@ -73,21 +73,43 @@ public class DiagnosticsIntegrationTest {
         params.put("warnings", "");
         String json = handler.handleProblems(params, ProjectScope.ALL);
         JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
-        boolean hasError = false;
-        boolean hasWarning = false;
-        for (var e : arr) {
-            String sev = e.getAsJsonObject()
-                    .get("severity").getAsString();
-            if ("ERROR".equals(sev)) hasError = true;
-            if ("WARNING".equals(sev)) hasWarning = true;
-        }
-        assertTrue(hasError, "Should contain at least one ERROR");
-        // With warnings param, result should include warnings
-        // (may be 0 if project has none, but array should be
-        // larger than errors-only)
         assertTrue(arr.size() >= 1,
-                "With warnings flag, should return errors"
-                        + (hasWarning ? " and warnings" : ""));
+                "With warnings flag, should return results");
+        assertTrue(json.contains("\"severity\":\"ERROR\""),
+                "Should contain at least one ERROR");
+    }
+
+    @Test
+    public void errorsBlankFileParamFallsToWorkspace()
+            throws Exception {
+        Map<String, String> params = new HashMap<>();
+        params.put("file", "  ");
+        String json = handler.handleProblems(params, ProjectScope.ALL);
+        JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
+        assertTrue(arr.size() > 0,
+                "Blank file → workspace scope should find errors");
+    }
+
+    @Test
+    public void errorsBlankProjectParamFallsToWorkspace()
+            throws Exception {
+        Map<String, String> params = new HashMap<>();
+        params.put("project", "");
+        String json = handler.handleProblems(params, ProjectScope.ALL);
+        JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
+        assertTrue(arr.size() > 0,
+                "Blank project → workspace scope should find errors");
+    }
+
+    @Test
+    public void buildBlankProjectRunsWorkspaceIncremental()
+            throws Exception {
+        Map<String, String> params = new HashMap<>();
+        params.put("project", " ");
+        String json = handler.handleBuild(params);
+        JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
+        assertNull(obj.get("error"));
+        assertNotNull(obj.get("errors"));
     }
 
     @Test
@@ -115,23 +137,13 @@ public class DiagnosticsIntegrationTest {
     @Test
     public void errorsWorkspaceWideAggregatesAllProjects()
             throws Exception {
-        // No project, no file → root-resource scope: aggregates
-        // every error in the workspace, including BrokenClass in
-        // the fixture project.
         String json = handler.handleProblems(
                 new HashMap<>(), ProjectScope.ALL);
         JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
-        boolean hasBrokenClass = false;
-        for (var e : arr) {
-            if (e.getAsJsonObject().get("file").getAsString()
-                    .contains("BrokenClass")) {
-                hasBrokenClass = true;
-                break;
-            }
-        }
-        assertTrue(hasBrokenClass,
-                "Workspace-wide scope must surface BrokenClass: "
-                        + arr);
+        assertTrue(arr.size() > 0,
+                "Workspace-wide scope should find errors");
+        assertTrue(json.contains("BrokenClass"),
+                "Should surface BrokenClass: " + arr);
     }
 
     @Test
@@ -246,6 +258,28 @@ public class DiagnosticsIntegrationTest {
         assertTrue(obj.get("refreshed").getAsBoolean());
         assertEquals(TestFixture.PROJECT_NAME,
                 obj.get("project").getAsString());
+    }
+
+    @Test
+    public void refreshBlankFileRefreshesWorkspace()
+            throws Exception {
+        Map<String, String> params = new HashMap<>();
+        params.put("file", "");
+        String json = handler.handleRefresh(params);
+        JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
+        assertTrue(obj.get("refreshed").getAsBoolean());
+        assertEquals("workspace", obj.get("scope").getAsString());
+    }
+
+    @Test
+    public void refreshBlankProjectRefreshesWorkspace()
+            throws Exception {
+        Map<String, String> params = new HashMap<>();
+        params.put("project", "  ");
+        String json = handler.handleRefresh(params);
+        JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
+        assertTrue(obj.get("refreshed").getAsBoolean());
+        assertEquals("workspace", obj.get("scope").getAsString());
     }
 
     @Test

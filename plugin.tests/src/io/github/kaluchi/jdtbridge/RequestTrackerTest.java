@@ -139,6 +139,20 @@ public class RequestTrackerTest {
         }
 
         @Test
+        void nullSessionIsNoop() {
+            tracker.logTelemetry("S", "keep");
+            tracker.clearSession(null);
+            assertEquals("keep", tracker.drain("S"));
+        }
+
+        @Test
+        void emptySessionIsNoop() {
+            tracker.logTelemetry("S", "keep");
+            tracker.clearSession("");
+            assertEquals("keep", tracker.drain("S"));
+        }
+
+        @Test
         void doesNotAffectOtherSessions() {
             tracker.logTelemetry("A", "keep");
             tracker.logTelemetry("B", "drop");

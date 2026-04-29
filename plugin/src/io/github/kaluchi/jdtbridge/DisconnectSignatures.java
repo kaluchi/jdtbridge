@@ -24,9 +24,9 @@ final class DisconnectSignatures {
         if (msg.contains("Broken pipe")) return true;
         if (msg.contains("Connection reset")) return true;
         // Windows English — WSAECONNABORTED
-        if (msg.contains("connection was aborted")) return true;
         if (msg.contains("established connection was aborted"))
             return true;
+        if (msg.contains("connection was aborted")) return true;
         if (msg.contains("existing connection was forcibly closed"))
             return true;
         // Windows Russian (ru_RU)

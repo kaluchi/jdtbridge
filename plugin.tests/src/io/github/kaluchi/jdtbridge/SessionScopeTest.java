@@ -53,26 +53,24 @@ public class SessionScopeTest {
     }
 
     @AfterEach
-    void tearDown() {
-        deleteQuietly("scope-disabled-test");
-        deleteQuietly("scope-enabled-test");
-        deleteQuietly("scope-missing-test");
-        deleteQuietly("scope-no-workdir-test");
+    void tearDown() throws IOException {
+        Files.deleteIfExists(
+                sessionsDir.resolve("scope-disabled-test.json"));
+        Files.deleteIfExists(
+                sessionsDir.resolve("scope-enabled-test.json"));
+        Files.deleteIfExists(
+                sessionsDir.resolve("scope-missing-test.json"));
+        Files.deleteIfExists(
+                sessionsDir.resolve("scope-no-workdir-test.json"));
+        Files.deleteIfExists(
+                sessionsDir.resolve(
+                        "scope-nonexistent-dir-test.json"));
     }
 
     private void writeSession(String sessionId, String json)
             throws IOException {
         Files.writeString(
                 sessionsDir.resolve(sessionId + ".json"), json);
-    }
-
-    private void deleteQuietly(String sessionId) {
-        try {
-            Files.deleteIfExists(
-                    sessionsDir.resolve(sessionId + ".json"));
-        } catch (IOException e) {
-            // best effort
-        }
     }
 
     /**
@@ -208,6 +206,23 @@ public class SessionScopeTest {
                     "scope-no-workdir-test");
             assertTrue(isAllScope(scope),
                     "projectScope:true but blank workingDir → ALL");
+        }
+
+        @Test
+        void nonexistentWorkingDirFallsBackToAbsNormalize()
+                throws Exception {
+            writeSession("scope-nonexistent-dir-test",
+                    "{\"provider\":\"local\","
+                    + "\"agent\":\"claude\","
+                    + "\"workingDir\":"
+                    + "\"Z:/nonexistent/path/that/does/not/exist\","
+                    + "\"projectScope\":true,"
+                    + "\"bridgePort\":12345}");
+            ProjectScope scope = sessionScope.resolve(
+                    "scope-nonexistent-dir-test");
+            assertTrue(isAllScope(scope),
+                    "Nonexistent workingDir → no matching projects"
+                    + " → ALL scope");
         }
 
         @Test

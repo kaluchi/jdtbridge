@@ -100,9 +100,13 @@ public class DisconnectSignaturesTest {
     }
 
     @Test
+    void windowsEnglishGenericAborted() {
+        assertTrue(DisconnectSignatures.matches(
+                "Software caused connection was aborted"));
+    }
+
+    @Test
     void partialPhraseDoesNotMatch() {
-        // Each multi-word locale signature requires both parts
-        // to be present — partial keyword match must NOT trip.
         assertFalse(DisconnectSignatures.matches(
                 "Verbindung wurde aufgebaut"),
                 "German 'Verbindung wurde' alone (no abgebrochen)"
@@ -111,5 +115,9 @@ public class DisconnectSignaturesTest {
                 "connexion existante a été établie"),
                 "French 'connexion existante a' alone (no"
                 + " interrompue) is not a disconnect");
+        assertFalse(DisconnectSignatures.matches(
+                "Una conexión existente fue cerrada normalmente"),
+                "Spanish 'conexión existente' alone (no"
+                + " forzosamente) is not a disconnect");
     }
 }
