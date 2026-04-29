@@ -61,15 +61,11 @@ public class CoverageBridgeTest {
 
         @Test
         void doesNotUseDispatchErrorShape() {
-            // Dispatch errors use {"error":"...","message":"..."};
-            // stream events use {"event":"failed","reason":"..."}.
-            // Stream consumers parse by event field — the dispatch
-            // shape would be invisible to them.
             String json = CoverageBridge.streamNotInstalledEvent();
             var obj = JsonParser.parseString(json).getAsJsonObject();
             assertTrue(obj.has("event"),
                     "Stream error must carry event field: " + json);
-            assertTrue(!obj.has("error"),
+            assertFalse(obj.has("error"),
                     "Stream error must NOT use dispatch shape: "
                             + json);
         }
@@ -102,11 +98,7 @@ public class CoverageBridgeTest {
         void unknownPathReturnsCoverageUnknownPath() throws Exception {
             String json = bridge.dispatch("/coverage/nope",
                     Map.of(), null, ProjectScope.ALL);
-            // Either the bridge returns "not-installed" (EclEmma
-            // missing) or the router returns "coverage-unknown-path".
-            // Both are valid; we just assert one of them.
-            assertTrue(json.contains("coverage-not-installed")
-                            || json.contains("coverage-unknown-path"),
+            assertTrue(json.contains("coverage-unknown-path"),
                     "Unexpected error kind: " + json);
         }
 

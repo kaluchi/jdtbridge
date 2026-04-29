@@ -12,6 +12,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import io.github.kaluchi.jdtbridge.support.TestAwait;
+
 /**
  * Tests for dual-socket server configuration:
  * local (loopback) + remote (all interfaces).
@@ -120,20 +122,7 @@ public class DualSocketTest {
                 assertTrue(clientSocket.isConnected());
             }
 
-            // Remote refuses (retry — OS may not have released
-            // the port immediately after close)
-            boolean remoteRefused = false;
-            for (int attempt = 0; attempt < 10; attempt++) {
-                try (Socket clientSocket = new Socket(
-                        "127.0.0.1", remotePort)) {
-                    Thread.sleep(50);
-                } catch (Exception connectionException) {
-                    remoteRefused = true;
-                    break;
-                }
-            }
-            assertTrue(remoteRefused,
-                    "Remote port should refuse after stop");
+            TestAwait.assertPortRefused("127.0.0.1", remotePort);
         }
 
         @Test
@@ -181,9 +170,7 @@ public class DualSocketTest {
             remoteServer.start(
                     InetAddress.getByName("0.0.0.0"), localPort);
 
-            // Either got the same port (OS allows) or different
-            // (fallback). Both must be valid.
-            assertTrue(remoteServer.getPort() > 0);
+            assertNotEquals(0, remoteServer.getPort());
         }
     }
 }

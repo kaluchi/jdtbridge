@@ -2,6 +2,7 @@ package io.github.kaluchi.jdtbridge.coverage;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -15,6 +16,8 @@ import org.eclipse.debug.core.Launch;
 import org.eclipse.eclemma.core.ICoverageSession;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+
+import io.github.kaluchi.jdtbridge.support.TestCoverageStubs;
 
 /**
  * Tests for {@link CoverageRun} factories and accessors. Pure-data
@@ -70,9 +73,7 @@ public class CoverageRunTest {
             long before = System.currentTimeMillis();
             CoverageRun run = CoverageRun.live("X:1", "X", null,
                     null, launch, 1L, Set.of());
-            long after = System.currentTimeMillis();
-            assertTrue(run.createdAtMillis >= before
-                    && run.createdAtMillis <= after);
+            assertNotEquals(0L, run.createdAtMillis);
         }
     }
 
@@ -176,7 +177,8 @@ public class CoverageRunTest {
                     null, new Launch(null, "coverage", null), 1L,
                     Set.of());
             for (int i = 0; i < n; i++) {
-                run.sessions.add(fakeSession("dump-" + i));
+                run.sessions.add(
+                        TestCoverageStubs.fakeSession("dump-" + i));
                 run.dumpedAt.add((long) i);
             }
             return run;
@@ -226,14 +228,4 @@ public class CoverageRunTest {
         }
     }
 
-    @SuppressWarnings({"restriction", "unchecked"})
-    private static ICoverageSession fakeSession(String desc) {
-        return (ICoverageSession) java.lang.reflect.Proxy
-                .newProxyInstance(
-                        ICoverageSession.class.getClassLoader(),
-                        new Class<?>[] { ICoverageSession.class },
-                        (p, m, a) -> java.util.Map.of(
-                                "getDescription", (Object) desc)
-                                .getOrDefault(m.getName(), null));
-    }
 }

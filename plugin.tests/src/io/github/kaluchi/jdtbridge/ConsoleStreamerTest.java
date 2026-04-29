@@ -2,6 +2,7 @@ package io.github.kaluchi.jdtbridge;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -152,6 +153,8 @@ public class ConsoleStreamerTest {
         @Test
         void closedOutputThrowsStreamClosedException()
                 throws Exception {
+            assertNull(catchAppendException(newTrackedLaunch()));
+
             var tl = newTrackedLaunch();
             var failingOut = new OutputStream() {
                 @Override
@@ -161,10 +164,19 @@ public class ConsoleStreamerTest {
             };
             streamAsync(tl, failingOut, null, -1);
             Thread.sleep(100);
-            org.junit.jupiter.api.Assertions.assertThrows(
-                    ConsoleStreamer.StreamClosedException.class,
-                    () -> tl.appendOut("trigger\n"));
+            assertEquals(ConsoleStreamer.StreamClosedException.class,
+                    catchAppendException(tl));
             tl.terminated = true;
+        }
+
+        private static Class<?> catchAppendException(
+                LaunchTracker.TrackedLaunch tl) {
+            try {
+                tl.appendOut("trigger\n");
+                return null;
+            } catch (RuntimeException e) {
+                return e.getClass();
+            }
         }
 
         @Test

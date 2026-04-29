@@ -2,6 +2,7 @@ package io.github.kaluchi.jdtbridge.coverage;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -12,8 +13,9 @@ import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.eclemma.core.CoverageTools;
 import org.eclipse.eclemma.core.ICoverageSession;
-import org.eclipse.eclemma.core.IExecutionDataSource;
 import org.eclipse.eclemma.core.ISessionImporter;
+
+import io.github.kaluchi.jdtbridge.support.TestCoverageStubs;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -56,7 +58,7 @@ public class CoverageAnalyzerTest {
             assertNotNull(ca.modelCoverage);
             assertNotNull(ca.jacocoSessionInfos);
             assertNotNull(ca.jacocoExecData);
-            assertTrue(ca.computedAtMillis > 0);
+            assertNotEquals(0L, ca.computedAtMillis);
         }
 
         @Test
@@ -110,7 +112,7 @@ public class CoverageAnalyzerTest {
         @Test
         void invalidateUnknownIsNoop() {
             // Should not throw on a session never analyzed.
-            ICoverageSession fake = stubSession();
+            ICoverageSession fake = TestCoverageStubs.stubSession();
             analyzer.invalidate(fake);
             assertEquals(0, analyzer.cacheSize());
         }
@@ -143,30 +145,15 @@ public class CoverageAnalyzerTest {
         ISessionImporter importer = CoverageTools.getImporter();
         importer.setDescription(description);
         importer.setScope(Set.of());
-        importer.setExecutionDataSource(emptyDataSource());
+        importer.setExecutionDataSource(
+                TestCoverageStubs.emptyDataSource());
         importer.setCopy(false);
         importer.importSession(new NullProgressMonitor());
         Job.getJobManager().join(
                 CoverageTracker.CLASSIFY_FAMILY, null);
-        // Fetch back the just-imported session by description.
         return CoverageTools.getSessionManager().getSessions().stream()
                 .filter(s -> description.equals(s.getDescription()))
                 .findFirst()
                 .orElseThrow();
-    }
-
-    private static IExecutionDataSource emptyDataSource() {
-        return (execVisitor, sessionInfoVisitor) -> {
-            // empty
-        };
-    }
-
-    @SuppressWarnings("restriction")
-    private static ICoverageSession stubSession() {
-        return (ICoverageSession) java.lang.reflect.Proxy
-                .newProxyInstance(
-                        ICoverageSession.class.getClassLoader(),
-                        new Class<?>[] { ICoverageSession.class },
-                        (p, m, a) -> null);
     }
 }

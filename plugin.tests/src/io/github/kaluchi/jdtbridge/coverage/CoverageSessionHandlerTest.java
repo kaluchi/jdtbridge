@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.github.kaluchi.jdtbridge.ProjectScope;
+import io.github.kaluchi.jdtbridge.support.TestCoverageStubs;
 import io.github.kaluchi.jdtbridge.support.TestFixture;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.jobs.Job;
@@ -11,15 +12,8 @@ import org.eclipse.eclemma.core.CoverageTools;
 import org.eclipse.eclemma.core.IExecutionDataSource;
 import org.eclipse.eclemma.core.ISessionImporter;
 import org.eclipse.eclemma.core.analysis.IJavaModelCoverage;
-import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IJavaProject;
-import org.eclipse.jdt.core.IPackageFragment;
-import org.eclipse.jdt.core.IPackageFragmentRoot;
-import org.eclipse.jdt.core.IType;
-import org.jacoco.core.analysis.CoverageNodeImpl;
-import org.jacoco.core.analysis.ICounter;
 import org.jacoco.core.analysis.ICoverageNode;
-import org.jacoco.core.internal.analysis.CounterImpl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -345,7 +339,7 @@ public class CoverageSessionHandlerTest {
 
         @Test
         void noProjectsReturnsEmptyNode() {
-            IJavaModelCoverage model = fakeModel(Map.of());
+            IJavaModelCoverage model = TestCoverageStubs.fakeModel(Map.of());
             ICoverageNode agg = CoverageSessionHandler
                     .aggregateProjectCounters(model);
             assertEquals(0, agg.getInstructionCounter().getTotalCount());
@@ -353,9 +347,9 @@ public class CoverageSessionHandlerTest {
 
         @Test
         void singleProjectReturnsItsCounters() {
-            IJavaProject p = fakeProject();
-            IJavaModelCoverage model = fakeModel(Map.of(
-                    p, fakeNode(50, 100, 5, 10)));
+            IJavaProject p = TestCoverageStubs.fakeProject();
+            IJavaModelCoverage model = TestCoverageStubs.fakeModel(Map.of(
+                    p, TestCoverageStubs.fakeNode(50, 100, 5, 10)));
             ICoverageNode agg = CoverageSessionHandler
                     .aggregateProjectCounters(model);
             assertEquals(100,
@@ -372,11 +366,11 @@ public class CoverageSessionHandlerTest {
 
         @Test
         void twoProjectsSumCounters() {
-            IJavaProject p1 = fakeProject();
-            IJavaProject p2 = fakeProject();
-            IJavaModelCoverage model = fakeModel(Map.of(
-                    p1, fakeNode(50, 100, 5, 10),
-                    p2, fakeNode(200, 30, 0, 4)));
+            IJavaProject p1 = TestCoverageStubs.fakeProject();
+            IJavaProject p2 = TestCoverageStubs.fakeProject();
+            IJavaModelCoverage model = TestCoverageStubs.fakeModel(Map.of(
+                    p1, TestCoverageStubs.fakeNode(50, 100, 5, 10),
+                    p2, TestCoverageStubs.fakeNode(200, 30, 0, 4)));
             ICoverageNode agg = CoverageSessionHandler
                     .aggregateProjectCounters(model);
             assertEquals(130,
@@ -393,12 +387,12 @@ public class CoverageSessionHandlerTest {
 
         @Test
         void nullChildCoverageSkippedWithoutNpe() {
-            IJavaProject present = fakeProject();
-            IJavaProject missing = fakeProject();
+            IJavaProject present = TestCoverageStubs.fakeProject();
+            IJavaProject missing = TestCoverageStubs.fakeProject();
             Map<IJavaProject, ICoverageNode> map = new HashMap<>();
-            map.put(present, fakeNode(10, 90, 0, 0));
+            map.put(present, TestCoverageStubs.fakeNode(10, 90, 0, 0));
             map.put(missing, null);
-            IJavaModelCoverage model = fakeModel(map);
+            IJavaModelCoverage model = TestCoverageStubs.fakeModel(map);
             ICoverageNode agg = CoverageSessionHandler
                     .aggregateProjectCounters(model);
             assertEquals(90,
@@ -679,7 +673,8 @@ public class CoverageSessionHandlerTest {
         ISessionImporter importer = CoverageTools.getImporter();
         importer.setDescription(description);
         importer.setScope(Set.of());
-        importer.setExecutionDataSource(emptyDataSource());
+        importer.setExecutionDataSource(
+                TestCoverageStubs.emptyDataSource());
         importer.setCopy(false);
         importer.importSession(new NullProgressMonitor());
         Job.getJobManager().join(
@@ -689,106 +684,5 @@ public class CoverageSessionHandlerTest {
                 .map(r -> r.coverageId)
                 .findFirst()
                 .orElseThrow();
-    }
-
-    private static IExecutionDataSource emptyDataSource() {
-        return (execVisitor, sessionInfoVisitor) -> {
-            // Intentionally empty.
-        };
-    }
-
-    /** Fresh dynamic-proxy IJavaProject — used as a Map key in
-     *  fake IJavaModelCoverage. Equality by identity; nothing else
-     *  is exercised. */
-    private static IJavaProject fakeProject() {
-        return (IJavaProject) java.lang.reflect.Proxy.newProxyInstance(
-                IJavaProject.class.getClassLoader(),
-                new Class<?>[] { IJavaProject.class },
-                (proxy, method, args) -> switch (method.getName()) {
-                    case "equals" -> proxy == args[0];
-                    case "hashCode" ->
-                            System.identityHashCode(proxy);
-                    default -> null;
-                });
-    }
-
-    /** Test-only ICoverageNode with directly-set instruction and
-     *  branch counters — bypasses the JaCoCo Analyzer to drive
-     *  {@link CoverageSessionHandler#aggregateProjectCounters}
-     *  with known totals. Other counters stay at zero. */
-    private static final class FakeNode extends CoverageNodeImpl {
-        FakeNode(int instMissed, int instCovered,
-                int branchMissed, int branchCovered) {
-            super(ElementType.GROUP, "fake-project-coverage");
-            this.instructionCounter = CounterImpl.getInstance(
-                    instMissed, instCovered);
-            this.branchCounter = CounterImpl.getInstance(
-                    branchMissed, branchCovered);
-        }
-    }
-
-    private static ICoverageNode fakeNode(int instMissed,
-            int instCovered, int branchMissed, int branchCovered) {
-        return new FakeNode(instMissed, instCovered,
-                branchMissed, branchCovered);
-    }
-
-    /** Anonymous IJavaModelCoverage backed by a Map. Implements
-     *  only {@code getProjects} and {@code getCoverageFor};
-     *  everything else returns inert defaults so unrelated callers
-     *  don't NPE. */
-    private static IJavaModelCoverage fakeModel(
-            Map<IJavaProject, ICoverageNode> projectMap) {
-        return new IJavaModelCoverage() {
-            public IJavaProject[] getProjects() {
-                return projectMap.keySet()
-                        .toArray(new IJavaProject[0]);
-            }
-            public IPackageFragmentRoot[] getPackageFragmentRoots() {
-                return new IPackageFragmentRoot[0];
-            }
-            public IPackageFragment[] getPackageFragments() {
-                return new IPackageFragment[0];
-            }
-            public IType[] getTypes() {
-                return new IType[0];
-            }
-            public ICoverageNode getCoverageFor(IJavaElement element) {
-                return projectMap.get(element);
-            }
-            public ElementType getElementType() {
-                return ElementType.GROUP;
-            }
-            public String getName() {
-                return "fake-model";
-            }
-            public boolean containsCode() {
-                return false;
-            }
-            public ICoverageNode getPlainCopy() {
-                return this;
-            }
-            public ICounter getInstructionCounter() {
-                return CounterImpl.COUNTER_0_0;
-            }
-            public ICounter getBranchCounter() {
-                return CounterImpl.COUNTER_0_0;
-            }
-            public ICounter getLineCounter() {
-                return CounterImpl.COUNTER_0_0;
-            }
-            public ICounter getComplexityCounter() {
-                return CounterImpl.COUNTER_0_0;
-            }
-            public ICounter getMethodCounter() {
-                return CounterImpl.COUNTER_0_0;
-            }
-            public ICounter getClassCounter() {
-                return CounterImpl.COUNTER_0_0;
-            }
-            public ICounter getCounter(CounterEntity entity) {
-                return CounterImpl.COUNTER_0_0;
-            }
-        };
     }
 }

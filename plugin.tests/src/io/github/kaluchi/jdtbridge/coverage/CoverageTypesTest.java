@@ -130,11 +130,6 @@ public class CoverageTypesTest {
 
         @Test
         void whenEclEmmaPresentJavaApplicationIsSupported() {
-            // This assertion is conditional on the EclEmma bundle
-            // being present in the test runtime — true under the
-            // local Eclipse target (which has EclEmma installed)
-            // and the CI target (which pulls EclEmma from p2).
-            if (!CoverageBridge.isAvailable()) return;
             assertTrue(CoverageTypes.isSupported(
                     "org.eclipse.jdt.launching.localJavaApplication"),
                     "Java App should have a coverage delegate when"

@@ -7,6 +7,9 @@ Bundle-Version: 2.6.0.qualifier
 Require-Bundle: io.github.kaluchi.jdtbridge,
  org.eclipse.core.resources,
  org.eclipse.core.runtime,
- org.eclipse.jdt.core
+ org.eclipse.jdt.core,
+ org.eclipse.eclemma.core;resolution:=optional,
+ org.jacoco.core;resolution:=optional,
+ org.eclipse.debug.core
 Export-Package: io.github.kaluchi.jdtbridge.support
 Automatic-Module-Name: io.github.kaluchi.jdtbridge.tests.support

@@ -3,9 +3,10 @@ package io.github.kaluchi.jdtbridge.coverage;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.eclemma.core.CoverageTools;
-import org.eclipse.eclemma.core.IExecutionDataSource;
 import org.eclipse.eclemma.core.ISessionImporter;
 import org.eclipse.eclemma.core.ISessionManager;
+
+import io.github.kaluchi.jdtbridge.support.TestCoverageStubs;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -69,10 +70,8 @@ public class CoverageTrackerTest {
 
         @Test
         void snapshotIsImmutable() {
-            var snapshot = tracker.snapshot();
-            org.junit.jupiter.api.Assertions.assertThrows(
-                    UnsupportedOperationException.class,
-                    () -> snapshot.put("X", null));
+            io.github.kaluchi.jdtbridge.support.TestAwait
+                    .assertUnmodifiableMap(tracker.snapshot());
         }
     }
 
@@ -249,26 +248,16 @@ public class CoverageTrackerTest {
         ISessionImporter importer = CoverageTools.getImporter();
         importer.setDescription(description);
         importer.setScope(Set.of());
-        importer.setExecutionDataSource(emptyDataSource());
+        importer.setExecutionDataSource(
+                TestCoverageStubs.emptyDataSource());
         importer.setCopy(false);
         importer.importSession(new NullProgressMonitor());
         Job.getJobManager().join(
                 CoverageTracker.CLASSIFY_FAMILY, null);
-        // Find the run whose latest dump's description matches —
-        // gives us the coverageId without depending on the
-        // System.currentTimeMillis() value the tracker assigned.
         return tracker.snapshot().values().stream()
                 .filter(r -> description.equals(r.description))
                 .map(r -> r.coverageId)
                 .findFirst()
                 .orElseThrow();
-    }
-
-    /** Empty {@link IExecutionDataSource} — emits no data and no
-     *  session info. SessionImporter accepts it without error. */
-    private static IExecutionDataSource emptyDataSource() {
-        return (execVisitor, sessionInfoVisitor) -> {
-            // Intentionally empty — no exec data, no session info.
-        };
     }
 }

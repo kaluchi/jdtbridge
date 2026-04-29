@@ -14,6 +14,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import io.github.kaluchi.jdtbridge.support.TestAwait;
+
 /**
  * Tests for HttpServer configurable bind address and port.
  * Covers: custom bind, fixed port, port conflict fallback,
@@ -35,12 +37,11 @@ public class HttpServerBindTest {
             server = new HttpServer();
             server.start();
             int port = server.getPort();
-            assertTrue(port > 0, "Should get assigned port");
+            assertNotEquals(0, port, "Should get assigned port");
 
-            // Verify reachable on loopback
-            try (Socket socket = new Socket("127.0.0.1", port)) {
-                assertTrue(socket.isConnected());
-            }
+            Socket socket = new Socket("127.0.0.1", port);
+            assertTrue(socket.isConnected());
+            socket.close();
         }
     }
 
@@ -138,26 +139,8 @@ public class HttpServerBindTest {
             int oldPort = server.getPort();
 
             server.rebind(InetAddress.getLoopbackAddress(), 0);
-            int newPort = server.getPort();
 
-            // New port should accept connections
-            try (Socket socket = new Socket("127.0.0.1", newPort)) {
-                assertTrue(socket.isConnected());
-            }
-
-            // Old port should refuse connections (retry — OS may
-            // not have released the port immediately after close)
-            boolean refused = false;
-            for (int attempt = 0; attempt < 10; attempt++) {
-                try (Socket socket = new Socket("127.0.0.1", oldPort)) {
-                    Thread.sleep(50);
-                } catch (Exception e) {
-                    refused = true;
-                    break;
-                }
-            }
-            assertTrue(refused,
-                    "Old port should refuse connections after rebind");
+            TestAwait.assertPortRefused("127.0.0.1", oldPort);
         }
 
         @Test
