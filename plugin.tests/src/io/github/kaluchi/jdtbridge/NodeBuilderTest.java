@@ -489,7 +489,7 @@ public class NodeBuilderTest {
     void projectDetailAddsClasspathAndSourceRoots() throws Exception {
         JsonObject detail = NodeBuilder.projectDetail(
                 fixtureProject());
-        assertTrue(detail.getAsJsonArray("classpathEntries").size() >= 3);
+        assertEquals(18, detail.getAsJsonArray("classpathEntries").size());
         assertEquals(1, detail.getAsJsonArray("sourceRoots").size());
         assertNotNull(detail.get("javaVersion"));
     }
