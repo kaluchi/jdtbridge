@@ -322,6 +322,48 @@ public class CoverageSessionHandlerTest {
             assertEquals("coverage-dump-not-found",
                     obj.get("error").getAsString());
         }
+
+        @Test
+        void resolvableFqnInScopeReturnsCountersAndLines()
+                throws Exception {
+            var root = org.eclipse.core.resources.ResourcesPlugin
+                    .getWorkspace().getRoot();
+            var project = org.eclipse.jdt.core.JavaCore.create(
+                    root.getProject(TestFixture.PROJECT_NAME));
+            var srcRoot = project.getPackageFragmentRoot(
+                    root.getProject(TestFixture.PROJECT_NAME)
+                            .getFolder("src"));
+
+            ISessionImporter importer = CoverageTools.getImporter();
+            importer.setDescription("node-with-scope");
+            importer.setScope(Set.of(srcRoot));
+            importer.setExecutionDataSource(
+                    TestCoverageStubs.emptyDataSource());
+            importer.setCopy(false);
+            importer.importSession(
+                    new org.eclipse.core.runtime
+                            .NullProgressMonitor());
+            org.eclipse.core.runtime.jobs.Job.getJobManager().join(
+                    CoverageTracker.CLASSIFY_FAMILY, null);
+            String coverageId = tracker.snapshot().values().stream()
+                    .filter(r -> "node-with-scope"
+                            .equals(r.description))
+                    .map(r -> r.coverageId)
+                    .findFirst()
+                    .orElseThrow();
+
+            JsonObject obj = parseObj(handler.handleNode(Map.of(
+                    "coverageId", coverageId,
+                    "fqn", "test.model.Dog")));
+            assertNotNull(obj.get("counters"),
+                    "Should have counters: " + obj);
+            assertNotNull(obj.get("lines"),
+                    "Should have lines block: " + obj);
+            assertEquals("test.model.Dog",
+                    obj.get("fqn").getAsString());
+            assertEquals("type",
+                    obj.get("elementKind").getAsString());
+        }
     }
 
     @Nested
