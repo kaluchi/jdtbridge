@@ -94,7 +94,7 @@ public class LaunchHandlerTest {
 
     private static void deleteIfPresent(ILaunchConfiguration cfg)
             throws Exception {
-        if (cfg != null && cfg.exists()) cfg.delete();
+        cfg.delete();
     }
 
     private static ILaunch addSyntheticLaunch(String mode) {
@@ -110,8 +110,8 @@ public class LaunchHandlerTest {
     }
 
     private static void removeIfPresent(ILaunch launch) {
-        if (launch == null) return;
-        DebugPlugin.getDefault().getLaunchManager().removeLaunch(launch);
+        DebugPlugin.getDefault().getLaunchManager()
+                .removeLaunch(launch);
     }
 
     @Nested

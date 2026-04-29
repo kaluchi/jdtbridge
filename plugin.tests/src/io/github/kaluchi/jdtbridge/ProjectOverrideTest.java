@@ -95,11 +95,9 @@ public class ProjectOverrideTest {
         }
 
         var root = ResourcesPlugin.getWorkspace().getRoot();
-        for (String name : new String[]{
-                SOURCE_PROJECT, LAUNCHER_PROJECT}) {
-            IProject p = root.getProject(name);
-            if (p.exists()) p.delete(true, true, null);
-        }
+        root.getProject(SOURCE_PROJECT).delete(true, true, null);
+        root.getProject(LAUNCHER_PROJECT)
+                .delete(true, true, null);
     }
 
     @Test
@@ -149,7 +147,6 @@ public class ProjectOverrideTest {
             org.eclipse.core.resources.IWorkspaceRoot root,
             String name, String testSource) throws Exception {
         IProject project = root.getProject(name);
-        if (project.exists()) project.delete(true, true, null);
         project.create(null);
         project.open(null);
 
