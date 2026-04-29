@@ -467,11 +467,11 @@ public class CoverageProgressStreamerTest {
         // CI runners can stall the EclEmma LoadSessionJob behind
         // other jobs in the manager queue — local runs settle
         // sub-millisecond.
-        TestAwait.pollUntil(30_000, () -> {
-            CoverageRun run = tracker.byCoverageId(coverageId);
-            return run == null || !run.analysisLoading;
-        }, "LoadSessionJob did not settle within 30s for "
-                + coverageId);
+        TestAwait.pollUntil(30_000,
+                () -> !tracker.byCoverageId(coverageId)
+                        .analysisLoading,
+                "LoadSessionJob did not settle within 30s for "
+                        + coverageId);
     }
 
     @SuppressWarnings("restriction")
@@ -496,12 +496,14 @@ public class CoverageProgressStreamerTest {
     private static JsonObject findEvent(ByteArrayOutputStream out,
             String name) {
         return java.util.Arrays.stream(lines(out))
-                .filter(line -> !line.isEmpty())
+                .filter(java.util.function.Predicate
+                        .not(String::isEmpty))
                 .map(line -> JsonParser.parseString(line)
                         .getAsJsonObject())
-                .filter(obj -> obj.has("event")
-                        && name.equals(
-                                obj.get("event").getAsString()))
+                .filter(obj -> java.util.Optional
+                        .ofNullable(obj.get("event"))
+                        .map(e -> name.equals(e.getAsString()))
+                        .orElse(false))
                 .findFirst()
                 .orElseThrow();
     }

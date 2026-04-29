@@ -48,7 +48,7 @@ public class LogTest {
         @Test
         void emitsInfoSeverityAndMessage() {
             Log.info("info-test-" + System.nanoTime());
-            IStatus s = lastForLevel(IStatus.INFO);
+            IStatus s = lastCaptured();
             assertNotNull(s, "Should record INFO status: " + captured);
             assertTrue(s.getMessage().startsWith("info-test-"));
             assertSame("io.github.kaluchi.jdtbridge",
@@ -62,7 +62,7 @@ public class LogTest {
         @Test
         void emitsWarningWithoutThrowable() {
             Log.warn("warn-noex-" + System.nanoTime());
-            IStatus s = lastForLevel(IStatus.WARNING);
+            IStatus s = lastCaptured();
             assertNotNull(s);
             assertTrue(s.getMessage().startsWith("warn-noex-"));
             // Status without throwable has getException() == null.
@@ -76,7 +76,7 @@ public class LogTest {
             RuntimeException cause = new RuntimeException(
                     "warn-cause-" + System.nanoTime());
             Log.warn("warn-withex-" + System.nanoTime(), cause);
-            IStatus s = lastForLevel(IStatus.WARNING);
+            IStatus s = lastCaptured();
             assertNotNull(s);
             assertSame(cause, s.getException());
         }
@@ -88,7 +88,7 @@ public class LogTest {
         @Test
         void emitsErrorWithoutThrowable() {
             Log.error("err-noex-" + System.nanoTime());
-            IStatus s = lastForLevel(IStatus.ERROR);
+            IStatus s = lastCaptured();
             assertNotNull(s);
             assertTrue(s.getMessage().startsWith("err-noex-"));
             org.junit.jupiter.api.Assertions
@@ -100,16 +100,13 @@ public class LogTest {
             IllegalStateException cause = new IllegalStateException(
                     "err-cause-" + System.nanoTime());
             Log.error("err-withex-" + System.nanoTime(), cause);
-            IStatus s = lastForLevel(IStatus.ERROR);
+            IStatus s = lastCaptured();
             assertNotNull(s);
             assertSame(cause, s.getException());
         }
     }
 
-    private IStatus lastForLevel(int severity) {
-        return captured.stream()
-                .filter(s -> s.getSeverity() == severity)
-                .reduce((a, b) -> b)
-                .orElseThrow();
+    private IStatus lastCaptured() {
+        return captured.get(captured.size() - 1);
     }
 }
