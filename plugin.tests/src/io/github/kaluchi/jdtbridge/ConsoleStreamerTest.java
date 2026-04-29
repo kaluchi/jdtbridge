@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 
 import org.eclipse.debug.core.ILaunch;
 import org.junit.jupiter.api.Nested;
@@ -16,6 +17,12 @@ import org.junit.jupiter.api.Test;
  * and the tail utility.
  */
 public class ConsoleStreamerTest {
+
+    @Test
+    void utilityClassInstantiable() {
+        org.junit.jupiter.api.Assertions.assertNotNull(
+                new ConsoleStreamer());
+    }
 
     @Nested
     class Tail {
@@ -114,6 +121,82 @@ public class ConsoleStreamerTest {
             var out = new ByteArrayOutputStream();
             ConsoleStreamer.stream(tl, out, "stderr", -1);
             assertEquals("stderr-data", out.toString());
+        }
+
+        @Test
+        void liveStderrFilteredFromStdout()
+                throws Exception {
+            ILaunch launch = new org.eclipse.debug.core.Launch(
+                    null, "run", null);
+            var tl = new LaunchTracker.TrackedLaunch(launch);
+
+            var out = new ByteArrayOutputStream();
+            var streamThread = new Thread(() -> {
+                try {
+                    ConsoleStreamer.stream(tl, out, "stdout", -1);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+            streamThread.start();
+            Thread.sleep(100);
+            tl.appendErr("stderr-noise");
+            tl.appendOut("stdout-signal\n");
+            tl.terminated = true;
+            streamThread.join(5000);
+            assertFalse(streamThread.isAlive());
+            String result = out.toString();
+            assertTrue(result.contains("stdout-signal"));
+            assertFalse(result.contains("stderr-noise"));
+        }
+
+        @Test
+        void interruptedThreadStopsStreaming()
+                throws Exception {
+            ILaunch launch = new org.eclipse.debug.core.Launch(
+                    null, "run", null);
+            var tl = new LaunchTracker.TrackedLaunch(launch);
+            var out = new ByteArrayOutputStream();
+
+            var streamThread = new Thread(() -> {
+                try {
+                    ConsoleStreamer.stream(tl, out, null, -1);
+                } catch (IOException ignored) { }
+            });
+            streamThread.start();
+            Thread.sleep(100);
+            streamThread.interrupt();
+            streamThread.join(5000);
+            assertFalse(streamThread.isAlive());
+        }
+
+        @Test
+        void closedOutputThrowsStreamClosedException()
+                throws Exception {
+            ILaunch launch = new org.eclipse.debug.core.Launch(
+                    null, "run", null);
+            var tl = new LaunchTracker.TrackedLaunch(launch);
+
+            var failingOut = new OutputStream() {
+                @Override
+                public void write(int b) throws IOException {
+                    throw new IOException("closed");
+                }
+            };
+            var streamThread = new Thread(() -> {
+                try {
+                    ConsoleStreamer.stream(tl, failingOut,
+                            null, -1);
+                } catch (Exception ignored) { }
+            });
+            streamThread.start();
+            Thread.sleep(100);
+            org.junit.jupiter.api.Assertions.assertThrows(
+                    ConsoleStreamer.StreamClosedException.class,
+                    () -> tl.appendOut("trigger\n"));
+            tl.terminated = true;
+            streamThread.join(5000);
+            assertFalse(streamThread.isAlive());
         }
 
         @Test
