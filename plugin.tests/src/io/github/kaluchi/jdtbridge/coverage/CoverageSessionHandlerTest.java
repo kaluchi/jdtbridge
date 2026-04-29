@@ -324,34 +324,9 @@ public class CoverageSessionHandlerTest {
         }
 
         @Test
-        void resolvableFqnInScopeReturnsCountersAndLines()
+        void typeInScopeReturnsCountersAndLines()
                 throws Exception {
-            var root = org.eclipse.core.resources.ResourcesPlugin
-                    .getWorkspace().getRoot();
-            var project = org.eclipse.jdt.core.JavaCore.create(
-                    root.getProject(TestFixture.PROJECT_NAME));
-            var srcRoot = project.getPackageFragmentRoot(
-                    root.getProject(TestFixture.PROJECT_NAME)
-                            .getFolder("src"));
-
-            ISessionImporter importer = CoverageTools.getImporter();
-            importer.setDescription("node-with-scope");
-            importer.setScope(Set.of(srcRoot));
-            importer.setExecutionDataSource(
-                    TestCoverageStubs.emptyDataSource());
-            importer.setCopy(false);
-            importer.importSession(
-                    new org.eclipse.core.runtime
-                            .NullProgressMonitor());
-            org.eclipse.core.runtime.jobs.Job.getJobManager().join(
-                    CoverageTracker.CLASSIFY_FAMILY, null);
-            String coverageId = tracker.snapshot().values().stream()
-                    .filter(r -> "node-with-scope"
-                            .equals(r.description))
-                    .map(r -> r.coverageId)
-                    .findFirst()
-                    .orElseThrow();
-
+            String coverageId = importWithScope("node-type");
             JsonObject obj = parseObj(handler.handleNode(Map.of(
                     "coverageId", coverageId,
                     "fqn", "test.model.Dog")));
@@ -363,6 +338,55 @@ public class CoverageSessionHandlerTest {
                     obj.get("fqn").getAsString());
             assertEquals("type",
                     obj.get("elementKind").getAsString());
+        }
+
+        @Test
+        void methodInScopeReturnsCounters() throws Exception {
+            String coverageId = importWithScope("node-method");
+            JsonObject obj = parseObj(handler.handleNode(Map.of(
+                    "coverageId", coverageId,
+                    "fqn", "test.model.Dog#name()")));
+            assertNotNull(obj.get("counters"),
+                    "Should have counters: " + obj);
+            assertEquals("method",
+                    obj.get("elementKind").getAsString());
+        }
+
+        @Test
+        void fieldReturnsNoDataForElement() throws Exception {
+            String coverageId = importWithScope("node-field");
+            JsonObject obj = parseObj(handler.handleNode(Map.of(
+                    "coverageId", coverageId,
+                    "fqn", "test.model.Dog#age")));
+            assertEquals("coverage-no-data-for-element",
+                    obj.get("error").getAsString());
+        }
+
+        private String importWithScope(String desc)
+                throws Exception {
+            var root = org.eclipse.core.resources.ResourcesPlugin
+                    .getWorkspace().getRoot();
+            var project = org.eclipse.jdt.core.JavaCore.create(
+                    root.getProject(TestFixture.PROJECT_NAME));
+            var srcRoot = project.getPackageFragmentRoot(
+                    root.getProject(TestFixture.PROJECT_NAME)
+                            .getFolder("src"));
+            ISessionImporter importer = CoverageTools.getImporter();
+            importer.setDescription(desc);
+            importer.setScope(Set.of(srcRoot));
+            importer.setExecutionDataSource(
+                    TestCoverageStubs.emptyDataSource());
+            importer.setCopy(false);
+            importer.importSession(
+                    new org.eclipse.core.runtime
+                            .NullProgressMonitor());
+            org.eclipse.core.runtime.jobs.Job.getJobManager().join(
+                    CoverageTracker.CLASSIFY_FAMILY, null);
+            return tracker.snapshot().values().stream()
+                    .filter(r -> desc.equals(r.description))
+                    .map(r -> r.coverageId)
+                    .findFirst()
+                    .orElseThrow();
         }
     }
 
