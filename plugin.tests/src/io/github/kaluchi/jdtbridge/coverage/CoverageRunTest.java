@@ -176,7 +176,7 @@ public class CoverageRunTest {
                     null, new Launch(null, "coverage", null), 1L,
                     Set.of());
             for (int i = 0; i < n; i++) {
-                run.sessions.add(new FakeSession("dump-" + i));
+                run.sessions.add(fakeSession("dump-" + i));
                 run.dumpedAt.add((long) i);
             }
             return run;
@@ -226,44 +226,14 @@ public class CoverageRunTest {
         }
     }
 
-    /** Bare-bones {@link ICoverageSession} stub for resolve tests —
-     *  only {@code getDescription()} is queried. */
-    @SuppressWarnings("restriction")
-	private static final class FakeSession
-            implements ICoverageSession {
-        private final String desc;
-
-        FakeSession(String desc) {
-            this.desc = desc;
-        }
-
-        @Override
-        public String getDescription() {
-            return desc;
-        }
-
-        @Override
-        public Set<org.eclipse.jdt.core.IPackageFragmentRoot>
-                getScope() {
-            return Set.of();
-        }
-
-        @Override
-        public org.eclipse.debug.core.ILaunchConfiguration
-                getLaunchConfiguration() {
-            return null;
-        }
-
-        @Override
-        public void accept(
-                org.jacoco.core.data.IExecutionDataVisitor execVisitor,
-                org.jacoco.core.data.ISessionInfoVisitor
-                        sessionInfoVisitor) {
-        }
-
-        @Override
-        public <T> T getAdapter(Class<T> adapter) {
-            return null;
-        }
+    @SuppressWarnings({"restriction", "unchecked"})
+    private static ICoverageSession fakeSession(String desc) {
+        return (ICoverageSession) java.lang.reflect.Proxy
+                .newProxyInstance(
+                        ICoverageSession.class.getClassLoader(),
+                        new Class<?>[] { ICoverageSession.class },
+                        (p, m, a) -> java.util.Map.of(
+                                "getDescription", (Object) desc)
+                                .getOrDefault(m.getName(), null));
     }
 }

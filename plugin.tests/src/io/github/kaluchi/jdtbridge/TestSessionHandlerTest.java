@@ -211,28 +211,25 @@ public class TestSessionHandlerTest {
         }
 
         @Test
-        void clearByTestRunIdRemovesThatSession() {
+        void clearByTestRunIdRemovesThatSession()
+                throws Exception {
             Map<String, String> launchParams = new HashMap<>();
             launchParams.put("target", SIMPLE_TEST_FQN);
             launchParams.put("no-refresh", "");
-            try {
-                String json = new TestHandler()
-                        .handleTestRun(launchParams);
-                JsonObject obj = JsonParser.parseString(json)
-                        .getAsJsonObject();
-                String tempRunId =
-                        obj.get("testRunId").getAsString();
-                TestSessionAwait.awaitFinished(
-                        tempRunId, 60_000);
+            String json = new TestHandler()
+                    .handleTestRun(launchParams);
+            JsonObject obj = JsonParser.parseString(json)
+                    .getAsJsonObject();
+            String tempRunId =
+                    obj.get("testRunId").getAsString();
+            TestSessionAwait.awaitFinished(
+                    tempRunId, 60_000);
 
-                JsonObject result = parse(
-                        handler.handleClear(
-                                params("testRunId", tempRunId)));
-                assertEquals(1,
-                        result.get("removed").getAsInt());
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
+            JsonObject result = parse(
+                    handler.handleClear(
+                            params("testRunId", tempRunId)));
+            assertEquals(1,
+                    result.get("removed").getAsInt());
         }
     }
 
