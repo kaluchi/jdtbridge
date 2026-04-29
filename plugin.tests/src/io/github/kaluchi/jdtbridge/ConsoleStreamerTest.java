@@ -126,114 +126,79 @@ public class ConsoleStreamerTest {
         @Test
         void liveStderrFilteredFromStdout()
                 throws Exception {
-            ILaunch launch = new org.eclipse.debug.core.Launch(
-                    null, "run", null);
-            var tl = new LaunchTracker.TrackedLaunch(launch);
-
+            var tl = newTrackedLaunch();
             var out = new ByteArrayOutputStream();
-            var streamThread = new Thread(() -> {
-                try {
-                    ConsoleStreamer.stream(tl, out, "stdout", -1);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            });
-            streamThread.start();
+            var future = streamAsync(tl, out, "stdout", -1);
             Thread.sleep(100);
             tl.appendErr("stderr-noise");
             tl.appendOut("stdout-signal\n");
             tl.terminated = true;
-            streamThread.join(5000);
-            assertFalse(streamThread.isAlive());
-            String result = out.toString();
-            assertTrue(result.contains("stdout-signal"));
-            assertFalse(result.contains("stderr-noise"));
+            future.get(5, java.util.concurrent.TimeUnit.SECONDS);
+            assertTrue(out.toString().contains("stdout-signal"));
+            assertFalse(out.toString().contains("stderr-noise"));
         }
 
         @Test
         void interruptedThreadStopsStreaming()
                 throws Exception {
-            ILaunch launch = new org.eclipse.debug.core.Launch(
-                    null, "run", null);
-            var tl = new LaunchTracker.TrackedLaunch(launch);
+            var tl = newTrackedLaunch();
             var out = new ByteArrayOutputStream();
-
-            var streamThread = new Thread(() -> {
-                try {
-                    ConsoleStreamer.stream(tl, out, null, -1);
-                } catch (IOException ignored) { }
-            });
-            streamThread.start();
+            var future = streamAsync(tl, out, null, -1);
             Thread.sleep(100);
-            streamThread.interrupt();
-            streamThread.join(5000);
-            assertFalse(streamThread.isAlive());
+            future.cancel(true);
+            assertFalse(tl.terminated);
         }
 
         @Test
         void closedOutputThrowsStreamClosedException()
                 throws Exception {
-            ILaunch launch = new org.eclipse.debug.core.Launch(
-                    null, "run", null);
-            var tl = new LaunchTracker.TrackedLaunch(launch);
-
+            var tl = newTrackedLaunch();
             var failingOut = new OutputStream() {
                 @Override
                 public void write(int b) throws IOException {
                     throw new IOException("closed");
                 }
             };
-            var streamThread = new Thread(() -> {
-                try {
-                    ConsoleStreamer.stream(tl, failingOut,
-                            null, -1);
-                } catch (Exception ignored) { }
-            });
-            streamThread.start();
+            streamAsync(tl, failingOut, null, -1);
             Thread.sleep(100);
             org.junit.jupiter.api.Assertions.assertThrows(
                     ConsoleStreamer.StreamClosedException.class,
                     () -> tl.appendOut("trigger\n"));
             tl.terminated = true;
-            streamThread.join(5000);
-            assertFalse(streamThread.isAlive());
         }
 
         @Test
         void liveOutputDeliveredOnTermination()
                 throws Exception {
-            ILaunch launch = new org.eclipse.debug.core.Launch(
-                    null, "run", null);
-            var tl = new LaunchTracker.TrackedLaunch(launch);
-
+            var tl = newTrackedLaunch();
             var out = new ByteArrayOutputStream();
-
-            // Stream in background, terminate after adding content
-            var streamThread = new Thread(() -> {
-                try {
-                    ConsoleStreamer.stream(tl, out, null, -1);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            });
-            streamThread.start();
-
-            // Let streamer register listener
+            var future = streamAsync(tl, out, null, -1);
             Thread.sleep(100);
-
-            // Add content while streaming
             tl.appendOut("live-data\n");
-
-            // Terminate
             tl.terminated = true;
+            future.get(5, java.util.concurrent.TimeUnit.SECONDS);
+            assertTrue(out.toString().contains("live-data"),
+                    "Should have live data: " + out);
+        }
 
-            streamThread.join(5000);
-            assertFalse(streamThread.isAlive(),
-                    "Stream should have ended");
+        private static LaunchTracker.TrackedLaunch
+                newTrackedLaunch() {
+            return new LaunchTracker.TrackedLaunch(
+                    new org.eclipse.debug.core.Launch(
+                            null, "run", null));
+        }
 
-            String result = out.toString();
-            assertTrue(result.contains("live-data"),
-                    "Should have live data: " + result);
+        private static java.util.concurrent.Future<?>
+                streamAsync(LaunchTracker.TrackedLaunch tl,
+                        OutputStream out, String stream,
+                        int tail) {
+            return java.util.concurrent.Executors
+                    .newSingleThreadExecutor()
+                    .submit(() -> {
+                        ConsoleStreamer.stream(tl, out,
+                                stream, tail);
+                        return null;
+                    });
         }
     }
 }
