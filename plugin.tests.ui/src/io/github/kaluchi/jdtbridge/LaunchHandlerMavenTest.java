@@ -75,6 +75,39 @@ public class LaunchHandlerMavenTest {
     }
 
     @Test
+    void mavenSummaryHasGoalsAndProfiles() throws Exception {
+        mavenCfg.delete();
+        ILaunchManager mgr = DebugPlugin.getDefault()
+                .getLaunchManager();
+        ILaunchConfigurationType type = mgr
+                .getLaunchConfigurationType(
+                        "org.eclipse.m2e.Maven2LaunchConfigurationType");
+        ILaunchConfigurationWorkingCopy wc =
+                type.newInstance(null, "SumMaven");
+        wc.setAttribute("M2_GOALS", "clean verify");
+        wc.setAttribute("M2_PROFILES", "ci");
+        mavenCfg = wc.doSave();
+
+        JsonArray arr = JsonParser.parseString(
+                handler.handleConfigs(Map.of(),
+                        ProjectScope.ALL)).getAsJsonArray();
+        JsonObject maven = null;
+        for (var el : arr) {
+            var obj = el.getAsJsonObject();
+            if ("SumMaven".equals(
+                    obj.get("configId").getAsString())) {
+                maven = obj;
+                break;
+            }
+        }
+        assertNotNull(maven, "SumMaven must appear");
+        assertEquals("clean verify",
+                maven.get("goals").getAsString());
+        assertEquals("ci",
+                maven.get("profiles").getAsString());
+    }
+
+    @Test
     void agentConfigHasProviderAndAgent() throws Exception {
         ILaunchManager mgr = DebugPlugin.getDefault()
                 .getLaunchManager();

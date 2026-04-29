@@ -1011,33 +1011,6 @@ public class LaunchHandlerTest {
             }
         }
 
-        @Test
-        void mavenSummaryHasGoalsAndProfiles() throws Exception {
-            ILaunchManager mgr =
-                    DebugPlugin.getDefault().getLaunchManager();
-            if (mgr.getLaunchConfigurationType(
-                    "org.eclipse.m2e.Maven2LaunchConfigurationType")
-                    == null) {
-                return;
-            }
-            ILaunchConfiguration mavenCfg = createConfig(
-                    "org.eclipse.m2e.Maven2LaunchConfigurationType",
-                    "SumMaven",
-                    Map.of("M2_GOALS", "clean verify",
-                           "M2_PROFILES", "ci"));
-            try {
-                var arr = JsonParser.parseString(
-                        handler.handleConfigs(Map.of(),
-                                ProjectScope.ALL)).getAsJsonArray();
-                JsonObject maven = findByConfigId(arr, "SumMaven");
-                assertEquals("clean verify",
-                        maven.get("goals").getAsString());
-                assertEquals("ci",
-                        maven.get("profiles").getAsString());
-            } finally {
-                deleteIfPresent(mavenCfg);
-            }
-        }
     }
 
     @Nested
