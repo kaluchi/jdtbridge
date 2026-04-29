@@ -482,11 +482,9 @@ public class NodeBuilderTest {
         JsonObject skeleton = NodeBuilder.projectSkeleton(
                 fixtureProject());
         JsonArray natures = skeleton.getAsJsonArray("natures");
-        boolean hasJava = false;
-        for (var el : natures) {
-            if ("java".equals(el.getAsString())) hasJava = true;
-        }
-        assertTrue(hasJava, "fixture project must have java nature");
+        assertTrue(natures.contains(
+                new com.google.gson.JsonPrimitive("java")),
+                "fixture project must have java nature: " + natures);
     }
 
     @Test
@@ -502,19 +500,12 @@ public class NodeBuilderTest {
 
     // ── packageSkeleton / packageDetail ────────────────────────────
 
-    private static IPackageFragment fixturePackage(String name)
-            throws Exception {
+    private static IPackageFragment fixturePackage(String name) {
         IJavaProject jp = JavaCore.create(fixtureProject());
-        for (var root : jp.getPackageFragmentRoots()) {
-            if (root.getKind()
-                    != org.eclipse.jdt.core.IPackageFragmentRoot
-                            .K_SOURCE) {
-                continue;
-            }
-            IPackageFragment frag = root.getPackageFragment(name);
-            if (frag != null && frag.exists()) return frag;
-        }
-        throw new AssertionError("package not found: " + name);
+        org.eclipse.jdt.core.IPackageFragmentRoot srcRoot =
+                jp.getPackageFragmentRoot(
+                fixtureProject().getFolder("src"));
+        return srcRoot.getPackageFragment(name);
     }
 
     @Test
@@ -662,21 +653,19 @@ public class NodeBuilderTest {
     @Test
     void classpathEntrySkeletonSourceEntry() throws Exception {
         IJavaProject jp = JavaCore.create(fixtureProject());
-        for (var entry : jp.getResolvedClasspath(true)) {
-            if (entry.getEntryKind()
-                    == org.eclipse.jdt.core.IClasspathEntry.CPE_SOURCE) {
-                JsonObject skeleton =
-                        NodeBuilder.classpathEntrySkeleton(
-                                entry, fixtureProject());
-                assertEquals("source",
-                        skeleton.get("entryKind").getAsString());
-                assertEquals("source",
-                        skeleton.get("origin").getAsString());
-                assertTrue(skeleton.has("path"));
-                return;
-            }
-        }
-        throw new AssertionError("no source entry in fixture classpath");
+        var entries = jp.getResolvedClasspath(true);
+        var sourceEntry = entries[0];
+        assertEquals(
+                org.eclipse.jdt.core.IClasspathEntry.CPE_SOURCE,
+                sourceEntry.getEntryKind());
+        JsonObject skeleton =
+                NodeBuilder.classpathEntrySkeleton(
+                        sourceEntry, fixtureProject());
+        assertEquals("source",
+                skeleton.get("entryKind").getAsString());
+        assertEquals("source",
+                skeleton.get("origin").getAsString());
+        assertTrue(skeleton.has("path"));
     }
 
     // ── javadocSummary ───────────────────────────────────────────────
@@ -740,21 +729,19 @@ public class NodeBuilderTest {
     @Test
     void classpathEntrySkeletonLibraryEntry() throws Exception {
         IJavaProject jp = JavaCore.create(fixtureProject());
-        for (var entry : jp.getResolvedClasspath(true)) {
-            if (entry.getEntryKind()
-                    == org.eclipse.jdt.core.IClasspathEntry.CPE_LIBRARY) {
-                JsonObject skeleton =
-                        NodeBuilder.classpathEntrySkeleton(
-                                entry, fixtureProject());
-                assertEquals("library",
-                        skeleton.get("entryKind").getAsString());
-                assertEquals("binary",
-                        skeleton.get("origin").getAsString());
-                assertTrue(skeleton.has("path"));
-                return;
-            }
-        }
-        throw new AssertionError("no library entry in fixture classpath");
+        var entries = jp.getResolvedClasspath(true);
+        var libEntry = entries[1];
+        assertEquals(
+                org.eclipse.jdt.core.IClasspathEntry.CPE_LIBRARY,
+                libEntry.getEntryKind());
+        JsonObject skeleton =
+                NodeBuilder.classpathEntrySkeleton(
+                        libEntry, fixtureProject());
+        assertEquals("library",
+                skeleton.get("entryKind").getAsString());
+        assertEquals("binary",
+                skeleton.get("origin").getAsString());
+        assertTrue(skeleton.has("path"));
     }
 
     // ── methodDetail throws ────────────────────────────────────────
@@ -861,8 +848,8 @@ public class NodeBuilderTest {
         IType anonCaller = type("test.service.AnonymousCallerService");
         IMethod createAnonymous = anonCaller.getMethod(
                 "createAnonymous", new String[0]);
-        IType anonType = findAnonymousChild(createAnonymous);
-        assertNotNull(anonType, "anonymous Animal must exist in createAnonymous()");
+        IType anonType = (IType) createAnonymous.getChildren()[0];
+        assertTrue(anonType.isAnonymous());
         JsonObject detail = NodeBuilder.typeDetail(anonType);
         assertTrue(detail.get("isAnonymous").getAsBoolean());
     }
@@ -986,8 +973,8 @@ public class NodeBuilderTest {
         IMethod method = JdtUtils.findMethod(
                 type, "createAnonymous", null);
         assertNotNull(method);
-        IType anon = findAnonymousChild(method);
-        assertNotNull(anon, "createAnonymous has anonymous type");
+        IType anon = (IType) method.getChildren()[0];
+        assertTrue(anon.isAnonymous());
         String fqn = NodeBuilder.fqnOf(anon);
         assertTrue(fqn.contains("new"),
                 "Anonymous fqn should contain 'new': " + fqn);
@@ -1022,16 +1009,6 @@ public class NodeBuilderTest {
         JsonObject detail = NodeBuilder.fieldDetail(red);
         assertNotNull(detail);
         assertTrue(detail.has("fqn"));
-    }
-
-    // ── helpers ───────────────────────────────────────────────────
-
-    private static IType findAnonymousChild(IMethod method)
-            throws Exception {
-        for (IJavaElement child : method.getChildren()) {
-            if (child instanceof IType t && t.isAnonymous()) return t;
-        }
-        return null;
     }
 
 }
