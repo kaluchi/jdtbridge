@@ -361,54 +361,43 @@ public class HttpIntegrationTest {
 
     private String rawRequestWithBody(String requestLine,
             String body, String... headers) throws Exception {
+        return rawHttp(requestLine, body, headers);
+    }
+
+    private String rawRequest(String requestLine,
+            String... headers) throws Exception {
+        return rawHttp(requestLine, null, headers);
+    }
+
+    private String rawHttp(String requestLine, String body,
+            String... headers) throws Exception {
         try (Socket socket = new Socket("localhost", port)) {
             socket.setSoTimeout(15_000);
             OutputStream out = socket.getOutputStream();
-            byte[] bodyBytes =
-                    body.getBytes(StandardCharsets.UTF_8);
+            byte[] bodyBytes = body != null
+                    ? body.getBytes(StandardCharsets.UTF_8)
+                    : new byte[0];
             StringBuilder req = new StringBuilder();
             req.append(requestLine).append("\r\n");
             for (String h : headers) {
                 req.append(h).append("\r\n");
             }
-            req.append("Content-Length: ")
-                    .append(bodyBytes.length).append("\r\n");
+            if (bodyBytes.length > 0) {
+                req.append("Content-Length: ")
+                        .append(bodyBytes.length).append("\r\n");
+            }
             req.append("\r\n");
             out.write(req.toString()
                     .getBytes(StandardCharsets.UTF_8));
-            out.write(bodyBytes);
+            if (bodyBytes.length > 0) {
+                out.write(bodyBytes);
+            }
             out.flush();
 
             BufferedReader reader = new BufferedReader(
                     new InputStreamReader(
                             socket.getInputStream(),
                             StandardCharsets.UTF_8));
-            StringBuilder response = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                response.append(line).append("\r\n");
-            }
-            return response.toString();
-        }
-    }
-
-    private String rawRequest(String requestLine, String... headers)
-            throws Exception {
-        try (Socket socket = new Socket("localhost", port)) {
-            socket.setSoTimeout(15_000);
-            OutputStream out = socket.getOutputStream();
-            StringBuilder req = new StringBuilder();
-            req.append(requestLine).append("\r\n");
-            for (String h : headers) {
-                req.append(h).append("\r\n");
-            }
-            req.append("\r\n");
-            out.write(req.toString().getBytes(StandardCharsets.UTF_8));
-            out.flush();
-
-            BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(
-                            socket.getInputStream(), StandardCharsets.UTF_8));
             StringBuilder response = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null) {

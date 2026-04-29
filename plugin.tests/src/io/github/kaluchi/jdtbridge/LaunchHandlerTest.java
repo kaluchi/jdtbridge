@@ -6,7 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 
@@ -111,7 +115,7 @@ public class LaunchHandlerTest {
     }
 
     @Nested
-    class List {
+    class ListLaunches {
 
         @Test
         void returnsArray() {
@@ -1334,10 +1338,8 @@ public class LaunchHandlerTest {
                         "org.eclipse.debug.ui.launchGroup.run",
                         "favorites", memento);
 
-                java.util.List<ILaunchConfiguration> out =
-                        new java.util.ArrayList<>();
-                java.util.Set<String> seen =
-                        new java.util.HashSet<>();
+                List<ILaunchConfiguration> out = new ArrayList<>();
+                Set<String> seen = new HashSet<>();
                 LaunchHandler.collectSection(doc,
                         "org.eclipse.debug.ui.launchGroup.run",
                         "favorites",
@@ -1360,10 +1362,8 @@ public class LaunchHandlerTest {
                         "org.eclipse.debug.ui.launchGroup.run",
                         "favorites", memento, memento);
 
-                java.util.List<ILaunchConfiguration> out =
-                        new java.util.ArrayList<>();
-                java.util.Set<String> seen =
-                        new java.util.HashSet<>();
+                List<ILaunchConfiguration> out = new ArrayList<>();
+                Set<String> seen = new HashSet<>();
                 LaunchHandler.collectSection(doc,
                         "org.eclipse.debug.ui.launchGroup.run",
                         "favorites",
@@ -1381,10 +1381,8 @@ public class LaunchHandlerTest {
             Document doc = buildHistoryDoc(
                     "org.eclipse.debug.ui.launchGroup.run",
                     "favorites");
-            java.util.List<ILaunchConfiguration> out =
-                    new java.util.ArrayList<>();
-            java.util.Set<String> seen =
-                    new java.util.HashSet<>();
+            List<ILaunchConfiguration> out = new ArrayList<>();
+            Set<String> seen = new HashSet<>();
             LaunchHandler.collectSection(doc,
                     "no.such.group", "favorites",
                     LaunchAttrs.launchManager(), out, seen);
@@ -1396,10 +1394,8 @@ public class LaunchHandlerTest {
             Document doc = buildHistoryDoc(
                     "org.eclipse.debug.ui.launchGroup.run",
                     "favorites");
-            java.util.List<ILaunchConfiguration> out =
-                    new java.util.ArrayList<>();
-            java.util.Set<String> seen =
-                    new java.util.HashSet<>();
+            List<ILaunchConfiguration> out = new ArrayList<>();
+            Set<String> seen = new HashSet<>();
             LaunchHandler.collectSection(doc,
                     "org.eclipse.debug.ui.launchGroup.run",
                     "mruHistory",
@@ -1415,10 +1411,8 @@ public class LaunchHandlerTest {
                 Document doc = buildHistoryDoc(
                         "org.eclipse.debug.ui.launchGroup.run",
                         "favorites", "invalid-memento-xyz");
-                java.util.List<ILaunchConfiguration> out =
-                        new java.util.ArrayList<>();
-                java.util.Set<String> seen =
-                        new java.util.HashSet<>();
+                List<ILaunchConfiguration> out = new ArrayList<>();
+                Set<String> seen = new HashSet<>();
                 LaunchHandler.collectSection(doc,
                         "org.eclipse.debug.ui.launchGroup.run",
                         "favorites",

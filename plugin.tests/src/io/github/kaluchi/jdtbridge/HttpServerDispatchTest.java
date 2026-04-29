@@ -22,11 +22,12 @@ import io.github.kaluchi.jdtbridge.support.TestFixture;
  */
 public class HttpServerDispatchTest {
 
-    private static final HttpServer server = new HttpServer();
+    private static HttpServer server;
 
     @BeforeAll
     static void setUp() throws Exception {
         TestFixture.create();
+        server = new HttpServer();
     }
 
     private static boolean isJson(String s) {

@@ -295,43 +295,35 @@ public class RefactoringIntegrationTest {
         deleteTempPkg("test.moved");
     }
 
-    private static void createTempCU(
-            String name, String source) throws Exception {
+    private static org.eclipse.jdt.core.IPackageFragmentRoot
+            srcRoot() {
         var root = ResourcesPlugin.getWorkspace().getRoot();
         var project = org.eclipse.jdt.core.JavaCore.create(
                 root.getProject(TestFixture.PROJECT_NAME));
-        var srcRoot = project.getPackageFragmentRoot(
+        return project.getPackageFragmentRoot(
                 root.getProject(TestFixture.PROJECT_NAME)
                         .getFolder("src"));
-        var pkg = srcRoot.getPackageFragment("test.refactor");
-        pkg.createCompilationUnit(
-                name + ".java", source, true, null);
+    }
+
+    private static void createTempCU(
+            String name, String source) throws Exception {
+        srcRoot().getPackageFragment("test.refactor")
+                .createCompilationUnit(
+                        name + ".java", source, true, null);
         Job.getJobManager().join(
                 ResourcesPlugin.FAMILY_AUTO_BUILD, null);
     }
 
     private static void deleteTempCU(
             String pkgName, String fileName) throws Exception {
-        var root = ResourcesPlugin.getWorkspace().getRoot();
-        var project = org.eclipse.jdt.core.JavaCore.create(
-                root.getProject(TestFixture.PROJECT_NAME));
-        var srcRoot = project.getPackageFragmentRoot(
-                root.getProject(TestFixture.PROJECT_NAME)
-                        .getFolder("src"));
-        var pkg = srcRoot.getPackageFragment(pkgName);
-        var cu = pkg.getCompilationUnit(fileName);
+        var cu = srcRoot().getPackageFragment(pkgName)
+                .getCompilationUnit(fileName);
         if (cu.exists()) cu.delete(true, null);
     }
 
     private static void deleteTempPkg(String pkgName)
             throws Exception {
-        var root = ResourcesPlugin.getWorkspace().getRoot();
-        var project = org.eclipse.jdt.core.JavaCore.create(
-                root.getProject(TestFixture.PROJECT_NAME));
-        var srcRoot = project.getPackageFragmentRoot(
-                root.getProject(TestFixture.PROJECT_NAME)
-                        .getFolder("src"));
-        var pkg = srcRoot.getPackageFragment(pkgName);
+        var pkg = srcRoot().getPackageFragment(pkgName);
         if (pkg.exists()) pkg.delete(true, null);
     }
 
