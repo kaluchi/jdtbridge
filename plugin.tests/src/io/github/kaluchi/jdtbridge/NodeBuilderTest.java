@@ -209,15 +209,13 @@ public class NodeBuilderTest {
     void locationCarriesFileLineRangeAndNameOffsets() throws Exception {
         IMethod barkMethod = method("test.model.Dog", "bark", null);
         JsonObject loc = NodeBuilder.location(barkMethod);
-        assertNotNull(loc, "bark() must have a location in source fixture");
+        assertNotNull(loc);
         assertTrue(loc.get("file").getAsString().endsWith("Dog.java"));
-        assertTrue(loc.get("startLine").getAsInt() > 0);
-        assertTrue(loc.get("endLine").getAsInt()
-                >= loc.get("startLine").getAsInt());
-        assertTrue(loc.has("nameStart"));
-        assertTrue(loc.has("nameEnd"));
-        assertTrue(loc.get("nameEnd").getAsInt()
-                > loc.get("nameStart").getAsInt());
+        assertEquals(11, loc.get("startLine").getAsInt());
+        assertEquals(13, loc.get("endLine").getAsInt());
+        assertEquals(3, loc.get("lineCount").getAsInt());
+        assertEquals(166, loc.get("nameStart").getAsInt());
+        assertEquals(170, loc.get("nameEnd").getAsInt());
     }
 
     @Test
