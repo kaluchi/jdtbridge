@@ -187,9 +187,7 @@ ${alignCmds([
 ${alignCmds([
   [`jdt q '"<FQN>" | @source'`, "view test source"],
   [`jdt test run <FQN> -f`, "re-run single test"],
-])}
-
-Add \`-q\` to suppress this guide.`;
+])}`;
 }
 
 /**
