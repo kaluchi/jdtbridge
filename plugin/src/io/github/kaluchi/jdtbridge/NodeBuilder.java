@@ -738,7 +738,8 @@ class NodeBuilder {
      * root path lives in detail under {@code :rootPath} so the
      * canonical {@code :location} stays a code-coordinate sub-Map.
      */
-    static JsonObject projectSkeleton(IProject project) {
+    @SuppressWarnings("restriction")
+	static JsonObject projectSkeleton(IProject project) {
         var obj = baseHeader(
                 project.getName(), "project", "source");
         // Projects have a filesystem root, but no code-position
@@ -772,10 +773,10 @@ class NodeBuilder {
         // git repos and the membership is fundamental enough that
         // bulk listings (jdt q '@projects') must show it without an
         // @detail roundtrip per project.
-        var mapping = org.eclipse.egit.core.project
+		var mapping = org.eclipse.egit.core.project
                 .RepositoryMapping.getMapping(project);
         if (mapping != null && mapping.getRepository() != null) {
-            var repo = mapping.getRepository();
+			var repo = mapping.getRepository();
             obj.addProperty("repo",
                     repo.getWorkTree().getAbsolutePath());
             try {

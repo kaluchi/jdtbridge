@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
  * underlying {@link org.eclipse.eclemma.internal.core.analysis
  * .SessionAnalyzer} actually runs end-to-end.
  */
+@SuppressWarnings("restriction")
 public class CoverageAnalyzerTest {
 
     private CoverageAnalyzer analyzer;

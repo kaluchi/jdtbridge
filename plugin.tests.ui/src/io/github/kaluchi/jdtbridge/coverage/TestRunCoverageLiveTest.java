@@ -70,7 +70,8 @@ public class TestRunCoverageLiveTest {
         }, "Launch did not terminate within 30s: " + testRunId);
     }
 
-    @AfterEach
+    @SuppressWarnings("restriction")
+	@AfterEach
     void cleanupCoverageSessions() {
         CoverageTools.getSessionManager().removeAllSessions();
     }

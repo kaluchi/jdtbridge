@@ -42,7 +42,8 @@ public class CoverageHandlerTest {
         handler = new CoverageHandler(tracker);
     }
 
-    @AfterEach
+    @SuppressWarnings("restriction")
+	@AfterEach
     void tearDown() {
         tracker.stop();
         CoverageTools.getSessionManager().removeAllSessions();
@@ -201,7 +202,8 @@ public class CoverageHandlerTest {
     @Nested
     class HandleRefresh {
 
-        @Test
+        @SuppressWarnings("restriction")
+		@Test
         void noActiveSessionReturnsNoActiveError() {
             CoverageTools.getSessionManager().removeAllSessions();
             JsonObject obj = parseObj(handler.handleRefresh());
@@ -223,7 +225,8 @@ public class CoverageHandlerTest {
     @Nested
     class HandleRelaunch {
 
-        @Test
+        @SuppressWarnings("restriction")
+		@Test
         void noActiveSessionReturnsNoActiveError() {
             CoverageTools.getSessionManager().removeAllSessions();
             JsonObject obj = parseObj(handler.handleRelaunch());
@@ -279,8 +282,9 @@ public class CoverageHandlerTest {
         return JsonParser.parseString(json).getAsJsonObject();
     }
 
-    private String importAndAwait(String description) throws Exception {
-        ISessionImporter importer = CoverageTools.getImporter();
+    @SuppressWarnings("restriction")
+	private String importAndAwait(String description) throws Exception {
+		ISessionImporter importer = CoverageTools.getImporter();
         importer.setDescription(description);
         importer.setScope(Set.of());
         importer.setExecutionDataSource(emptyDataSource());
@@ -295,7 +299,8 @@ public class CoverageHandlerTest {
                 .orElseThrow();
     }
 
-    private static IExecutionDataSource emptyDataSource() {
+    @SuppressWarnings("restriction")
+	private static IExecutionDataSource emptyDataSource() {
         return (execVisitor, sessionInfoVisitor) -> {
             // Intentionally empty.
         };

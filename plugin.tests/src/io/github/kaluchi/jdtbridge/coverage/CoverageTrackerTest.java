@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * driven through the real EclEmma {@link ISessionManager} via
  * {@link CoverageTools#getImporter()}.
  */
+@SuppressWarnings("restriction")
 public class CoverageTrackerTest {
 
     private CoverageTracker tracker;

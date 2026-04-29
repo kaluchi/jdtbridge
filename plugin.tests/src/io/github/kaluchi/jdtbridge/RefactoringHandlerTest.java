@@ -41,33 +41,33 @@ public class RefactoringHandlerTest {
     // ── organize-imports errors ────────────────────────────────────
 
     @Test
-    void organizeImportsMissingFileParamReturnsError() throws Exception {
+    void organizeImportsMissingClassParamReturnsError() throws Exception {
         assertError(
                 handler.handleOrganizeImports(Map.of()),
-                "Missing 'file' parameter");
+                "Missing 'class' parameter");
     }
 
     @Test
-    void organizeImportsBlankFileParamReturnsError() throws Exception {
+    void organizeImportsBlankClassParamReturnsError() throws Exception {
         assertError(
-                handler.handleOrganizeImports(Map.of("file", "  ")),
-                "Missing 'file' parameter");
+                handler.handleOrganizeImports(Map.of("class", "  ")),
+                "Missing 'class' parameter");
     }
 
     // ── format errors ─────────────────────────────────────────────
 
     @Test
-    void formatMissingFileParamReturnsError() throws Exception {
+    void formatMissingClassParamReturnsError() throws Exception {
         assertError(
                 handler.handleFormat(Map.of()),
-                "Missing 'file' parameter");
+                "Missing 'class' parameter");
     }
 
     @Test
-    void formatBlankFileParamReturnsError() throws Exception {
+    void formatBlankClassParamReturnsError() throws Exception {
         assertError(
-                handler.handleFormat(Map.of("file", "")),
-                "Missing 'file' parameter");
+                handler.handleFormat(Map.of("class", "")),
+                "Missing 'class' parameter");
     }
 
     // ── rename errors ─────────────────────────────────────────────
@@ -137,22 +137,22 @@ public class RefactoringHandlerTest {
         assertError(json, "");
     }
 
-    // ── findCompilationUnit edge cases ────────────────────────────
+    // ── type resolution edge cases ──────────────────────────────
 
     @Test
-    void organizeImportsNonExistentPathReturnsError() throws Exception {
+    void organizeImportsNonExistentTypeReturnsError() throws Exception {
         assertError(
                 handler.handleOrganizeImports(
-                        Map.of("file", "/no/such/File.java")),
-                "Java file not found");
+                        Map.of("class", "no.such.Type")),
+                "Type not found");
     }
 
     @Test
-    void formatNonExistentPathReturnsError() throws Exception {
+    void formatNonExistentTypeReturnsError() throws Exception {
         assertError(
                 handler.handleFormat(
-                        Map.of("file", "/no/such/File.java")),
-                "Java file not found");
+                        Map.of("class", "no.such.Type")),
+                "Type not found");
     }
 
     // ── ensurePreferencesInitialized ──────────────────────────────
@@ -167,20 +167,13 @@ public class RefactoringHandlerTest {
 
     // ── success paths (integration with TestFixture) ─────────────
 
-    private static String fixturePath(String pkg, String file) {
-        return "/" + TestFixture.PROJECT_NAME
-                + "/src/" + pkg.replace('.', '/') + "/" + file;
-    }
-
     @Nested
     class OrganizeImportsSuccess {
 
         @Test
         void removesUnusedImports() throws Exception {
-            String path = fixturePath(
-                    "test.refactor", "ImportTarget.java");
             String json = handler.handleOrganizeImports(
-                    Map.of("file", path));
+                    Map.of("class", "test.refactor.ImportTarget"));
             var obj = parseJson(json);
             assertFalse(obj.has("error"), "unexpected: " + json);
             assertTrue(obj.has("added"), "should have added: " + json);
@@ -193,10 +186,8 @@ public class RefactoringHandlerTest {
 
         @Test
         void noOpOnCleanFile() throws Exception {
-            String path = fixturePath(
-                    "test.model", "Dog.java");
             String json = handler.handleOrganizeImports(
-                    Map.of("file", path));
+                    Map.of("class", "test.model.Dog"));
             var obj = parseJson(json);
             assertFalse(obj.has("error"), "unexpected: " + json);
             assertEquals(0, obj.get("added").getAsInt());
@@ -209,10 +200,8 @@ public class RefactoringHandlerTest {
 
         @Test
         void formatsMessyCode() throws Exception {
-            String path = fixturePath(
-                    "test.refactor", "FormatTarget.java");
             String json = handler.handleFormat(
-                    Map.of("file", path));
+                    Map.of("class", "test.refactor.FormatTarget"));
             var obj = parseJson(json);
             assertFalse(obj.has("error"), "unexpected: " + json);
             assertTrue(obj.get("modified").getAsBoolean(),
@@ -236,12 +225,11 @@ public class RefactoringHandlerTest {
                     """, true, null);
             org.eclipse.core.runtime.jobs.Job.getJobManager().join(
                     ResourcesPlugin.FAMILY_AUTO_BUILD, null);
-            String path = fixturePath(
-                    "test.refactor", "FormatOnce.java");
             try {
-                handler.handleFormat(Map.of("file", path));
+                handler.handleFormat(
+                        Map.of("class", "test.refactor.FormatOnce"));
                 String json2 = handler.handleFormat(
-                        Map.of("file", path));
+                        Map.of("class", "test.refactor.FormatOnce"));
                 var obj = parseJson(json2);
                 assertFalse(obj.has("error"),
                         "second format must not error: " + json2);
@@ -255,10 +243,8 @@ public class RefactoringHandlerTest {
 
         @Test
         void noOpOnAlreadyFormatted() throws Exception {
-            String path = fixturePath(
-                    "test.model", "Animal.java");
             String json = handler.handleFormat(
-                    Map.of("file", path));
+                    Map.of("class", "test.model.Animal"));
             var obj = parseJson(json);
             assertFalse(obj.has("error"), "unexpected: " + json);
         }

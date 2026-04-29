@@ -80,7 +80,8 @@ class CoverageHandler {
 
     /** {@code POST /coverage/dump} body {@code {coverageId, reset}}
      *  — request a dump from the running JaCoCo agent. */
-    String handleDump(String requestBody) {
+    @SuppressWarnings("restriction")
+	String handleDump(String requestBody) {
         JsonObject body = parseObjectBody(requestBody);
         if (body == null) {
             return error("coverage-not-found",
@@ -124,9 +125,10 @@ class CoverageHandler {
      *  {@code sessionActivated} for the active session, which
      *  causes {@link org.eclipse.eclemma.internal.core.JavaCoverageLoader}
      *  to cancel any in-flight job and re-analyze. */
-    String handleRefresh() {
-        ISessionManager sm = CoverageTools.getSessionManager();
-        ICoverageSession active = sm.getActiveSession();
+    @SuppressWarnings("restriction")
+	String handleRefresh() {
+		ISessionManager sm = CoverageTools.getSessionManager();
+		ICoverageSession active = sm.getActiveSession();
         if (active == null) {
             return error("coverage-no-active-session",
                     "No active coverage session");
@@ -144,13 +146,16 @@ class CoverageHandler {
      *  headless and calls {@code config.launch(LAUNCH_MODE, ...)}
      *  directly instead of Eclipse's {@code DebugUITools.launch}. */
     String handleRelaunch() {
-        ISessionManager sm = CoverageTools.getSessionManager();
-        ICoverageSession active = sm.getActiveSession();
+        @SuppressWarnings("restriction")
+		ISessionManager sm = CoverageTools.getSessionManager();
+        @SuppressWarnings("restriction")
+		ICoverageSession active = sm.getActiveSession();
         if (active == null) {
             return error("coverage-no-active-session",
                     "No active coverage session");
         }
-        ILaunchConfiguration config = active.getLaunchConfiguration();
+        @SuppressWarnings("restriction")
+		ILaunchConfiguration config = active.getLaunchConfiguration();
         if (config == null) {
             return error("coverage-launch-not-live",
                     "Active session has no associated launch "
@@ -169,7 +174,8 @@ class CoverageHandler {
 
     /** Build the response JSON for {@code /coverage/run} and
      *  {@code /coverage/relaunch}. */
-    private static String runResponse(ILaunch launch) {
+    @SuppressWarnings("restriction")
+	private static String runResponse(ILaunch launch) {
         var obj = new JsonObject();
         obj.addProperty("ok", true);
 

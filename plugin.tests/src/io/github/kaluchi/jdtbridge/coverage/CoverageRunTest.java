@@ -168,6 +168,7 @@ public class CoverageRunTest {
     }
 
     @Nested
+    @SuppressWarnings("restriction")
     class ResolveSession {
 
         private CoverageRun runWithDumps(int n) {
@@ -188,25 +189,25 @@ public class CoverageRunTest {
             assertNull(run.resolveSession(1));
         }
 
-        @Test
+		@Test
         void nullSelectsLatest() {
             CoverageRun run = runWithDumps(3);
-            ICoverageSession s = run.resolveSession(null);
+			ICoverageSession s = run.resolveSession(null);
             assertNotNull(s);
             assertEquals("dump-2", s.getDescription());
         }
 
-        @Test
+		@Test
         void oneIsFirst() {
             CoverageRun run = runWithDumps(3);
-            ICoverageSession s = run.resolveSession(1);
+			ICoverageSession s = run.resolveSession(1);
             assertEquals("dump-0", s.getDescription());
         }
 
-        @Test
+		@Test
         void exactNumberOfDumpsReturnsLast() {
             CoverageRun run = runWithDumps(3);
-            ICoverageSession s = run.resolveSession(3);
+			ICoverageSession s = run.resolveSession(3);
             assertEquals("dump-2", s.getDescription());
         }
 
@@ -227,7 +228,8 @@ public class CoverageRunTest {
 
     /** Bare-bones {@link ICoverageSession} stub for resolve tests —
      *  only {@code getDescription()} is queried. */
-    private static final class FakeSession
+    @SuppressWarnings("restriction")
+	private static final class FakeSession
             implements ICoverageSession {
         private final String desc;
 

@@ -49,6 +49,7 @@ import io.github.kaluchi.jdtbridge.ProjectScope;
  * relaunch) lives in {@link CoverageHandler}; streaming lives in
  * {@link CoverageProgressStreamer}.
  */
+@SuppressWarnings("restriction")
 class CoverageSessionHandler {
 
     /** Same template as EclEmma's
@@ -98,7 +99,7 @@ class CoverageSessionHandler {
             return error("coverage-not-found", coverageId);
         }
         Integer dumpIndex = parseDumpIndex(coverageId);
-        ICoverageSession session = run.resolveSession(dumpIndex);
+		ICoverageSession session = run.resolveSession(dumpIndex);
         if (session == null) {
             if (dumpIndex != null) {
                 return error("coverage-dump-not-found", coverageId);
@@ -126,7 +127,7 @@ class CoverageSessionHandler {
      * folds {@code getCoverageFor(project)} into the result via
      * {@link CoverageNodeImpl#increment(ICoverageNode)}.
      */
-    static ICoverageNode aggregateProjectCounters(
+	static ICoverageNode aggregateProjectCounters(
             IJavaModelCoverage model) {
         CoverageNodeImpl agg = new CoverageNodeImpl(
                 ICoverageNode.ElementType.GROUP, "session");
@@ -134,7 +135,7 @@ class CoverageSessionHandler {
             return agg;
         }
         for (IJavaProject project : model.getProjects()) {
-            ICoverageNode pc = model.getCoverageFor(project);
+			ICoverageNode pc = model.getCoverageFor(project);
             if (pc != null) {
                 agg.increment(pc);
             }
@@ -152,7 +153,7 @@ class CoverageSessionHandler {
      * method / source-file), the per-line breakdown — no
      * aggregation, no derived flags, no synthesis.
      */
-    String handleNode(Map<String, String> params) {
+	String handleNode(Map<String, String> params) {
         String coverageId = params.get("coverageId");
         if (coverageId == null || coverageId.isBlank()) {
             return error("coverage-not-found",
@@ -168,7 +169,7 @@ class CoverageSessionHandler {
             return error("coverage-not-found", coverageId);
         }
         Integer dumpIndex = parseDumpIndex(coverageId);
-        ICoverageSession session = run.resolveSession(dumpIndex);
+		ICoverageSession session = run.resolveSession(dumpIndex);
         if (session == null) {
             return error(dumpIndex != null
                     ? "coverage-dump-not-found"
@@ -191,7 +192,7 @@ class CoverageSessionHandler {
             return error("coverage-analysis-failed",
                     e.getMessage());
         }
-        ICoverageNode node = ca.modelCoverage.getCoverageFor(element);
+		ICoverageNode node = ca.modelCoverage.getCoverageFor(element);
         if (node == null) {
             return error("coverage-no-data-for-element",
                     fqn + " (kind=" + elementKind(element) + ")");
@@ -279,7 +280,7 @@ class CoverageSessionHandler {
     }
 
     /** {@code POST /coverage/activate} body {@code {coverageId}}. */
-    String handleActivate(String requestBody) {
+	String handleActivate(String requestBody) {
         JsonObject body = parseObjectBody(requestBody);
         if (body == null) {
             return error("coverage-not-found",
@@ -295,7 +296,7 @@ class CoverageSessionHandler {
             return error("coverage-not-found", coverageId);
         }
         Integer dumpIndex = parseDumpIndex(coverageId);
-        ICoverageSession target = run.resolveSession(dumpIndex);
+		ICoverageSession target = run.resolveSession(dumpIndex);
         if (target == null) {
             return error("coverage-dump-not-found", coverageId);
         }
@@ -310,7 +311,7 @@ class CoverageSessionHandler {
 
     /** {@code POST /coverage/merge} body
      *  {@code {coverageIds, description}}. */
-    String handleMerge(String requestBody) {
+	String handleMerge(String requestBody) {
         JsonObject body = parseObjectBody(requestBody);
         if (body == null) {
             return error("coverage-not-found",
@@ -326,7 +327,7 @@ class CoverageSessionHandler {
             return error("coverage-merge-too-few-inputs",
                     "Need at least 2 inputs, got " + inputArr.size());
         }
-        List<ICoverageSession> inputs = new ArrayList<>();
+		List<ICoverageSession> inputs = new ArrayList<>();
         for (JsonElement el : inputArr) {
             String id = el.getAsString();
             CoverageRun run = tracker.byCoverageId(id);
@@ -348,8 +349,8 @@ class CoverageSessionHandler {
                     MERGE_DESC_TEMPLATE,
                     new Object[] { new Date() });
         }
-        ISessionManager sm = CoverageTools.getSessionManager();
-        ICoverageSession merged;
+		ISessionManager sm = CoverageTools.getSessionManager();
+		ICoverageSession merged;
         try {
             merged = sm.mergeSessions(inputs, description,
                     new NullProgressMonitor());
@@ -379,10 +380,10 @@ class CoverageSessionHandler {
 
     /** {@code POST /coverage/remove} — body {@code {}} removes
      *  the active session, body {@code {all: true}} removes all. */
-    String handleRemove(String requestBody) {
+	String handleRemove(String requestBody) {
         JsonObject body = parseObjectBody(requestBody);
         boolean all = body != null && optBool(body, "all", false);
-        ISessionManager sm = CoverageTools.getSessionManager();
+		ISessionManager sm = CoverageTools.getSessionManager();
         List<String> removed = new ArrayList<>();
         if (all) {
             for (CoverageRun run : tracker.snapshot().values()) {
@@ -390,7 +391,7 @@ class CoverageSessionHandler {
             }
             sm.removeAllSessions();
         } else {
-            ICoverageSession active = sm.getActiveSession();
+			ICoverageSession active = sm.getActiveSession();
             if (active == null) {
                 return error("coverage-no-active-session",
                         "No active coverage session");

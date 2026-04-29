@@ -51,6 +51,7 @@ import io.github.kaluchi.jdtbridge.Log;
  * class is loaded only after {@link CoverageBridge#isAvailable()}
  * confirms the bundle is present.
  */
+@SuppressWarnings("restriction")
 final class CoverageTracker
         implements ISessionListener, ILaunchesListener2,
                    IJavaCoverageListener {
@@ -560,8 +561,10 @@ final class CoverageTracker
      *  classification. Mutated only inside listener callbacks (single
      *  thread per dispatch) — no lock needed for the lists. */
     private static final class PendingClassification {
-        final ICoverageSession session;
-        final long createdAtMillis = System.currentTimeMillis();
+        @SuppressWarnings("unused")
+		final ICoverageSession session;
+        @SuppressWarnings("unused")
+		final long createdAtMillis = System.currentTimeMillis();
         final List<String> removedCoverageIds = new ArrayList<>();
         volatile String assignedCoverageId;
 

@@ -22,6 +22,7 @@ import org.eclipse.jdt.core.IPackageFragmentRoot;
  * exactly one session and is created at the {@code sessionAdded}
  * that produced it.
  */
+@SuppressWarnings("restriction")
 final class CoverageRun {
 
     enum Kind {
@@ -62,7 +63,7 @@ final class CoverageRun {
     /** All sessions that belong to this run, latest last. Live runs
      *  grow this list per dump; merged/imported runs hold exactly
      *  one element. */
-    final List<ICoverageSession> sessions = new CopyOnWriteArrayList<>();
+	final List<ICoverageSession> sessions = new CopyOnWriteArrayList<>();
     /** Wall-clock millis per session in {@link #sessions}, same
      *  index. */
     final List<Long> dumpedAt = new CopyOnWriteArrayList<>();
@@ -73,7 +74,7 @@ final class CoverageRun {
 
     /** Latest {@link ICoverageSession#getDescription()} — live runs
      *  refresh on every dump, merged/imported keep the original. */
-    volatile String description;
+	volatile String description;
 
     volatile boolean terminated;
     volatile boolean dataReceived;
@@ -147,7 +148,7 @@ final class CoverageRun {
      *  suffix on the coverage ID, where {@code N} is 1-based.
      *  Without a suffix returns the latest dump (or the only
      *  session for merged/imported). */
-    ICoverageSession resolveSession(Integer dumpIndex) {
+	ICoverageSession resolveSession(Integer dumpIndex) {
         if (sessions.isEmpty()) {
             return null;
         }

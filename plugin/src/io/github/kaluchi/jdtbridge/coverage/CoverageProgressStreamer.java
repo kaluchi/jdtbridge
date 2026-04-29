@@ -171,7 +171,8 @@ public final class CoverageProgressStreamer {
     private static JsonObject countersFor(CoverageRun run,
             CoverageAnalyzer analyzer) {
         if (analyzer == null) return null;
-        ICoverageSession session = run.resolveSession(null);
+        @SuppressWarnings("restriction")
+		ICoverageSession session = run.resolveSession(null);
         if (session == null) return null;
         try {
             CoverageAnalyzer.CachedAnalysis ca =
