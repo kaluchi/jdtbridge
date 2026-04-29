@@ -12,6 +12,8 @@ import java.nio.charset.StandardCharsets;
  */
 class ConsoleStreamer {
 
+    ConsoleStreamer() { }
+
     /**
      * Stream console output. Blocks until terminated or IOException.
      *
