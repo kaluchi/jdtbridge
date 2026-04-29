@@ -1514,37 +1514,6 @@ public class LaunchHandlerTest {
     }
 
     @Nested
-    class AgentConfigSummary {
-
-        @Test
-        void agentConfigHasProviderAndAgent() throws Exception {
-            ILaunchConfiguration cfg = createConfig(
-                    "io.github.kaluchi.jdtbridge.ui.agentLaunchType",
-                    "SumAgent",
-                    Map.of("io.github.kaluchi.jdtbridge.ui.provider",
-                                    "local",
-                            "io.github.kaluchi.jdtbridge.ui.agent",
-                                    "claude",
-                            "io.github.kaluchi.jdtbridge.ui.agentArgs",
-                                    "--continue"));
-            try {
-                var arr = JsonParser.parseString(
-                        handler.handleConfigs(Map.of(),
-                                ProjectScope.ALL)).getAsJsonArray();
-                JsonObject agent = findByConfigId(arr, "SumAgent");
-                assertEquals("local",
-                        agent.get("provider").getAsString());
-                assertEquals("claude",
-                        agent.get("agent").getAsString());
-                assertEquals("--continue",
-                        agent.get("agentArgs").getAsString());
-            } finally {
-                deleteIfPresent(cfg);
-            }
-        }
-    }
-
-    @Nested
     class NonLocalConfigDelete {
 
         @Test

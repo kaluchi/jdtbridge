@@ -73,4 +73,53 @@ public class LaunchHandlerMavenTest {
                 maven.get("goals").getAsString(),
                 "Maven goals must round-trip: " + maven);
     }
+
+    @Test
+    void agentConfigHasProviderAndAgent() throws Exception {
+        ILaunchManager mgr = DebugPlugin.getDefault()
+                .getLaunchManager();
+        ILaunchConfigurationType agentType = mgr
+                .getLaunchConfigurationType(
+                        "io.github.kaluchi.jdtbridge.ui"
+                        + ".agentLaunchType");
+        assertNotNull(agentType,
+                "agent launch type missing in UI runtime");
+        ILaunchConfigurationWorkingCopy wc =
+                agentType.newInstance(null, "AgentConfigTest");
+        wc.setAttribute(
+                "io.github.kaluchi.jdtbridge.ui.provider",
+                "local");
+        wc.setAttribute(
+                "io.github.kaluchi.jdtbridge.ui.agent",
+                "claude");
+        wc.setAttribute(
+                "io.github.kaluchi.jdtbridge.ui.agentArgs",
+                "--continue");
+        ILaunchConfiguration agentCfg = wc.doSave();
+        try {
+            String json = handler.handleConfigs(
+                    Map.of(), ProjectScope.ALL);
+            JsonArray arr = JsonParser.parseString(json)
+                    .getAsJsonArray();
+            JsonObject agent = null;
+            for (var el : arr) {
+                var obj = el.getAsJsonObject();
+                if ("AgentConfigTest".equals(
+                        obj.get("configId").getAsString())) {
+                    agent = obj;
+                    break;
+                }
+            }
+            assertNotNull(agent,
+                    "Agent config must appear: " + json);
+            assertEquals("local",
+                    agent.get("provider").getAsString());
+            assertEquals("claude",
+                    agent.get("agent").getAsString());
+            assertEquals("--continue",
+                    agent.get("agentArgs").getAsString());
+        } finally {
+            agentCfg.delete();
+        }
+    }
 }
