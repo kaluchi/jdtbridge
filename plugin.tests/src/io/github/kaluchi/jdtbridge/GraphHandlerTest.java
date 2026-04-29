@@ -569,7 +569,7 @@ public class GraphHandlerTest {
         var arr = JsonParser.parseString(handler.handleTypes(
                 params("pattern", "*Service"),
                 ProjectScope.ALL)).getAsJsonArray();
-        assertTrue(arr.size() >= 2,
+        assertEquals(2, Math.min(arr.size(), 2),
                 "*Service should match multiple, got " + arr.size());
         for (var entry : arr) {
             String fqn = entry.getAsJsonObject().get("fqn").getAsString();
@@ -853,7 +853,7 @@ public class GraphHandlerTest {
     void classpathReturnsAllEntries() {
         var arr = JsonParser.parseString(handler.handleClasspath(
                 params("of", "jdtbridge-test"))).getAsJsonArray();
-        assertTrue(arr.size() >= 3,
+        assertEquals(3, Math.min(arr.size(), 3),
                 "fixture project has at least src + JRE + JUnit");
         for (var entry : arr) {
             JsonObject e = entry.getAsJsonObject();

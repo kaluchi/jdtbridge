@@ -147,7 +147,7 @@ class LogHandlerTest {
 
         // Cap below the total size forces a truncate-and-align path.
         String tail = LogHandler.readTailBytes(p, 256);
-        assertTrue(tail.length() <= 256);
+        assertEquals(256, Math.max(tail.length(), 256));
         assertTrue(tail.contains("!ENTRY b 4 0 t"),
                 "aligned tail must contain a full !ENTRY header, "
                 + "not a mid-line suffix");
@@ -212,7 +212,7 @@ class LogHandlerTest {
                 java.util.Map.of("tail", "1"));
         var arr = com.google.gson.JsonParser.parseString(json)
                 .getAsJsonArray();
-        assertTrue(arr.size() <= 1,
+        assertEquals(1, Math.max(arr.size(), 1),
                 "tail=1 must cap at 1: size=" + arr.size());
     }
 

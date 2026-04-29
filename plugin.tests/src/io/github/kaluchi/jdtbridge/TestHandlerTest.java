@@ -352,7 +352,6 @@ public class TestHandlerTest {
         return fakeProject(java.util.Map.of(markerFqn, marker));
     }
 
-    @SuppressWarnings("unchecked")
     private IJavaProject fakeProject(
             java.util.Map<String, IType> types) {
         return (IJavaProject) Proxy.newProxyInstance(
