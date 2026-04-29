@@ -116,7 +116,7 @@ public class HttpServerBindTest {
 
             assertNotEquals(oldPort, newPort,
                     "Rebind should assign a new port");
-            assertTrue(newPort > 0);
+            assertNotEquals(0, newPort);
         }
 
         @Test

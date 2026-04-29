@@ -130,10 +130,7 @@ public class LaunchHandlerTest {
             ILaunchManager mgr =
                     DebugPlugin.getDefault().getLaunchManager();
             ILaunch[] existing = mgr.getLaunches();
-            // Remove all for clean test
-            if (existing.length > 0) {
-                mgr.removeLaunches(existing);
-            }
+            mgr.removeLaunches(existing);
             String json = handler.handleList(Map.of(), ProjectScope.ALL);
             assertEquals("[]", json);
             // Restore
@@ -363,8 +360,7 @@ public class LaunchHandlerTest {
             assertTrue(obj.has("xml"),
                     "Should have xml field: " + json);
             String xml = obj.get("xml").getAsString();
-            assertTrue(xml.contains("<?xml")
-                    || xml.contains("<launchConfiguration"),
+            assertTrue(xml.contains("<launchConfiguration"),
                     "XML should contain launch config: "
                     + xml.substring(0,
                             Math.min(200, xml.length())));
@@ -379,11 +375,9 @@ public class LaunchHandlerTest {
             var attrs = obj.getAsJsonObject("attributes");
             assertTrue(
                     attrs.has(
-                        "org.eclipse.jdt.launching.MAIN_TYPE")
-                    || attrs.has(
-                        "org.eclipse.jdt.junit.CONTAINER"),
-                    "JUnit config should have test class or "
-                    + "container in attributes: " + attrs);
+                            "org.eclipse.jdt.launching.MAIN_TYPE"),
+                    "JUnit config should have MAIN_TYPE: "
+                    + attrs);
         }
 
         @Test
