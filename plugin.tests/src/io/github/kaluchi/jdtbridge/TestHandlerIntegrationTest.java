@@ -192,6 +192,18 @@ public class TestHandlerIntegrationTest {
     }
 
     @Test
+    public void launchWithRefreshProject() throws Exception {
+        Map<String, String> params = new HashMap<>();
+        params.put("target", "test.edge.SimpleTest");
+        String json = handler.handleTestRun(params);
+        var obj = com.google.gson.JsonParser.parseString(json)
+                .getAsJsonObject();
+        assertTrue(obj.get("ok").getAsBoolean(),
+                "handleTestRun without no-refresh: " + json);
+        terminateLaunch(obj.get("configId").getAsString());
+    }
+
+    @Test
     public void emptyTargetReturnsError() throws Exception {
         Map<String, String> params = new HashMap<>();
         params.put("target", "   ");
