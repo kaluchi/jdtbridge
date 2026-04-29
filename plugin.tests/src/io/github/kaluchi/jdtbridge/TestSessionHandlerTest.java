@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -125,7 +126,7 @@ public class TestSessionHandlerTest {
                     paramsMulti("testRunId", testRunId,
                                 "filter", "all")));
             JsonArray entries = result.getAsJsonArray("entries");
-            assertTrue(entries.size() >= 1,
+            assertFalse(entries.isEmpty(),
                     "all filter should include passing tests");
             JsonObject first = entries.get(0).getAsJsonObject();
             assertEquals("PASS",
@@ -166,7 +167,7 @@ public class TestSessionHandlerTest {
             JsonArray arr = JsonParser.parseString(
                     handler.handleSessions(Map.of(),
                             ProjectScope.ALL)).getAsJsonArray();
-            assertTrue(arr.size() >= 1);
+            assertFalse(arr.isEmpty());
             boolean found = arr.asList().stream()
                     .map(JsonElement::getAsJsonObject)
                     .anyMatch(e -> testRunId.equals(

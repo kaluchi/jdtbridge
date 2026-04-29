@@ -44,7 +44,7 @@ public class DiagnosticsIntegrationTest {
         params.put("project", TestFixture.PROJECT_NAME);
         String json = handler.handleProblems(params, ProjectScope.ALL);
         JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
-        assertTrue(arr.size() > 0, "Should have errors");
+        assertFalse(arr.isEmpty(), "Should have errors");
         JsonObject error = arr.get(0).getAsJsonObject();
         assertEquals("ERROR", error.get("severity").getAsString());
         assertTrue(error.get("file").getAsString()
@@ -73,7 +73,7 @@ public class DiagnosticsIntegrationTest {
         params.put("warnings", "");
         String json = handler.handleProblems(params, ProjectScope.ALL);
         JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
-        assertTrue(arr.size() >= 1,
+        assertFalse(arr.isEmpty(),
                 "With warnings flag, should return results");
         assertTrue(json.contains("\"severity\":\"ERROR\""),
                 "Should contain at least one ERROR");
@@ -86,7 +86,7 @@ public class DiagnosticsIntegrationTest {
         params.put("file", "  ");
         String json = handler.handleProblems(params, ProjectScope.ALL);
         JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
-        assertTrue(arr.size() > 0,
+        assertFalse(arr.isEmpty(),
                 "Blank file → workspace scope should find errors");
     }
 
@@ -97,7 +97,7 @@ public class DiagnosticsIntegrationTest {
         params.put("project", "");
         String json = handler.handleProblems(params, ProjectScope.ALL);
         JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
-        assertTrue(arr.size() > 0,
+        assertFalse(arr.isEmpty(),
                 "Blank project → workspace scope should find errors");
     }
 
@@ -140,7 +140,7 @@ public class DiagnosticsIntegrationTest {
         String json = handler.handleProblems(
                 new HashMap<>(), ProjectScope.ALL);
         JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
-        assertTrue(arr.size() > 0,
+        assertFalse(arr.isEmpty(),
                 "Workspace-wide scope should find errors");
         assertTrue(json.contains("BrokenClass"),
                 "Should surface BrokenClass: " + arr);
@@ -169,7 +169,7 @@ public class DiagnosticsIntegrationTest {
         params.put("all", "");
         String json = handler.handleProblems(params, ProjectScope.ALL);
         JsonArray arr = JsonParser.parseString(json).getAsJsonArray();
-        assertTrue(arr.size() > 0, "expected fixture errors");
+        assertFalse(arr.isEmpty(), "expected fixture errors");
         JsonObject first = arr.get(0).getAsJsonObject();
         assertTrue(first.has("source"),
                 "all flag must attach marker origin: " + first);
@@ -182,7 +182,6 @@ public class DiagnosticsIntegrationTest {
         String json = handler.handleBuild(params);
         JsonObject obj = JsonParser.parseString(json).getAsJsonObject();
         assertNotNull(obj.get("errors"), "Should have errors field");
-        assertTrue(obj.get("errors").getAsInt() >= 0);
     }
 
     @Test

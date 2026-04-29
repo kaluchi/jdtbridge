@@ -22,6 +22,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -130,7 +131,7 @@ public class CoverageHandlerTest {
                         Map.of("configId", configName)));
                 var arr = obj.get("supportedTypeIds")
                         .getAsJsonArray();
-                assertTrue(arr.size() > 0);
+                assertFalse(arr.isEmpty());
             } finally {
                 cfg.delete();
             }

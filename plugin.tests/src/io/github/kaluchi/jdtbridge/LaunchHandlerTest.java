@@ -395,7 +395,7 @@ public class LaunchHandlerTest {
                     .getAsJsonObject();
             var attrs = obj.getAsJsonObject("attributes");
             assertNotNull(attrs);
-            assertTrue(attrs.size() > 0,
+            assertFalse(attrs.isEmpty(),
                     "Config should have some attributes");
         }
     }

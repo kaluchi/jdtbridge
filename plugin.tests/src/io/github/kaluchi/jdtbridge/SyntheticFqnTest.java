@@ -38,15 +38,9 @@ public class SyntheticFqnTest {
                 "test.service.AnonymousCallerService");
         IMethod createAnon = JdtUtils.findMethod(
                 type, "createAnonymous", null);
-        IType anon = null;
-        for (IJavaElement child : createAnon.getChildren()) {
-            if (child instanceof IType t && t.isAnonymous()) {
-                anon = t;
-                break;
-            }
-        }
-        assertNotNull(anon,
-                "createAnonymous() must declare an anonymous IType");
+        IType anon = (IType) createAnon.getChildren()[0];
+        assertTrue(anon.isAnonymous(),
+                "First child must be an anonymous IType");
         assertEquals(
                 "test.service.AnonymousCallerService"
                 + "#createAnonymous().new Animal() {...}",

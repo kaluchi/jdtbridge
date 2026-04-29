@@ -488,7 +488,7 @@ public class GraphHandlerTest {
                 params("of", "test.model.Dog#bark()"),
                 ProjectScope.ALL)).getAsJsonArray();
         // bark() is called by AnimalService.createDog and CallerService.callCreateDog (transitively, but only direct here)
-        assertTrue(arr.size() >= 1, "bark() has at least one caller");
+        assertFalse(arr.isEmpty(), "bark() has at least one caller");
         var first = arr.get(0).getAsJsonObject();
         assertEquals("reference", first.get("kind").getAsString());
         assertEquals("incoming", first.get("direction").getAsString(),
@@ -509,7 +509,7 @@ public class GraphHandlerTest {
         var arr = JsonParser.parseString(handler.handleRefsTo(
                 params("of", "test.model.Animal"),
                 ProjectScope.ALL)).getAsJsonArray();
-        assertTrue(arr.size() >= 1);
+        assertFalse(arr.isEmpty());
         for (var entry : arr) {
             JsonObject e = entry.getAsJsonObject();
             assertEquals("typeUse",
@@ -526,7 +526,7 @@ public class GraphHandlerTest {
                         "test.edge.Outer.StaticNested#VALUE",
                         "refKind", "read"),
                 ProjectScope.ALL)).getAsJsonArray();
-        assertTrue(arr.size() >= 1,
+        assertFalse(arr.isEmpty(),
                 "VALUE is read in EnrichedRefService.getStaticValue");
         assertEquals("read",
                 arr.get(0).getAsJsonObject().get("refKind").getAsString());
@@ -1078,7 +1078,7 @@ public class GraphHandlerTest {
         var arr = JsonParser.parseString(handler.handleProblems(
                 params("of", "jdtbridge-test"),
                 ProjectScope.ALL)).getAsJsonArray();
-        assertTrue(arr.size() >= 1,
+        assertFalse(arr.isEmpty(),
                 "fixture has BrokenClass with compile error");
         var first = arr.get(0).getAsJsonObject();
         assertEquals("problem", first.get("kind").getAsString());
@@ -1141,7 +1141,7 @@ public class GraphHandlerTest {
                 ProjectScope.ALL)).getAsJsonArray();
         // The fixture has BrokenClass so workspace scope must
         // contain at least one marker.
-        assertTrue(arr.size() >= 1,
+        assertFalse(arr.isEmpty(),
                 "workspace scope sees the fixture's BrokenClass");
     }
 
