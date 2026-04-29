@@ -25,7 +25,7 @@ public class HttpServerBindTest {
 
     @AfterEach
     void tearDown() {
-        if (server != null) server.stop();
+        server.stop();
     }
 
     @Nested

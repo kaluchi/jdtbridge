@@ -56,11 +56,9 @@ public class TestSessionHandlerTest {
 
     @AfterAll
     static void tearDown() throws Exception {
-        if (session != null) {
-            JUnitCorePlugin.getModel()
-                    .removeTestRunSession(session);
-            session = null;
-        }
+        JUnitCorePlugin.getModel()
+                .removeTestRunSession(session);
+        session = null;
         TestFixture.destroy();
     }
 
