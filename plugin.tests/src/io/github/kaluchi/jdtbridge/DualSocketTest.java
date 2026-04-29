@@ -44,8 +44,8 @@ public class DualSocketTest {
             assertNotEquals(localServer.getPort(),
                     remoteServer.getPort(),
                     "Local and remote must have different ports");
-            assertTrue(localServer.getPort() > 0);
-            assertTrue(remoteServer.getPort() > 0);
+            assertNotEquals(0, localServer.getPort());
+            assertNotEquals(0, remoteServer.getPort());
         }
 
         @Test
@@ -154,11 +154,8 @@ public class DualSocketTest {
                     InetAddress.getByName("0.0.0.0"), 0);
             int secondRemotePort = remoteServer.getPort();
 
-            // Local unchanged
-            assertTrue(localServer.getPort() > 0);
-
-            // Remote on new port
-            assertTrue(secondRemotePort > 0);
+            assertNotEquals(0, localServer.getPort());
+            assertNotEquals(0, secondRemotePort);
             try (Socket clientSocket = new Socket(
                     "127.0.0.1", secondRemotePort)) {
                 assertTrue(clientSocket.isConnected());

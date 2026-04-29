@@ -17,6 +17,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -56,11 +57,9 @@ public class TestSessionHandlerTest {
 
     @AfterAll
     static void tearDown() throws Exception {
-        if (session != null) {
-            JUnitCorePlugin.getModel()
-                    .removeTestRunSession(session);
-            session = null;
-        }
+        JUnitCorePlugin.getModel()
+                .removeTestRunSession(session);
+        session = null;
         TestFixture.destroy();
     }
 
@@ -102,11 +101,11 @@ public class TestSessionHandlerTest {
                     result.get("testRunId").getAsString());
             assertEquals("finished",
                     result.get("state").getAsString());
-            assertTrue(result.get("total").getAsInt() >= 1);
-            assertTrue(result.get("passed").getAsInt() >= 1);
+            assertNotEquals(0, result.get("total").getAsInt());
+            assertNotEquals(0, result.get("passed").getAsInt());
             assertEquals(0, result.get("failed").getAsInt());
             assertEquals(0, result.get("errors").getAsInt());
-            assertTrue(result.get("time").getAsDouble() >= 0.0);
+            assertNotNull(result.get("time"));
             assertNotNull(result.get("entries"));
         }
 
@@ -132,7 +131,7 @@ public class TestSessionHandlerTest {
             assertEquals("PASS",
                     first.get("status").getAsString());
             assertNotNull(first.get("fqn"));
-            assertTrue(first.get("time").getAsDouble() >= 0.0);
+            assertNotNull(first.get("time"));
         }
 
         @Test

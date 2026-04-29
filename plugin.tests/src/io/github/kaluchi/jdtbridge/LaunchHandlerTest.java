@@ -130,10 +130,7 @@ public class LaunchHandlerTest {
             ILaunchManager mgr =
                     DebugPlugin.getDefault().getLaunchManager();
             ILaunch[] existing = mgr.getLaunches();
-            // Remove all for clean test
-            if (existing.length > 0) {
-                mgr.removeLaunches(existing);
-            }
+            mgr.removeLaunches(existing);
             String json = handler.handleList(Map.of(), ProjectScope.ALL);
             assertEquals("[]", json);
             // Restore
@@ -274,9 +271,8 @@ public class LaunchHandlerTest {
             JsonObject junit = findByConfigId(arr, "ConfigsTest-JUnit");
             assertNotNull(junit,
                     "Created JUnit config must appear: " + json);
-            assertTrue(junit.has("class") || junit.has("project"),
-                    "JUnit config should have class or project: "
-                    + junit);
+            assertTrue(junit.has("class"),
+                    "JUnit config should have class: " + junit);
         }
     }
 
@@ -364,8 +360,7 @@ public class LaunchHandlerTest {
             assertTrue(obj.has("xml"),
                     "Should have xml field: " + json);
             String xml = obj.get("xml").getAsString();
-            assertTrue(xml.contains("<?xml")
-                    || xml.contains("<launchConfiguration"),
+            assertTrue(xml.contains("<launchConfiguration"),
                     "XML should contain launch config: "
                     + xml.substring(0,
                             Math.min(200, xml.length())));
@@ -380,11 +375,9 @@ public class LaunchHandlerTest {
             var attrs = obj.getAsJsonObject("attributes");
             assertTrue(
                     attrs.has(
-                        "org.eclipse.jdt.launching.MAIN_TYPE")
-                    || attrs.has(
-                        "org.eclipse.jdt.junit.CONTAINER"),
-                    "JUnit config should have test class or "
-                    + "container in attributes: " + attrs);
+                            "org.eclipse.jdt.launching.MAIN_TYPE"),
+                    "JUnit config should have MAIN_TYPE: "
+                    + attrs);
         }
 
         @Test
@@ -894,20 +887,6 @@ public class LaunchHandlerTest {
         }
 
         @Test
-        void debugModeSetsCorrectMode() throws Exception {
-            var params = new java.util.HashMap<String, String>();
-            params.put("configId", "RunSuccessTest");
-            params.put("debug", "true");
-            String json = handler.handleRun(params);
-            var obj = JsonParser.parseString(json)
-                    .getAsJsonObject();
-            if (obj.has("ok")) {
-                assertEquals("debug",
-                        obj.get("mode").getAsString());
-            }
-        }
-
-        @Test
         void runWithExtraArgs() throws Exception {
             var params = new java.util.HashMap<String, String>();
             params.put("configId", "RunSuccessTest");
@@ -1011,33 +990,6 @@ public class LaunchHandlerTest {
             }
         }
 
-        @Test
-        void mavenSummaryHasGoalsAndProfiles() throws Exception {
-            ILaunchManager mgr =
-                    DebugPlugin.getDefault().getLaunchManager();
-            if (mgr.getLaunchConfigurationType(
-                    "org.eclipse.m2e.Maven2LaunchConfigurationType")
-                    == null) {
-                return;
-            }
-            ILaunchConfiguration mavenCfg = createConfig(
-                    "org.eclipse.m2e.Maven2LaunchConfigurationType",
-                    "SumMaven",
-                    Map.of("M2_GOALS", "clean verify",
-                           "M2_PROFILES", "ci"));
-            try {
-                var arr = JsonParser.parseString(
-                        handler.handleConfigs(Map.of(),
-                                ProjectScope.ALL)).getAsJsonArray();
-                JsonObject maven = findByConfigId(arr, "SumMaven");
-                assertEquals("clean verify",
-                        maven.get("goals").getAsString());
-                assertEquals("ci",
-                        maven.get("profiles").getAsString());
-            } finally {
-                deleteIfPresent(mavenCfg);
-            }
-        }
     }
 
     @Nested

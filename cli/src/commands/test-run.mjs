@@ -94,6 +94,8 @@ export async function testRun(args) {
       console.log(`  \`jdt coverage status ${result.coverageId}\`             snapshot`);
       console.log(`  \`jdt coverage status ${result.coverageId} -f\`          follow`);
     }
+    console.log("");
+    console.log("Add `-q` to suppress this guide.");
   }
 }
 
