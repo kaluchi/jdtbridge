@@ -282,9 +282,8 @@ describe("testRunGuide", () => {
     expect(guide).toContain("jdt test run <FQN> -f");
   });
 
-  it("includes -q suppression note", () => {
+  it("does not include -q note (caller adds it after coverage section)", () => {
     const guide = testRunGuide("FooTest:1775000", "FooTest:123");
-    expect(guide).toContain("-q");
-    expect(guide).toContain("suppress");
+    expect(guide).not.toContain("suppress");
   });
 });
