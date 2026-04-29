@@ -149,9 +149,89 @@ public class HttpServerDispatchTest {
         }
 
         @Test
+        void overloadsRouteReturnsJson() {
+            var resp = server.dispatch("/overloads",
+                    Map.of("of", "test.edge.Calculator#add(int,int)"),
+                    null, ProjectScope.ALL);
+            assertEquals("application/json", resp.contentType());
+        }
+
+        @Test
         void packageRouteReturnsJson() {
             var resp = server.dispatch("/package",
                     Map.of("of", "test.model"),
+                    null, ProjectScope.ALL);
+            assertEquals("application/json", resp.contentType());
+        }
+
+        @Test
+        void methodRouteReturnsJson() {
+            var resp = server.dispatch("/method",
+                    Map.of("of", "test.model.Dog#name()"),
+                    null, ProjectScope.ALL);
+            assertEquals("application/json", resp.contentType());
+        }
+
+        @Test
+        void fieldRouteReturnsJson() {
+            var resp = server.dispatch("/field",
+                    Map.of("of", "test.model.Dog#age"),
+                    null, ProjectScope.ALL);
+            assertEquals("application/json", resp.contentType());
+        }
+
+        @Test
+        void outgoingRefsRouteReturnsJson() {
+            var resp = server.dispatch("/outgoingRefs",
+                    Map.of("of", "test.model.Dog#name()"),
+                    null, ProjectScope.ALL);
+            assertEquals("application/json", resp.contentType());
+        }
+
+        @Test
+        void projectRouteReturnsJson() {
+            var resp = server.dispatch("/project",
+                    Map.of("of", TestFixture.PROJECT_NAME),
+                    null, ProjectScope.ALL);
+            assertEquals("application/json", resp.contentType());
+        }
+
+        @Test
+        void classpathRouteReturnsJson() {
+            var resp = server.dispatch("/classpath",
+                    Map.of("of", TestFixture.PROJECT_NAME),
+                    null, ProjectScope.ALL);
+            assertEquals("application/json", resp.contentType());
+        }
+
+        @Test
+        void fileRouteReturnsJson() {
+            var resp = server.dispatch("/file",
+                    Map.of("of", "test.model.Dog"),
+                    null, ProjectScope.ALL);
+            assertEquals("application/json", resp.contentType());
+        }
+
+        @Test
+        void typesInPackageRouteReturnsJson() {
+            var resp = server.dispatch("/typesInPackage",
+                    Map.of("of", "test.model"),
+                    null, ProjectScope.ALL);
+            assertEquals("application/json", resp.contentType());
+        }
+
+        @Test
+        void typesInFileRouteReturnsJson() {
+            var resp = server.dispatch("/typesInFile",
+                    Map.of("of", "test.model.Dog"),
+                    null, ProjectScope.ALL);
+            assertEquals("application/json", resp.contentType());
+        }
+
+        @Test
+        void packagesInProjectRouteReturnsJson() {
+            var resp = server.dispatch("/packagesInProject",
+                    Map.of("of", TestFixture.PROJECT_NAME),
                     null, ProjectScope.ALL);
             assertEquals("application/json", resp.contentType());
         }
@@ -193,6 +273,27 @@ public class HttpServerDispatchTest {
             var resp = server.dispatch("/test/sessions",
                     Map.of(), null, ProjectScope.ALL);
             assertEquals("application/json", resp.contentType());
+        }
+
+        @Test
+        void testStatusMissingIdErrors() {
+            var resp = server.dispatch("/test/status",
+                    Map.of(), null, ProjectScope.ALL);
+            assertTrue(resp.body().contains("error"));
+        }
+
+        @Test
+        void testClearReturnsJson() {
+            var resp = server.dispatch("/test/clear",
+                    Map.of(), null, ProjectScope.ALL);
+            assertEquals("application/json", resp.contentType());
+        }
+
+        @Test
+        void testRunMissingClassErrors() {
+            var resp = server.dispatch("/test/run",
+                    Map.of(), null, ProjectScope.ALL);
+            assertTrue(resp.body().contains("error"));
         }
     }
 
@@ -246,8 +347,15 @@ public class HttpServerDispatchTest {
         }
 
         @Test
-        void coverageRouteReturnsJson() {
-            var resp = server.dispatch("/coverage/runs",
+        void refreshRouteReturnsJson() {
+            var resp = server.dispatch("/refresh",
+                    Map.of(), null, ProjectScope.ALL);
+            assertEquals("application/json", resp.contentType());
+        }
+
+        @Test
+        void mavenUpdateRouteReturnsJson() {
+            var resp = server.dispatch("/maven/update",
                     Map.of(), null, ProjectScope.ALL);
             assertEquals("application/json", resp.contentType());
         }
@@ -257,6 +365,133 @@ public class HttpServerDispatchTest {
             var resp = server.dispatch("/no-such-path",
                     Map.of(), null, ProjectScope.ALL);
             assertTrue(resp.body().contains("Unknown path"));
+        }
+    }
+
+    @Nested
+    class CoverageRoutes {
+
+        @Test
+        void coverageRunsReturnsJson() {
+            var resp = server.dispatch("/coverage/runs",
+                    Map.of(), null, ProjectScope.ALL);
+            assertEquals("application/json", resp.contentType());
+        }
+
+        @Test
+        void coverageActiveReturnsJson() {
+            var resp = server.dispatch("/coverage/active",
+                    Map.of(), null, ProjectScope.ALL);
+            assertEquals("application/json", resp.contentType());
+        }
+
+        @Test
+        void coverageSessionMissingIdErrors() {
+            var resp = server.dispatch("/coverage/session",
+                    Map.of(), null, ProjectScope.ALL);
+            assertTrue(resp.body().contains("coverage-not-found"));
+        }
+
+        @Test
+        void coverageNodeMissingIdErrors() {
+            var resp = server.dispatch("/coverage/node",
+                    Map.of(), null, ProjectScope.ALL);
+            assertTrue(resp.body().contains("coverage-not-found"));
+        }
+
+        @Test
+        void coverageRunMissingConfigErrors() {
+            var resp = server.dispatch("/coverage/run",
+                    Map.of(), null, ProjectScope.ALL);
+            assertTrue(resp.body().contains("error"));
+        }
+
+        @Test
+        void coverageDumpMissingBodyErrors() {
+            var resp = server.dispatch("/coverage/dump",
+                    Map.of(), null, ProjectScope.ALL);
+            assertTrue(resp.body().contains("error"));
+        }
+
+        @Test
+        void coverageRefreshNoActiveErrors() {
+            var resp = server.dispatch("/coverage/refresh",
+                    Map.of(), null, ProjectScope.ALL);
+            assertTrue(resp.body().contains("error"));
+        }
+
+        @Test
+        void coverageRelaunchNoActiveErrors() {
+            var resp = server.dispatch("/coverage/relaunch",
+                    Map.of(), null, ProjectScope.ALL);
+            assertTrue(resp.body().contains("error"));
+        }
+
+        @Test
+        void coverageActivateMissingBodyErrors() {
+            var resp = server.dispatch("/coverage/activate",
+                    Map.of(), null, ProjectScope.ALL);
+            assertTrue(resp.body().contains("error"));
+        }
+
+        @Test
+        void coverageMergeMissingBodyErrors() {
+            var resp = server.dispatch("/coverage/merge",
+                    Map.of(), null, ProjectScope.ALL);
+            assertTrue(resp.body().contains("error"));
+        }
+
+        @Test
+        void coverageRemoveNoActiveErrors() {
+            var resp = server.dispatch("/coverage/remove",
+                    Map.of(), null, ProjectScope.ALL);
+            assertTrue(resp.body().contains("error"));
+        }
+    }
+
+    @Nested
+    class AdditionalLaunchRoutes {
+
+        @Test
+        void launchConsoleMissingIdErrors() {
+            var resp = server.dispatch("/launch/console",
+                    Map.of(), null, ProjectScope.ALL);
+            assertTrue(resp.body().contains("error"));
+        }
+
+        @Test
+        void launchRunMissingIdErrors() {
+            var resp = server.dispatch("/launch/run",
+                    Map.of(), null, ProjectScope.ALL);
+            assertTrue(resp.body().contains("error"));
+        }
+
+        @Test
+        void launchStopMissingIdErrors() {
+            var resp = server.dispatch("/launch/stop",
+                    Map.of(), null, ProjectScope.ALL);
+            assertTrue(resp.body().contains("error"));
+        }
+
+        @Test
+        void launchConfigMissingIdErrors() {
+            var resp = server.dispatch("/launch/config",
+                    Map.of(), null, ProjectScope.ALL);
+            assertTrue(resp.body().contains("error"));
+        }
+
+        @Test
+        void launchConfigDeleteMissingIdErrors() {
+            var resp = server.dispatch("/launch/config/delete",
+                    Map.of(), null, ProjectScope.ALL);
+            assertTrue(resp.body().contains("Missing"));
+        }
+
+        @Test
+        void launchImportMissingIdErrors() {
+            var resp = server.dispatch("/launch/import",
+                    Map.of(), null, ProjectScope.ALL);
+            assertTrue(resp.body().contains("Missing"));
         }
     }
 
