@@ -2,6 +2,7 @@ package io.github.kaluchi.jdtbridge;
 
 import io.github.kaluchi.jdtbridge.support.TestFixture;
 
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.BufferedReader;
@@ -30,7 +31,7 @@ public class HttpIntegrationTest {
         server.setToken(TOKEN);
         server.start();
         port = server.getPort();
-        assertTrue(port > 0, "Port should be assigned");
+        assertNotEquals(0, port, "Port should be assigned");
     }
 
     @AfterAll

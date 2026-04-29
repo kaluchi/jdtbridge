@@ -1,6 +1,7 @@
 package io.github.kaluchi.jdtbridge;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -187,9 +188,10 @@ public class ErrorDescriptorTest {
                     "kind must be lowercase: " + kind);
             assertTrue(Character.isUpperCase(thrown.charAt(0)),
                     "thrown must be PascalCase: " + thrown);
-            assertTrue(!thrown.contains("-") && !thrown.contains("_"),
-                    "thrown must be PascalCase, no separators: "
-                    + thrown);
+            assertFalse(thrown.contains("-"),
+                    "thrown must have no dash: " + thrown);
+            assertFalse(thrown.contains("_"),
+                    "thrown must have no underscore: " + thrown);
         }
     }
 

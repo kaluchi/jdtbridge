@@ -702,14 +702,13 @@ public class CoverageSessionHandlerTest {
      *  fake IJavaModelCoverage. Equality by identity; nothing else
      *  is exercised. */
     private static IJavaProject fakeProject() {
-        return (IJavaProject) Proxy.newProxyInstance(
+        return (IJavaProject) java.lang.reflect.Proxy.newProxyInstance(
                 IJavaProject.class.getClassLoader(),
                 new Class<?>[] { IJavaProject.class },
                 (proxy, method, args) -> switch (method.getName()) {
                     case "equals" -> proxy == args[0];
                     case "hashCode" ->
                             System.identityHashCode(proxy);
-                    case "toString" -> "fakeProject";
                     default -> null;
                 });
     }

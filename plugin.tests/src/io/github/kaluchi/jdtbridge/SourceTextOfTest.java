@@ -43,14 +43,9 @@ public class SourceTextOfTest {
         IProject project = org.eclipse.core.resources.ResourcesPlugin
                 .getWorkspace().getRoot().getProject("jdtbridge-test");
         IJavaProject jp = JavaCore.create(project);
-        IPackageFragmentRoot srcRoot = null;
-        for (IPackageFragmentRoot r : jp.getPackageFragmentRoots()) {
-            if (r.getKind() == IPackageFragmentRoot.K_SOURCE) {
-                srcRoot = r;
-                break;
-            }
-        }
-        assertNotNull(srcRoot, "fixture src root");
+        IPackageFragmentRoot srcRoot = jp.getPackageFragmentRoot(
+                project.getFolder("src"));
+        assertTrue(srcRoot.exists(), "fixture src root");
         IPackageFragment pkg = srcRoot.createPackageFragment(
                 pkgName, true, null);
         var cu = pkg.createCompilationUnit(cuName, source, true, null);

@@ -4,6 +4,7 @@ import io.github.kaluchi.jdtbridge.support.TestFixture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -215,10 +216,8 @@ public class MavenIntegrationTest {
                 "no-clean", "", "wait", ""));
         assertTrue(r.has("errors"),
                 "With wait should have errors: " + r);
-        int errors = r.get("errors").getAsInt();
-        assertTrue(errors > 0,
-                "Broken.java has UnknownType — expect errors: "
-                + errors);
+        assertNotEquals(0, r.get("errors").getAsInt(),
+                "Broken.java has UnknownType — expect errors");
     }
 
     @Test
@@ -289,10 +288,8 @@ public class MavenIntegrationTest {
     public void updateAllMavenProjects() throws Exception {
         var r = update(params("no-clean", ""));
         assertTrue(r.get("ok").getAsBoolean());
-        int updated = r.get("updated").getAsInt();
-        assertTrue(updated >= 1,
-                "Should update at least our test project: "
-                + updated);
+        assertNotEquals(0, r.get("updated").getAsInt(),
+                "Should update at least our test project");
         var projects = r.getAsJsonArray("projects");
         var names = StreamSupport.stream(
                         projects.spliterator(), false)
