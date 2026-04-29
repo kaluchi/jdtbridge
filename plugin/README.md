@@ -118,11 +118,11 @@ Returns `{"updated":N, "projects":[...], "ok":true/false, "errors":N}`.
 
 ## Refactoring
 
-### `GET /organize-imports?file=<path>`
+### `GET /organize-imports?class=<FQN>`
 
 Organize imports using Eclipse project settings. Returns `{"added":N,"removed":N}`.
 
-### `GET /format?file=<path>`
+### `GET /format?class=<FQN>`
 
 Format a Java file using Eclipse project formatter settings. Returns `{"modified":true/false}`.
 
