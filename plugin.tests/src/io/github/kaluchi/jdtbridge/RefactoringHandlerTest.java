@@ -1,24 +1,20 @@
 package io.github.kaluchi.jdtbridge;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import io.github.kaluchi.jdtbridge.support.TestFixture;
+import org.eclipse.core.resources.ResourcesPlugin;
+import org.eclipse.jdt.core.JavaCore;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import java.util.Map;
-
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-
-import org.eclipse.core.resources.ResourcesPlugin;
-import org.eclipse.jdt.core.JavaCore;
-
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
 
 public class RefactoringHandlerTest {
 

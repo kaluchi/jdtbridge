@@ -1,17 +1,16 @@
 import { get } from "../client.mjs";
 import { extractPositional, parseFlags, parseFqn } from "../args.mjs";
-import { toWsPath } from "../paths.mjs";
 import { green, yellow } from "../color.mjs";
 
 export async function organizeImports(args) {
   const pos = extractPositional(args);
-  const filePath = pos[0];
-  if (!filePath) {
-    console.error("Usage: organize-imports <workspace-relative-path>");
+  const fqn = pos[0];
+  if (!fqn) {
+    console.error("Usage: organize-imports <FQN>");
     process.exit(1);
   }
   const result = await get(
-    `/organize-imports?file=${encodeURIComponent(toWsPath(filePath))}`,
+    `/organize-imports?class=${encodeURIComponent(fqn)}`,
     30_000,
   );
   if (result.error) {
@@ -23,13 +22,13 @@ export async function organizeImports(args) {
 
 export async function format(args) {
   const pos = extractPositional(args);
-  const filePath = pos[0];
-  if (!filePath) {
-    console.error("Usage: format <workspace-relative-path>");
+  const fqn = pos[0];
+  if (!fqn) {
+    console.error("Usage: format <FQN>");
     process.exit(1);
   }
   const result = await get(
-    `/format?file=${encodeURIComponent(toWsPath(filePath))}`,
+    `/format?class=${encodeURIComponent(fqn)}`,
     30_000,
   );
   if (result.error) {
@@ -93,15 +92,15 @@ export async function move(args) {
 
 export const organizeImportsHelp = `Organize imports in a Java file.
 
-Usage:  jdt organize-imports <file>
+Usage:  jdt organize-imports <FQN>
 
-Example:  jdt organize-imports my-server/src/main/java/.../Foo.java`;
+Example:  jdt organize-imports com.example.MyClass`;
 
 export const formatHelp = `Format a Java file using Eclipse project settings.
 
-Usage:  jdt format <file>
+Usage:  jdt format <FQN>
 
-Example:  jdt format my-server/src/main/java/.../Foo.java`;
+Example:  jdt format com.example.MyClass`;
 
 export const renameHelp = `Rename a type, method, or field (updates all references).
 

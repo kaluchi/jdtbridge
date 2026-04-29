@@ -1,7 +1,5 @@
 package io.github.kaluchi.jdtbridge.support;
 
-import io.github.kaluchi.jdtbridge.JdtUtils;
-
 import org.eclipse.core.resources.IFolder;
 import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IProjectDescription;
