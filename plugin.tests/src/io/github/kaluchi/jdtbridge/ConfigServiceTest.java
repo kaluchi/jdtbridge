@@ -81,6 +81,13 @@ public class ConfigServiceTest {
                     "{\"path\":\"D:/eclipse\"}");
             assertEquals("D:/eclipse", config.getString("path"));
         }
+
+        @Test
+        void nullJsonValueReturnsNull() throws IOException {
+            Files.writeString(tempDir.resolve("config.json"),
+                    "{\"key\":null}");
+            assertNull(config.getString("key"));
+        }
     }
 
     @Nested
@@ -179,6 +186,39 @@ public class ConfigServiceTest {
                     "not a bridge file");
             var info = config.readBridgeInfo();
             assertEquals(0, info.port());
+        }
+
+        @Test
+        void missingPortDefaultsToZero() throws IOException {
+            Path instances = Files.createDirectories(
+                    tempDir.resolve("instances"));
+            Files.writeString(instances.resolve("bridge.json"),
+                    "{\"version\":\"2.0.0\",\"token\":\"abc\"}");
+            var info = config.readBridgeInfo();
+            assertEquals(0, info.port());
+            assertEquals("2.0.0", info.version());
+        }
+
+        @Test
+        void missingVersionDefaultsToEmpty() throws IOException {
+            Path instances = Files.createDirectories(
+                    tempDir.resolve("instances"));
+            Files.writeString(instances.resolve("bridge.json"),
+                    "{\"port\":9999,\"token\":\"abc\"}");
+            var info = config.readBridgeInfo();
+            assertEquals(9999, info.port());
+            assertEquals("", info.version());
+        }
+
+        @Test
+        void nullVersionDefaultsToEmpty() throws IOException {
+            Path instances = Files.createDirectories(
+                    tempDir.resolve("instances"));
+            Files.writeString(instances.resolve("bridge.json"),
+                    "{\"port\":8080,\"version\":null}");
+            var info = config.readBridgeInfo();
+            assertEquals(8080, info.port());
+            assertEquals("", info.version());
         }
     }
 

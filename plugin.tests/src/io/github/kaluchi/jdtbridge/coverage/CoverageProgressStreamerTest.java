@@ -44,7 +44,8 @@ public class CoverageProgressStreamerTest {
         tracker.start();
     }
 
-    @AfterEach
+    @SuppressWarnings("restriction")
+	@AfterEach
     void tearDown() {
         tracker.stop();
         CoverageTools.getSessionManager().removeAllSessions();
@@ -433,8 +434,9 @@ public class CoverageProgressStreamerTest {
         return body.split("\n");
     }
 
-    private String importAndAwait(String description) throws Exception {
-        ISessionImporter importer = CoverageTools.getImporter();
+    @SuppressWarnings("restriction")
+	private String importAndAwait(String description) throws Exception {
+		ISessionImporter importer = CoverageTools.getImporter();
         importer.setDescription(description);
         importer.setScope(Set.of());
         importer.setExecutionDataSource(emptyDataSource());
@@ -472,7 +474,8 @@ public class CoverageProgressStreamerTest {
                 + coverageId);
     }
 
-    private static IExecutionDataSource emptyDataSource() {
+    @SuppressWarnings("restriction")
+	private static IExecutionDataSource emptyDataSource() {
         return (execVisitor, sessionInfoVisitor) -> {
             // Intentionally empty.
         };

@@ -42,23 +42,18 @@ public class RefactoringIntegrationTest {
 
     @Test
     public void a1_organizeImportsRemovesUnused() throws Exception {
-        String filePath = "/" + TestFixture.PROJECT_NAME
-                + "/src/test/refactor/ImportTarget.java";
         String json = handler.handleOrganizeImports(
-                Map.of("file", filePath));
-        // ImportTarget imports Map and Set but only uses List
+                Map.of("class", "test.refactor.ImportTarget"));
         assertTrue(json.contains("\"removed\":2"),
                 "Should remove unused imports: " + json);
     }
 
     @Test
     public void a2_organizeImportsNoChanges() throws Exception {
-        String filePath = "/" + TestFixture.PROJECT_NAME
-                + "/src/test/refactor/ImportTarget.java";
-        // Run twice — first organize, then verify idempotent
-        handler.handleOrganizeImports(Map.of("file", filePath));
+        handler.handleOrganizeImports(
+                Map.of("class", "test.refactor.ImportTarget"));
         String json = handler.handleOrganizeImports(
-                Map.of("file", filePath));
+                Map.of("class", "test.refactor.ImportTarget"));
         assertTrue(json.contains("\"added\":0"),
                 "Should have 0 added: " + json);
         assertTrue(json.contains("\"removed\":0"),
@@ -66,40 +61,35 @@ public class RefactoringIntegrationTest {
     }
 
     @Test
-    public void a3_organizeImportsFileNotFound() throws Exception {
+    public void a3_organizeImportsTypeNotFound() throws Exception {
         String json = handler.handleOrganizeImports(
-                Map.of("file", "/no/such/File.java"));
-        assertJsonError(json, "Java file not found");
+                Map.of("class", "no.such.Type"));
+        assertJsonError(json, "Type not found");
     }
 
     // ---- Format ----
 
     @Test
     public void b1_formatFixesMessyCode() throws Exception {
-        String filePath = "/" + TestFixture.PROJECT_NAME
-                + "/src/test/refactor/FormatTarget.java";
         String json = handler.handleFormat(
-                Map.of("file", filePath));
+                Map.of("class", "test.refactor.FormatTarget"));
         assertTrue(json.contains("\"modified\":true"),
                 "Should be modified: " + json);
     }
 
     @Test
     public void b2_formatAlreadyFormatted() throws Exception {
-        // After formatting, running again should find no changes
-        String filePath = "/" + TestFixture.PROJECT_NAME
-                + "/src/test/refactor/FormatTarget.java";
         String json = handler.handleFormat(
-                Map.of("file", filePath));
+                Map.of("class", "test.refactor.FormatTarget"));
         assertTrue(json.contains("\"modified\":false"),
                 "Should not be modified: " + json);
     }
 
     @Test
-    public void b3_formatFileNotFound() throws Exception {
+    public void b3_formatTypeNotFound() throws Exception {
         String json = handler.handleFormat(
-                Map.of("file", "/no/such/File.java"));
-        assertJsonError(json, "Java file not found");
+                Map.of("class", "no.such.Type"));
+        assertJsonError(json, "Type not found");
     }
 
     // ---- Rename method ----

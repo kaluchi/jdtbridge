@@ -5,7 +5,6 @@ Bundle-Vendor: kaluchi
 Bundle-SymbolicName: io.github.kaluchi.jdtbridge.tests.ui
 Bundle-Version: 2.6.0.qualifier
 Fragment-Host: io.github.kaluchi.jdtbridge
-Bundle-RequiredExecutionEnvironment: JavaSE-21
 Require-Bundle: junit-jupiter-api;bundle-version="5.14",
  org.opentest4j,
  io.github.kaluchi.jdtbridge.ui,

@@ -38,7 +38,8 @@ public class TestRunCoverageFlagTest {
         TestFixture.destroy();
     }
 
-    @AfterEach
+    @SuppressWarnings("restriction")
+	@AfterEach
     void cleanupCoverageSessions() {
         // Active coverage launches and their sessions accumulate
         // across tests in the same Eclipse runtime — drop them.

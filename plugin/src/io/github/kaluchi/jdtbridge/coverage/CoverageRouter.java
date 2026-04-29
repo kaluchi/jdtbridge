@@ -50,7 +50,7 @@ class CoverageRouter {
     }
 
     String dispatch(String path, Map<String, String> params,
-            String body, ProjectScope scope) {
+            String body, ProjectScope scope) throws Exception {
         return switch (path) {
             case "/coverage/run" -> handler.handleRun(params);
             case "/coverage/dump" -> handler.handleDump(body);

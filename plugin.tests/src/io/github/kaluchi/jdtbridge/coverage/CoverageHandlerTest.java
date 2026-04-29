@@ -1,14 +1,7 @@
 package io.github.kaluchi.jdtbridge.coverage;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.debug.core.DebugPlugin;
@@ -24,8 +17,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for {@link CoverageHandler}. Validation paths are unit-style
@@ -44,7 +42,8 @@ public class CoverageHandlerTest {
         handler = new CoverageHandler(tracker);
     }
 
-    @AfterEach
+    @SuppressWarnings("restriction")
+	@AfterEach
     void tearDown() {
         tracker.stop();
         CoverageTools.getSessionManager().removeAllSessions();
@@ -54,14 +53,14 @@ public class CoverageHandlerTest {
     class HandleRun {
 
         @Test
-        void missingConfigIdReturnsConfigNotFound() {
+        void missingConfigIdReturnsConfigNotFound() throws Exception {
             JsonObject obj = parseObj(handler.handleRun(Map.of()));
             assertEquals("coverage-config-not-found",
                     obj.get("error").getAsString());
         }
 
         @Test
-        void blankConfigIdReturnsConfigNotFound() {
+        void blankConfigIdReturnsConfigNotFound() throws Exception {
             JsonObject obj = parseObj(handler.handleRun(
                     Map.of("configId", "   ")));
             assertEquals("coverage-config-not-found",
@@ -69,7 +68,7 @@ public class CoverageHandlerTest {
         }
 
         @Test
-        void unknownConfigReturnsConfigNotFound() {
+        void unknownConfigReturnsConfigNotFound() throws Exception {
             JsonObject obj = parseObj(handler.handleRun(Map.of(
                     "configId", "definitely-not-a-real-config-xyz-9z")));
             assertEquals("coverage-config-not-found",
@@ -203,7 +202,8 @@ public class CoverageHandlerTest {
     @Nested
     class HandleRefresh {
 
-        @Test
+        @SuppressWarnings("restriction")
+		@Test
         void noActiveSessionReturnsNoActiveError() {
             CoverageTools.getSessionManager().removeAllSessions();
             JsonObject obj = parseObj(handler.handleRefresh());
@@ -225,7 +225,8 @@ public class CoverageHandlerTest {
     @Nested
     class HandleRelaunch {
 
-        @Test
+        @SuppressWarnings("restriction")
+		@Test
         void noActiveSessionReturnsNoActiveError() {
             CoverageTools.getSessionManager().removeAllSessions();
             JsonObject obj = parseObj(handler.handleRelaunch());
@@ -248,7 +249,7 @@ public class CoverageHandlerTest {
     class ErrorJsonShape {
 
         @Test
-        void everyErrorHasErrorAndMessage() {
+        void everyErrorHasErrorAndMessage() throws Exception {
             // Iterate the validation paths that don't require a
             // real launch and assert the error JSON shape.
             String[] errorJsons = {
@@ -281,8 +282,9 @@ public class CoverageHandlerTest {
         return JsonParser.parseString(json).getAsJsonObject();
     }
 
-    private String importAndAwait(String description) throws Exception {
-        ISessionImporter importer = CoverageTools.getImporter();
+    @SuppressWarnings("restriction")
+	private String importAndAwait(String description) throws Exception {
+		ISessionImporter importer = CoverageTools.getImporter();
         importer.setDescription(description);
         importer.setScope(Set.of());
         importer.setExecutionDataSource(emptyDataSource());
@@ -297,7 +299,8 @@ public class CoverageHandlerTest {
                 .orElseThrow();
     }
 
-    private static IExecutionDataSource emptyDataSource() {
+    @SuppressWarnings("restriction")
+	private static IExecutionDataSource emptyDataSource() {
         return (execVisitor, sessionInfoVisitor) -> {
             // Intentionally empty.
         };

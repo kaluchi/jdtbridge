@@ -10,7 +10,6 @@ import com.google.gson.JsonObject;
  * and {@link TestProgressStreamer}. No Eclipse runtime state — only
  * value mappings used to shape the wire format.
  */
-@SuppressWarnings("restriction")
 final class TestSessionFormat {
 
     private TestSessionFormat() {

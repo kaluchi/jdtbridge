@@ -6,8 +6,6 @@ import java.util.Map;
 
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IResource;
-import org.eclipse.core.resources.IWorkspaceRoot;
-import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.preferences.DefaultScope;
 import org.eclipse.jdt.core.ICompilationUnit;
@@ -17,7 +15,6 @@ import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IPackageFragment;
 import org.eclipse.jdt.core.IPackageFragmentRoot;
 import org.eclipse.jdt.core.IType;
-import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.ToolFactory;
 import org.eclipse.jdt.core.formatter.CodeFormatter;
 import org.eclipse.jdt.core.manipulation.CodeStyleConfiguration;
@@ -252,20 +249,6 @@ class RefactoringHandler {
                 null);
     }
 
-    private ICompilationUnit findCompilationUnit(String filePath) {
-        IWorkspaceRoot root =
-                ResourcesPlugin.getWorkspace().getRoot();
-        IResource resource = root.findMember(filePath);
-        if (resource == null || !(resource instanceof IFile file)) {
-            return null;
-        }
-        ICompilationUnit cu =
-                JavaCore.createCompilationUnitFrom(file);
-        if (cu == null || !cu.exists()) {
-            return null;
-        }
-        return cu;
-    }
 
     @FunctionalInterface
     private interface DescriptorConfigurer {
@@ -347,15 +330,20 @@ class RefactoringHandler {
 
     private Resolved<ICompilationUnit> resolveUnit(
             Map<String, String> params) throws Exception {
-        String filePath = params.get("file");
-        if (filePath == null || filePath.isBlank()) {
+        String fqn = params.get("class");
+        if (fqn == null || fqn.isBlank()) {
             return new Resolved.Fail<>(
-                    HttpServer.missingParamError("file"));
+                    HttpServer.missingParamError("class"));
         }
-        ICompilationUnit cu = findCompilationUnit(filePath);
-        if (cu == null) {
+        IType type = JdtUtils.findType(fqn);
+        if (type == null) {
             return new Resolved.Fail<>(HttpServer.jsonError(
-                    "Java file not found: " + filePath));
+                    "Type not found: " + fqn));
+        }
+        ICompilationUnit cu = type.getCompilationUnit();
+        if (cu == null || !cu.exists()) {
+            return new Resolved.Fail<>(HttpServer.jsonError(
+                    "No source for: " + fqn));
         }
         cu.getResource().refreshLocal(IResource.DEPTH_ZERO, null);
         return new Resolved.Ok<>(cu);

@@ -104,6 +104,26 @@ public class LaunchTrackerTest {
         }
 
         @Test
+        void outLenReflectsAppendedContent() {
+            ILaunch launch = new org.eclipse.debug.core.Launch(
+                    null, "run", null);
+            var tl = new LaunchTracker.TrackedLaunch(launch);
+            assertEquals(0, tl.outLen());
+            tl.appendOut("hello");
+            assertEquals(5, tl.outLen());
+        }
+
+        @Test
+        void errLenReflectsAppendedContent() {
+            ILaunch launch = new org.eclipse.debug.core.Launch(
+                    null, "run", null);
+            var tl = new LaunchTracker.TrackedLaunch(launch);
+            assertEquals(0, tl.errLen());
+            tl.appendErr("err");
+            assertEquals(3, tl.errLen());
+        }
+
+        @Test
         void outputListenerDistinguishesStdoutStderr() {
             ILaunch launch = new org.eclipse.debug.core.Launch(
                     null, "run", null);
@@ -132,6 +152,46 @@ public class LaunchTrackerTest {
         @AfterEach
         void tearDown() {
             tracker.stop();
+        }
+
+        @Test
+        void startTracksExistingLaunches() throws Exception {
+            tracker.stop();
+            LaunchTracker fresh = new LaunchTracker();
+            ILaunchManager mgr =
+                    DebugPlugin.getDefault().getLaunchManager();
+            ILaunch launch = new org.eclipse.debug.core.Launch(
+                    null, "run", null);
+            mgr.addLaunch(launch);
+            try {
+                fresh.start();
+                assertNotNull(fresh.get("(unknown)"),
+                        "Should retroactively track existing launch");
+            } finally {
+                fresh.stop();
+                mgr.removeLaunch(launch);
+                tracker.start();
+            }
+        }
+
+        @Test
+        void timestampAttributeCreatesSecondaryKey()
+                throws Exception {
+            ILaunchManager mgr =
+                    DebugPlugin.getDefault().getLaunchManager();
+            ILaunch launch = new org.eclipse.debug.core.Launch(
+                    null, "run", null);
+            String ts = String.valueOf(System.currentTimeMillis());
+            launch.setAttribute(
+                    DebugPlugin.ATTR_LAUNCH_TIMESTAMP, ts);
+            mgr.addLaunch(launch);
+            try {
+                var tl = tracker.get("(unknown):" + ts);
+                assertNotNull(tl,
+                        "Should be accessible by configId:timestamp");
+            } finally {
+                mgr.removeLaunch(launch);
+            }
         }
 
         @Test
@@ -203,6 +263,101 @@ public class LaunchTrackerTest {
 
             assertNotNull(tracker.get("tracker-remove-test"),
                     "Should survive removal from manager");
+        }
+
+        @Test
+        void allReturnsTrackedMap() throws Exception {
+            assertNotNull(tracker.all());
+            ILaunchManager mgr =
+                    DebugPlugin.getDefault().getLaunchManager();
+            ILaunch launch = new org.eclipse.debug.core.Launch(
+                    null, "run", null);
+            mgr.addLaunch(launch);
+            try {
+                assertFalse(tracker.all().isEmpty(),
+                        "Map should contain tracked launch");
+            } finally {
+                mgr.removeLaunch(launch);
+            }
+        }
+
+        @Test
+        void launchesTerminatedSetsFlag() throws Exception {
+            ILaunchManager mgr =
+                    DebugPlugin.getDefault().getLaunchManager();
+            ILaunch launch = new org.eclipse.debug.core.Launch(
+                    null, "run", null);
+            mgr.addLaunch(launch);
+            try {
+                var tl = tracker.get("(unknown)");
+                assertNotNull(tl);
+                assertFalse(tl.terminated);
+                tracker.launchesTerminated(
+                        new ILaunch[] { launch });
+                assertTrue(tl.terminated);
+            } finally {
+                mgr.removeLaunch(launch);
+            }
+        }
+
+        @Test
+        void launchesTerminatedIgnoresUntrackedLaunch() {
+            ILaunch untracked = new org.eclipse.debug.core.Launch(
+                    null, "run", null);
+            tracker.launchesTerminated(
+                    new ILaunch[] { untracked });
+        }
+
+        @Test
+        void launchesTerminatedIgnoresDifferentInstance()
+                throws Exception {
+            ILaunchManager mgr =
+                    DebugPlugin.getDefault().getLaunchManager();
+            ILaunch first = new org.eclipse.debug.core.Launch(
+                    null, "run", null);
+            mgr.addLaunch(first);
+            var tl = tracker.get("(unknown)");
+            assertNotNull(tl);
+            mgr.removeLaunch(first);
+
+            ILaunch second = new org.eclipse.debug.core.Launch(
+                    null, "run", null);
+            mgr.addLaunch(second);
+            try {
+                tracker.launchesTerminated(
+                        new ILaunch[] { first });
+                assertFalse(tl.terminated,
+                        "Should not terminate for different instance");
+            } finally {
+                mgr.removeLaunch(second);
+            }
+        }
+
+        @Test
+        void launchesChangedReattachesIdempotently()
+                throws Exception {
+            ILaunchManager mgr =
+                    DebugPlugin.getDefault().getLaunchManager();
+            ILaunch launch = new org.eclipse.debug.core.Launch(
+                    null, "run", null);
+            Process proc = new ProcessBuilder(
+                    "java", "-version").start();
+            proc.waitFor(5,
+                    java.util.concurrent.TimeUnit.SECONDS);
+            DebugPlugin.newProcess(launch, proc,
+                    "tracker-changed-test");
+            mgr.addLaunch(launch);
+            try {
+                var tl = tracker.get("tracker-changed-test");
+                assertNotNull(tl);
+                int monitorsBefore = tl.attached.size();
+                tracker.launchesChanged(
+                        new ILaunch[] { launch });
+                assertEquals(monitorsBefore, tl.attached.size(),
+                        "Re-attach should not duplicate monitors");
+            } finally {
+                mgr.removeLaunch(launch);
+            }
         }
 
         @Test

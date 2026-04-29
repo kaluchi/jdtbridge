@@ -112,8 +112,8 @@ jdt maven up -q                                        # quiet mode, suppress gu
 ### Refactoring
 
 ```bash
-jdt organize-imports <file>                            # (alias: oi) organize imports
-jdt format <file>                                      # (alias: fmt) format code (Eclipse settings)
+jdt organize-imports <FQN>                             # (alias: oi) organize imports
+jdt format <FQN>                                       # (alias: fmt) format code (Eclipse settings)
 jdt rename <FQN> <newName>                             # rename type or method (FQN = pkg.T or pkg.T#m(A))
 jdt rename <FQN> <newName> --field <old>               # rename field
 jdt move <FQN> <target.package>                        # move type to another package

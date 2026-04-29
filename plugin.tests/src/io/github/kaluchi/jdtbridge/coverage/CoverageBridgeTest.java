@@ -99,7 +99,7 @@ public class CoverageBridgeTest {
         private final CoverageBridge bridge = new CoverageBridge();
 
         @Test
-        void unknownPathReturnsCoverageUnknownPath() {
+        void unknownPathReturnsCoverageUnknownPath() throws Exception {
             String json = bridge.dispatch("/coverage/nope",
                     Map.of(), null, ProjectScope.ALL);
             // Either the bridge returns "not-installed" (EclEmma
@@ -111,7 +111,7 @@ public class CoverageBridgeTest {
         }
 
         @Test
-        void knownPathReturnsValidJson() {
+        void knownPathReturnsValidJson() throws Exception {
             String json = bridge.dispatch("/coverage/runs",
                     Map.of(), null, ProjectScope.ALL);
             // Phase 1: stub returns coverage-not-implemented;
@@ -123,7 +123,7 @@ public class CoverageBridgeTest {
         }
 
         @Test
-        void everyKnownPathRoutes() {
+        void everyKnownPathRoutes() throws Exception {
             String[] paths = {
                     "/coverage/run", "/coverage/dump",
                     "/coverage/refresh", "/coverage/relaunch",

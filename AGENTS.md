@@ -435,7 +435,7 @@ it must exist. If it doesn't, the test is broken — let it fail.
 
 ## Conventions
 
-- Java: Eclipse formatter (`jdt format <file>`)
+- Java: Eclipse formatter (`jdt format <FQN>`)
 - JavaScript: ESM (`.mjs`), no TypeScript
 - Commits: imperative mood ("Add X", "Fix Y"), Co-Authored-By in message
 - PRs: no "Generated with Claude Code" in body — Co-Authored-By is enough

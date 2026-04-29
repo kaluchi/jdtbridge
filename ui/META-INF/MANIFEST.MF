@@ -5,7 +5,6 @@ Bundle-Vendor: kaluchi
 Bundle-SymbolicName: io.github.kaluchi.jdtbridge.ui;singleton:=true
 Bundle-Version: 2.6.0.qualifier
 Bundle-Activator: io.github.kaluchi.jdtbridge.ui.Activator
-Bundle-RequiredExecutionEnvironment: JavaSE-21
 Automatic-Module-Name: io.github.kaluchi.jdtbridge.ui
 Require-Bundle: org.eclipse.core.runtime,
  org.eclipse.core.resources,

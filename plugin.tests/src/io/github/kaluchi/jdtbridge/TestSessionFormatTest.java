@@ -16,7 +16,6 @@ import com.google.gson.JsonObject;
  * helpers shared between {@link TestSessionHandler} and
  * {@link TestProgressStreamer}.
  */
-@SuppressWarnings("restriction")
 public class TestSessionFormatTest {
 
     @Nested

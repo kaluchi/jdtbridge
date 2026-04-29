@@ -27,6 +27,7 @@ import org.osgi.framework.Bundle;
  * <p>Activated by the UI plugin's Activator when EclEmma is on
  * the classpath. No-op when the Coverage View is not open.
  */
+@SuppressWarnings("restriction")
 public final class CoverageToolbarRefresher
         implements ISessionListener {
 
@@ -36,13 +37,13 @@ public final class CoverageToolbarRefresher
     private CoverageToolbarRefresher() {
     }
 
-    public static CoverageToolbarRefresher install() {
+	public static CoverageToolbarRefresher install() {
         CoverageToolbarRefresher r = new CoverageToolbarRefresher();
         CoverageTools.getSessionManager().addSessionListener(r);
         return r;
     }
 
-    public void uninstall() {
+	public void uninstall() {
         // EclEmma may stop before us; once gone, the listener is unreachable too
         Bundle eclemma = Platform.getBundle("org.eclipse.eclemma.core");
         if (eclemma == null || eclemma.getState() != Bundle.ACTIVE) {

@@ -55,7 +55,7 @@ public class LaunchImportTest {
     private String importedConfigId;
 
     @AfterEach
-    void cleanupImportedConfig() {
+    void cleanupImportedConfig() throws Exception {
         if (importedConfigId != null) {
             launchHandler.handleConfigDelete(
                     Map.of("configId", importedConfigId));
@@ -131,21 +131,21 @@ public class LaunchImportTest {
     @Nested
     class ImportErrors {
         @Test
-        void rejectsMissingConfigId() {
+        void rejectsMissingConfigId() throws Exception {
             String responseJson = launchHandler.handleImport(
                     Map.of(), MAVEN_LAUNCH_XML);
             assertTrue(responseJson.contains("Missing"));
         }
 
         @Test
-        void rejectsEmptyBody() {
+        void rejectsEmptyBody() throws Exception {
             String responseJson = launchHandler.handleImport(
                     Map.of("configId", "test"), "");
             assertTrue(responseJson.contains("Missing"));
         }
 
         @Test
-        void rejectsNullBody() {
+        void rejectsNullBody() throws Exception {
             String responseJson = launchHandler.handleImport(
                     Map.of("configId", "test"), null);
             assertTrue(responseJson.contains("Missing"));
@@ -189,7 +189,7 @@ public class LaunchImportTest {
         }
 
         @Test
-        void deleteRejectsNotFound() {
+        void deleteRejectsNotFound() throws Exception {
             String responseJson = launchHandler.handleConfigDelete(
                     Map.of("configId", "nonexistent-config-xyz"));
             assertTrue(responseJson.contains("not found"));
