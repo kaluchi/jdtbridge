@@ -4,10 +4,17 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.github.kaluchi.jdtbridge.ProjectScope;
+import io.github.kaluchi.jdtbridge.support.FakeCoverageLaunch;
 import io.github.kaluchi.jdtbridge.support.TestCoverageStubs;
 import io.github.kaluchi.jdtbridge.support.TestFixture;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.jobs.Job;
+import org.eclipse.debug.core.DebugPlugin;
+import org.eclipse.debug.core.ILaunch;
+import org.eclipse.debug.core.ILaunchConfiguration;
+import org.eclipse.debug.core.ILaunchConfigurationType;
+import org.eclipse.debug.core.ILaunchConfigurationWorkingCopy;
+import org.eclipse.debug.core.ILaunchManager;
 import org.eclipse.eclemma.core.CoverageTools;
 import org.eclipse.eclemma.core.IExecutionDataSource;
 import org.eclipse.eclemma.core.ISessionImporter;
@@ -22,8 +29,10 @@ import org.junit.jupiter.api.Test;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -96,6 +105,40 @@ public class CoverageSessionHandlerTest {
                         "Missing required field '" + required
                                 + "': " + entry);
             }
+        }
+
+        @Test
+        void liveRunCarriesLaunchIdAndConfigType() throws Exception {
+            ILaunchManager mgr = DebugPlugin.getDefault()
+                    .getLaunchManager();
+            ILaunchConfigurationType type =
+                    mgr.getLaunchConfigurationType(
+                            "org.eclipse.jdt.junit.launchconfig");
+            String name = "session-live-" + UUID.randomUUID();
+            ILaunchConfigurationWorkingCopy wc =
+                    type.newInstance(null, name);
+            ILaunchConfiguration cfg = wc.doSave();
+            FakeCoverageLaunch launch =
+                    new FakeCoverageLaunch(cfg, Set.of());
+            tracker.launchesAdded(new ILaunch[]{launch});
+
+            JsonArray arr = JsonParser.parseString(
+                            handler.handleRuns(ProjectScope.ALL))
+                    .getAsJsonArray();
+            JsonObject live = null;
+            for (var el : arr) {
+                JsonObject o = el.getAsJsonObject();
+                if ("live".equals(o.get("coverageSessionKind")
+                        .getAsString())) {
+                    live = o;
+                    break;
+                }
+            }
+            assertNotNull(live);
+            assertFalse(live.get("launchId").isJsonNull());
+            assertFalse(live.get("configType").isJsonNull());
+            assertEquals(name, live.get("configId").getAsString());
+            cfg.delete();
         }
 
         @Test
@@ -501,6 +544,22 @@ public class CoverageSessionHandlerTest {
         void unknownIdReturnsCoverageNotFound() {
             JsonObject obj = parseObj(handler.handleActivate(
                     "{\"coverageId\":\"Bogus:1\"}"));
+            assertEquals("coverage-not-found",
+                    obj.get("error").getAsString());
+        }
+
+        @Test
+        void missingCoverageIdReturnsCoverageNotFound() {
+            JsonObject obj = parseObj(handler.handleActivate(
+                    "{\"reset\":true}"));
+            assertEquals("coverage-not-found",
+                    obj.get("error").getAsString());
+        }
+
+        @Test
+        void blankCoverageIdReturnsCoverageNotFound() {
+            JsonObject obj = parseObj(handler.handleActivate(
+                    "{\"coverageId\":\"  \"}"));
             assertEquals("coverage-not-found",
                     obj.get("error").getAsString());
         }

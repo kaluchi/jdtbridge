@@ -115,12 +115,23 @@ public final class TestCoverageStubs {
     }
 
     public static ICoverageSession fakeSession(String description) {
+        return fakeSession(description, null);
+    }
+
+    public static ICoverageSession fakeSession(String description,
+            org.eclipse.debug.core.ILaunchConfiguration config) {
         return (ICoverageSession) Proxy.newProxyInstance(
                 ICoverageSession.class.getClassLoader(),
                 new Class<?>[] { ICoverageSession.class },
-                (p, m, a) -> java.util.Map.of(
-                        "getDescription", (Object) description)
-                        .getOrDefault(m.getName(), null));
+                (p, m, a) -> switch (m.getName()) {
+                    case "getDescription" -> description;
+                    case "getLaunchConfiguration" -> config;
+                    case "getScope" -> java.util.Set.of();
+                    case "equals" -> p == a[0];
+                    case "hashCode" ->
+                            System.identityHashCode(p);
+                    default -> null;
+                });
     }
 
     private static final class FakeNode extends CoverageNodeImpl {
