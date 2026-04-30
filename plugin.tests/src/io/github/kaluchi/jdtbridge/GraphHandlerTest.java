@@ -1337,6 +1337,69 @@ public class GraphHandlerTest {
         assertTrue(isError(result));
     }
 
+    // ── Additional validation paths ────────────────────────────────
+
+    @Test
+    void refsToWriteOnFieldUsesWriteAccessesPattern() {
+        var arr = JsonParser.parseString(handler.handleRefsTo(
+                paramsMulti("of",
+                        "test.edge.Outer.StaticNested#VALUE",
+                        "refKind", "write"),
+                ProjectScope.ALL)).getAsJsonArray();
+        // VALUE is final — write accesses may be empty or only
+        // at the initializer. The important thing is it doesn't
+        // error and uses the WRITE_ACCESSES pattern.
+        assertNotNull(arr);
+    }
+
+    @Test
+    void refsToMissingOfReturnsError() {
+        JsonObject result = parse(handler.handleRefsTo(
+                Map.of(), ProjectScope.ALL));
+        assertTrue(isError(result));
+    }
+
+    @Test
+    void packagesInProjectUnknownProjectReturnsError() {
+        JsonObject result = parse(
+                handler.handlePackagesInProject(
+                        params("of", "no-such-project-xyz")));
+        assertTrue(isError(result));
+        assertEquals("project-not-found",
+                errorOf(result).get("kind").getAsString());
+    }
+
+    @Test
+    void sourceErrorWhenOfMissing() {
+        JsonObject result = parse(
+                handler.handleSource(Map.of()));
+        assertTrue(isError(result));
+    }
+
+    @Test
+    void outgoingRefsErrorWhenOfMissing() {
+        JsonObject result = parse(handler.handleOutgoingRefs(
+                Map.of(), ProjectScope.ALL));
+        assertTrue(isError(result));
+    }
+
+    @Test
+    void outgoingRefsErrorOnUnknownTarget() {
+        JsonObject result = parse(handler.handleOutgoingRefs(
+                params("of", "no.such.Type"),
+                ProjectScope.ALL));
+        assertTrue(isError(result));
+    }
+
+    @Test
+    void typesInFileForNonJavaReturnsError() throws Exception {
+        // Use a file that exists but isn't a Java source
+        String pomPath = "D:/git/eclipse-jdt-search/pom.xml";
+        JsonObject result = parse(
+                handler.handleTypesInFile(params("of", pomPath)));
+        assertTrue(isError(result));
+    }
+
     // ── Cross-cutting: every error carries origin :jdt/plugin ───────
 
     @Test

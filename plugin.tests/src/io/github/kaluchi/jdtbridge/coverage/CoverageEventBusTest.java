@@ -124,14 +124,10 @@ public class CoverageEventBusTest {
         @Test
         void thrownByOneListenerDoesNotBlockOthers() {
             CountingListener after = new CountingListener();
-            bus.subscribe("X:1", new CoverageTracker.CoverageEventListener() {
-                @Override public void onDumped(CoverageRun r, int i, long t) {}
-                @Override public void onAnalysisLoading(CoverageRun r) {}
-                @Override public void onAnalysisReady(CoverageRun r) {}
+            bus.subscribe("X:1", new CountingListener() {
                 @Override public void onTerminated(CoverageRun r) {
                     throw new RuntimeException("intentional");
                 }
-                @Override public void onFailed(CoverageRun r, String reason) {}
             });
             bus.subscribe("X:1", after);
             bus.fire("X:1", l -> l.onTerminated(null));
@@ -157,7 +153,7 @@ public class CoverageEventBusTest {
     /** Listener that just counts how many times each callback
      *  was invoked. CoverageRun arg is ignored — bus
      *  contract is just "deliver call-by-call". */
-    private static final class CountingListener
+    private static class CountingListener
             implements CoverageTracker.CoverageEventListener {
         final AtomicInteger dumped = new AtomicInteger();
         final AtomicInteger loading = new AtomicInteger();

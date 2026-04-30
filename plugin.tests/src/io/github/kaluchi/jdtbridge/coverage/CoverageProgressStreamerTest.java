@@ -468,8 +468,8 @@ public class CoverageProgressStreamerTest {
         // other jobs in the manager queue — local runs settle
         // sub-millisecond.
         TestAwait.pollUntil(30_000,
-                () -> !tracker.byCoverageId(coverageId)
-                        .analysisLoading,
+                () -> tracker.byCoverageId(coverageId)
+                        .analysisReady,
                 "LoadSessionJob did not settle within 30s for "
                         + coverageId);
     }

@@ -5,13 +5,16 @@ import com.google.gson.JsonParser;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.debug.core.DebugPlugin;
+import org.eclipse.debug.core.ILaunch;
 import org.eclipse.debug.core.ILaunchConfiguration;
 import org.eclipse.debug.core.ILaunchConfigurationType;
 import org.eclipse.debug.core.ILaunchConfigurationWorkingCopy;
 import org.eclipse.debug.core.ILaunchManager;
 import org.eclipse.eclemma.core.CoverageTools;
+import org.eclipse.eclemma.core.ICoverageSession;
 import org.eclipse.eclemma.core.ISessionImporter;
 
+import io.github.kaluchi.jdtbridge.support.FakeCoverageLaunch;
 import io.github.kaluchi.jdtbridge.support.TestCoverageStubs;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +27,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -248,12 +252,200 @@ public class CoverageHandlerTest {
     }
 
     @Nested
+    class HandleDumpLiveRun {
+
+        private ILaunchConfiguration config;
+
+        @BeforeEach
+        void createConfig() throws Exception {
+            ILaunchManager mgr = DebugPlugin.getDefault()
+                    .getLaunchManager();
+            ILaunchConfigurationType type =
+                    mgr.getLaunchConfigurationType(
+                            "org.eclipse.jdt.junit.launchconfig");
+            String name = "dump-live-" + UUID.randomUUID();
+            ILaunchConfigurationWorkingCopy wc =
+                    type.newInstance(null, name);
+            config = wc.doSave();
+        }
+
+        @AfterEach
+        void deleteConfig() throws Exception {
+            config.delete();
+        }
+
+        @Test
+        void terminatedLiveRunReturnsTerminatedError() {
+            FakeCoverageLaunch launch =
+                    new FakeCoverageLaunch(config, Set.of());
+            tracker.launchesAdded(new ILaunch[]{launch});
+            String coverageId = tracker.snapshot().keySet()
+                    .iterator().next();
+            tracker.launchesTerminated(new ILaunch[]{launch});
+
+            JsonObject obj = parseObj(handler.handleDump(
+                    "{\"coverageId\":\"" + coverageId + "\"}"));
+            assertEquals("coverage-launch-terminated",
+                    obj.get("error").getAsString());
+        }
+
+        @Test
+        void liveDumpRequestsFromAgent() {
+            FakeCoverageLaunch launch =
+                    new FakeCoverageLaunch(config, Set.of());
+            tracker.launchesAdded(new ILaunch[]{launch});
+            String coverageId = tracker.snapshot().keySet()
+                    .iterator().next();
+
+            JsonObject obj = parseObj(handler.handleDump(
+                    "{\"coverageId\":\"" + coverageId
+                            + "\",\"reset\":true}"));
+            assertTrue(obj.get("ok").getAsBoolean());
+            assertTrue(launch.wasDumpRequested());
+            assertTrue(launch.wasDumpReset());
+        }
+
+        @Test
+        void liveDumpWithoutResetDefaultsToFalse() {
+            FakeCoverageLaunch launch =
+                    new FakeCoverageLaunch(config, Set.of());
+            tracker.launchesAdded(new ILaunch[]{launch});
+            String coverageId = tracker.snapshot().keySet()
+                    .iterator().next();
+
+            JsonObject obj = parseObj(handler.handleDump(
+                    "{\"coverageId\":\"" + coverageId + "\"}"));
+            assertTrue(obj.get("ok").getAsBoolean());
+            assertTrue(launch.wasDumpRequested());
+            assertFalse(launch.wasDumpReset());
+        }
+
+        @Test
+        void blankCoverageIdInDumpReturnsNotFound() {
+            JsonObject obj = parseObj(handler.handleDump(
+                    "{\"coverageId\":\"  \"}"));
+            assertEquals("coverage-not-found",
+                    obj.get("error").getAsString());
+        }
+    }
+
+    @Nested
+    class RunResponse {
+
+        private ILaunchConfiguration config;
+
+        @BeforeEach
+        void createConfig() throws Exception {
+            ILaunchManager mgr = DebugPlugin.getDefault()
+                    .getLaunchManager();
+            ILaunchConfigurationType type =
+                    mgr.getLaunchConfigurationType(
+                            "org.eclipse.jdt.junit.launchconfig");
+            String name = "run-resp-" + UUID.randomUUID();
+            ILaunchConfigurationWorkingCopy wc =
+                    type.newInstance(null, name);
+            config = wc.doSave();
+        }
+
+        @AfterEach
+        void deleteConfig() throws Exception {
+            config.delete();
+        }
+
+        @Test
+        void responseContainsConfigAndCoverageId() {
+            FakeCoverageLaunch launch =
+                    new FakeCoverageLaunch(config, Set.of());
+            JsonObject obj = parseObj(
+                    CoverageHandler.runResponse(launch));
+            assertTrue(obj.get("ok").getAsBoolean());
+            assertEquals(config.getName(),
+                    obj.get("configId").getAsString());
+            assertTrue(obj.has("coverageId"));
+            assertTrue(obj.get("coverageId").getAsString()
+                    .startsWith(config.getName() + ":"));
+        }
+
+        @Test
+        void responseContainsLaunchTimestamp() {
+            FakeCoverageLaunch launch =
+                    new FakeCoverageLaunch(config, Set.of());
+            JsonObject obj = parseObj(
+                    CoverageHandler.runResponse(launch));
+            assertTrue(obj.has("launchTimestamp"));
+            assertNotEquals(0,
+                    obj.get("launchTimestamp").getAsLong());
+        }
+
+        @Test
+        void responseContainsConfigType() {
+            FakeCoverageLaunch launch =
+                    new FakeCoverageLaunch(config, Set.of());
+            JsonObject obj = parseObj(
+                    CoverageHandler.runResponse(launch));
+            assertTrue(obj.has("configType"));
+            assertTrue(obj.has("configTypeId"));
+        }
+
+        @Test
+        void responseContainsLaunchId() {
+            FakeCoverageLaunch launch =
+                    new FakeCoverageLaunch(config, Set.of());
+            JsonObject obj = parseObj(
+                    CoverageHandler.runResponse(launch));
+            assertTrue(obj.has("launchId"));
+        }
+
+        @Test
+        void responseContainsCoverageScope() {
+            FakeCoverageLaunch launch =
+                    new FakeCoverageLaunch(config, Set.of());
+            JsonObject obj = parseObj(
+                    CoverageHandler.runResponse(launch));
+            assertTrue(obj.has("coverageScope"));
+            assertTrue(obj.get("coverageScope").isJsonArray());
+        }
+
+        @Test
+        void nonCoverageLaunchOmitsScope() {
+            ILaunch plain = new org.eclipse.debug.core.Launch(
+                    config, "run", null);
+            plain.setAttribute(
+                    org.eclipse.debug.core.DebugPlugin
+                            .ATTR_LAUNCH_TIMESTAMP,
+                    Long.toString(System.currentTimeMillis()));
+            JsonObject obj = parseObj(
+                    CoverageHandler.runResponse(plain));
+            assertTrue(obj.get("ok").getAsBoolean());
+            assertFalse(obj.has("coverageScope"));
+        }
+
+        @Test
+        void launchWithoutTimestampUsesConfigIdAsCoverageId() {
+            ILaunch plain = new org.eclipse.debug.core.Launch(
+                    config, "run", null);
+            JsonObject obj = parseObj(
+                    CoverageHandler.runResponse(plain));
+            assertEquals(config.getName(),
+                    obj.get("coverageId").getAsString());
+            assertFalse(obj.has("launchTimestamp"));
+        }
+
+        @Test
+        void launchWithoutConfigUsesEmptyConfigId() {
+            ILaunch plain = new org.eclipse.debug.core.Launch(
+                    null, "run", null);
+            JsonObject obj = parseObj(
+                    CoverageHandler.runResponse(plain));
+            assertEquals("", obj.get("configId").getAsString());
+        }
+    }
+
+    @Nested
     class ErrorJsonShape {
 
         @Test
         void everyErrorHasErrorAndMessage() throws Exception {
-            // Iterate the validation paths that don't require a
-            // real launch and assert the error JSON shape.
             String[] errorJsons = {
                     handler.handleRun(Map.of()),
                     handler.handleRun(

@@ -2,20 +2,31 @@ package io.github.kaluchi.jdtbridge.coverage;
 
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.jobs.Job;
+import org.eclipse.debug.core.DebugPlugin;
+import org.eclipse.debug.core.ILaunch;
+import org.eclipse.debug.core.ILaunchConfiguration;
+import org.eclipse.debug.core.ILaunchConfigurationType;
+import org.eclipse.debug.core.ILaunchConfigurationWorkingCopy;
+import org.eclipse.debug.core.ILaunchManager;
 import org.eclipse.eclemma.core.CoverageTools;
+import org.eclipse.eclemma.core.ICoverageSession;
 import org.eclipse.eclemma.core.ISessionImporter;
 import org.eclipse.eclemma.core.ISessionManager;
 
+import io.github.kaluchi.jdtbridge.support.FakeCoverageLaunch;
 import io.github.kaluchi.jdtbridge.support.TestCoverageStubs;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -54,18 +65,20 @@ public class CoverageTrackerTest {
         void startIsIdempotent() {
             tracker.start();
             tracker.start();
-            // No assertion beyond "did not throw" — duplicate
-            // start should be a no-op.
         }
 
         @Test
         void stopThenStartReregisters() throws Exception {
             tracker.stop();
             tracker.start();
-            // Listener registration must succeed — verify by
-            // firing an import and seeing the run appear.
             String coverageId = importAndAwait("alpha");
             assertNotNull(tracker.byCoverageId(coverageId));
+        }
+
+        @Test
+        void stopWithoutStartIsNoOp() {
+            CoverageTracker fresh = new CoverageTracker();
+            fresh.stop();
         }
 
         @Test
@@ -225,25 +238,295 @@ public class CoverageTrackerTest {
         @Test
         void twoImportsInSameMillisecondGetUniqueIds()
                 throws Exception {
-            // Force the issue by reusing the same start time —
-            // we can't fully control Java's clock granularity, but
-            // calling import twice back-to-back routinely lands
-            // both events in the same millisecond on modern CPUs.
             String firstId = importAndAwait("collide-1");
             String secondId = importAndAwait("collide-2");
             assertNotNull(firstId);
             assertNotNull(secondId);
-            // The two coverage IDs must differ regardless of
-            // millisecond clock alignment.
-            org.junit.jupiter.api.Assertions.assertNotEquals(
-                    firstId, secondId);
+            assertNotEquals(firstId, secondId);
         }
     }
 
-    /** Trigger {@code SessionImporter.importSession} with a no-op
-     *  execution-data source, then block until the deferred
-     *  classification job has run. Returns the assigned
-     *  {@code coverageId}. */
+    @Nested
+    class LaunchLifecycle {
+
+        private ILaunchConfiguration config;
+
+        @BeforeEach
+        void createConfig() throws Exception {
+            ILaunchManager mgr = DebugPlugin.getDefault()
+                    .getLaunchManager();
+            ILaunchConfigurationType type =
+                    mgr.getLaunchConfigurationType(
+                            "org.eclipse.jdt.junit.launchconfig");
+            assertNotNull(type);
+            String name = "tracker-test-" + UUID.randomUUID();
+            ILaunchConfigurationWorkingCopy wc =
+                    type.newInstance(null, name);
+            config = wc.doSave();
+        }
+
+        @AfterEach
+        void deleteConfig() throws Exception {
+            config.delete();
+        }
+
+        @Test
+        void launchesAddedRegistersLiveRun() {
+            FakeCoverageLaunch launch =
+                    new FakeCoverageLaunch(config, Set.of());
+            tracker.launchesAdded(new ILaunch[]{launch});
+
+            Map<String, CoverageRun> snap = tracker.snapshot();
+            assertEquals(1, snap.size());
+            CoverageRun run = snap.values().iterator().next();
+            assertEquals(CoverageRun.Kind.LIVE, run.kind);
+            assertEquals(config.getName(), run.configId);
+            assertFalse(run.terminated);
+            assertSame(launch, run.launch);
+        }
+
+        @Test
+        void launchesAddedIgnoresNonCoverageLaunch() {
+            ILaunch plain = new org.eclipse.debug.core.Launch(
+                    config, "run", null);
+            tracker.launchesAdded(new ILaunch[]{plain});
+            assertTrue(tracker.snapshot().isEmpty());
+        }
+
+        @Test
+        void launchesAddedSkipsNullConfig() {
+            FakeCoverageLaunch launch =
+                    new FakeCoverageLaunch(null, Set.of());
+            tracker.launchesAdded(new ILaunch[]{launch});
+            assertTrue(tracker.snapshot().isEmpty());
+        }
+
+        @Test
+        void launchesAddedIdempotent() {
+            FakeCoverageLaunch launch =
+                    new FakeCoverageLaunch(config, Set.of());
+            tracker.launchesAdded(new ILaunch[]{launch});
+            tracker.launchesAdded(new ILaunch[]{launch});
+            assertEquals(1, tracker.snapshot().size());
+        }
+
+        @Test
+        void launchesTerminatedMarksCoverageRun() {
+            FakeCoverageLaunch launch =
+                    new FakeCoverageLaunch(config, Set.of());
+            tracker.launchesAdded(new ILaunch[]{launch});
+
+            tracker.launchesTerminated(new ILaunch[]{launch});
+
+            CoverageRun run = tracker.snapshot().values()
+                    .iterator().next();
+            assertTrue(run.terminated);
+            assertNotNull(run.terminatedAt);
+        }
+
+        @Test
+        void launchesTerminatedIdempotentOnTimestamp() {
+            FakeCoverageLaunch launch =
+                    new FakeCoverageLaunch(config, Set.of());
+            tracker.launchesAdded(new ILaunch[]{launch});
+            tracker.launchesTerminated(new ILaunch[]{launch});
+
+            CoverageRun run = tracker.snapshot().values()
+                    .iterator().next();
+            Long firstTerminatedAt = run.terminatedAt;
+
+            tracker.launchesTerminated(new ILaunch[]{launch});
+            assertEquals(firstTerminatedAt, run.terminatedAt);
+        }
+
+        @Test
+        void launchesChangedNoOp() {
+            FakeCoverageLaunch launch =
+                    new FakeCoverageLaunch(config, Set.of());
+            tracker.launchesAdded(new ILaunch[]{launch});
+            tracker.launchesChanged(new ILaunch[]{launch});
+            assertEquals(1, tracker.snapshot().size());
+        }
+
+        @Test
+        void launchesRemovedKeepsRun() {
+            FakeCoverageLaunch launch =
+                    new FakeCoverageLaunch(config, Set.of());
+            tracker.launchesAdded(new ILaunch[]{launch});
+            tracker.launchesRemoved(new ILaunch[]{launch});
+            assertEquals(1, tracker.snapshot().size());
+        }
+
+        @Test
+        void liveRunCoverageIdContainsConfigNameAndTimestamp() {
+            FakeCoverageLaunch launch =
+                    new FakeCoverageLaunch(config, Set.of());
+            tracker.launchesAdded(new ILaunch[]{launch});
+
+            CoverageRun run = tracker.snapshot().values()
+                    .iterator().next();
+            assertTrue(run.coverageId.startsWith(
+                    config.getName() + ":"));
+        }
+
+        @Test
+        void liveRunHasConfigType() {
+            FakeCoverageLaunch launch =
+                    new FakeCoverageLaunch(config, Set.of());
+            tracker.launchesAdded(new ILaunch[]{launch});
+
+            CoverageRun run = tracker.snapshot().values()
+                    .iterator().next();
+            assertNotNull(run.configType);
+            assertNotNull(run.configTypeId);
+        }
+
+        @Test
+        void launchWithoutTimestampIsSkipped() {
+            FakeCoverageLaunch launch =
+                    new FakeCoverageLaunch(config, Set.of());
+            launch.setAttribute(
+                    org.eclipse.debug.core.DebugPlugin
+                            .ATTR_LAUNCH_TIMESTAMP, null);
+            tracker.launchesAdded(new ILaunch[]{launch});
+            assertTrue(tracker.snapshot().isEmpty());
+        }
+
+        @Test
+        void sessionAddedMatchesLiveRun() {
+            FakeCoverageLaunch launch =
+                    new FakeCoverageLaunch(config, Set.of());
+            tracker.launchesAdded(new ILaunch[]{launch});
+
+            String coverageId = tracker.snapshot().keySet()
+                    .iterator().next();
+
+            ICoverageSession session = TestCoverageStubs
+                    .fakeSession("live-dump", config);
+            tracker.sessionAdded(session);
+
+            CoverageRun run = tracker.byCoverageId(coverageId);
+            assertEquals(1, run.dumpCount());
+            assertTrue(run.dataReceived);
+            assertEquals("live-dump", run.description);
+        }
+
+        @Test
+        void sessionAddedIdempotent() {
+            FakeCoverageLaunch launch =
+                    new FakeCoverageLaunch(config, Set.of());
+            tracker.launchesAdded(new ILaunch[]{launch});
+
+            String coverageId = tracker.snapshot().keySet()
+                    .iterator().next();
+
+            ICoverageSession session = TestCoverageStubs
+                    .fakeSession("dup-dump", config);
+            tracker.sessionAdded(session);
+            tracker.sessionAdded(session);
+
+            CoverageRun run = tracker.byCoverageId(coverageId);
+            assertEquals(1, run.dumpCount());
+        }
+
+        @Test
+        void terminatedLiveRunDoesNotMatchNewSession() throws Exception {
+            FakeCoverageLaunch launch =
+                    new FakeCoverageLaunch(config, Set.of());
+            tracker.launchesAdded(new ILaunch[]{launch});
+            tracker.launchesTerminated(new ILaunch[]{launch});
+
+            int before = tracker.snapshot().size();
+            ICoverageSession session = TestCoverageStubs
+                    .fakeSession("post-term", config);
+            tracker.sessionAdded(session);
+            Job.getJobManager().join(
+                    CoverageTracker.CLASSIFY_FAMILY, null);
+
+            assertEquals(before + 1, tracker.snapshot().size());
+        }
+
+        @Test
+        void flushPendingSettlesAllDeferred() throws Exception {
+            ICoverageSession session = TestCoverageStubs
+                    .fakeSession("flush-test");
+            tracker.sessionAdded(session);
+            tracker.flushPending();
+
+            CoverageRun run = tracker.snapshot().values().stream()
+                    .filter(r -> "flush-test".equals(r.description))
+                    .findFirst()
+                    .orElseThrow();
+            assertTrue(run.coverageId.startsWith("imported:"));
+        }
+    }
+
+    @Nested
+    class CoverageChangedCallback {
+
+        @Test
+        void coverageChangedUpdatesActiveRunState()
+                throws Exception {
+            String coverageId = importAndAwait("cc-active");
+            CoverageRun run = tracker.byCoverageId(coverageId);
+            run.analysisLoading = true;
+
+            tracker.coverageChanged();
+
+            assertEquals(coverageId, tracker.activeCoverageId());
+        }
+
+        @Test
+        void coverageChangedIgnoresUnknownSession()
+                throws Exception {
+            importAndAwait("cc-ignore");
+            int before = tracker.snapshot().size();
+            tracker.coverageChanged();
+            assertEquals(before, tracker.snapshot().size());
+        }
+    }
+
+    @Nested
+    class SessionRemoval {
+
+        @Test
+        void removedSessionDeletesEmptyRun() throws Exception {
+            String coverageId = importAndAwait("remove-test");
+            CoverageRun run = tracker.byCoverageId(coverageId);
+            assertEquals(1, run.sessions.size());
+
+            ICoverageSession session = run.sessions.get(0);
+            tracker.sessionRemoved(session);
+
+            assertNull(tracker.byCoverageId(coverageId));
+        }
+
+        @Test
+        void removedSessionKeepsRunWithRemainingSessions()
+                throws Exception {
+            String coverageId = importAndAwait("keep-run");
+            CoverageRun run = tracker.byCoverageId(coverageId);
+            assertEquals(1, run.dumpCount());
+
+            ICoverageSession original = run.sessions.get(0);
+            ICoverageSession extra = TestCoverageStubs
+                    .fakeSession("extra-session");
+            run.sessions.add(extra);
+            run.dumpedAt.add(System.currentTimeMillis());
+            assertEquals(2, run.dumpCount());
+
+            tracker.sessionRemoved(original);
+            assertEquals(1, run.dumpCount());
+            assertNotNull(tracker.byCoverageId(coverageId));
+        }
+
+        @Test
+        void sessionActivatedWithNull() {
+            tracker.sessionActivated(null);
+            assertNull(tracker.activeCoverageId());
+        }
+    }
+
     private String importAndAwait(String description) throws Exception {
         ISessionImporter importer = CoverageTools.getImporter();
         importer.setDescription(description);

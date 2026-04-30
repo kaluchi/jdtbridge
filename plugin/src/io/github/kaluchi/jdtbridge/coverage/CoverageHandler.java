@@ -175,7 +175,7 @@ class CoverageHandler {
     /** Build the response JSON for {@code /coverage/run} and
      *  {@code /coverage/relaunch}. */
     @SuppressWarnings("restriction")
-	private static String runResponse(ILaunch launch) {
+	static String runResponse(ILaunch launch) {
         var obj = new JsonObject();
         obj.addProperty("ok", true);
 
