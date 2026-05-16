@@ -276,6 +276,19 @@ describe("commands (integration)", () => {
     expect(io.logs[0]).toBe("Refreshed 1 file");
   });
 
+  it("refresh rejects relative path with clear error", async () => {
+    let captured;
+    await setupMock((req, res) => {
+      captured = req.url;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ refreshed: false }));
+    });
+    const { refresh } = await import("../src/commands/refresh.mjs");
+    await refresh(["foo/bar.java", "-q"]);
+    expect(captured).toBeUndefined();
+    expect(io.errors[0]).toBe("Path must be absolute: foo/bar.java");
+  });
+
   it("refresh translates CLI-local path to host on remote", async () => {
     let captured;
     await setupMock((req, res) => {

@@ -181,6 +181,24 @@ class EditorHandler {
         IFile[] workspaceFiles =
                 root.findFilesForLocationURI(uri);
 
+        // EFS exists/isDirectory checks are filesystem I/O — keep
+        // them off the UI thread. Only the editor-opening call
+        // itself needs Display.syncExec.
+        IFileStore externalStore = null;
+        if (workspaceFiles.length == 0) {
+            externalStore = EFS.getStore(uri);
+            var info = externalStore.fetchInfo();
+            if (!info.exists()) {
+                return HttpServer.jsonError(
+                        "File not found: " + pathParam);
+            }
+            if (info.isDirectory()) {
+                return HttpServer.jsonError(
+                        "Path is a directory: " + pathParam);
+            }
+        }
+        final IFileStore store = externalStore;
+
         String[] result = {HttpServer.jsonError(
                 "Failed to open editor")};
         Display.getDefault().syncExec(() -> {
@@ -195,27 +213,9 @@ class EditorHandler {
                 }
                 IWorkbenchPage page = window.getActivePage();
 
-                IEditorPart editor;
-                if (workspaceFiles.length > 0) {
-                    editor = IDE.openEditor(
-                            page, workspaceFiles[0]);
-                } else {
-                    IFileStore store = EFS.getStore(uri);
-                    var info = store.fetchInfo();
-                    if (!info.exists()) {
-                        result[0] = HttpServer.jsonError(
-                                "File not found: " + pathParam);
-                        return;
-                    }
-                    if (info.isDirectory()) {
-                        result[0] = HttpServer.jsonError(
-                                "Path is a directory: "
-                                + pathParam);
-                        return;
-                    }
-                    editor = IDE.openEditorOnFileStore(
-                            page, store);
-                }
+                IEditorPart editor = (workspaceFiles.length > 0)
+                        ? IDE.openEditor(page, workspaceFiles[0])
+                        : IDE.openEditorOnFileStore(page, store);
 
                 JsonObject ok = new JsonObject();
                 ok.addProperty("ok", true);

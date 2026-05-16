@@ -238,6 +238,26 @@ gh pr checks 55 --watch
 all checks complete, then exits with 0 (all pass) or 1 (failures).
 Never use `sleep` loops to poll CI status.
 
+**Bot review comments.** After CI, automated reviewers
+(`gemini-code-assist[bot]`, etc.) leave a review summary plus
+line-level comments. `gemini-code-assist` first puts an 👀 reaction
+on the PR description when it picks up the PR; the actual review
+lands ~1–2 min later. Watch for both signals:
+
+```bash
+gh api repos/kaluchi/jdtbridge/issues/<N>/reactions  # 👀 = bot reading
+gh api repos/kaluchi/jdtbridge/pulls/<N>/reviews
+gh api repos/kaluchi/jdtbridge/pulls/<N>/comments    # line-level
+gh api repos/kaluchi/jdtbridge/issues/<N>/comments   # PR-level
+```
+
+Every concrete bot finding must be resolved before merge — either
+fix it in a follow-up commit, or reply on the comment with a clear
+reason for rejection. Do not leave bot comments unanswered: the
+human reviewer expects each one closed by the time they look. Reply
+inline (`gh api ... -X POST -f in_reply_to=<comment-id>`) so the
+thread stays attached to the diff line.
+
 ### Important details
 
 - **Clean build after branch switch or merge.** `git checkout`, `git pull`,
@@ -293,6 +313,13 @@ jdt test run io.github.kaluchi.jdtbridge.tests --coverage -f -q
 # Full UI suite (workbench PDE runtime — editors, coverage)
 jdt test run io.github.kaluchi.jdtbridge.tests.ui --coverage -f -q
 ```
+
+**UI tests must run via the full suite**, not by class FQN.
+`jdt test run <FQN>` against a class in `plugin.tests.ui` synthesises
+a headless launch config — `PlatformUI.getWorkbench()` is null in
+that runtime and the test hangs on the first `Display.syncExec`.
+Use `jdt test run io.github.kaluchi.jdtbridge.tests.ui` so the
+shared `*.tests.ui.launch` (workbench PDE) picks up the test.
 
 Both suites use shared launch configs from `launches/`. If a config
 is missing or broken, restore from the repo:
