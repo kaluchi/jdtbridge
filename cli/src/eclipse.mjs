@@ -20,6 +20,21 @@ export function eclipseExe(name) {
   return IS_WIN ? name + ".exe" : name;
 }
 
+/**
+ * Resolve a user-supplied Eclipse path to the actual installation directory.
+ * On macOS, Eclipse ships as a .app bundle; the real root lives at
+ * Contents/Eclipse inside it. Safe to call on any OS — non-.app paths are
+ * returned unchanged.
+ */
+export function resolveEclipsePath(p) {
+  if (!p) return p;
+  const s = p.trim().replace(/[/\\]+$/, "");
+  if (s.match(/\.app$/i)) return join(s, "Contents", "Eclipse");
+  const m = s.match(/^(.*\.app)[/\\]Contents[/\\]MacOS([/\\][^/\\]*)?$/i);
+  if (m) return join(m[1], "Contents", "Eclipse");
+  return s;
+}
+
 /** Check if any Eclipse process is running. */
 export function isEclipseRunning() {
   try {
@@ -46,22 +61,40 @@ export function isEclipseRunning() {
  */
 export function isEclipseInstall(dir) {
   if (!dir) return false;
-  if (existsSync(join(dir, eclipseExe("eclipsec")))) return true;
-  if (existsSync(join(dir, ".eclipseproduct"))) return true;
+  const resolved = resolveEclipsePath(dir);
+  if (existsSync(join(resolved, eclipseExe("eclipsec")))) return true;
+  if (existsSync(join(resolved, ".eclipseproduct"))) return true;
   return false;
 }
 
 export function findEclipsePath(config) {
-  if (config.eclipse && isEclipseInstall(config.eclipse)) {
-    return config.eclipse;
+  if (config.eclipse) {
+    const resolved = resolveEclipsePath(config.eclipse);
+    if (isEclipseInstall(resolved)) return resolved;
   }
-  const candidates = IS_WIN
-    ? ["D:/eclipse", "C:/eclipse"]
-    : [
-        "/usr/local/eclipse",
-        "/opt/eclipse",
-        `${process.env.HOME}/eclipse`,
-      ];
+  let candidates;
+  if (IS_WIN) {
+    candidates = ["D:/eclipse", "C:/eclipse"];
+  } else if (process.platform === "darwin") {
+    const macApps = [];
+    try {
+      readdirSync("/Applications")
+        .filter((f) => f.toLowerCase().startsWith("eclipse") && f.endsWith(".app"))
+        .forEach((app) => macApps.push(join("/Applications", app, "Contents", "Eclipse")));
+    } catch { /* /Applications not readable */ }
+    candidates = [
+      "/usr/local/eclipse",
+      "/opt/eclipse",
+      `${process.env.HOME}/eclipse`,
+      ...macApps,
+    ];
+  } else {
+    candidates = [
+      "/usr/local/eclipse",
+      "/opt/eclipse",
+      `${process.env.HOME}/eclipse`,
+    ];
+  }
   for (const p of candidates) {
     if (isEclipseInstall(p)) return p;
   }
@@ -159,11 +192,23 @@ export function stopEclipse() {
 }
 
 /**
+ * Return the path to the Eclipse launcher binary for the given install dir.
+ * On macOS the launcher lives in Contents/MacOS, not in Contents/Eclipse.
+ */
+function getEclipseLauncher(eclipsePath) {
+  if (process.platform === "darwin") {
+    const macLauncher = resolve(join(eclipsePath, "..", "MacOS", "eclipse"));
+    if (existsSync(macLauncher)) return macLauncher;
+  }
+  return join(eclipsePath, eclipseExe("eclipse"));
+}
+
+/**
  * Start Eclipse as a detached process.
  * @returns {number} PID of the launched process
  */
 export function startEclipse(eclipsePath, workspace) {
-  const exe = join(eclipsePath, eclipseExe("eclipse"));
+  const exe = getEclipseLauncher(eclipsePath);
   const args = workspace ? ["-data", workspace] : [];
   const child = spawn(exe, args, {
     detached: true,
@@ -201,25 +246,38 @@ function findLauncherJar(eclipsePath) {
 
 /** Run the p2 director application (headless Eclipse). */
 export function runDirector(eclipsePath, profile, extraArgs) {
-  const eclipsecPath = join(eclipsePath, eclipseExe("eclipsec"));
-
   let cmd;
   let prefixArgs = [];
+  let vmArgs = [];
 
-  if (existsSync(eclipsecPath)) {
-    // Classic Eclipse launcher
-    cmd = `"${eclipsecPath}"`;
-  } else {
-    // Fallback: run via Equinox launcher JAR (works for Eclipse-based products
-    // such as Spring Tools that ship a branded launcher instead of eclipsec).
-    const launcherJar = findLauncherJar(eclipsePath);
-    if (!launcherJar) {
+  if (process.platform === "darwin") {
+    // macOS: eclipsec does not exist. Use the Contents/MacOS launcher directly.
+    // Cocoa requires -XstartOnFirstThread; without it p2 director hangs (Bug 310456).
+    const launcher = getEclipseLauncher(eclipsePath);
+    if (!existsSync(launcher)) {
       throw new Error(
-        "Cannot find eclipsec(.exe) or org.eclipse.equinox.launcher_*.jar in Eclipse installation.",
+        `Cannot find Eclipse launcher at ${launcher}. Ensure the Eclipse.app bundle is intact.`,
       );
     }
-    cmd = "java";
-    prefixArgs = ["-jar", `"${launcherJar}"`];
+    cmd = `"${launcher}"`;
+    vmArgs = ["-vmargs", "-XstartOnFirstThread", "-Djava.awt.headless=true"];
+  } else {
+    const eclipsecPath = join(eclipsePath, eclipseExe("eclipsec"));
+    if (existsSync(eclipsecPath)) {
+      // Classic Eclipse launcher
+      cmd = `"${eclipsecPath}"`;
+    } else {
+      // Fallback: run via Equinox launcher JAR (works for Eclipse-based products
+      // such as Spring Tools that ship a branded launcher instead of eclipsec).
+      const launcherJar = findLauncherJar(eclipsePath);
+      if (!launcherJar) {
+        throw new Error(
+          "Cannot find eclipsec(.exe) or org.eclipse.equinox.launcher_*.jar in Eclipse installation.",
+        );
+      }
+      cmd = "java";
+      prefixArgs = ["-jar", `"${launcherJar}"`];
+    }
   }
 
   const args = [
@@ -233,6 +291,7 @@ export function runDirector(eclipsePath, profile, extraArgs) {
     "-destination",
     `"${eclipsePath}"`,
     ...extraArgs,
+    ...vmArgs,
   ].join(" ");
 
   try {

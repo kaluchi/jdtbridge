@@ -17,6 +17,7 @@ import {
   eclipseExe,
   isEclipseRunning,
   findEclipsePath,
+  resolveEclipsePath,
   getEclipseVersion,
   detectProfile,
   getInstalledVersion,
@@ -248,7 +249,8 @@ async function runInstall(config, flags) {
   console.log(bold("Eclipse"));
   let eclipsePath = findEclipsePath(config);
   if (!eclipsePath) {
-    eclipsePath = await ask("  Eclipse not found. Path: ");
+    const raw = await ask("  Eclipse not found. Path: ");
+    eclipsePath = resolveEclipsePath(raw?.trim());
     if (!eclipsePath || !isEclipseInstall(eclipsePath)) {
       console.error("  Not a valid Eclipse installation.");
       process.exit(1);

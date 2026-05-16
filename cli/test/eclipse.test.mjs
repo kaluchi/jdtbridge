@@ -10,6 +10,8 @@ import { tmpdir } from "node:os";
 import { createServer } from "node:http";
 import {
   eclipseExe,
+  resolveEclipsePath,
+  isEclipseInstall,
   getEclipseVersion,
   detectProfile,
   getInstalledVersion,
@@ -27,6 +29,85 @@ describe("eclipse", () => {
 
   beforeEach(() => {
     testDir = mkdtempSync(join(tmpdir(), "jdt-eclipse-test-"));
+  });
+
+  describe("resolveEclipsePath", () => {
+    function fwd(p) { return p.replaceAll("\\", "/"); }
+
+    it("resolves .app bundle to Contents/Eclipse", () => {
+      const result = resolveEclipsePath(join(testDir, "Eclipse.app"));
+      expect(fwd(result)).toMatch(/Eclipse\.app\/Contents\/Eclipse$/);
+    });
+
+    it("resolves Contents/MacOS binary path to Contents/Eclipse", () => {
+      const result = resolveEclipsePath(
+        join(testDir, "Eclipse.app", "Contents", "MacOS", "eclipse"),
+      );
+      expect(fwd(result)).toMatch(/Eclipse\.app\/Contents\/Eclipse$/);
+    });
+
+    it("resolves Contents/MacOS directory to Contents/Eclipse", () => {
+      const result = resolveEclipsePath(
+        join(testDir, "Eclipse.app", "Contents", "MacOS"),
+      );
+      expect(fwd(result)).toMatch(/Eclipse\.app\/Contents\/Eclipse$/);
+    });
+
+    it("strips trailing path separators before resolving", () => {
+      const result = resolveEclipsePath(join(testDir, "Eclipse.app") + "/");
+      expect(fwd(result)).toMatch(/Eclipse\.app\/Contents\/Eclipse$/);
+    });
+
+    it("trims leading/trailing whitespace", () => {
+      const result = resolveEclipsePath("  /opt/eclipse  ");
+      expect(result).toBe("/opt/eclipse");
+    });
+
+    it("returns regular paths unchanged", () => {
+      expect(resolveEclipsePath("/opt/eclipse")).toBe("/opt/eclipse");
+      expect(resolveEclipsePath("D:/eclipse")).toBe("D:/eclipse");
+    });
+
+    it("returns falsy input as-is", () => {
+      expect(resolveEclipsePath(null)).toBeNull();
+      expect(resolveEclipsePath("")).toBe("");
+    });
+  });
+
+  describe("isEclipseInstall", () => {
+    it("accepts a directory with eclipsec binary", () => {
+      writeFileSync(join(testDir, eclipseExe("eclipsec")), "");
+      expect(isEclipseInstall(testDir)).toBe(true);
+    });
+
+    it("accepts a directory with .eclipseproduct marker", () => {
+      writeFileSync(join(testDir, ".eclipseproduct"), "version=4.40.0\n");
+      expect(isEclipseInstall(testDir)).toBe(true);
+    });
+
+    it("rejects a directory with neither", () => {
+      expect(isEclipseInstall(testDir)).toBe(false);
+    });
+
+    it("accepts .app bundle path — reads .eclipseproduct from Contents/Eclipse", () => {
+      const eclipseDir = join(testDir, "Eclipse.app", "Contents", "Eclipse");
+      mkdirSync(eclipseDir, { recursive: true });
+      writeFileSync(join(eclipseDir, ".eclipseproduct"), "version=4.40.0\n");
+      expect(isEclipseInstall(join(testDir, "Eclipse.app"))).toBe(true);
+    });
+
+    it("rejects .app bundle with Contents/Eclipse but no marker", () => {
+      mkdirSync(join(testDir, "Eclipse.app", "Contents", "Eclipse"), { recursive: true });
+      expect(isEclipseInstall(join(testDir, "Eclipse.app"))).toBe(false);
+    });
+
+    it("accepts Contents/MacOS/eclipse binary path by resolving to Contents/Eclipse", () => {
+      const eclipseDir = join(testDir, "Eclipse.app", "Contents", "Eclipse");
+      mkdirSync(eclipseDir, { recursive: true });
+      writeFileSync(join(eclipseDir, ".eclipseproduct"), "version=4.40.0\n");
+      const binaryPath = join(testDir, "Eclipse.app", "Contents", "MacOS", "eclipse");
+      expect(isEclipseInstall(binaryPath)).toBe(true);
+    });
   });
 
   describe("eclipseExe", () => {
