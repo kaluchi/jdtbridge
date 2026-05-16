@@ -3,9 +3,14 @@ package io.github.kaluchi.jdtbridge;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
+import java.net.URI;
 import java.util.Map;
 
+import org.eclipse.core.filesystem.EFS;
+import org.eclipse.core.filesystem.IFileStore;
 import org.eclipse.core.resources.IFile;
+import org.eclipse.core.resources.IWorkspaceRoot;
+import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IMethod;
@@ -21,6 +26,7 @@ import org.eclipse.ui.IFileEditorInput;
 import org.eclipse.ui.IWorkbenchPage;
 import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.PlatformUI;
+import org.eclipse.ui.ide.IDE;
 
 class EditorHandler {
 
@@ -142,6 +148,86 @@ class EditorHandler {
             } catch (Exception e) {
                 result[0] = HttpServer.jsonError(
                         e.getMessage());
+            }
+        });
+        return result[0];
+    }
+
+    /**
+     * Open an arbitrary filesystem path in Eclipse. Picks the editor
+     * via {@link IDE#openEditor(IWorkbenchPage, IFile)} for workspace
+     * resources (content-type + name/extension binding), or
+     * {@link IDE#openEditorOnFileStore} via EFS for external files.
+     * <p>
+     * {@code path} must be absolute and host-native. CLI is expected
+     * to translate from the agent-local form before sending.
+     */
+    String handleOpenFile(Map<String, String> params)
+            throws Exception {
+        String pathParam = params.get("path");
+        if (pathParam == null || pathParam.isBlank()) {
+            return HttpServer.missingParamError("path");
+        }
+
+        java.io.File f = new java.io.File(pathParam);
+        if (!f.isAbsolute()) {
+            return HttpServer.jsonError(
+                    "Path must be absolute: " + pathParam);
+        }
+
+        URI uri = f.toURI();
+        IWorkspaceRoot root =
+                ResourcesPlugin.getWorkspace().getRoot();
+        IFile[] workspaceFiles =
+                root.findFilesForLocationURI(uri);
+
+        // EFS exists/isDirectory checks are filesystem I/O — keep
+        // them off the UI thread. Only the editor-opening call
+        // itself needs Display.syncExec.
+        IFileStore externalStore = null;
+        if (workspaceFiles.length == 0) {
+            externalStore = EFS.getStore(uri);
+            var info = externalStore.fetchInfo();
+            if (!info.exists()) {
+                return HttpServer.jsonError(
+                        "File not found: " + pathParam);
+            }
+            if (info.isDirectory()) {
+                return HttpServer.jsonError(
+                        "Path is a directory: " + pathParam);
+            }
+        }
+        final IFileStore store = externalStore;
+
+        String[] result = {HttpServer.jsonError(
+                "Failed to open editor")};
+        Display.getDefault().syncExec(() -> {
+            try {
+                IWorkbenchWindow window = PlatformUI.getWorkbench()
+                        .getActiveWorkbenchWindow();
+                if (window == null
+                        || window.getActivePage() == null) {
+                    result[0] = HttpServer.jsonError(
+                            "No active workbench page");
+                    return;
+                }
+                IWorkbenchPage page = window.getActivePage();
+
+                IEditorPart editor = (workspaceFiles.length > 0)
+                        ? IDE.openEditor(page, workspaceFiles[0])
+                        : IDE.openEditorOnFileStore(page, store);
+
+                JsonObject ok = new JsonObject();
+                ok.addProperty("ok", true);
+                if (editor != null) {
+                    ok.addProperty("editorId",
+                            editor.getSite().getId());
+                }
+                result[0] = ok.toString();
+            } catch (Exception e) {
+                String msg = e.getMessage();
+                result[0] = HttpServer.jsonError(
+                        msg != null ? msg : e.toString());
             }
         });
         return result[0];

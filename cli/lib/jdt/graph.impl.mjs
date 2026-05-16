@@ -22,6 +22,7 @@ import { keyword, isKeyword, makeErrorValue } from '@kaluchi/qlang-core';
 import { get } from '../../src/client.mjs';
 import { remapJsonPaths } from '../../src/json-output.mjs';
 import { translateHostPathFromLocal } from '../../src/path-translate.mjs';
+import { isAbsolutePath } from '../../src/paths.mjs';
 
 // ── Conversion helpers ──────────────────────────────────────────
 
@@ -255,15 +256,13 @@ const sourceImpl    = axisOp('@source',    '/source');
 // (@containingFile / @typesInPackage / @containingProject) before
 // reaching here. Path-shape fqns go through
 // translateHostPathFromLocal for remote bridges.
-const PATH_SHAPE = /^[A-Za-z]:[/\\]|^[/\\]|[/\\]/;
-
 const problemMarkersImpl = nullaryOp('@problemMarkers', async (subject) => {
     if (subject === undefined || subject === null) {
         return getEndpoint('/problems');
     }
     const fqn = fqnOf(subject);
     if (fqn === null) return missingSubject('@problemMarkers', subject);
-    const of = PATH_SHAPE.test(fqn) ? translateHostPathFromLocal(fqn) : fqn;
+    const of = isAbsolutePath(fqn) ? translateHostPathFromLocal(fqn) : fqn;
     return getEndpoint(`/problems?of=${enc(of)}`);
 });
 

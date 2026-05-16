@@ -1,5 +1,7 @@
 import { get } from "../client.mjs";
 import { extractPositional } from "../args.mjs";
+import { translateHostPathFromLocal } from "../path-translate.mjs";
+import { isAbsolutePath } from "../paths.mjs";
 
 export async function refresh(args) {
   const quiet = args.includes("-q") || args.includes("--quiet");
@@ -13,8 +15,13 @@ export async function refresh(args) {
       // File mode: refresh each file
       let refreshed = 0;
       for (const filePath of pos) {
+        if (!isAbsolutePath(filePath)) {
+          console.error(`Path must be absolute: ${filePath}`);
+          continue;
+        }
+        const hostPath = translateHostPathFromLocal(filePath);
         const result = await get(
-          `/refresh?file=${encodeURIComponent(filePath)}`,
+          `/refresh?file=${encodeURIComponent(hostPath)}`,
           10_000,
         );
         if (result.refreshed) refreshed++;
