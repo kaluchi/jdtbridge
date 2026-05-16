@@ -17,6 +17,7 @@ import {
   getInstalledVersion,
   findEclipsePath,
   getEclipseJavaHome,
+  getEclipseLauncher,
   generateTargetPlatform,
   waitForBridge,
   awaitProfileLockFree,
@@ -302,6 +303,59 @@ describe("eclipse", () => {
       generateTargetPlatform(testDir, "C:/Program Files/eclipse");
       const content = readFileSync(join(testDir, "jdtbridge.target"), "utf8");
       expect(content).toContain('path="C:/Program Files/eclipse"');
+    });
+  });
+
+  describe("getEclipseLauncher", () => {
+    function fwd(p) { return p.replaceAll("\\", "/"); }
+
+    it("returns eclipse binary from Contents/MacOS when it exists (darwin)", () => {
+      const saved = process.platform;
+      Object.defineProperty(process, "platform", { value: "darwin", configurable: true });
+      try {
+        const macDir = join(testDir, "Eclipse.app", "Contents", "MacOS");
+        mkdirSync(macDir, { recursive: true });
+        writeFileSync(join(macDir, "eclipse"), "");
+        const eclipseDir = join(testDir, "Eclipse.app", "Contents", "Eclipse");
+        expect(fwd(getEclipseLauncher(eclipseDir))).toMatch(/Contents\/MacOS\/eclipse$/);
+      } finally {
+        Object.defineProperty(process, "platform", { value: saved, configurable: true });
+      }
+    });
+
+    it("returns branded binary when eclipse not found in Contents/MacOS (darwin)", () => {
+      const saved = process.platform;
+      Object.defineProperty(process, "platform", { value: "darwin", configurable: true });
+      try {
+        const macDir = join(testDir, "Eclipse.app", "Contents", "MacOS");
+        mkdirSync(macDir, { recursive: true });
+        writeFileSync(join(macDir, "SpringToolSuite4"), "");
+        const eclipseDir = join(testDir, "Eclipse.app", "Contents", "Eclipse");
+        expect(fwd(getEclipseLauncher(eclipseDir))).toMatch(/Contents\/MacOS\/SpringToolSuite4$/);
+      } finally {
+        Object.defineProperty(process, "platform", { value: saved, configurable: true });
+      }
+    });
+
+    it("falls through to eclipsePath/eclipse(.exe) when Contents/MacOS is absent (darwin)", () => {
+      const saved = process.platform;
+      Object.defineProperty(process, "platform", { value: "darwin", configurable: true });
+      try {
+        const eclipseDir = join(testDir, "eclipse-plain");
+        mkdirSync(eclipseDir, { recursive: true });
+        const result = fwd(getEclipseLauncher(eclipseDir));
+        expect(result).toMatch(/eclipse-plain\/eclipse(\.exe)?$/);
+      } finally {
+        Object.defineProperty(process, "platform", { value: saved, configurable: true });
+      }
+    });
+
+    it("returns eclipsePath/eclipse.exe on Windows", () => {
+      if (IS_WIN) {
+        expect(fwd(getEclipseLauncher(testDir))).toMatch(/eclipse\.exe$/);
+      } else {
+        expect(fwd(getEclipseLauncher(testDir))).toMatch(/eclipse$/);
+      }
     });
   });
 

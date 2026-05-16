@@ -77,11 +77,14 @@ export function findEclipsePath(config) {
     candidates = ["D:/eclipse", "C:/eclipse"];
   } else if (process.platform === "darwin") {
     const macApps = [];
-    try {
-      readdirSync("/Applications")
-        .filter((f) => f.toLowerCase().startsWith("eclipse") && f.endsWith(".app"))
-        .forEach((app) => macApps.push(join("/Applications", app, "Contents", "Eclipse")));
-    } catch { /* /Applications not readable */ }
+    const appSearchDirs = ["/Applications", join(process.env.HOME || "", "Applications")];
+    for (const dir of appSearchDirs) {
+      try {
+        readdirSync(dir)
+          .filter((f) => f.toLowerCase().startsWith("eclipse") && f.endsWith(".app"))
+          .forEach((app) => macApps.push(join(dir, app, "Contents", "Eclipse")));
+      } catch { /* not readable */ }
+    }
     candidates = [
       "/usr/local/eclipse",
       "/opt/eclipse",
@@ -197,8 +200,15 @@ export function stopEclipse() {
  */
 export function getEclipseLauncher(eclipsePath) {
   if (process.platform === "darwin") {
-    const macLauncher = resolve(join(eclipsePath, "..", "MacOS", "eclipse"));
-    if (existsSync(macLauncher)) return macLauncher;
+    const macDir = resolve(join(eclipsePath, "..", "MacOS"));
+    if (existsSync(macDir)) {
+      const eclipseBin = join(macDir, "eclipse");
+      if (existsSync(eclipseBin)) return eclipseBin;
+      try {
+        const files = readdirSync(macDir).filter((f) => !f.startsWith("."));
+        if (files.length > 0) return join(macDir, files[0]);
+      } catch { /* ignore */ }
+    }
   }
   return join(eclipsePath, eclipseExe("eclipse"));
 }
@@ -254,13 +264,21 @@ export function runDirector(eclipsePath, profile, extraArgs) {
     // macOS: eclipsec does not exist. Use the Contents/MacOS launcher directly.
     // Cocoa requires -XstartOnFirstThread; without it p2 director hangs (Bug 310456).
     const launcher = getEclipseLauncher(eclipsePath);
-    if (!existsSync(launcher)) {
-      throw new Error(
-        `Cannot find Eclipse launcher at ${launcher}. Ensure the Eclipse.app bundle is intact.`,
-      );
+    if (existsSync(launcher)) {
+      cmd = `"${launcher}"`;
+      vmArgs = ["-vmargs", "-XstartOnFirstThread", "-Djava.awt.headless=true"];
+    } else {
+      // Fallback for branded products (e.g. STS) where Contents/MacOS launcher
+      // was not found: run via Equinox launcher JAR with JVM flags before -jar.
+      const launcherJar = findLauncherJar(eclipsePath);
+      if (!launcherJar) {
+        throw new Error(
+          "Cannot find Eclipse launcher binary or org.eclipse.equinox.launcher_*.jar in Eclipse installation.",
+        );
+      }
+      cmd = "java";
+      prefixArgs = ["-XstartOnFirstThread", "-Djava.awt.headless=true", "-jar", `"${launcherJar}"`];
     }
-    cmd = `"${launcher}"`;
-    vmArgs = ["-vmargs", "-XstartOnFirstThread", "-Djava.awt.headless=true"];
   } else {
     const eclipsecPath = join(eclipsePath, eclipseExe("eclipsec"));
     if (existsSync(eclipsecPath)) {
