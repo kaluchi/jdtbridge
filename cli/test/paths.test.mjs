@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { toWsPath, hostToSandboxPath, formatLineRange, normalizePath }
-    from "../src/paths.mjs";
+import {
+  toWsPath, hostToSandboxPath, formatLineRange, normalizePath,
+  isAbsolutePath,
+} from "../src/paths.mjs";
 import { remapJsonPaths } from "../src/json-output.mjs";
 
 describe("toWsPath", () => {
@@ -59,6 +61,41 @@ describe("normalizePath", () => {
 
   it("leaves forward-slash paths alone", () => {
     expect(normalizePath("/a/b/c")).toBe("/a/b/c");
+  });
+});
+
+describe("isAbsolutePath", () => {
+  it("accepts POSIX absolute path", () => {
+    expect(isAbsolutePath("/foo/bar.xml")).toBe(true);
+  });
+
+  it("accepts Windows drive path with backslashes", () => {
+    expect(isAbsolutePath("D:\\git\\repo\\foo.xml")).toBe(true);
+  });
+
+  it("accepts Windows drive path with forward slashes", () => {
+    expect(isAbsolutePath("D:/git/repo/foo.xml")).toBe(true);
+  });
+
+  it("accepts UNC path", () => {
+    expect(isAbsolutePath("\\\\server\\share\\file.txt")).toBe(true);
+  });
+
+  it("rejects Java FQN", () => {
+    expect(isAbsolutePath("com.example.Foo")).toBe(false);
+    expect(isAbsolutePath("com.example.Foo#bar(String)")).toBe(false);
+    expect(isAbsolutePath("com.example.Foo$Inner")).toBe(false);
+  });
+
+  it("rejects relative path", () => {
+    expect(isAbsolutePath("foo/bar.xml")).toBe(false);
+    expect(isAbsolutePath("./foo.xml")).toBe(false);
+  });
+
+  it("rejects non-string inputs", () => {
+    expect(isAbsolutePath(null)).toBe(false);
+    expect(isAbsolutePath(undefined)).toBe(false);
+    expect(isAbsolutePath(42)).toBe(false);
   });
 });
 

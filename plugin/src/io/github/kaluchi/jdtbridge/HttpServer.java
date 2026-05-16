@@ -618,6 +618,10 @@ public class HttpServer {
                         ? editor().handleOpen(params)
                         : jsonError(
                                 "Editor commands require a UI workbench"));
+                case "/openFile" -> Response.json(workbenchActive()
+                        ? editor().handleOpenFile(params)
+                        : jsonError(
+                                "Editor commands require a UI workbench"));
                 case "/launch/list" -> Response.json(
                         launch.handleList(params, scope));
                 case "/launch/configs" -> Response.json(

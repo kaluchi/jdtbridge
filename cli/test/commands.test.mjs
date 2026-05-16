@@ -187,6 +187,118 @@ describe("commands (integration)", () => {
     expect(io.logs[0]).toBe("Opened");
   });
 
+  it("open routes FQN to /open with class param", async () => {
+    let captured;
+    await setupMock((req, res) => {
+      captured = req.url;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+    });
+    const { open } = await import("../src/commands/editor.mjs");
+    await open(["com.example.Foo"]);
+    expect(captured).toMatch(/^\/open\?class=com\.example\.Foo/);
+  });
+
+  it("open routes absolute path to /openFile", async () => {
+    let captured;
+    await setupMock((req, res) => {
+      captured = req.url;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+    });
+    const { open } = await import("../src/commands/editor.mjs");
+    await open(["D:/projects/pom.xml"]);
+    expect(captured).toBe(
+        "/openFile?path=" + encodeURIComponent("D:/projects/pom.xml"));
+    expect(io.logs[0]).toBe("Opened");
+  });
+
+  it("open routes POSIX absolute path to /openFile", async () => {
+    let captured;
+    await setupMock((req, res) => {
+      captured = req.url;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+    });
+    const { open } = await import("../src/commands/editor.mjs");
+    await open(["/workspace/repo/config.properties"]);
+    expect(captured).toBe(
+        "/openFile?path=" + encodeURIComponent(
+            "/workspace/repo/config.properties"));
+  });
+
+  it("open translates CLI-local path to host on remote", async () => {
+    let captured;
+    await setupMock((req, res) => {
+      captured = req.url;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+    });
+    vi.doMock("../src/path-translate.mjs", async (importOriginal) => {
+      const orig = await importOriginal();
+      return {
+        ...orig,
+        translateHostPathFromLocal: (p) =>
+          p && p.startsWith("/workspace/")
+            ? "D:\\git" + p.slice("/workspace".length).replace(/\//g, "\\")
+            : p,
+      };
+    });
+    const { open } = await import("../src/commands/editor.mjs");
+    await open(["/workspace/repo/pom.xml"]);
+    expect(captured).toBe(
+        "/openFile?path=" + encodeURIComponent("D:\\git\\repo\\pom.xml"));
+  });
+
+  it("open surfaces plugin error", async () => {
+    await setupMock((req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "File not found: /x" }));
+    });
+    const { open } = await import("../src/commands/editor.mjs");
+    await open(["/x"]);
+    expect(io.errors[0]).toBe("File not found: /x");
+  });
+
+  // ── Refresh ──
+
+  it("refresh sends raw path on local instance", async () => {
+    let captured;
+    await setupMock((req, res) => {
+      captured = req.url;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ refreshed: true, files: 1 }));
+    });
+    const { refresh } = await import("../src/commands/refresh.mjs");
+    await refresh(["D:/projects/Foo.java", "-q"]);
+    expect(captured).toBe(
+        "/refresh?file=" + encodeURIComponent("D:/projects/Foo.java"));
+    expect(io.logs[0]).toBe("Refreshed 1 file");
+  });
+
+  it("refresh translates CLI-local path to host on remote", async () => {
+    let captured;
+    await setupMock((req, res) => {
+      captured = req.url;
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ refreshed: true, files: 1 }));
+    });
+    vi.doMock("../src/path-translate.mjs", async (importOriginal) => {
+      const orig = await importOriginal();
+      return {
+        ...orig,
+        translateHostPathFromLocal: (p) =>
+          p && p.startsWith("/workspace/")
+            ? "D:\\git" + p.slice("/workspace".length).replace(/\//g, "\\")
+            : p,
+      };
+    });
+    const { refresh } = await import("../src/commands/refresh.mjs");
+    await refresh(["/workspace/repo/Foo.java", "-q"]);
+    expect(captured).toBe(
+        "/refresh?file=" + encodeURIComponent("D:\\git\\repo\\Foo.java"));
+  });
+
   // ── Build ──
 
   it("build shows success with 0 errors", async () => {

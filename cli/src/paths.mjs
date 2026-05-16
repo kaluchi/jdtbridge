@@ -6,6 +6,8 @@
 // the CLI's filesystem. This file keeps only general-purpose
 // helpers that do not require any per-response context.
 
+import { posix, win32 } from "node:path";
+
 /**
  * Ensure path starts with / for workspace-relative API calls.
  * Used by the legacy /organize-imports and /format endpoints in
@@ -44,4 +46,15 @@ export function hostToSandboxPath(p) {
 /** Normalise backslashes to forward slashes for path comparison. */
 export function normalizePath(p) {
   return p.replace(/\\/g, "/");
+}
+
+/**
+ * True for absolute paths on either POSIX (`/foo`) or Windows
+ * (`C:\foo`, `C:/foo`, `\\unc\share`). Java FQNs never start that
+ * way, so this is the gate for commands and axis wiring that accept
+ * either form (`jdt open`, `@file`, `@problems`).
+ */
+export function isAbsolutePath(s) {
+  return typeof s === "string"
+      && (posix.isAbsolute(s) || win32.isAbsolute(s));
 }
