@@ -195,7 +195,7 @@ export function stopEclipse() {
  * Return the path to the Eclipse launcher binary for the given install dir.
  * On macOS the launcher lives in Contents/MacOS, not in Contents/Eclipse.
  */
-function getEclipseLauncher(eclipsePath) {
+export function getEclipseLauncher(eclipsePath) {
   if (process.platform === "darwin") {
     const macLauncher = resolve(join(eclipsePath, "..", "MacOS", "eclipse"));
     if (existsSync(macLauncher)) return macLauncher;

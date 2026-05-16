@@ -39,6 +39,7 @@ describe("setup command", () => {
       isEclipseRunning: () => false,
       findEclipsePath: () => "/mock/eclipse",
       resolveEclipsePath: (p) => p,
+      getEclipseLauncher: (p) => p + "/eclipse",
       getEclipseVersion: () => "4.33.0",
       detectProfile: () => "epp.package.java",
       getInstalledVersion: () => null,
