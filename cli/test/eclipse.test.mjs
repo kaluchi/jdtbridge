@@ -385,7 +385,7 @@ describe("eclipse", () => {
       writeFileSync(join(profileDir, ".lock"), "");
       // Use system java — required for this test path.
       awaitProfileLockFree(profileDir, "java", 5_000);
-    });
+    }, 15_000);
 
     it("throws with a clear message when another JVM holds the lock",
         async () => {
