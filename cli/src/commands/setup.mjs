@@ -17,6 +17,8 @@ import {
   eclipseExe,
   isEclipseRunning,
   findEclipsePath,
+  resolveEclipsePath,
+  getEclipseLauncher,
   getEclipseVersion,
   detectProfile,
   getInstalledVersion,
@@ -248,7 +250,8 @@ async function runInstall(config, flags) {
   console.log(bold("Eclipse"));
   let eclipsePath = findEclipsePath(config);
   if (!eclipsePath) {
-    eclipsePath = await ask("  Eclipse not found. Path: ");
+    const raw = await ask("  Eclipse not found. Path: ");
+    eclipsePath = resolveEclipsePath(raw?.trim());
     if (!eclipsePath || !isEclipseInstall(eclipsePath)) {
       console.error("  Not a valid Eclipse installation.");
       process.exit(1);
@@ -376,7 +379,7 @@ async function runInstall(config, flags) {
 
   // Start Eclipse — restore all workspaces that were running
   console.log();
-  const launcherPath = join(eclipsePath, eclipseExe("eclipse"));
+  const launcherPath = getEclipseLauncher(eclipsePath);
   if (!existsSync(launcherPath)) {
     info("Plugin installed. Run your Eclipse product to complete setup and activate the bridge.");
   } else if (workspaces.length === 0) {
@@ -481,7 +484,7 @@ async function runRemove(config) {
 
   // Restart Eclipse if it was running
   if (workspaces.length > 0) {
-    const launcherPath = join(eclipsePath, eclipseExe("eclipse"));
+    const launcherPath = getEclipseLauncher(eclipsePath);
     if (existsSync(launcherPath)) {
       for (const ws of workspaces) {
         const pid = startEclipse(eclipsePath, ws);

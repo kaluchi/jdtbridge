@@ -10,11 +10,14 @@ import { tmpdir } from "node:os";
 import { createServer } from "node:http";
 import {
   eclipseExe,
+  resolveEclipsePath,
+  isEclipseInstall,
   getEclipseVersion,
   detectProfile,
   getInstalledVersion,
   findEclipsePath,
   getEclipseJavaHome,
+  getEclipseLauncher,
   generateTargetPlatform,
   waitForBridge,
   awaitProfileLockFree,
@@ -27,6 +30,85 @@ describe("eclipse", () => {
 
   beforeEach(() => {
     testDir = mkdtempSync(join(tmpdir(), "jdt-eclipse-test-"));
+  });
+
+  describe("resolveEclipsePath", () => {
+    function fwd(p) { return p.replaceAll("\\", "/"); }
+
+    it("resolves .app bundle to Contents/Eclipse", () => {
+      const result = resolveEclipsePath(join(testDir, "Eclipse.app"));
+      expect(fwd(result)).toMatch(/Eclipse\.app\/Contents\/Eclipse$/);
+    });
+
+    it("resolves Contents/MacOS binary path to Contents/Eclipse", () => {
+      const result = resolveEclipsePath(
+        join(testDir, "Eclipse.app", "Contents", "MacOS", "eclipse"),
+      );
+      expect(fwd(result)).toMatch(/Eclipse\.app\/Contents\/Eclipse$/);
+    });
+
+    it("resolves Contents/MacOS directory to Contents/Eclipse", () => {
+      const result = resolveEclipsePath(
+        join(testDir, "Eclipse.app", "Contents", "MacOS"),
+      );
+      expect(fwd(result)).toMatch(/Eclipse\.app\/Contents\/Eclipse$/);
+    });
+
+    it("strips trailing path separators before resolving", () => {
+      const result = resolveEclipsePath(join(testDir, "Eclipse.app") + "/");
+      expect(fwd(result)).toMatch(/Eclipse\.app\/Contents\/Eclipse$/);
+    });
+
+    it("trims leading/trailing whitespace", () => {
+      const result = resolveEclipsePath("  /opt/eclipse  ");
+      expect(result).toBe("/opt/eclipse");
+    });
+
+    it("returns regular paths unchanged", () => {
+      expect(resolveEclipsePath("/opt/eclipse")).toBe("/opt/eclipse");
+      expect(resolveEclipsePath("D:/eclipse")).toBe("D:/eclipse");
+    });
+
+    it("returns falsy input as-is", () => {
+      expect(resolveEclipsePath(null)).toBeNull();
+      expect(resolveEclipsePath("")).toBe("");
+    });
+  });
+
+  describe("isEclipseInstall", () => {
+    it("accepts a directory with eclipsec binary", () => {
+      writeFileSync(join(testDir, eclipseExe("eclipsec")), "");
+      expect(isEclipseInstall(testDir)).toBe(true);
+    });
+
+    it("accepts a directory with .eclipseproduct marker", () => {
+      writeFileSync(join(testDir, ".eclipseproduct"), "version=4.40.0\n");
+      expect(isEclipseInstall(testDir)).toBe(true);
+    });
+
+    it("rejects a directory with neither", () => {
+      expect(isEclipseInstall(testDir)).toBe(false);
+    });
+
+    it("accepts .app bundle path — reads .eclipseproduct from Contents/Eclipse", () => {
+      const eclipseDir = join(testDir, "Eclipse.app", "Contents", "Eclipse");
+      mkdirSync(eclipseDir, { recursive: true });
+      writeFileSync(join(eclipseDir, ".eclipseproduct"), "version=4.40.0\n");
+      expect(isEclipseInstall(join(testDir, "Eclipse.app"))).toBe(true);
+    });
+
+    it("rejects .app bundle with Contents/Eclipse but no marker", () => {
+      mkdirSync(join(testDir, "Eclipse.app", "Contents", "Eclipse"), { recursive: true });
+      expect(isEclipseInstall(join(testDir, "Eclipse.app"))).toBe(false);
+    });
+
+    it("accepts Contents/MacOS/eclipse binary path by resolving to Contents/Eclipse", () => {
+      const eclipseDir = join(testDir, "Eclipse.app", "Contents", "Eclipse");
+      mkdirSync(eclipseDir, { recursive: true });
+      writeFileSync(join(eclipseDir, ".eclipseproduct"), "version=4.40.0\n");
+      const binaryPath = join(testDir, "Eclipse.app", "Contents", "MacOS", "eclipse");
+      expect(isEclipseInstall(binaryPath)).toBe(true);
+    });
   });
 
   describe("eclipseExe", () => {
@@ -224,6 +306,59 @@ describe("eclipse", () => {
     });
   });
 
+  describe("getEclipseLauncher", () => {
+    function fwd(p) { return p.replaceAll("\\", "/"); }
+
+    it("returns eclipse binary from Contents/MacOS when it exists (darwin)", () => {
+      const saved = process.platform;
+      Object.defineProperty(process, "platform", { value: "darwin", configurable: true });
+      try {
+        const macDir = join(testDir, "Eclipse.app", "Contents", "MacOS");
+        mkdirSync(macDir, { recursive: true });
+        writeFileSync(join(macDir, "eclipse"), "");
+        const eclipseDir = join(testDir, "Eclipse.app", "Contents", "Eclipse");
+        expect(fwd(getEclipseLauncher(eclipseDir))).toMatch(/Contents\/MacOS\/eclipse$/);
+      } finally {
+        Object.defineProperty(process, "platform", { value: saved, configurable: true });
+      }
+    });
+
+    it("returns branded binary when eclipse not found in Contents/MacOS (darwin)", () => {
+      const saved = process.platform;
+      Object.defineProperty(process, "platform", { value: "darwin", configurable: true });
+      try {
+        const macDir = join(testDir, "Eclipse.app", "Contents", "MacOS");
+        mkdirSync(macDir, { recursive: true });
+        writeFileSync(join(macDir, "SpringToolSuite4"), "");
+        const eclipseDir = join(testDir, "Eclipse.app", "Contents", "Eclipse");
+        expect(fwd(getEclipseLauncher(eclipseDir))).toMatch(/Contents\/MacOS\/SpringToolSuite4$/);
+      } finally {
+        Object.defineProperty(process, "platform", { value: saved, configurable: true });
+      }
+    });
+
+    it("falls through to eclipsePath/eclipse(.exe) when Contents/MacOS is absent (darwin)", () => {
+      const saved = process.platform;
+      Object.defineProperty(process, "platform", { value: "darwin", configurable: true });
+      try {
+        const eclipseDir = join(testDir, "eclipse-plain");
+        mkdirSync(eclipseDir, { recursive: true });
+        const result = fwd(getEclipseLauncher(eclipseDir));
+        expect(result).toMatch(/eclipse-plain\/eclipse(\.exe)?$/);
+      } finally {
+        Object.defineProperty(process, "platform", { value: saved, configurable: true });
+      }
+    });
+
+    it("returns eclipsePath/eclipse.exe on Windows", () => {
+      if (IS_WIN) {
+        expect(fwd(getEclipseLauncher(testDir))).toMatch(/eclipse\.exe$/);
+      } else {
+        expect(fwd(getEclipseLauncher(testDir))).toMatch(/eclipse$/);
+      }
+    });
+  });
+
   describe("waitForBridge", () => {
     let server;
 
@@ -304,7 +439,7 @@ describe("eclipse", () => {
       writeFileSync(join(profileDir, ".lock"), "");
       // Use system java — required for this test path.
       awaitProfileLockFree(profileDir, "java", 5_000);
-    });
+    }, 15_000);
 
     it("throws with a clear message when another JVM holds the lock",
         async () => {
