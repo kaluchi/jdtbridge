@@ -254,9 +254,30 @@ gh api repos/kaluchi/jdtbridge/issues/<N>/comments   # PR-level
 Every concrete bot finding must be resolved before merge — either
 fix it in a follow-up commit, or reply on the comment with a clear
 reason for rejection. Do not leave bot comments unanswered: the
-human reviewer expects each one closed by the time they look. Reply
-inline (`gh api ... -X POST -f in_reply_to=<comment-id>`) so the
-thread stays attached to the diff line.
+human reviewer expects each one closed by the time they look.
+
+After replying, also **mark the conversation resolved** so the PR
+page no longer shows it as outstanding. The REST comments API can
+post replies; resolving the conversation is GraphQL-only:
+
+```bash
+# Reply on the diff line
+gh api repos/kaluchi/jdtbridge/pulls/<N>/comments/<comment-id>/replies \
+  -X POST -f body="…"
+
+# Look up review-thread IDs (PRRT_*) for the PR
+gh api graphql -f query='query {
+  repository(owner: "kaluchi", name: "jdtbridge") {
+    pullRequest(number: <N>) {
+      reviewThreads(first: 50) {
+        nodes { id isResolved
+          comments(first: 1) { nodes { databaseId path } } } } } } }'
+
+# Resolve a thread by its PRRT_* id
+gh api graphql -f query='mutation {
+  resolveReviewThread(input: {threadId: "PRRT_…"}) {
+    thread { id isResolved } } }'
+```
 
 ### Important details
 
