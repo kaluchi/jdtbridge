@@ -60,10 +60,13 @@ jdt q '@projects * /fqn'                               # workspace projects
 jdt q '@problems'                                      # compilation problems
 ```
 
-Bare-name reify shows operand descriptors:
+Operand introspection — descriptors, prose, and runnable examples
+live on dedicated axes of the binding:
 
 ```bash
-jdt q '@subtypes'                                      # :docs / :examples / :throws
+jdt q ':@subtypes | spec'                              # descriptor — kind, subject, returns, throws
+jdt q ':@subtypes | docs'                              # prose from the attached doc-prefix
+jdt q ':@subtypes | examples'                          # the ~{…} snippets the catalog declares
 jdt q 'manifest * /name'                               # full operand catalog
 ```
 

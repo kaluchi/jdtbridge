@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { keyword } from "@kaluchi/qlang-core";
+import { keyword, makeTagKeyword } from "@kaluchi/qlang-core";
 
 // End-to-end coverage for the :jdt/graph qlang module. Loads
 // graph.qlang with its conduits (@asNode, @detail, @sourceCard,
@@ -99,38 +99,47 @@ describe("@asNode routing on String subjects", () => {
     expect(error).toBeNull();
     expect(calls).toEqual([]);
     expect(result).toBeInstanceOf(Map);
-    expect(result.get(keyword("fqn"))).toBe("pkg.Foo");
+    expect(result.get("fqn")).toBe("pkg.Foo");
   });
 });
 
 describe(":jdt/graph descriptor consistency", () => {
-  async function descriptor(name) {
+  // qlang 0.7 surface: `:name | spec` returns the env-side
+  // declaration descriptor — for `::builtin` catalog entries it
+  // carries `:kind ::builtin :impl <fn> :category … :subject …
+  // :modifiers … :returns … :throws … :captured [min max]
+  // :effectful <bool>`. For a `:conduit` BindStep it carries the
+  // Conduit value-class Map with `:kind ::conduit :name … :params
+  // [...] :source <body-source>`. Map keys are plain Strings;
+  // discriminator values are TagKeyword for `:kind` and Keyword
+  // for `:category` / `:returns` / individual `:modifiers`.
+  async function spec(name) {
     const session = await loadSession(async () => null);
     const { result, error } = await session.evalCell(
-        `use(:jdt/graph) | reify(:${name})`);
+        `use(:jdt/graph) | :${name} | spec`);
     if (error) throw error;
     return result;
   }
 
   function field(desc, keyName) {
-    return desc.get(keyword(keyName));
+    return desc.get(keyName);
   }
 
   it("@source :returns :string (raw text, not a Map bundle)",
         async () => {
-    const d = await descriptor("@source");
-    expect(field(d, "returns")).toBe(keyword("string"));
+    const d = await spec("@source");
+    expect(field(d, "returns")).toEqual(keyword("string"));
   });
 
   it("@source :modifiers is empty",
         async () => {
-    const d = await descriptor("@source");
+    const d = await spec("@source");
     expect(field(d, "modifiers")).toEqual([]);
   });
 
   it("@types :modifiers is empty (impl is nullary)",
         async () => {
-    const d = await descriptor("@types");
+    const d = await spec("@types");
     // Previously advertised [:keyword] implying an unsupported
     // :sourceOnly modifier; impl is nullaryOp.
     expect(field(d, "modifiers")).toEqual([]);
@@ -138,20 +147,20 @@ describe(":jdt/graph descriptor consistency", () => {
 
   it("@types :returns :vec",
         async () => {
-    const d = await descriptor("@types");
-    expect(field(d, "returns")).toBe(keyword("vec"));
+    const d = await spec("@types");
+    expect(field(d, "returns")).toEqual(keyword("vec"));
   });
 
   it("@incomingRefs :modifiers carries :keyword "
       + "(optional refKind)", async () => {
-    const d = await descriptor("@incomingRefs");
+    const d = await spec("@incomingRefs");
     expect(field(d, "modifiers"))
         .toEqual([keyword("keyword")]);
   });
 
   it("@outgoingRefs :modifiers is empty",
         async () => {
-    const d = await descriptor("@outgoingRefs");
+    const d = await spec("@outgoingRefs");
     expect(field(d, "modifiers")).toEqual([]);
   });
 
@@ -160,25 +169,25 @@ describe(":jdt/graph descriptor consistency", () => {
     // @problems was rebuilt as a polymorphic qlang conduit over
     // the @problemMarkers primitive and existing navigation
     // axes. The captured-arg (:scope) modifier is gone.
-    const d = await descriptor("@problems");
-    expect(field(d, "kind")).toBe(keyword("conduit"));
+    const d = await spec("@problems");
+    expect(field(d, "kind")).toEqual(makeTagKeyword("conduit"));
     expect(field(d, "params")).toEqual([]);
   });
 
   it("@problemMarkers primitive carries no modifiers", async () => {
-    const d = await descriptor("@problemMarkers");
-    expect(field(d, "kind")).toBe(keyword("builtin"));
+    const d = await spec("@problemMarkers");
+    expect(field(d, "kind")).toEqual(makeTagKeyword("builtin"));
     expect(field(d, "modifiers")).toEqual([]);
   });
 
   it("@type / @method / @field — nullary modifiers, :map return",
         async () => {
     for (const name of ["@type", "@method", "@field"]) {
-      const d = await descriptor(name);
+      const d = await spec(name);
       expect(field(d, "modifiers"))
           .toEqual([], name + " modifiers");
       expect(field(d, "returns"))
-          .toBe(keyword("map"), name + " returns");
+          .toEqual(keyword("map"), name + " returns");
     }
   });
 });

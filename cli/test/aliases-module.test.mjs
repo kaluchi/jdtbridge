@@ -6,7 +6,6 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { keyword } from "@kaluchi/qlang-core";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MODULE_LIB = join(__dirname, "..", "lib");
@@ -64,9 +63,35 @@ describe("jdt/aliases module — flatten", () => {
         expect(r).toEqual([3, 2, 1]);
     });
 
-    it("descriptor reports name and category", async () => {
+    it(":flatten | spec returns its conduit descriptor", async () => {
+        // qlang 0.7 axis-operand `spec` returns the env-side
+        // declaration descriptor (the Map every binding lives
+        // behind after BindStep evaluation). For a conduit it
+        // carries the captured body source + params; for a
+        // builtin it carries the catalog `::builtin{…}` body.
         const d = await evaluate(
-                "use(:jdt/aliases) | reify(:flatten)");
-        expect(d.get(keyword("name"))).toBe("flatten");
+                "use(:jdt/aliases) | :flatten | spec");
+        // :flatten is a zero-arg conduit aliasing `flat`, so the
+        // descriptor is a Conduit value-class Map with
+        // :kind ::conduit and :name "flatten".
+        expect(d.get("name")).toBe("flatten");
+    });
+
+    it(":flatten | source returns the BindStep source as Quote", async () => {
+        const q = await evaluate(
+                "use(:jdt/aliases) | :flatten | source");
+        // source axis returns a Quote-value carrying the
+        // verbatim BindStep text; `/source` projects the raw
+        // String off it.
+        expect(q.source).toContain(":flatten");
+        expect(q.source).toContain("flat");
+    });
+
+    it(":flatten | docs returns the attached prose Vec", async () => {
+        const docs = await evaluate(
+                "use(:jdt/aliases) | :flatten | docs");
+        expect(Array.isArray(docs)).toBe(true);
+        expect(docs.length).toBeGreaterThan(0);
+        expect(docs[0].content).toContain("flatten");
     });
 });

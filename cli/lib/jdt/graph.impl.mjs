@@ -8,7 +8,7 @@
 // flows into the operand and reduce composability.
 //
 // Filtering, distribution, projection, fan-out — all done via
-// core qlang combinators (filter / * / >> / | / !| / as / let).
+// core qlang combinators (filter / * / >> / | / !| / as / BindStep).
 // No filter parameters in URLs, no refKind/scope/sourceOnly
 // modifiers. The server emits each axis exhaustively; qlang
 // composes the rest.
@@ -16,9 +16,25 @@
 // Wire shape: server returns canonical node JSON or
 // {"_error": {…}}. liftServerResponse converts to qlang shape
 // and lifts errors via makeErrorValue (rides the fail-track).
+//
+// qlang 0.7 Map invariants:
+//   * Map keys are plain Strings (not Keyword objects).
+//   * Error descriptors carry `:kind ::TagKeyword` — the per-site
+//     tag identity surface every tagged value-class shares.
+//     `result !| type` reads the tag back; per-tag static facts
+//     (`:category`, `:operand`) reach the reader through the
+//     `spec` axis (`result !| type | spec | /category`).
+//   * `manifest`, axis-operands (`source` / `docs` / `examples` /
+//     `spec`), and Quote-segmented examples in attached doc-prefix
+//     drive the hypertext-discoverability surface.
 
 import { nullaryOp, overloadedOp } from '@kaluchi/qlang-core/dispatch';
-import { keyword, isKeyword, makeErrorValue } from '@kaluchi/qlang-core';
+import {
+    isKeyword,
+    keyword,
+    makeErrorValue,
+    makeTagKeyword,
+} from '@kaluchi/qlang-core';
 import { get } from '../../src/client.mjs';
 import { remapJsonPaths } from '../../src/json-output.mjs';
 import { translateHostPathFromLocal } from '../../src/path-translate.mjs';
@@ -26,14 +42,12 @@ import { isAbsolutePath } from '../../src/paths.mjs';
 
 // ── Conversion helpers ──────────────────────────────────────────
 
-const FQN_KEY = keyword('fqn');
-
 function jsonToQlang(jsonVal) {
     if (Array.isArray(jsonVal)) return jsonVal.map(jsonToQlang);
     if (jsonVal !== null && typeof jsonVal === 'object') {
         const m = new Map();
         for (const [k, v] of Object.entries(jsonVal)) {
-            m.set(keyword(k), jsonToQlang(v));
+            m.set(k, jsonToQlang(v));
         }
         return m;
     }
@@ -48,10 +62,36 @@ function jsonToQlang(jsonVal) {
 function fqnOf(subject) {
     if (typeof subject === 'string') return subject;
     if (subject instanceof Map) {
-        const fqn = subject.get(FQN_KEY);
+        const fqn = subject.get('fqn');
         if (typeof fqn === 'string') return fqn;
     }
     return null;
+}
+
+// liftServerError(jsonError) — boundary rename from the plugin's
+// JSON error envelope (`:kind` kebab-string broad-bucket plus
+// `:thrown` PascalCase per-site name) to qlang 0.7's tag-identity
+// surface. After the rename: `:kind ::TagKeyword` carries per-site
+// identity (so `result !| type | eq(::TypeNotFound)` works) and
+// `:category :keyword` carries the broad bucket (so `result !|
+// type | spec | /category` reads it once a catalog binding for
+// the tag lands).
+function liftServerError(rawError) {
+    const lifted = jsonToQlang(rawError);
+    if (!(lifted instanceof Map)) return makeErrorValue(lifted);
+    const thrown = lifted.get('thrown');
+    const broad  = lifted.get('kind');
+    const rewritten = new Map(lifted);
+    if (typeof thrown === 'string' && thrown.length > 0) {
+        rewritten.set('kind', makeTagKeyword(thrown));
+        rewritten.delete('thrown');
+    } else if (typeof broad === 'string' && broad.length > 0) {
+        rewritten.set('kind', makeTagKeyword(broad));
+    }
+    if (typeof broad === 'string' && broad.length > 0) {
+        rewritten.set('category', keyword(broad));
+    }
+    return makeErrorValue(rewritten);
 }
 
 function liftServerResponse(jsonVal) {
@@ -59,26 +99,25 @@ function liftServerResponse(jsonVal) {
             && typeof jsonVal === 'object'
             && !Array.isArray(jsonVal)
             && jsonVal._error !== undefined) {
-        return makeErrorValue(jsonToQlang(jsonVal._error));
+        return liftServerError(jsonVal._error);
     }
     return jsonToQlang(jsonVal);
 }
 
 function missingSubject(operandName, subject) {
     const ctx = new Map();
-    ctx.set(keyword('operand'), operandName);
-    ctx.set(keyword('subjectType'),
+    ctx.set('operand', keyword(operandName));
+    ctx.set('subjectType',
             subject === null || subject === undefined ? 'null'
             : Array.isArray(subject) ? 'vec'
             : subject instanceof Map ? 'map-without-fqn'
             : typeof subject);
     const descriptor = new Map();
-    descriptor.set(keyword('kind'), keyword('missing-subject-fqn'));
-    descriptor.set(keyword('thrown'), keyword('MissingSubjectFqn'));
-    descriptor.set(keyword('origin'), keyword('jdt/graph'));
-    descriptor.set(keyword('message'),
+    descriptor.set('kind', makeTagKeyword('MissingSubjectFqn'));
+    descriptor.set('origin', keyword('jdt/graph'));
+    descriptor.set('message',
             `${operandName}: pipeValue must be a node-Map with :fqn or a fqn-String`);
-    descriptor.set(keyword('context'), ctx);
+    descriptor.set('context', ctx);
     return makeErrorValue(descriptor);
 }
 

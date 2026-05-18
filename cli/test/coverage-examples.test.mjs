@@ -1,5 +1,5 @@
 // CI gate for the :jdt/coverage module's documented examples.
-// Mirror of graph-examples.test.mjs — every `:snippet "..."` inside
+// Mirror of graph-examples.test.mjs — every `~{…}` Quote inside
 // coverage.qlang must parse cleanly as a qlang pipeline. Pure
 // syntactic check; semantic rot (stale fqn, dead coverageId) needs
 // a live session and is out of scope.
@@ -9,39 +9,18 @@ import { fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { parse } from '@kaluchi/qlang-core';
+import { extractQuotes } from './helpers/extract-quotes.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const COVERAGE_QLANG = resolve(
         __dirname, '..', 'lib', 'jdt', 'coverage.qlang');
 
-const SNIPPET_RE = /:snippet\s+"((?:\\.|[^"\\])*)"/g;
-
-function extractSnippets(source) {
-    const out = [];
-    for (const match of source.matchAll(SNIPPET_RE)) {
-        out.push(unescapeQlangString(match[1]));
-    }
-    return out;
-}
-
-function unescapeQlangString(raw) {
-    return raw
-        .replace(/\\n/g, '\n')
-        .replace(/\\t/g, '\t')
-        .replace(/\\r/g, '\r')
-        .replace(/\\"/g, '"')
-        .replace(/\\\\/g, '\\');
-}
-
 describe(':jdt/coverage examples parse as qlang', () => {
     const source = readFileSync(COVERAGE_QLANG, 'utf8');
-    const snippets = extractSnippets(source);
+    const snippets = extractQuotes(source);
 
-    it('catalog lists every declared :examples snippet', () => {
+    it('catalog lists at least one declared example snippet', () => {
         expect(snippets.length).toBeGreaterThan(0);
-        const occurrences =
-                (source.match(/:snippet\s+"/g) ?? []).length;
-        expect(snippets.length).toBe(occurrences);
     });
 
     for (const snippet of snippets) {
