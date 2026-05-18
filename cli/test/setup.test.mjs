@@ -401,12 +401,13 @@ describe("setup command", () => {
 
   // ---- argument validation ----
   //
-  // Regression: `jdt setup --help` used to fall through into the default
-  // install branch, which stops Eclipse and runs `mvn verify`. Any
-  // unrecognized input must print the problem + help and exit, not install.
+  // `jdt setup --help` must print the help banner and exit; any
+  // unrecognized input must print the problem plus help and exit.
+  // The destructive default install branch (stops Eclipse, runs
+  // `mvn verify`) fires when no mode-selection flag is provided.
 
   describe("argument validation", () => {
-    it("exits on --help and does not run install (regression)", async () => {
+    it("exits on --help without firing the install branch", async () => {
       const p2InstallFn = vi.fn();
       const stopEclipseFn = vi.fn(() => true);
       const execSyncFn = vi.fn(() => "BUILD SUCCESS");
