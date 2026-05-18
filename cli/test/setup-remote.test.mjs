@@ -658,8 +658,8 @@ describe("jdt setup remote", () => {
       const cachePath = join(cacheDir, cacheFile);
       const cache = JSON.parse(readFS(cachePath, "utf8"));
       // Replace forward slashes with backslashes in project paths.
-      // Cache entries are objects {eclipseRoot, localRoot} (new
-      // format) or plain strings (legacy). Normalise both shapes.
+      // Cache entries surface as objects `{eclipseRoot, localRoot}`
+      // or plain Strings depending on the call path; normalise both.
       for (const [k, v] of Object.entries(cache.projects)) {
         if (typeof v === "string") {
           cache.projects[k] = v.replace(/\//g, "\\");

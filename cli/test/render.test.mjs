@@ -434,8 +434,9 @@ describe("mdRefs", () => {
   });
 
   it("single-record incoming still renders caller", async () => {
-    // N=1 edge case — :direction removes the fqn-fixity heuristic
-    // ambiguity that used to require N≥2.
+    // N=1 edge case — `:direction` on the record is the side-picker;
+    // a single-element Vec carries the same disambiguation a
+    // multi-record Vec does.
     const ref = map([
       ["kind", "reference"],
       ["direction", "incoming"],

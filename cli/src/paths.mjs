@@ -10,7 +10,7 @@ import { posix, win32 } from "node:path";
 
 /**
  * Ensure path starts with / for workspace-relative API calls.
- * Used by the legacy /organize-imports and /format endpoints in
+ * Used by the /organize-imports and /format endpoints in
  * refactoring.mjs.
  */
 export function toWsPath(p) {
