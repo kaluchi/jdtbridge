@@ -1,169 +1,121 @@
-|~ :jdt/graph — canonical access surface for the Eclipse JDT graph.
+|~ :jdt/graph — pipeline access surface for Eclipse JDT.
 
-   Operand discipline: every @-operand is nullary. Subject is
-   taken from `pipeValue` only. Strings flow into the pipeline as
-   seed values (`"fqn" | @op`); navigation chains read the `:fqn`
-   from a node-Map when subject is a node from a previous step.
-   Captured arguments to @-operands are forbidden — they hide
-   what data flows into the operand and reduce composability.
+   Every `@`-operand is nullary. Subject rides on pipeValue —
+   a fqn String at the start of a chain (`"pkg.Foo" | @type`)
+   or a node-Map from the previous step (`"Foo" | @type |
+   @members * /fqn`). Captured arguments to `@`-operands are
+   reserved for refKind / scope modifiers (`@incomingRefs(:write)`,
+   `@inProject("io.github.kaluchi.jdtbridge")`) — never for the
+   subject itself, so what data enters every step stays
+   structurally derivable.
 
    Returned shape:
-     - Skeleton / detail node-Map (`{:kind "type" :fqn "..." ...}`)
-       for single-element lookups (`@type` / `@method` / `@file`).
-     - Vec of skeletons for plural axes (`@members` / `@callers`
-       / `@subtypes`).
-     - String for `@source`.
-     - Error value `!{:kind ::TagName :origin :jdt/graph
-       :message "..." :context {...}}` riding the fail-track on
-       lookup miss / shape mismatch — descriptor's `:kind` is a
-       TagKeyword carrying the per-site identity (reachable as
-       `result !| type`). ~|
 
-|~ ── Error tag-bindings ─────────────────────────────────────
-   Each per-site error class fires from one operand boundary,
-   carries one fixed `:context` shape, and rides through `!|` as
-   a typed identity. Catalog declarations below enable
-   `::TypeNotFound | source / docs / spec` axis-lookups — the
-   plugin (Java side) and the JS-side `liftServerError` both
-   stamp these tags onto `:kind` so `result !| type` reads them
-   back. ~|
+     Single-element axes — `@type` / `@method` / `@field` /
+     `@package` / `@project` / `@file` — return a detail
+     node-Map: `{:kind "type"|"method"|"field"|"package"
+     |"project"|"file" :fqn "..." :location {:file "..."
+     :startLine N :endLine N} …per-kind fields}`.
+
+     Plural axes — `@members` / `@methods` / `@fields` /
+     `@callers` / `@subtypes` / `@incomingRefs` / … — return
+     a Vec of skeleton node-Maps. Skeletons carry the same
+     `:kind` / `:fqn` / `:location` discriminator triple as
+     detail nodes plus a few kind-specific fields suited to
+     enumeration (skeleton fields are a strict subset of detail
+     fields).
+
+     `@source` returns a String — verbatim source slice of the
+     subject element. Top-level types return the full
+     compilation unit.
+
+     A `:reference` record (returned by `@incomingRefs` /
+     `@outgoingRefs`) is a Map: `{:kind "reference" :from <node>
+     :to <node> :refKind "call"|"read"|"write"|"typeUse"
+     :direction "incoming"|"outgoing" :location {...}}`.
+
+     Lookup miss and shape mismatch lift to an `!{:kind ::TagName
+     :origin :jdt/graph :message "..." :context {...}}` error
+     value riding the fail-track. The per-site `::TagName` reads
+     back through `result !| type` and is catalogued below
+     alongside the operand that fires it. ~|
+
+|~ ── Single-element seeds ────────────────────────────────── ~|
 
 ::TypeNotFound
-  |~~ Type lookup miss — the queried fqn does not resolve to a
-      known JDT type. Subject sites: `@type`, `@members`,
-      `@methods`, `@fields`, `@innerTypes`, `@subtypes`,
-      `@implementors`, `@supers`, `@source`.
+  |~~ Type lookup miss — fqn does not resolve to a workspace
+      type. The same tag fires from every type-subject axis
+      that reaches a lookup gate (`@methods` / `@fields` /
+      `@innerTypes` / `@subtypes` / `@implementors` / `@source`)
+      because each starts by lifting the String fqn through the
+      `@type` resolution path.
 
       ~{ "no.such.Type" | @type !| type | eq(::TypeNotFound) }
    ~~|
   ::builtin{:category :jdt/lookup-miss :operand :@type}
 
-::MethodNotFound
-  |~~ Method lookup miss — fqn does not resolve, or the bare
-      `pkg.Type#name` form has no matching overload.
-
-      ~{ "Foo#nosuch" | @method !| type | eq(::MethodNotFound) }
-   ~~|
-  ::builtin{:category :jdt/lookup-miss :operand :@method}
-
-::FieldNotFound
-  |~~ Field lookup miss — the fqn does not name a declared
-      field.
-
-      ~{ "Foo#nope" | @field !| type | eq(::FieldNotFound) }
-   ~~|
-  ::builtin{:category :jdt/lookup-miss :operand :@field}
-
-::ProjectNotFound
-  |~~ Project lookup miss — no Eclipse project of that name in
-      the workspace.
-
-      ~{ "no.such.proj" | @project !| type | eq(::ProjectNotFound) }
-   ~~|
-  ::builtin{:category :jdt/lookup-miss :operand :@project}
-
-::PackageNotFound
-  |~~ Package lookup miss — no source package of that name in
-      the workspace.
-   ~~|
-  ::builtin{:category :jdt/lookup-miss :operand :@package}
-
-::FileNotFound
-  |~~ File lookup miss — absolute filesystem path does not
-      resolve to a workspace file.
-   ~~|
-  ::builtin{:category :jdt/lookup-miss :operand :@file}
-
-::AmbiguousMatch
-  |~~ Bare `pkg.Type#name` matches multiple overloads. The
-      descriptor's `:context/candidates` lists every overload's
-      full fqn — the caller picks one and retries with the
-      disambiguated signature.
-
-      ~{ "Foo#overloaded" | @method !| /context/candidates | count | gt(0) }
-   ~~|
-  ::builtin{:category :jdt/lookup-miss :operand :@method}
-
 ::InvalidFqn
-  |~~ Subject String is shaped wrong for the requested axis
-      (missing `#` for method, contains spaces, etc.).
+  |~~ String subject is shaped wrong for the requested axis —
+      method fqn without `#`, type fqn with spaces, file path
+      relative when a workspace-absolute path is required, etc.
+      Distinguished from `::TypeNotFound` by the descriptor's
+      `:context/reason` field.
    ~~|
   ::builtin{:category :jdt/lookup-miss :operand :@type}
 
-::WrongSubjectKind
-  |~~ Subject is a valid node but its `:kind` is incompatible
-      with the axis (e.g. `@overrides` on a `:field` subject).
-   ~~|
-  ::builtin{:category :jdt/dispatch :operand :@overrides}
-
-::MissingSubjectFqn
-  |~~ Subject is neither a node-Map carrying `:fqn` nor a
-      String. Fired by the client-side dispatch wrapper before
-      any HTTP roundtrip.
-
-      ~{ [1 2 3] | @type !| type | eq(::MissingSubjectFqn) }
-   ~~|
-  ::builtin{:category :jdt/dispatch}
-
-::UnsupportedDetailKind
-  |~~ `@detail` reached a subject `:kind` it does not know how
-      to point-lookup. The descriptor's `:context/subjectKind`
-      pins the offending kind.
-   ~~|
-  ::builtin{:category :jdt/dispatch :operand :@detail}
-
-::UnsupportedScopeKind
-  |~~ `@problems` reached a subject `:kind` outside the
-      supported scope set (workspace / project / package / file
-      / type / method / field).
-   ~~|
-  ::builtin{:category :jdt/dispatch :operand :@problems}
-
-::UnsupportedSubjectType
-  |~~ `@problems` subject is neither absent, String, nor Map.
-   ~~|
-  ::builtin{:category :jdt/dispatch :operand :@problems}
-
-|~ ── Root queries ──────────────────────────────────────── ~|
-
-:@types
-  |~~ Type pattern search across the workspace. Subject is a
-      String pattern with optional `*` wildcards; returns a Vec
-      of `:type` skeletons. Binary dependencies are included —
-      use the `@sourceOnly` conduit to drop them.
-
-      ~{ "*Service" | @types * /fqn }
-   ~~|
-  ::builtin{:category :jdt/graph
-            :subject [:string]
-            :modifiers []
-            :returns :vec
-            :throws [::InvalidFqn]}
-
 :@type
-  |~~ Single `:type` detail by fully qualified name. Inner
-      classes use dotted form: `pkg.Outer.Inner`.
+  |~~ `:type` detail node-Map by fully qualified name. Inner
+      types use dotted form: `pkg.Outer.Inner`.
 
-      Returned shape — type detail node-Map: `{:kind "type"
-      :fqn "..." :typeKind "class"|"interface"|"enum"
-      |"annotation"|"record" :modifiers [...] :interfaces [...]
-      :javadocSummary "..." :annotations [...] :isTestScope
-      <bool> :location {...}}`.
+      Detail fields: `{:kind "type" :fqn "..." :typeKind
+      "class"|"interface"|"enum"|"annotation"|"record"
+      :modifiers ["public" "abstract" …] :superclass "..."
+      :interfaces [...] :javadocSummary "..." :annotations [...]
+      :isTestScope <bool> :origin "source"|"binary" :location
+      {:file "..." :startLine N :endLine N}}`.
 
-      ~{ "io.github.kaluchi.jdtbridge.HttpServer" | @type | /typeKind }
+      ~{ "no.such.Type" | @type !| type | eq(::TypeNotFound) }
    ~~|
   ::builtin{:category :jdt/graph
             :subject [:string :map]
             :modifiers []
             :returns :map
-            :throws [::TypeNotFound]}
+            :throws [::TypeNotFound ::InvalidFqn]}
+
+::MethodNotFound
+  |~~ Method lookup miss — fqn names no declared method, the
+      bare `pkg.Type#name` form has no overload of that name,
+      or the explicit signature does not match any overload's
+      erased parameter list.
+
+      ~{ "no.such.Type#m()" | @method !| type | eq(::MethodNotFound) }
+   ~~|
+  ::builtin{:category :jdt/lookup-miss :operand :@method}
+
+::AmbiguousMatch
+  |~~ Bare `pkg.Type#name` resolves to two or more overloads.
+      The descriptor's `:context/candidates` Vec lists every
+      candidate's full fqn with signature — the caller picks
+      one and retries.
+
+      ~{ "Object#equals" | @method !| /context/candidates
+         | every(contains("equals(")) }
+   ~~|
+  ::builtin{:category :jdt/lookup-miss :operand :@method}
 
 :@method
-  |~~ Single `:method` detail by FQN. Supports both inline-
-      paren signatures and the bare-name form (must be
-      unambiguous — see `::AmbiguousMatch`).
+  |~~ `:method` detail node-Map by fqn. Inline-paren form
+      `pkg.Type#name(ParamType,…)` always resolves; bare-name
+      form `pkg.Type#name` works only when one overload exists
+      — multiple overloads surface as `::AmbiguousMatch`.
 
-      ~{ "Foo#start(java.net.InetAddress,int)" | @method | /returnType }
+      Detail fields: `{:kind "method" :fqn "..." :name "..."
+      :signature "name(java.lang.String)" :returnType "..."
+      :modifiers [...] :parameters [{:name :type}...]
+      :throwsTypes [...] :annotations [...] :javadocSummary
+      "..." :declaringType "..." :location {...}}`.
+
+      ~{ "no.such.Type#m" | @method !| type | eq(::MethodNotFound) }
    ~~|
   ::builtin{:category :jdt/graph
             :subject [:string :map]
@@ -171,8 +123,23 @@
             :returns :map
             :throws [::MethodNotFound ::AmbiguousMatch ::InvalidFqn]}
 
+::FieldNotFound
+  |~~ Field lookup miss — fqn does not name a declared field of
+      the type.
+
+      ~{ "Object#notAField" | @field !| type | eq(::FieldNotFound) }
+   ~~|
+  ::builtin{:category :jdt/lookup-miss :operand :@field}
+
 :@field
-  |~~ Single `:field` detail by FQN (`pkg.Type#fieldName`).
+  |~~ `:field` detail node-Map by fqn (`pkg.Type#fieldName`).
+
+      Detail fields: `{:kind "field" :fqn "..." :name "..."
+      :type "..." :modifiers [...] :annotations [...]
+      :javadocSummary "..." :declaringType "..." :location
+      {...}}`.
+
+      ~{ "Object#nope" | @field !| type | eq(::FieldNotFound) }
    ~~|
   ::builtin{:category :jdt/graph
             :subject [:string :map]
@@ -180,10 +147,47 @@
             :returns :map
             :throws [::FieldNotFound ::InvalidFqn]}
 
+::PackageNotFound
+  |~~ Package lookup miss — no source package of that fqn in
+      the workspace's analysed source roots.
+   ~~|
+  ::builtin{:category :jdt/lookup-miss :operand :@package}
+
+:@package
+  |~~ `:package` detail node-Map by fully qualified name.
+
+      Detail fields: `{:kind "package" :fqn "..."
+      :containingProject "..." :sourceRoot "..." :typesInPackage
+      [...]}`.
+
+      ~{ "no.such.pkg" | @package !| type | eq(::PackageNotFound) }
+   ~~|
+  ::builtin{:category :jdt/graph
+            :subject [:string :map]
+            :modifiers []
+            :returns :map
+            :throws [::PackageNotFound]}
+
+::ProjectNotFound
+  |~~ Project lookup miss — no open Eclipse project of that
+      name in the workspace. Closed projects also surface as
+      not-found (open them via the Eclipse UI before querying).
+
+      ~{ "no.such.proj" | @project !| type | eq(::ProjectNotFound) }
+   ~~|
+  ::builtin{:category :jdt/lookup-miss :operand :@project}
+
 :@project
-  |~~ Single `:project` detail by name. Carries `:natures`,
-      `:classpathEntries`, `:dependencies`, `:sourceRoots`,
-      `:repo` and `:branch` when EGit-managed.
+  |~~ `:project` detail node-Map by Eclipse project name (NOT
+      filesystem path).
+
+      Detail fields: `{:kind "project" :fqn "..." :rootPath
+      "..." :natures [...] :classpathEntries [...] :dependencies
+      [...] :sourceRoots [...] :outputLocation "..." :repo "..."
+      :branch "..."}`. `:repo` / `:branch` populated for
+      EGit-managed projects only.
+
+      ~{ "missing-project" | @project !| type | eq(::ProjectNotFound) }
    ~~|
   ::builtin{:category :jdt/graph
             :subject [:string :map]
@@ -192,10 +196,11 @@
             :throws [::ProjectNotFound]}
 
 :@projects
-  |~~ All open workspace projects in the current session scope.
-      Returns Vec of `:project` skeletons.
+  |~~ Every open project in the workspace, returned as a Vec
+      of `:project` detail node-Maps in workspace iteration
+      order.
 
-      ~{ @projects * /fqn | count | gt(0) }
+      ~{ @projects | every(/kind | eq("project")) }
    ~~|
   ::builtin{:category :jdt/graph
             :subject :any
@@ -203,18 +208,21 @@
             :returns :vec
             :throws []}
 
-:@package
-  |~~ Single `:package` detail by FQN.
+::FileNotFound
+  |~~ File lookup miss — absolute filesystem path does not
+      resolve to a workspace file, or the file is outside any
+      open project's source root.
    ~~|
-  ::builtin{:category :jdt/graph
-            :subject [:string :map]
-            :modifiers []
-            :returns :map
-            :throws [::PackageNotFound]}
+  ::builtin{:category :jdt/lookup-miss :operand :@file}
 
 :@file
-  |~~ Single `:file` detail by absolute filesystem path. Holds
-      `:typesInFile` pointer.
+  |~~ `:file` detail node-Map by absolute filesystem path.
+      Holds the top-level types of the compilation unit through
+      `:typesInFile`.
+
+      Detail fields: `{:kind "file" :fqn "<absolute-path>"
+      :containingProject "..." :containingPackage "..."
+      :typesInFile [...] :location {:file "..."}}`.
    ~~|
   ::builtin{:category :jdt/graph
             :subject [:string :map]
@@ -222,12 +230,37 @@
             :returns :map
             :throws [::FileNotFound]}
 
-|~ ── Containment down ──────────────────────────────────── ~|
+|~ ── Pattern search ────────────────────────────────────── ~|
+
+:@types
+  |~~ Type pattern search across the workspace. Subject is a
+      String pattern — bare name matches any type whose simple
+      name equals the pattern; `*` wildcards match any
+      substring within the simple name (`*Service`,
+      `Abstract*Factory`).
+
+      Returns a Vec of `:type` skeleton node-Maps. Binary
+      dependencies are included — pipe through the
+      `@sourceOnly` conduit to retain workspace-source matches.
+
+      ~{ "*Service" | @types | every(/kind | eq("type")) }
+   ~~|
+  ::builtin{:category :jdt/graph
+            :subject [:string]
+            :modifiers []
+            :returns :vec
+            :throws [::InvalidFqn]}
+
+|~ ── Containment-down — type → members ─────────────────── ~|
 
 :@members
-  |~~ Direct children of a type — methods, fields, inner
-      types. Returns Vec of skeleton node-Maps, one per
-      declared member.
+  |~~ Direct children of a type: methods, fields, inner types.
+      Returns a Vec of skeleton node-Maps in source declaration
+      order. Inherited members are excluded — climb `@supers`
+      explicitly for the full inheritance chain.
+
+      ~{ "java.lang.Object" | @members
+         | every(/kind | (eq("method") | or(eq("field")) | or(eq("type")))) }
    ~~|
   ::builtin{:category :jdt/graph
             :subject [:string :map]
@@ -236,13 +269,19 @@
             :throws [::TypeNotFound]}
 
 :@methods
-  |~~ Methods declared directly in the type. Each entry
-      carries `:signature`, `:modifiers`, `:returnType`,
-      `:annotations`, `:location {:file "..." :startLine N
-      :endLine N :lineCount N}`.
+  |~~ Methods declared directly on the type. Each skeleton
+      carries the method `:signature` (erased parameter types,
+      EclEmma-style: `"name(java.lang.String,int)"`),
+      `:returnType` (erased), `:modifiers`, `:annotations`, and
+      `:location` (with `:lineCount` precomputed — line range
+      arithmetic stays on the server side).
 
-      ~{ "Foo" | @methods | sortWith(desc(/location/lineCount))
-         | take(5) * /fqn | count | lte(5) }
+      Inherited methods are excluded; constructors are
+      included (their `:name` is `"<init>"`).
+
+      ~{ "java.lang.Object" | @methods
+         | sortWith(desc(/location/lineCount))
+         * /signature | first | contains("(") }
    ~~|
   ::builtin{:category :jdt/graph
             :subject [:string :map]
@@ -251,7 +290,14 @@
             :throws [::TypeNotFound]}
 
 :@fields
-  |~~ Fields declared directly in the type.
+  |~~ Fields declared directly on the type. Skeleton carries
+      `:type` (erased), `:modifiers`, `:annotations`. Constants
+      (static + final) print with the `[K]` badge in markdown
+      cards; the catalog data here is unaffected by that
+      cosmetic distinction.
+
+      ~{ "java.lang.Math" | @fields | filter(/modifiers
+         | any(eq("static"))) | every(/modifiers | any(eq("final"))) }
    ~~|
   ::builtin{:category :jdt/graph
             :subject [:string :map]
@@ -260,7 +306,11 @@
             :throws [::TypeNotFound]}
 
 :@innerTypes
-  |~~ Inner types declared in the given type.
+  |~~ Inner types declared in the subject type. Returns a Vec
+      of `:type` skeletons (their fqn carries the outer prefix,
+      `pkg.Outer.Inner`). Local and anonymous inner classes
+      are excluded — only named, declarable inner types
+      surface here.
    ~~|
   ::builtin{:category :jdt/graph
             :subject [:string :map]
@@ -268,18 +318,25 @@
             :returns :vec
             :throws [::TypeNotFound]}
 
+|~ ── Containment-down — package / file → types ─────────── ~|
+
 :@typesInPackage
-  |~~ All top-level types in the given package, aggregated
-      across source roots.
+  |~~ Top-level types in the given package, aggregated across
+      every source root in the workspace that contains the
+      package. Inner types are excluded (climb `@innerTypes`
+      from each top-level type for the nested set).
    ~~|
   ::builtin{:category :jdt/graph
             :subject [:string :map]
             :modifiers []
             :returns :vec
-            :throws []}
+            :throws [::PackageNotFound]}
 
 :@typesInFile
-  |~~ Top-level types declared in the given Java file.
+  |~~ Top-level types declared in the compilation unit at the
+      given absolute filesystem path. A Java file usually
+      declares one public type plus optional package-private
+      siblings — every declaration surfaces here.
    ~~|
   ::builtin{:category :jdt/graph
             :subject [:string :map]
@@ -288,8 +345,11 @@
             :throws [::FileNotFound]}
 
 :@packagesInProject
-  |~~ Non-empty source packages in the project, deduped per
-      name.
+  |~~ Non-empty source packages in the project, deduped by
+      name across source roots (`src/main/java` + `src/test/java`
+      with the same package name surface as one entry — but
+      `:isTestScope` on the contained types still distinguishes
+      origin).
    ~~|
   ::builtin{:category :jdt/graph
             :subject [:string :map]
@@ -297,11 +357,15 @@
             :returns :vec
             :throws [::ProjectNotFound]}
 
-|~ ── Hierarchy ───────────────────────────────────────── ~|
+|~ ── Hierarchy ────────────────────────────────────────── ~|
 
 :@supers
-  |~~ Direct supertypes — superclass plus directly-declared
-      interfaces. Transitive ascent via `@ancestors` conduit.
+  |~~ Direct supertypes — `:superclass` plus every directly-
+      declared interface, returned as a Vec of `:type`
+      skeletons. Transitive ascent is the `@ancestors`
+      conduit below.
+
+      ~{ "java.util.ArrayList" | @supers | count | gte(1) }
    ~~|
   ::builtin{:category :jdt/graph
             :subject [:string :map]
@@ -310,8 +374,9 @@
             :throws [::TypeNotFound]}
 
 :@subtypes
-  |~~ Direct subtypes only. Transitive descent via
-      `@descendants` conduit.
+  |~~ Direct subtypes only — types whose `:superclass` or
+      direct interface list names the subject. Transitive
+      descent is the `@descendants` conduit below.
    ~~|
   ::builtin{:category :jdt/graph
             :subject [:string :map]
@@ -320,8 +385,13 @@
             :throws [::TypeNotFound]}
 
 :@implementors
-  |~~ Subtypes (for `:type` subject) or override-methods (for
-      `:method` subject).
+  |~~ Subtype-shape axis with kind-dependent semantic. On a
+      `:type` subject, returns subtypes (same as `@subtypes`).
+      On a `:method` subject, returns the override-methods
+      that inherit from this declaration.
+
+      ~{ "java.lang.Runnable" | @implementors
+         | every(/kind | eq("type")) }
    ~~|
   ::builtin{:category :jdt/graph
             :subject [:string :map]
@@ -329,9 +399,21 @@
             :returns :vec
             :throws [::TypeNotFound ::MethodNotFound]}
 
+::WrongSubjectKind
+  |~~ Subject is a valid node, but its `:kind` is incompatible
+      with the requested axis (e.g. `@overrides` on a `:field`
+      subject). Descriptor's `:context/subjectKind` carries
+      the offending kind; `:context/expectedKinds` lists the
+      kinds the axis accepts.
+   ~~|
+  ::builtin{:category :jdt/dispatch :operand :@overrides}
+
 :@overrides
-  |~~ The closest super-method this method overrides, or
-      `null` when no override exists.
+  |~~ The closest super-method this method overrides, returned
+      as a `:method` detail node-Map. `null` when the subject
+      does not override any inherited method.
+
+      ~{ "java.lang.Object#toString()" | @overrides | eq(null) }
    ~~|
   ::builtin{:category :jdt/graph
             :subject [:string :map]
@@ -340,8 +422,12 @@
             :throws [::MethodNotFound ::WrongSubjectKind]}
 
 :@overloads
-  |~~ Sibling methods of the same name in the containing
-      type, including the queried method.
+  |~~ Sibling methods of the same simple name in the
+      containing type — includes the queried method itself.
+      `@method` returns a single overload; this axis returns
+      the whole overload set.
+
+      ~{ "java.lang.String#valueOf" | @overloads | count | gte(1) }
    ~~|
   ::builtin{:category :jdt/graph
             :subject [:string :map]
@@ -352,18 +438,20 @@
 |~ ── References ─────────────────────────────────────── ~|
 
 :@incomingRefs
-  |~~ Incoming references to the subject of the given refKind.
-      Modifier is the refKind keyword: `:call | :read | :write
-      | :typeUse | :all`. Default depends on subject kind: for
-      methods `:call`, for fields `:read`, for types
-      `:typeUse`.
+  |~~ Inbound references to the subject, returned as a Vec of
+      `:reference` records. The captured-arg modifier picks the
+      refKind to retain: `:call` (default for methods), `:read`
+      (default for fields), `:write`, `:typeUse` (default for
+      types), `:all` to widen across every kind.
 
-      Each entry is a `:reference` record: `{:from <node>
+      Record shape: `{:kind "reference" :from <node>
       :to <subject-skeleton> :refKind "call"|"read"|"write"
-      |"typeUse" :direction "incoming" :location {...}}`.
+      |"typeUse" :direction "incoming" :location {:file "..."
+      :startLine N}}`. `:from` is the calling-site skeleton —
+      project / package / file context for navigation.
 
-      ~{ "Foo" | @incomingRefs * /from/fqn | distinct }
-      ~{ "Foo#running" | @incomingRefs(:write) * /from/fqn }
+      ~{ "java.lang.Object#toString()" | @incomingRefs(:call)
+         | every(/refKind | eq("call")) }
    ~~|
   ::builtin{:category :jdt/graph
             :subject [:string :map]
@@ -372,16 +460,15 @@
             :throws [::TypeNotFound ::MethodNotFound ::FieldNotFound]}
 
 :@outgoingRefs
-  |~~ Outgoing references from a source member — types /
-      methods / fields referenced inside the subject's body.
-
-      Each entry is a `:reference` record: `{:from <subject>
-      :to <target> :refKind "call"|"read"|"typeUse" :direction
-      "outgoing" :location {...}}`.
-
-      Subject must be a type / method / field with source
-      available; binary-origin subjects fail with
+  |~~ Outbound references from a source member — every type,
+      method, or field touched inside the subject's body.
+      Source must be available; binary-origin subjects (JAR
+      classes without source attachment) raise
       `::WrongSubjectKind`.
+
+      Record shape: `{:kind "reference" :from <subject> :to
+      <target> :refKind "call"|"read"|"write"|"typeUse"
+      :direction "outgoing" :location {...}}`.
    ~~|
   ::builtin{:category :jdt/graph
             :subject [:string :map]
@@ -390,9 +477,11 @@
             :throws [::TypeNotFound ::MethodNotFound ::FieldNotFound ::WrongSubjectKind]}
 
 :@classpath
-  |~~ Classpath entries of the given project. Each entry
-      carries `:entryKind` (`"source"|"library"|"container"
-      |"project"`), `:path`, `:isTest`, `:outputLocation`.
+  |~~ Classpath entries of the given project, in source-order.
+      Each entry: `{:entryKind "source"|"library"|"container"
+      |"project" :path "..." :isTest <bool> :outputLocation
+      "..."}`. Use `:entryKind "container"` to spot
+      auto-managed paths (JRE, Maven, …).
    ~~|
   ::builtin{:category :jdt/graph
             :subject [:string :map]
@@ -400,13 +489,20 @@
             :returns :vec
             :throws [::ProjectNotFound]}
 
-|~ ── Source / diagnostics ────────────────────────────── ~|
+|~ ── Source ─────────────────────────────────────────── ~|
 
 :@source
-  |~~ Raw source text of a type or member as a String.
-      Top-level types return the full compilation unit.
-      Prints unquoted — `jdt q '"X" | @source' > X.java`
-      writes a byte-faithful file.
+  |~~ Raw source slice of a type or member, returned as a
+      String. Methods / fields return the source span between
+      their declaration anchors. Top-level types return the
+      full compilation unit (package declaration, imports, and
+      every sibling declaration). Library types return source
+      only when the JAR ships a source attachment — otherwise
+      the response is `"Source not available"`.
+
+      `printValue` emits the String unquoted, so
+      `jdt q '"X" | @source' > X.java` writes a byte-faithful
+      copy of the workspace file.
    ~~|
   ::builtin{:category :jdt/graph
             :subject [:string :map]
@@ -414,15 +510,37 @@
             :returns :string
             :throws [::TypeNotFound ::MethodNotFound ::FieldNotFound]}
 
-:@problemMarkers
-  |~~ Primitive IResource-scope compile-problem marker fetch.
-      Public polymorphism lives in the `@problems` conduit
-      below.
+|~ ── Compile-time problems ─────────────────────────── ~|
 
-      Accepts: nothing → workspace; String with path-separator
-      / drive letter → IFile by absolute path; String without
-      → IProject by name; Map with `:kind "project"` or `:kind
-      "file"` → same, via `:fqn`.
+::UnsupportedScopeKind
+  |~~ `@problems` reached a Map subject whose `:kind` is not
+      one of the supported scopes (workspace / project /
+      package / file / type / method / field). Surfaces
+      through `@problemsForNodeVia`'s `cond`-tail when no
+      scope branch matches.
+   ~~|
+  ::builtin{:category :jdt/dispatch :operand :@problems}
+
+::UnsupportedSubjectType
+  |~~ `@problems` subject is neither absent (workspace),
+      String (project / file path), nor Map (node). Vec /
+      Number / Boolean / Keyword subjects lift to this error.
+
+      ~{ [1 2 3] | @problems !| type | eq(::UnsupportedSubjectType) }
+   ~~|
+  ::builtin{:category :jdt/dispatch :operand :@problems}
+
+:@problemMarkers
+  |~~ Primitive HTTP-boundary problem-marker fetch. Public
+      polymorphism rides on the `@problems` conduit further
+      down — this primitive accepts only a few subject shapes:
+      absent → workspace; String with path-separator or drive
+      letter → IFile by absolute path; String without →
+      IProject by name; Map with `:kind "project"` or `:kind
+      "file"` → same routing via `:fqn`.
+
+      Returns a Vec of `:problem` marker records with
+      `:severity` / `:message` / `:location` already filled.
    ~~|
   ::builtin{:category :jdt/graph
             :subject :any
@@ -430,15 +548,29 @@
             :returns :vec
             :throws [::FileNotFound ::ProjectNotFound]}
 
-|~ ── Polymorphic seed lift ─────────────────────────── ~|
+|~ ── Polymorphic seed lift + node enrichment ───────── ~|
 
-|~~ Map subjects (skeleton / detail) pass through. String
-    subjects dispatch by shape:
-      - has '#' and '(' → `@method` (FQN with explicit
-                          signature)
-      - has '#', no '(' → `@field`, falling back to `@method`
-                          via fail-track
-      - no '#'          → `@type` ~~|
+::MissingSubjectFqn
+  |~~ Subject is neither a node-Map carrying `:fqn` nor a
+      String. Lifted by the client-side dispatch wrapper
+      before any HTTP roundtrip — surfaces on Vec / Number /
+      Boolean / Keyword / null subjects.
+
+      ~{ [1 2 3] | @type !| type | eq(::MissingSubjectFqn) }
+   ~~|
+  ::builtin{:category :jdt/dispatch}
+
+|~~ Polymorphic head: lift any subject shape (Map / String)
+    into a node-Map. Map subjects pass through; String subjects
+    dispatch by the disambiguation rule documented in
+    `:@asNode`'s body comment below.
+
+    Returned shape: detail node-Map (`:kind "type"|"method"
+    |"field"|…`). String subjects without `#` route to `@type`;
+    Strings with `#` and `(` route to `@method`; Strings with
+    `#` but no `(` first try `@field`, then fall back to
+    `@method` via fail-track (so bare-name fields and method
+    references both find their target). ~~|
 :@asNode
   (as(:subj) | type | as(:subjType)
    | subj
@@ -448,25 +580,22 @@
                     @field !| (subj | @method)),
                @type)))
 
-|~~ Type that contains a member. ~~|
-:@containingType
-  (@asNode | /containingType | unless(eq(null), @type))
+::UnsupportedDetailKind
+  |~~ `@detail` reached a node subject whose `:kind` does not
+      match a registered detail-lookup axis. Descriptor's
+      `:context/subjectKind` carries the offending kind.
 
-|~~ Package that contains a type. ~~|
-:@containingPackage
-  (@asNode | /containingPackage | unless(eq(null), @package))
+      ~{ {:kind "alien"} | @detail !| type | eq(::UnsupportedDetailKind) }
+   ~~|
+  ::builtin{:category :jdt/dispatch :operand :@detail}
 
-|~~ Project that contains the given workspace node. ~~|
-:@containingProject
-  (@asNode | /containingProject | unless(eq(null), @project))
-
-|~~ File that contains a type / method / field. ~~|
-:@containingFile
-  (@asNode | /location/file | unless(eq(null), @file))
-
-|~~ Enrich a skeleton-node into a detail-node. Routes by
-    `:kind`. Idempotent on detail-nodes. Unknown `:kind` raises
-    `::UnsupportedDetailKind` on the fail-track. ~~|
+|~~ Enrich a skeleton node-Map into a full detail node-Map by
+    routing through the matching `@type` / `@method` / …
+    primitive based on `:kind`. Idempotent on already-detailed
+    nodes (their detail-axis call is the no-op identity from
+    the server's perspective; the wire format is the same).
+    String subjects also work — `@asNode` head normalizes them
+    first. ~~|
 :@detail
   (@asNode | as(:n) | /kind | as(:k)
    | cond(eq("type"),    n | @type,
@@ -477,21 +606,58 @@
           eq("file"),    n | @file,
           !{:kind ::UnsupportedDetailKind
             :origin :jdt/graph
-            :message "@detail cannot route subject — :kind is not one of type/method/field/project/package/file"
+            :message "@detail: subject :kind has no detail-axis route (expected one of type/method/field/project/package/file)"
             :context {:subjectKind k :subject n}}))
 
+|~ ── Containment-up — node → enclosing scope ─────── ~|
+
+|~~ The type that declares the given member. Identity on a
+    `:type` subject (the type contains itself trivially).
+    `null` for project / package / file subjects. ~~|
+:@containingType
+  (@asNode | /containingType | unless(eq(null), @type))
+
+|~~ The package whose source declares the given type. `null`
+    for nodes outside a source package (binary-origin nodes
+    from JARs without source attachment). ~~|
+:@containingPackage
+  (@asNode | /containingPackage | unless(eq(null), @package))
+
+|~~ The Eclipse project that owns the workspace resource
+    backing this node. `null` for binary-origin nodes. ~~|
+:@containingProject
+  (@asNode | /containingProject | unless(eq(null), @project))
+
+|~~ The compilation-unit file the subject is declared in.
+    Types return their primary source file (where the public
+    declaration sits); methods / fields return their declaring
+    type's file. `null` for non-source nodes. ~~|
+:@containingFile
+  (@asNode | /location/file | unless(eq(null), @file))
+
+|~ ── Compile-problems composition (sub-conduits, then
+   the polymorphic head) ───────────────────────────── ~|
+
 |~~ Retain markers whose `:location/startLine` falls inside
-    the captured node's `[startLine, endLine]`. ~~|
+    the captured node's `[startLine, endLine]` source range.
+    Used by `@problemsForMemberVia` to clip a file's full
+    marker list to the lines a single method or field
+    declares. ~~|
 :problemsInRangeOf [:node]
   filter(and(/location/startLine | gte(node | /location/startLine),
              /location/startLine | lte(node | /location/endLine)))
 
-|~~ Member subject → file markers from `fetcher` filtered to
-    the member's source range. ~~|
+|~~ Member-scope dispatch: fetch the markers of the file the
+    member lives in, then filter to its declaration range. The
+    fetcher is provided by `@problemsVia`. ~~|
 :@problemsForMemberVia [:fetcher]
   (as(:m) | /location/file | fetcher | problemsInRangeOf(m))
 
-|~~ Node subject → kind-dispatched scope navigation. ~~|
+|~~ Node-subject dispatch. Routes by `:kind`. Inner types
+    (those with a non-null `:declaringType`) narrow to their
+    own source range — a top-level type returns its whole
+    compilation unit's marker set. Kindless Maps (no `:kind`
+    field) fall through to the workspace fetcher. ~~|
 :@problemsForNodeVia [:fetcher :fileLocation :packageTypes]
   (as(:n) | at("kind") | as(:k)
    | cond(isNull,        n | fetcher,
@@ -509,13 +675,20 @@
             :message "@problems: subject :kind is not a scope (expected one of workspace/project/package/file/type/method/field)"
             :context {:subjectKind k :subject n}}))
 
-|~~ String subject dispatch. ~~|
+|~~ String-subject dispatch. A `#` in the path means it is a
+    member fqn — lift through `liftNode` (typically `@asNode`)
+    and route into the member-scope branch. Otherwise it is
+    a project name or absolute file path, both handled by the
+    fetcher directly. ~~|
 :@problemsForStringVia [:fetcher :liftNode]
   (as(:s)
    | cond(contains("#"), liftNode | @problemsForMemberVia(fetcher),
           fetcher))
 
-|~~ Polymorphic compile-problem scope factory. ~~|
+|~~ Higher-order factory — accepts `fetcher`, `liftNode`,
+    `fileLocation`, `packageTypes` as captured args and
+    composes the polymorphic dispatch. Direct unit tests for
+    the routing live in `test/graph-problems.test.mjs`. ~~|
 :@problemsVia [:fetcher :liftNode :fileLocation :packageTypes]
   (as(:subj)
    | cond(isNull,   fetcher,
@@ -526,58 +699,70 @@
             :message "@problems: subject must be absent, String, or Map"
             :context {:subject subj}}))
 
-|~~ Polymorphic compile-problem scope. Each marker is enriched
-    with `:error` and `:warning` booleans for filter
-    convenience. ~~|
+|~~ Polymorphic compile-problem scope. Every marker is
+    enriched with `:error` / `:warning` booleans so a
+    downstream filter reads naturally: `@problems |
+    filter(/error) * /message`. Absent subject yields the
+    workspace-wide marker set. ~~|
 :@problems
   (@problemsVia(@problemMarkers, @asNode,
                 @containingFile, @typesInPackage)
    * union({:error   /severity | eq("error")
             :warning /severity | eq("warning")}))
 
-|~~ Incoming call sites of a method — distinct `:from`
-    skeletons of every `:call` reference.
+|~ ── Reference-shape sugar conduits ──────────────── ~|
 
-    ~{ "Foo#bar()" | @callers | count | gte(0) } ~~|
+|~~ Distinct `:from` skeletons of every `:call` reference to
+    this method — the set of methods that invoke the subject.
+
+    ~{ "java.lang.Object#equals(java.lang.Object)" | @callers
+       | every(/kind | eq("method")) } ~~|
 :@callers
   (@incomingRefs
    | filter(/refKind | eq("call"))
    * /from
    | distinct)
 
-|~~ Distinct `:from` skeletons of every `:read` access of a
-    field. ~~|
+|~~ Distinct `:from` skeletons of every `:read` access of this
+    field — the methods that read the subject's value. ~~|
 :@readers
   (@incomingRefs
    | filter(/refKind | eq("read"))
    * /from
    | distinct)
 
-|~~ Distinct `:from` skeletons of every `:write` access of a
-    field. ~~|
+|~~ Distinct `:from` skeletons of every `:write` access of
+    this field — the methods that assign the subject's value.
+    Empty Vec means an effectively-final field. ~~|
 :@writers
   (@incomingRefs
    | filter(/refKind | eq("write"))
    * /from
    | distinct)
 
-|~~ Methods the subject body invokes. ~~|
+|~~ Distinct method skeletons the subject's body invokes.
+    Subject must be a source member; binary-origin subjects
+    raise `::WrongSubjectKind`. ~~|
 :@calls
   (@outgoingRefs
    | filter(/refKind | eq("call"))
    * /to
    | distinct)
 
-|~~ Types the subject body touches. ~~|
+|~~ Distinct type skeletons the subject body touches —
+    parameter types, return types, local-variable types,
+    annotation types, `instanceof` checks, generic bounds. ~~|
 :@typeUses
   (@outgoingRefs
    | filter(/refKind | eq("typeUse"))
    * /to
    | distinct)
 
-|~ ── Stdlib conduits ─────────────────────────────────── ~|
+|~ ── Transitive hierarchy conduits ───────────────── ~|
 
-|~~ Transitive supertypes, flat Vec of `:type` skeletons. ~~|
+|~~ Every supertype of the subject, transitively. Returns a
+    Vec of distinct `:type` skeletons — `Object` lands as the
+    last entry for any class chain. ~~|
 :@ancestors
   (@supers
    | as(:direct)
@@ -586,7 +771,9 @@
    | flat
    | distinct)
 
-|~~ Transitive subtypes, flat Vec of `:type` skeletons. ~~|
+|~~ Every subtype of the subject, transitively. The recursive
+    fan-out can be large for high-level interfaces — `count`
+    first if the workspace is unfamiliar. ~~|
 :@descendants
   (@subtypes
    | as(:direct)
@@ -595,13 +782,30 @@
    | flat
    | distinct)
 
-|~~ Public methods of a type with zero incoming callers. ~~|
+|~ ── Static-analysis conduits ────────────────────── ~|
+
+|~~ Public methods of a type with zero incoming callers. Read
+    as "API surface that nobody references" — typical first
+    pass for dead-code triage. Inherited methods are out of
+    scope (only methods declared on the subject type). ~~|
 :@publicOrphans
   (@methods
    | filter(/modifiers | any(eq("public")))
    | filter(@callers | empty))
 
-|~~ Types the subject depends on. ~~|
+|~~ Non-private methods of a type with zero incoming callers.
+    Wider net than `@publicOrphans` — covers package-private
+    and protected methods that might be reachable through
+    reflection or framework injection (which the JDT
+    SearchEngine does not see). ~~|
+:@deadCode
+  (@methods
+   | filter(/modifiers | any(eq("private")) | not)
+   | filter(@callers | empty))
+
+|~~ Outbound dependency surface of a type — its direct
+    supertypes plus the types its members' bodies touch. Use
+    as the seed for a layering / cyclic-dependency audit. ~~|
 :@dependsOn
   (as(:self)
    | [self | @supers,
@@ -609,7 +813,9 @@
    | flat
    | distinct)
 
-|~~ Types that depend on the subject. ~~|
+|~~ Inbound dependency surface of a type — every type that
+    type-uses the subject as a method parameter, return,
+    field type, or generic bound, plus its direct subtypes. ~~|
 :@usedBy
   (as(:self)
    | [self | @incomingRefs(:typeUse) * /from | filter(/kind | eq("type")),
@@ -617,51 +823,35 @@
    | flat
    | distinct)
 
-|~~ Non-private methods with zero incoming callers. ~~|
-:@deadCode
-  (@methods
-   | filter(/modifiers | any(eq("private")) | not)
-   | filter(@callers | empty))
+|~ ── Test-scope conduits ─────────────────────────── ~|
 
-|~~ Filter nodes to those from workspace source. ~~|
-:@sourceOnly
-  filter(/origin | eq("source"))
-
-|~~ Filter nodes to those belonging to the named project. ~~|
-:@inProject [:projName]
-  filter(/containingProject | eq(projName))
-
-|~~ Volume estimate for a Vec. Returns `{:count N :head [...]
-    :tail [...]}`.
-
-    ~{ [1 2 3 4 5 6 7 8 9 10] | @overview | /count | eq(10) } ~~|
-:@overview
-  (as(:v)
-   | {:count v | count
-      :head v | take(5)
-      :tail v | reverse | take(5) | reverse})
-
-|~~ Every top-level `:type` declared in the given project. ~~|
-:@typesInProject
-  (@project | as(:p) | /fqn | as(:pn)
-   | p | @packagesInProject * @typesInPackage | flat
-   | @inProject(pn))
-
-|~ ── Test-scope conduits ───────────────────────────── ~|
-
-|~~ Subset of callers whose declaring type is test-scope. ~~|
+|~~ Callers whose declaring type is in a test source root.
+    EclEmma classifies test scope by source-root path (a
+    classpath entry's `:isTest` flag). ~~|
 :@testCallers
   (@callers | filter(/isTestScope))
 
-|~~ Callers outside test scope. ~~|
+|~~ Callers outside test scope — production callers of a
+    method. ~~|
 :@productionCallers
   (@callers | filter(/isTestScope | not))
 
-|~~ True iff method / field has zero test-scope callers. ~~|
+|~~ True iff the method / field has zero callers from test
+    scope. Read as "this code is exercised, but no test
+    drives it" — when combined with structural analysis like
+    `@deadCode`, finds candidates for new test coverage.
+
+    Distinct from `:jdt/coverage`'s `@uncovered`, which reads
+    actual JaCoCo probe data and answers "this code ran, but
+    no probe fired". ~~|
 :@untested
   (@callers | filter(/isTestScope) | empty)
 
-|~~ Test-scope callers across type + members. ~~|
+|~~ Test-scope callers across a type AND every member it
+    declares — useful when asking "what tests exercise this
+    type at all", since some tests call the type's
+    constructor / static method, others target individual
+    instance methods. ~~|
 :@tests
   (as(:self)
    | [[self | /fqn], self | @methods * /fqn, self | @fields * /fqn]
@@ -671,21 +861,61 @@
    | filter(/isTestScope)
    | distinct)
 
-|~ ── Annotation conduits ──────────────────────────── ~|
+|~ ── Annotation conduits ───────────────────────── ~|
 
-|~~ True iff the element's `:annotations` Vec contains
-    `annotationFqn`. ~~|
+|~~ Predicate: true iff the subject's `:annotations` Vec
+    contains the named annotation type's fqn. Use inside
+    `filter` / `every` / `any` to slice members by annotation.
+
+    ~{ "io.github.kaluchi.jdtbridge.HttpServer" | @methods
+       | filter(@annotatedWith("java.lang.Override")) | count | gte(0) } ~~|
 :@annotatedWith [:annotationFqn]
   (/annotations | any(eq(annotationFqn)))
 
-|~~ Deprecated-element predicate. ~~|
+|~~ Predicate: true iff the subject carries `@Deprecated`. ~~|
 :@deprecated
   @annotatedWith("java.lang.Deprecated")
 
-|~ ── Markdown render shortcuts ─────────────────────── ~|
+|~ ── Vec-shape conduits ────────────────────────── ~|
 
-|~~ `@source` enriched with the context an IDE shows on
-    hover. ~~|
+|~~ Retain Vec elements whose `:origin` is workspace `source`
+    — drops binary-only matches that come back from `@types`
+    pattern searches against `JRE` / Maven library types. ~~|
+:@sourceOnly
+  filter(/origin | eq("source"))
+
+|~~ Retain Vec elements whose `:containingProject` matches
+    the named project's fqn. Use to narrow a workspace-wide
+    `@types` result to one project. ~~|
+:@inProject [:projName]
+  filter(/containingProject | eq(projName))
+
+|~~ Aggregate enumeration shape for a Vec — `{:count N :head
+    [first 5] :tail [last 5]}`. Drop-in pre-flight for any
+    `@`-axis whose result could be large.
+
+    ~{ [1 2 3 4 5 6 7 8 9 10] | @overview | /count | eq(10) } ~~|
+:@overview
+  (as(:v)
+   | {:count v | count
+      :head v | take(5)
+      :tail v | reverse | take(5) | reverse})
+
+|~~ Every top-level type declared in the given project,
+    deduped by fqn across source roots. ~~|
+:@typesInProject
+  (@project | as(:p) | /fqn | as(:pn)
+   | p | @packagesInProject * @typesInPackage | flat
+   | @inProject(pn))
+
+|~ ── Markdown cards (compose render operands from
+   :jdt/render with the right bundle) ─────────────── ~|
+
+|~~ Bundle a source card for the subject: the subject's
+    detail node, its source text, every outgoing reference,
+    every incoming reference, plus supers / subtypes (when
+    the subject is a type). Pipe through `mdSource` (from
+    `:jdt/render`) for the markdown layout. ~~|
 :@sourceCard
   (@asNode | as(:self)
    | {:node     self | @detail
@@ -696,7 +926,9 @@
       :subtypes self | @subtypes           !| []}
    | mdSource)
 
-|~~ Type hierarchy card. ~~|
+|~~ Type hierarchy card — direct supers and subtypes only.
+    Wrap inputs through `@ancestors` / `@descendants` for the
+    transitive variant. ~~|
 :@hierarchyCard
   (@asNode | as(:self)
    | {:node     self | @detail
@@ -704,7 +936,8 @@
       :subtypes self | @subtypes}
    | mdHierarchy)
 
-|~~ Structural outline of a type. ~~|
+|~~ Structural outline of a type — fields, methods, inner
+    types grouped per source convention. ~~|
 :@outlineCard
   (@asNode | as(:self)
    | {:node    self | @detail

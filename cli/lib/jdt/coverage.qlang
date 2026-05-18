@@ -1,22 +1,53 @@
 |~ :jdt/coverage — query surface over EclEmma's IJavaModelCoverage
-   cache, layered on the GET /coverage/node endpoint.
+   cache.
 
-   Subject = a node-Map (skeleton / detail) or a fqn String. Each
-   axis routes to `/coverage/node?coverageId=<id>&fqn=<fqn>` with
-   the active session as default; the optional captured-arg
-   modifier on `@coverage` pins to a specific coverageId.
+   Every coverage axis routes through `/coverage/node?coverageId=
+   <id>&fqn=<fqn>`. The 0-arity form of `@coverage` resolves the
+   active session via `@activeCoverageId`; the 1-arity form pins a
+   specific coverageId — `@coverage("MyTest:1234")` or any String
+   expression evaluating to one. Per-line breakdown is available
+   on ISourceNode subjects only (type / method / source-file);
+   project / package / fragment-root subjects carry counters but
+   no `:lines` block, and the line-axis conduits return an error
+   value on those shapes.
 
-   Per-line breakdown (covered / uncovered / partial) is
-   available on ISourceNode subjects only — type, method,
-   source-file. Project / package / fragment-root subjects carry
-   counters but no `:lines` block; line-axis conduits return an
-   error value on those shapes. ~|
+   Returned shape from `@coverage`: `{:counters {:instruction
+   {:coveredCount N :missedCount N :totalCount N :coverageStatus
+   "FULLY_COVERED"|"PARTLY_COVERED"|"NOT_COVERED" :coveredRatio
+   <ratio>} :branch {...} :line {...} :method {...} :class {...}
+   :complexity {...}} :lines {:entries [{:line N :status "..."
+   :branchCovered N :branchMissed N} ...]}}`. `:lines` absent on
+   non-ISourceNode subjects. ~|
 
-|~ ── Error tag-bindings ──────────────────────────────────── ~|
+|~ ── Coverage source primitives ─────────────────────────── ~|
+
+::CoverageNotInstalled
+  |~~ EclEmma plugin not installed in the Eclipse runtime —
+      the `/coverage/*` endpoints are unavailable. Bridge
+      lifecycle fault; install EclEmma and reload the bridge
+      before retrying.
+   ~~|
+  ::builtin{:category :jdt/coverage-error
+            :operand :@activeCoverageId}
+
+:@activeCoverageId
+  |~~ Active coverageId from `/coverage/active`, or `null` when
+      no session is active. Cached per-process for the life of
+      one `jdt q` invocation; `@coverage` reads it implicitly
+      when no captured-arg pin is given.
+
+      ~{ @activeCoverageId | type | eq(:string) | or(@activeCoverageId | eq(null)) }
+   ~~|
+  ::builtin{:category :jdt/coverage
+            :subject :any
+            :modifiers []
+            :returns :string
+            :throws [::CoverageNotInstalled]}
 
 ::CoverageNotFound
-  |~~ Coverage lookup miss — the requested coverageId is unknown
-      to EclEmma's cache.
+  |~~ Coverage lookup miss — the requested coverageId is
+      unknown to EclEmma's cache (the session was discarded
+      or never recorded).
    ~~|
   ::builtin{:category :jdt/coverage-error :operand :@coverage}
 
@@ -28,42 +59,44 @@
 
 ::CoverageFqnUnresolved
   |~~ Coverage element fqn cannot be resolved against the
-      session's analysed bundles.
+      session's analysed bundles. Typical cause: querying a
+      type that lives in a later-loaded plugin not present in
+      the coverage session's classpath.
    ~~|
   ::builtin{:category :jdt/coverage-error :operand :@coverage}
 
 ::CoverageNoDataForElement
-  |~~ Element is known but the session has no probe data for it
-      (e.g. the test that exercises it never ran in that run).
+  |~~ Element is known to EclEmma but the session has no probe
+      data for it — the test exercising it never ran in that
+      session. Distinct from `::CoverageFqnUnresolved` (element
+      absent from classpath altogether).
    ~~|
   ::builtin{:category :jdt/coverage-error :operand :@coverage}
 
 ::CoverageAnalysisFailed
-  |~~ Server-side analysis raised — EclEmma JaCoCo bridge
-      failure.
+  |~~ EclEmma's JaCoCo bridge raised a server-side fault while
+      analysing the requested element. The descriptor's
+      `:context/originalError` carries the Java-side stack.
    ~~|
   ::builtin{:category :jdt/coverage-error :operand :@coverage}
-
-::CoverageNotInstalled
-  |~~ EclEmma plugin not installed in the Eclipse runtime —
-      `/coverage/*` endpoints unavailable.
-   ~~|
-  ::builtin{:category :jdt/coverage-error
-            :operand :@activeCoverageId}
 
 ::CoverageNoActiveSession
   |~~ `@coverage` called in 0-arity form (active-session
       binding) while no coverage session is active. Pin
-      explicitly via `@coverage("<coverageId>")` or activate one
-      with `jdt coverage activate <id>`.
+      explicitly via `@coverage("<coverageId>")` or activate
+      one with `jdt coverage activate <id>`.
 
-      ~{ @coverage !| type | eq(::CoverageNoActiveSession) }
+      ~{ "pkg.Foo" | @coverage !| type | eq(::CoverageNoActiveSession) }
    ~~|
   ::builtin{:category :jdt/coverage-error :operand :@coverage}
 
 ::CoverageIdNotString
-  |~~ `@coverage(<modifier>)` modifier evaluated to a value
-      other than a non-empty String coverageId.
+  |~~ `@coverage(<modifier>)` captured-arg evaluated to a
+      non-String value. Coverage ids are bridge-side identifiers
+      (e.g. `"MyTest:1748901234567"`) and cannot be derived
+      structurally from another shape.
+
+      ~{ "pkg.Foo" | @coverage(42) !| type | eq(::CoverageIdNotString) }
    ~~|
   ::builtin{:category :jdt/coverage-error :operand :@coverage}
 
@@ -71,29 +104,30 @@
   |~~ Coverage axis subject is neither a node-Map carrying
       `:fqn` nor a String. (Same tag the `:jdt/graph` module
       declares; both modules stamp it from the client-side
-      dispatch wrapper.)
+      dispatch wrapper before any HTTP roundtrip.)
+
+      ~{ [1 2 3] | @coverage !| type | eq(::MissingSubjectFqn) }
    ~~|
   ::builtin{:category :jdt/dispatch}
 
-|~ ── Primitives — bound by coverage.impl.mjs ─────────────── ~|
-
 :@coverage
-  |~~ Raw `/coverage/node` response: counters Map plus
-      `:lines` block when subject is an ISourceNode. 0-arity
-      form binds to the active session via `@activeCoverageId`.
-      1-arity form pins a specific coverageId —
-      `@coverage("MyTest:1234")` or any String expression
-      evaluating to one.
+  |~~ `/coverage/node` response Map — counters plus `:lines`
+      block when the subject is an ISourceNode. 0-arity binds
+      to the active session via `@activeCoverageId`; the 1-arity
+      overload pins a specific coverageId.
 
-      Returned shape: `{:counters {:instruction {:coveredCount N
-      :missedCount N :totalCount N :coverageStatus
-      "FULLY_COVERED"|"PARTLY_COVERED"|"NOT_COVERED"
-      :coveredRatio <ratio>} :branch {...} :line {...} :method
-      {...} :class {...} :complexity {...}} :lines {:entries
+      Returned shape — `{:counters {<counter-key>
+      {:coveredCount N :missedCount N :totalCount N
+      :coverageStatus "FULLY_COVERED"|"PARTLY_COVERED"
+      |"NOT_COVERED" :coveredRatio R} …} :lines {:entries
       [{:line N :status "..." :branchCovered N :branchMissed
-      N} ...]}}`.
+      N} …]}}` — counter keys are `:instruction`, `:branch`,
+      `:line`, `:method`, `:class`, `:complexity`. `:lines`
+      absent on non-ISourceNode subjects (project / package /
+      fragment-root).
 
-      ~{ "Foo" | @coverage | /counters/instruction/totalCount | gte(0) }
+      ~{ "pkg.Foo" | @coverage("InvalidId:0") !| type
+         | (eq(::CoverageNotFound) | or(eq(::CoverageNoActiveSession))) }
    ~~|
   ::builtin{:category :jdt/coverage
             :subject [:string :map]
@@ -108,47 +142,38 @@
                      ::CoverageIdNotString
                      ::MissingSubjectFqn]}
 
-:@activeCoverageId
-  |~~ Active coverageId from `/coverage/active`, or `null` when
-      no session is active. Cached per-process for the life of
-      one `jdt q` invocation; `@coverage` uses it implicitly
-      when no captured-arg pin is given.
-
-      ~{ @activeCoverageId !| type | eq(::CoverageNotInstalled) }
-   ~~|
-  ::builtin{:category :jdt/coverage
-            :subject :any
-            :modifiers []
-            :returns :string
-            :throws [::CoverageNotInstalled]}
-
-|~ ── Counter-status predicates ─────────────────────────── ~|
+|~ ── Counter-status predicates ──────────────────────────── ~|
 
 |~~ Subject-level predicate — true iff `coveredCount` of the
-    `instruction` counter equals zero.
+    `instruction` counter equals zero. Distinct from
+    `:jdt/graph`'s `@untested`, which infers absence from the
+    lack of test-scope callers (structural proxy); `@uncovered`
+    reads the actual JaCoCo probe data (the test ran but never
+    hit this element).
 
-    Distinct from `:jdt/graph`'s `@untested`, which infers
-    absence from the lack of test-scope callers (a structural
-    proxy). `@uncovered` reads the actual JaCoCo probe data —
-    the test ran but never hit this element. ~~|
+    ~{ "pkg.Foo" | @uncovered !| type
+       | (eq(::CoverageNoActiveSession) | or(eq(::CoverageNotFound))) } ~~|
 :@uncovered
   (@coverage | /counters/instruction/coveredCount | eq(0))
 
 |~~ True iff the element's `instruction` counter is
-    `PARTLY_COVERED` — some instructions ran, some didn't. ~~|
+    `PARTLY_COVERED` — some instructions ran, some didn't.
+    Read as "branch coverage incomplete". ~~|
 :@partial
   (@coverage | /counters/instruction/coverageStatus | eq("PARTLY_COVERED"))
 
-|~~ True iff every instruction of the element ran. ~~|
+|~~ True iff every instruction of the element ran. Read as
+    "fully exercised by some test in the active session". ~~|
 :@fullyCovered
   (@coverage | /counters/instruction/coverageStatus | eq("FULLY_COVERED"))
 
 |~ ── Line-level axes — ISourceNode subjects only ────────── ~|
 
 |~~ Vec of line numbers whose status is `FULLY_COVERED`.
-    Subject must be a type, method, or source-file (ISourceNode)
-    — on project / package / fragment-root the underlying
-    `/coverage/node` response carries no `:lines` block. ~~|
+    Subject must be a type, method, or source-file (ISourceNode);
+    project / package / fragment-root return an error value
+    because the underlying `/coverage/node` response carries
+    no `:lines` block on those shapes. ~~|
 :@coveredLines
   (@coverage | /lines/entries
    | filter(/status | eq("FULLY_COVERED")) * /line)
@@ -158,17 +183,22 @@
   (@coverage | /lines/entries
    | filter(/status | eq("NOT_COVERED")) * /line)
 
-|~~ Vec of partial-line entries — each carries `:line` plus
-    branch counters (`:branchCovered`, `:branchMissed`). ~~|
+|~~ Vec of partial-line entries — each carries `:line`,
+    `:branchCovered`, `:branchMissed`. Use to render the
+    "{m} of {total} branches missed" annotation EclEmma
+    shows on gutter hover. ~~|
 :@partialLines
   (@coverage | /lines/entries
    | filter(/status | eq("PARTLY_COVERED")))
 
-|~ ── Drill conduits for cleanup workflows ─────────────── ~|
+|~ ── Drill conduits for cleanup workflows ────────────────── ~|
 
 |~~ Partial-coverage methods of a type, sorted desc by missed
-    instruction count. Each row carries `:fqn`, `:missed`,
-    `:covered` for quick triage. ~~|
+    instruction count. Each row: `{:fqn :missed :covered}`
+    for quick triage of which methods leak coverage the most.
+
+    ~{ "pkg.Foo" | @partialMethods !| type
+       | (eq(::CoverageNoActiveSession) | or(eq(::CoverageNotFound))) } ~~|
 :@partialMethods
   (@methods | filter(@partial) * (
       as(:m) | @coverage | /counters/instruction | as(:c)
@@ -178,7 +208,9 @@
    | sortWith(desc(/missed)))
 
 |~~ Partial-coverage classes of a project, sorted desc by
-    missed instruction count. ~~|
+    missed instruction count. Project-wide variant of
+    `@partialMethods` — feeds a per-project coverage cleanup
+    workflow. ~~|
 :@partialClasses
   (@typesInProject | filter(@partial) * (
       as(:t) | @coverage | /counters/instruction | as(:c)
@@ -187,12 +219,12 @@
          :covered (c | /coveredCount)})
    | sortWith(desc(/missed)))
 
-|~ ── Markdown coverage card ────────────────────────────── ~|
+|~ ── Markdown coverage card ───────────────────────────── ~|
 
 |~~ Bundle the subject's `@detail` node and its `@coverage`
-    Map for the host-bound `mdCoverage` renderer. Subject can
-    be a type or method fqn / node-Map; the card lays out the
-    six counters plus the per-line breakdown when present. ~~|
+    Map for `mdCoverage` (from `:jdt/render`). The card lays
+    out the six counters plus the per-line breakdown when
+    present. ~~|
 :@coverageCard
   (@asNode | as(:self)
    | {:node     self | @detail
