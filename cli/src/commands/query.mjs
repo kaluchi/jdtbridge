@@ -69,9 +69,10 @@ function locationMap(loc) {
 
 function parseErrorToValue(err, uri) {
   const descriptor = new Map([
-    ['kind',    makeTagKeyword(err.name || 'ParseError')],
-    ['origin',  keyword('qlang/parse')],
-    ['message', err.message || String(err)],
+    ['kind',     makeTagKeyword(err.name || 'ParseError')],
+    ['category', keyword('parse-error')],
+    ['origin',   keyword('qlang/parse')],
+    ['message',  err.message || String(err)],
   ]);
   if (err.location) descriptor.set('location', locationMap(err.location));
   if (err.uri || uri) descriptor.set('uri', err.uri || uri);
@@ -96,10 +97,11 @@ async function readStdin() {
 
 function usageErrorValue(message, usage) {
   const descriptor = new Map([
-    ['kind',    makeTagKeyword('UsageError')],
-    ['origin',  keyword('jdt/cli')],
-    ['message', message],
-    ['usage',   usage],
+    ['kind',     makeTagKeyword('UsageError')],
+    ['category', keyword('usage-error')],
+    ['origin',   keyword('jdt/cli')],
+    ['message',  message],
+    ['usage',    usage],
   ]);
   return makeErrorValue(descriptor);
 }
@@ -112,15 +114,23 @@ function usageErrorValue(message, usage) {
  * calls in an agent harness are never cancelled by a non-zero exit.
  */
 function runtimeErrorToValue(err) {
-  const tagName = err instanceof BridgeNotRunningError
+  const isBridgeDown   = err instanceof BridgeNotRunningError;
+  const isBridgeBroken = !isBridgeDown && isConnectionError(err);
+  const tagName = isBridgeDown
     ? 'BridgeNotRunning'
-    : isConnectionError(err)
+    : isBridgeBroken
       ? 'BridgeNotResponding'
       : (err.name || 'JdtCliError');
+  const category = isBridgeDown
+    ? 'bridge-not-running'
+    : isBridgeBroken
+      ? 'bridge-not-responding'
+      : 'jdt-cli-error';
   const descriptor = new Map([
-    ['kind',    makeTagKeyword(tagName)],
-    ['origin',  keyword('jdt/cli')],
-    ['message', err.message || String(err)],
+    ['kind',     makeTagKeyword(tagName)],
+    ['category', keyword(category)],
+    ['origin',   keyword('jdt/cli')],
+    ['message',  err.message || String(err)],
   ]);
   if (err.code) descriptor.set('code', err.code);
   return makeErrorValue(descriptor);

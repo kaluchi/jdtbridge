@@ -71,6 +71,7 @@ describe("jdt q — read-only exit-0 contract", () => {
     // Per-site identity rides on the `::Tag` head ahead of `!{…}`;
     // the descriptor body carries the remaining structured fields.
     expect(stdout).toContain("::UsageError!{");
+    expect(stdout).toContain(":category :usage-error");
     expect(stdout).toContain(":origin :jdt/cli");
     expect(stdout).toContain("jdt q <qlang-query>");
   });
@@ -82,6 +83,7 @@ describe("jdt q — read-only exit-0 contract", () => {
     expect(io.exits).toEqual([]);
     const stdout = io.logs.join("\n");
     expect(stdout).toContain("::ParseError!{");
+    expect(stdout).toContain(":category :parse-error");
     expect(stdout).toContain(":origin :qlang/parse");
     expect(stdout).toContain(":location");
     expect(stdout).toContain(":line");
