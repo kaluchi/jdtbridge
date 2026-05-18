@@ -404,7 +404,7 @@ describe("setup command", () => {
   // `jdt setup --help` must print the help banner and exit; any
   // unrecognized input must print the problem plus help and exit.
   // The destructive default install branch (stops Eclipse, runs
-  // `mvn verify`) fires only on the explicit no-flag invocation.
+  // `mvn verify`) fires when no mode-selection flag is provided.
 
   describe("argument validation", () => {
     it("exits on --help without firing the install branch", async () => {
