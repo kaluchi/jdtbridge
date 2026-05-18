@@ -68,9 +68,10 @@ describe("jdt q — read-only exit-0 contract", () => {
     await query([]);
     expect(io.exits).toEqual([]);
     const stdout = io.logs.join("\n");
-    expect(stdout).toContain(":kind :usage-error");
+    // Per-site identity rides on the `::Tag` head ahead of `!{…}`;
+    // the descriptor body carries the remaining structured fields.
+    expect(stdout).toContain("::UsageError!{");
     expect(stdout).toContain(":origin :jdt/cli");
-    expect(stdout).toContain(":thrown :UsageError");
     expect(stdout).toContain("jdt q <qlang-query>");
   });
 
@@ -80,9 +81,8 @@ describe("jdt q — read-only exit-0 contract", () => {
     await query(["bad syntax [[["]);
     expect(io.exits).toEqual([]);
     const stdout = io.logs.join("\n");
-    expect(stdout).toContain(":kind :parse-error");
+    expect(stdout).toContain("::ParseError!{");
     expect(stdout).toContain(":origin :qlang/parse");
-    expect(stdout).toContain(":thrown :ParseError");
     expect(stdout).toContain(":location");
     expect(stdout).toContain(":line");
     expect(stdout).toContain(":column");
@@ -104,9 +104,12 @@ describe("jdt q — read-only exit-0 contract", () => {
     await query(['"no.such.Type" | @type']);
     expect(io.exits).toEqual([]);
     const stdout = io.logs.join("\n");
-    expect(stdout).toContain("!{");
-    expect(stdout).toContain("TypeNotFound");
-    expect(stdout).toContain("Type not found: no.such.Type");
+    // Per-site identity surfaces through the `::TagName` head ahead
+    // of `!{…}`; the plugin's broad-bucket kind lands on `:category`.
+    // `:message` is suppressed in the printed form by qlang's
+    // hypertext-error convention (the prose lives on `::Tag | docs`).
+    expect(stdout).toContain("::TypeNotFound!{");
+    expect(stdout).toContain(":category :type-not-found");
   });
 
   it("successful string result prints raw (no quotes), no non-zero exit", async () => {

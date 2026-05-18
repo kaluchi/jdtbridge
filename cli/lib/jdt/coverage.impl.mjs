@@ -16,13 +16,21 @@
 // none live here. They are qlang conduits in coverage.qlang. The
 // plugin is a thin adapter; this layer is a thin transport.
 
-import { nullaryOp, overloadedOp } from '@kaluchi/qlang-core/dispatch';
-import { keyword, makeErrorValue, isErrorValue }
-    from '@kaluchi/qlang-core';
-import { get } from '../../src/client.mjs';
+// qlang 0.7 invariants applied here:
+//   * Map keys are plain Strings (Keyword objects ride as VALUES).
+//   * Error descriptors carry `:kind ::TagKeyword` for per-site
+//     identity. `result !| type` returns the tag; per-tag static
+//     facts (`:category`, `:operand`, `:expectedType`) live on the
+//     catalog body and reach the reader through the `spec` axis.
 
-const FQN_KEY = keyword('fqn');
-const ACTIVE_COVERAGE_ID_KEY = keyword('activeCoverageId');
+import { nullaryOp, overloadedOp } from '@kaluchi/qlang-core/dispatch';
+import {
+    keyword,
+    makeErrorValue,
+    makeTagKeyword,
+    isErrorValue,
+} from '@kaluchi/qlang-core';
+import { get } from '../../src/client.mjs';
 
 const enc = encodeURIComponent;
 
@@ -56,7 +64,7 @@ function jsonToQlang(jsonVal) {
     if (jsonVal !== null && typeof jsonVal === 'object') {
         const m = new Map();
         for (const [k, v] of Object.entries(jsonVal)) {
-            m.set(keyword(k), jsonToQlang(v));
+            m.set(k, jsonToQlang(v));
         }
         return m;
     }
@@ -76,7 +84,7 @@ function liftServerResponse(jsonVal) {
 function fqnOf(subject) {
     if (typeof subject === 'string') return subject;
     if (subject instanceof Map) {
-        const fqn = subject.get(FQN_KEY);
+        const fqn = subject.get('fqn');
         if (typeof fqn === 'string') return fqn;
     }
     return null;
@@ -84,32 +92,27 @@ function fqnOf(subject) {
 
 function missingSubjectError(operandName, subject) {
     const ctx = new Map();
-    ctx.set(keyword('operand'), operandName);
-    ctx.set(keyword('subjectType'),
+    ctx.set('operand', keyword(operandName));
+    ctx.set('subjectType',
             subject === null || subject === undefined ? 'null'
             : Array.isArray(subject) ? 'vec'
             : subject instanceof Map ? 'map-without-fqn'
             : typeof subject);
     const descriptor = new Map();
-    descriptor.set(keyword('kind'),
-            keyword('missing-subject-fqn'));
-    descriptor.set(keyword('thrown'), keyword('MissingSubjectFqn'));
-    descriptor.set(keyword('origin'), keyword('jdt/coverage'));
-    descriptor.set(keyword('message'),
+    descriptor.set('kind', makeTagKeyword('MissingSubjectFqn'));
+    descriptor.set('origin', keyword('jdt/coverage'));
+    descriptor.set('message',
             `${operandName}: pipeValue must be a node-Map with `
             + `:fqn or a fqn-String`);
-    descriptor.set(keyword('context'), ctx);
+    descriptor.set('context', ctx);
     return makeErrorValue(descriptor);
 }
 
 function noActiveCoverageError() {
     const descriptor = new Map();
-    descriptor.set(keyword('kind'),
-            keyword('coverage-no-active-session'));
-    descriptor.set(keyword('thrown'),
-            keyword('CoverageNoActiveSession'));
-    descriptor.set(keyword('origin'), keyword('jdt/coverage'));
-    descriptor.set(keyword('message'),
+    descriptor.set('kind', makeTagKeyword('CoverageNoActiveSession'));
+    descriptor.set('origin', keyword('jdt/coverage'));
+    descriptor.set('message',
             'No active coverage session — pin a coverageId via '
             + '`@coverage("<coverageId>")` or activate one via '
             + '`jdt coverage activate <id>`');
@@ -118,12 +121,9 @@ function noActiveCoverageError() {
 
 function coverageIdNotStringError(actualValue) {
     const descriptor = new Map();
-    descriptor.set(keyword('kind'),
-            keyword('coverage-id-not-string'));
-    descriptor.set(keyword('thrown'),
-            keyword('CoverageIdNotString'));
-    descriptor.set(keyword('origin'), keyword('jdt/coverage'));
-    descriptor.set(keyword('message'),
+    descriptor.set('kind', makeTagKeyword('CoverageIdNotString'));
+    descriptor.set('origin', keyword('jdt/coverage'));
+    descriptor.set('message',
             `@coverage modifier must evaluate to a non-empty `
             + `String coverageId, got `
             + (actualValue === null ? 'null' : typeof actualValue));
@@ -136,7 +136,7 @@ async function fetchActiveCoverageId() {
     const lifted = liftServerResponse(raw);
     if (isErrorValue(lifted)) return lifted;
     if (lifted instanceof Map) {
-        const id = lifted.get(ACTIVE_COVERAGE_ID_KEY);
+        const id = lifted.get('activeCoverageId');
         return typeof id === 'string' ? id : null;
     }
     return null;

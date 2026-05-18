@@ -16,6 +16,7 @@ import { createSession } from '@kaluchi/qlang-core/session';
 import {
   printValue,
   keyword,
+  makeTagKeyword,
   isErrorValue,
   makeErrorValue,
 } from '@kaluchi/qlang-core';
@@ -52,28 +53,27 @@ function createLocator() {
 
 function positionMap(pos) {
   return new Map([
-    [keyword('offset'), pos.offset],
-    [keyword('line'),   pos.line],
-    [keyword('column'), pos.column],
+    ['offset', pos.offset],
+    ['line',   pos.line],
+    ['column', pos.column],
   ]);
 }
 
 function locationMap(loc) {
   return new Map([
-    [keyword('start'), positionMap(loc.start)],
-    [keyword('end'),   positionMap(loc.end)],
+    ['start', positionMap(loc.start)],
+    ['end',   positionMap(loc.end)],
   ]);
 }
 
 function parseErrorToValue(err, uri) {
   const descriptor = new Map([
-    [keyword('kind'),    keyword('parse-error')],
-    [keyword('origin'),  keyword('qlang/parse')],
-    [keyword('thrown'),  keyword(err.name || 'ParseError')],
-    [keyword('message'), err.message || String(err)],
+    ['kind',    makeTagKeyword(err.name || 'ParseError')],
+    ['origin',  keyword('qlang/parse')],
+    ['message', err.message || String(err)],
   ]);
-  if (err.location) descriptor.set(keyword('location'), locationMap(err.location));
-  if (err.uri || uri) descriptor.set(keyword('uri'), err.uri || uri);
+  if (err.location) descriptor.set('location', locationMap(err.location));
+  if (err.uri || uri) descriptor.set('uri', err.uri || uri);
   return makeErrorValue(descriptor);
 }
 
@@ -95,11 +95,10 @@ async function readStdin() {
 
 function usageErrorValue(message, usage) {
   const descriptor = new Map([
-    [keyword('kind'),    keyword('usage-error')],
-    [keyword('origin'),  keyword('jdt/cli')],
-    [keyword('thrown'),  keyword('UsageError')],
-    [keyword('message'), message],
-    [keyword('usage'),   usage],
+    ['kind',    makeTagKeyword('UsageError')],
+    ['origin',  keyword('jdt/cli')],
+    ['message', message],
+    ['usage',   usage],
   ]);
   return makeErrorValue(descriptor);
 }
@@ -112,19 +111,17 @@ function usageErrorValue(message, usage) {
  * calls in an agent harness are never cancelled by a non-zero exit.
  */
 function runtimeErrorToValue(err) {
-  const kind = err instanceof BridgeNotRunningError
-    ? 'bridge-not-running'
+  const tagName = err instanceof BridgeNotRunningError
+    ? 'BridgeNotRunning'
     : isConnectionError(err)
-      ? 'bridge-not-responding'
-      : 'jdt-cli-error';
-  const thrown = err.name || 'Error';
+      ? 'BridgeNotResponding'
+      : (err.name || 'JdtCliError');
   const descriptor = new Map([
-    [keyword('kind'),    keyword(kind)],
-    [keyword('origin'),  keyword('jdt/cli')],
-    [keyword('thrown'),  keyword(thrown)],
-    [keyword('message'), err.message || String(err)],
+    ['kind',    makeTagKeyword(tagName)],
+    ['origin',  keyword('jdt/cli')],
+    ['message', err.message || String(err)],
   ]);
-  if (err.code) descriptor.set(keyword('code'), err.code);
+  if (err.code) descriptor.set('code', err.code);
   return makeErrorValue(descriptor);
 }
 
@@ -147,7 +144,7 @@ export async function query(args) {
             flags.length > 1 ? 's' : ''} ${flags.join(' ')}\n`
         + 'jdt q takes no flags — pass the qlang pipeline as the '
         + 'single positional argument. For descriptor lookup use '
-        + "`jdt q 'reify(:<name>)'`.\n");
+        + "`jdt q ':<name> | spec'`.\n");
   }
   const positional = args.filter(a => !a.startsWith('--'));
   const querySource = positional[0];
@@ -214,8 +211,10 @@ Usage:  jdt q <qlang-pipeline>
 
 Pipeline = SEED | step | step … . Seed is a String (fqn, or
 wildcard like "*Service") or a nullary axis (@projects, @problems).
-Exit is always 0; errors land on stdout as \`!{:kind … :message …}\`
-values — route with \`!|\`.
+Exit is always 0; errors land on stdout as \`::TagName!{:field …}\`
+values — route with \`!|\`. Per-site identity rides on the head tag
+(\`!| type\` returns it as \`::TagKeyword\`); the broad bucket lands
+on \`:category\` (\`!| type | spec | /category\`).
 
 ───── fqn — fully qualified name ─────
 
@@ -262,8 +261,8 @@ values — route with \`!|\`.
   # Tests that exercise a type
   jdt q '"<Type>" | @tests * /fqn'
 
-  # Existence check — element on success, :type-not-found via fail-track on miss
-  jdt q '"<Type>" | @type !| /kind'
+  # Existence check — node-Map on success, ::TypeNotFound tag on miss
+  jdt q '"<Type>" | @type !| type'
 
   # Hotspots — biggest methods in a type
   jdt q '"<Type>" | @methods | sortWith(desc(/location/lineCount)) | take(5) * {:fqn /fqn :lines /location/lineCount}'
@@ -288,9 +287,9 @@ one HTTP round-trip. No wc / head / tail.
   /key         Map projection; /a/b = /a | /b
   [a b]        Vec literal         {:k v}    Map literal
   #{a b}       Set literal         !{:k v}   Error literal
-  "text"       String              :keyword  Keyword
+  "text"       String              :keyword  Keyword     ::Tag  TagKeyword
   as(:name)    snapshot pipeValue under :name
-  let(:name, body) | let(:name, [:p], body)   conduit
+  :name body | :name [:p] body                BindStep — names a binding (conduit if param)
 
 ───── Axes (seeds + navigation) ─────
 
@@ -353,16 +352,18 @@ Host-bound I/O + format (from qlang-cli):
 
   manifest | count                              all ops
   manifest | filter(/effectful) * /name         every axis name
-  reify(:@members)                              descriptor
-  reify(:@members) | runExamples                verify docs
-  reify(:@callers) | /source                    read a conduit's body
+  :@members | spec                              descriptor (kind, subject, returns, throws)
+  :@members | docs                              prose from the attached doc-prefix
+  :@members | examples                          executable ~{…} examples
+  :@callers | source                            verbatim BindStep source
+  :@members | runExamples                       run examples against the live session
 
 ───── Debug — errors are data ─────
 
-  expr !| /kind                   :type-error, :unresolved-identifier …
-  expr !| /thrown                 per-site class (:TypeNotFound …)
-  expr !| /message                human-readable
-  expr !| /context/candidates     AmbiguousMatch — pick and retry
+  expr !| type                    ::TagKeyword — per-site identity (::TypeNotFound, ::AmbiguousMatch …)
+  expr !| type | spec / docs      definition + prose for the tag
+  expr !| /category               broad bucket (:type-error, :jdt/coverage …)
+  expr !| /context                structured context — operand-specific fields
   expr !| /trail * /text          which steps deflected
 
 ───── Paths ─────

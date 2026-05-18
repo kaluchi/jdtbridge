@@ -1,13 +1,21 @@
-// Descriptor consistency for the :jdt/coverage module — checks that
-// what coverage.qlang advertises in :modifiers, :returns, :kind and
-// :params matches the underlying coverage.impl.mjs primitives and
-// the qlang conduits' actual params lists.
+// Descriptor consistency for the :jdt/coverage module — checks
+// that what coverage.qlang advertises in :modifiers, :returns,
+// :kind and :params matches the underlying coverage.impl.mjs
+// primitives and the qlang conduits' actual params lists.
+//
+// qlang 0.7 surface: `:name | spec` returns the env-side
+// declaration descriptor. For a `:builtin` catalog entry the
+// descriptor carries `:kind ::builtin :impl <fn> :category … :subject
+// … :modifiers … :returns … :throws … :captured [min max]
+// :effectful <bool>`. For a `:conduit` BindStep the descriptor
+// is a Conduit value-class Map with `:kind ::conduit :name … :params
+// [...] :source <body-source>`.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { keyword } from "@kaluchi/qlang-core";
+import { keyword, makeTagKeyword } from "@kaluchi/qlang-core";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MODULE_LIB = join(__dirname, "..", "lib");
@@ -49,44 +57,40 @@ afterEach(() => {
     vi.doUnmock("../src/client.mjs");
 });
 
-async function descriptor(name) {
+async function spec(name) {
     const session = await loadSession();
     const { result, error } = await session.evalCell(
-        `use(:jdt/coverage) | reify(:${name})`);
+        `use(:jdt/coverage) | :${name} | spec`);
     if (error) throw error;
     return result;
 }
 
-function field(desc, key) {
-    return desc.get(keyword(key));
-}
-
 describe(":jdt/coverage primitive descriptors", () => {
     it("@coverage :returns :map, :modifiers carries :string", async () => {
-        const d = await descriptor("@coverage");
-        expect(field(d, "kind")).toBe(keyword("builtin"));
-        expect(field(d, "returns")).toBe(keyword("map"));
-        expect(field(d, "modifiers"))
+        const d = await spec("@coverage");
+        expect(d.get("kind")).toEqual(makeTagKeyword("builtin"));
+        expect(d.get("returns")).toEqual(keyword("map"));
+        expect(d.get("modifiers"))
                 .toEqual([keyword("string")]);
     });
 
     it("@activeCoverageId :returns :string, :modifiers empty",
             async () => {
-        const d = await descriptor("@activeCoverageId");
-        expect(field(d, "kind")).toBe(keyword("builtin"));
-        expect(field(d, "returns")).toBe(keyword("string"));
-        expect(field(d, "modifiers")).toEqual([]);
+        const d = await spec("@activeCoverageId");
+        expect(d.get("kind")).toEqual(makeTagKeyword("builtin"));
+        expect(d.get("returns")).toEqual(keyword("string"));
+        expect(d.get("modifiers")).toEqual([]);
     });
 
     it("@coverage :captured spans 0..1 (overloaded)", async () => {
-        const d = await descriptor("@coverage");
-        expect(field(d, "captured")).toEqual([0, 1]);
+        const d = await spec("@coverage");
+        expect(d.get("captured")).toEqual([0, 1]);
     });
 
     it("@activeCoverageId :captured is [0 0] (nullary)",
             async () => {
-        const d = await descriptor("@activeCoverageId");
-        expect(field(d, "captured")).toEqual([0, 0]);
+        const d = await spec("@activeCoverageId");
+        expect(d.get("captured")).toEqual([0, 0]);
     });
 });
 
@@ -96,9 +100,9 @@ describe(":jdt/coverage conduits", () => {
             "@coveredLines", "@uncoveredLines", "@partialLines",
             "@coverageCard"]) {
         it(`${name} is a conduit with empty params`, async () => {
-            const d = await descriptor(name);
-            expect(field(d, "kind")).toBe(keyword("conduit"));
-            expect(field(d, "params")).toEqual([]);
+            const d = await spec(name);
+            expect(d.get("kind")).toEqual(makeTagKeyword("conduit"));
+            expect(d.get("params")).toEqual([]);
         });
     }
 });

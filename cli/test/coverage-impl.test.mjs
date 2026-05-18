@@ -8,7 +8,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { keyword } from "@kaluchi/qlang-core";
+import { keyword, makeTagKeyword } from "@kaluchi/qlang-core";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MODULE_LIB = join(__dirname, "..", "lib");
@@ -101,8 +101,8 @@ describe("@coverage routing — 0-arity (active session)", () => {
         });
         const { result } = await session.evalCell(
             'use(:jdt/coverage) '
-          + '| "pkg.Foo" | @coverage !| /thrown');
-        expect(result).toBe(keyword("CoverageNoActiveSession"));
+          + '| "pkg.Foo" | @coverage !| type');
+        expect(result).toEqual(makeTagKeyword("CoverageNoActiveSession"));
     });
 });
 
@@ -146,8 +146,8 @@ describe("@coverage routing — 1-arity (explicit coverageId)", () => {
         });
         const { result } = await session.evalCell(
             'use(:jdt/coverage) | "pkg.Foo" '
-          + '| @coverage(42) !| /thrown');
-        expect(result).toBe(keyword("CoverageIdNotString"));
+          + '| @coverage(42) !| type');
+        expect(result).toEqual(makeTagKeyword("CoverageIdNotString"));
     });
 });
 
@@ -176,8 +176,8 @@ describe("@coverage routing — subject shapes", () => {
             return null;
         });
         const { result } = await session.evalCell(
-            'use(:jdt/coverage) | 42 | @coverage !| /thrown');
-        expect(result).toBe(keyword("MissingSubjectFqn"));
+            'use(:jdt/coverage) | 42 | @coverage !| type');
+        expect(result).toEqual(makeTagKeyword("MissingSubjectFqn"));
         expect(calls).toEqual([]);
     });
 });

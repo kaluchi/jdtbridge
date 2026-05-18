@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { createSession } from "@kaluchi/qlang-core/session";
-import { keyword } from "@kaluchi/qlang-core";
 import { bindJdtRenderOperands } from "../lib/jdt/render.impl.mjs";
 
 // Pure unit tests for the host-bound markdown renderers. No HTTP,
@@ -19,7 +18,7 @@ async function runWithBundle(operandName, bundle) {
 }
 
 function map(entries) {
-  return new Map(entries.map(([k, v]) => [keyword(k), v]));
+  return new Map(entries);
 }
 
 describe("mdSource", () => {

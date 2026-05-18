@@ -10,64 +10,64 @@
 // formats" split live there.
 
 import { valueOp } from '@kaluchi/qlang-core/dispatch';
-import { keyword } from '@kaluchi/qlang-core';
 
 // ── Map accessor helpers ────────────────────────────────────────
 //
-// qlang node-Maps are JS Map objects keyed by interned Keyword
-// values. Every access goes through a keyword() lookup; interning
-// once at module load keeps the hot path allocation-free.
+// qlang 0.7 node-Maps are JS Map objects keyed by plain Strings
+// — Keyword objects ride only as VALUES (pipeline-visible
+// identifiers carrying `.literal`). The string-key constants below
+// are named symbolically so a rename ripples through one place.
 
 // Bundle-level keys
-const K_NODE       = keyword('node');
-const K_TEXT       = keyword('text');
-const K_OUTGOING   = keyword('outgoing');
-const K_INCOMING   = keyword('incoming');
-const K_SUPERS     = keyword('supers');
-const K_SUBTYPES   = keyword('subtypes');
-const K_MEMBERS    = keyword('members');
-const K_COVERAGE   = keyword('coverage');
+const K_NODE       = 'node';
+const K_TEXT       = 'text';
+const K_OUTGOING   = 'outgoing';
+const K_INCOMING   = 'incoming';
+const K_SUPERS     = 'supers';
+const K_SUBTYPES   = 'subtypes';
+const K_MEMBERS    = 'members';
+const K_COVERAGE   = 'coverage';
 
 // Coverage-bundle and node-Map keys
-const K_COUNTERS         = keyword('counters');
-const K_LINES_BUNDLE     = keyword('lines');
-const K_ENTRIES          = keyword('entries');
-const K_STATUS           = keyword('status');
-const K_LINE_NUMBER      = keyword('line');
-const K_COVERED_COUNT    = keyword('coveredCount');
-const K_MISSED_COUNT     = keyword('missedCount');
-const K_TOTAL_COUNT      = keyword('totalCount');
-const K_COVERED_RATIO    = keyword('coveredRatio');
-const K_BRANCH_COVERED   = keyword('branchCovered');
-const K_BRANCH_MISSED    = keyword('branchMissed');
-const K_C_INSTRUCTION    = keyword('instruction');
-const K_C_BRANCH         = keyword('branch');
-const K_C_LINE           = keyword('line');
-const K_C_METHOD         = keyword('method');
-const K_C_CLASS          = keyword('class');
-const K_C_COMPLEXITY     = keyword('complexity');
+const K_COUNTERS         = 'counters';
+const K_LINES_BUNDLE     = 'lines';
+const K_ENTRIES          = 'entries';
+const K_STATUS           = 'status';
+const K_LINE_NUMBER      = 'line';
+const K_COVERED_COUNT    = 'coveredCount';
+const K_MISSED_COUNT     = 'missedCount';
+const K_TOTAL_COUNT      = 'totalCount';
+const K_COVERED_RATIO    = 'coveredRatio';
+const K_BRANCH_COVERED   = 'branchCovered';
+const K_BRANCH_MISSED    = 'branchMissed';
+const K_C_INSTRUCTION    = 'instruction';
+const K_C_BRANCH         = 'branch';
+const K_C_LINE           = 'line';
+const K_C_METHOD         = 'method';
+const K_C_CLASS          = 'class';
+const K_C_COMPLEXITY     = 'complexity';
 
 // Node-Map fields
-const K_FQN           = keyword('fqn');
-const K_KIND          = keyword('kind');
-const K_TYPE_KIND     = keyword('typeKind');
-const K_NAME          = keyword('name');
-const K_SIGNATURE     = keyword('signature');
-const K_TYPE          = keyword('type');
-const K_MODIFIERS     = keyword('modifiers');
-const K_RETURN_TYPE   = keyword('returnType');
-const K_CONTAINING_TP = keyword('containingType');
-const K_LOCATION      = keyword('location');
-const K_FILE          = keyword('file');
-const K_START_LINE    = keyword('startLine');
-const K_END_LINE      = keyword('endLine');
-const K_JAVADOC       = keyword('javadocSummary');
+const K_FQN           = 'fqn';
+const K_KIND          = 'kind';
+const K_TYPE_KIND     = 'typeKind';
+const K_NAME          = 'name';
+const K_SIGNATURE     = 'signature';
+const K_TYPE          = 'type';
+const K_MODIFIERS     = 'modifiers';
+const K_RETURN_TYPE   = 'returnType';
+const K_CONTAINING_TP = 'containingType';
+const K_LOCATION      = 'location';
+const K_FILE          = 'file';
+const K_START_LINE    = 'startLine';
+const K_END_LINE      = 'endLine';
+const K_JAVADOC       = 'javadocSummary';
 
 // Reference-record fields
-const K_FROM          = keyword('from');
-const K_TO            = keyword('to');
-const K_REF_KIND      = keyword('refKind');
-const K_DIRECTION     = keyword('direction');
+const K_FROM          = 'from';
+const K_TO            = 'to';
+const K_REF_KIND      = 'refKind';
+const K_DIRECTION     = 'direction';
 
 function mapGet(m, key) {
     return m instanceof Map ? m.get(key) : undefined;

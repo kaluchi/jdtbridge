@@ -9,7 +9,7 @@
 // `org.eclipse.core.runtime.IStartup` → `org.eclipse.ui.IStartup`
 // drift caught during the 0.2.x → 0.3.0 review) lives outside this
 // gate: those are only detectable against a live Eclipse via
-// `jdt q 'reify(:@name) | runExamples'`. What this gate does cover
+// `jdt q ':@name | runExamples'`. What this gate does cover
 // is pure-syntax rot — a typo in a combinator, an unterminated
 // String, a mismatched bracket — none of which need Eclipse to
 // verify.
@@ -23,27 +23,20 @@ import { parse } from '@kaluchi/qlang-core';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const GRAPH_QLANG = resolve(__dirname, '..', 'lib', 'jdt', 'graph.qlang');
 
-// Match :snippet "<string-with-qlang-escapes>". The escape set
-// matches qlang's \\, \", \n, \t, \r — same as qlang's parser.
-// Non-greedy capture stays inside the first closing quote that is
-// not part of an escape sequence.
-const SNIPPET_RE = /:snippet\s+"((?:\\.|[^"\\])*)"/g;
+// Match `~{…}` Quote literals — qlang 0.7 carries examples as
+// embedded Quote bodies inside attached doc-prefix blocks. Balanced
+// braces are not supported by regex, so we accept the first `}`
+// that is not preceded by an escape character. Snippets that contain
+// a literal `}` would need a richer extractor; the catalog stays
+// brace-free in example bodies by convention.
+const QUOTE_RE = /~\{((?:\\.|[^}\\])*)\}/g;
 
 function extractSnippets(source) {
     const snippets = [];
-    for (const match of source.matchAll(SNIPPET_RE)) {
-        snippets.push(unescapeQlangString(match[1]));
+    for (const match of source.matchAll(QUOTE_RE)) {
+        snippets.push(match[1]);
     }
     return snippets;
-}
-
-function unescapeQlangString(raw) {
-    return raw
-        .replace(/\\n/g, '\n')
-        .replace(/\\t/g, '\t')
-        .replace(/\\r/g, '\r')
-        .replace(/\\"/g, '"')
-        .replace(/\\\\/g, '\\');
 }
 
 describe(':jdt/graph examples parse as qlang', () => {
@@ -52,9 +45,9 @@ describe(':jdt/graph examples parse as qlang', () => {
 
     it('catalog lists every declared :examples snippet', () => {
         expect(snippets.length).toBeGreaterThan(0);
-        // Sanity: the count matches the raw :snippet occurrences.
+        // Sanity: the count matches the raw `~{` occurrences.
         const snippetOccurrences =
-            (graphSource.match(/:snippet\s+"/g) ?? []).length;
+            (graphSource.match(/~\{/g) ?? []).length;
         expect(snippets.length).toBe(snippetOccurrences);
     });
 

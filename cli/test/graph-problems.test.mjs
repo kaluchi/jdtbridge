@@ -20,7 +20,7 @@
 // the full compilation unit" docstring.
 
 import { describe, it, expect, afterEach } from "vitest";
-import { keyword } from "@kaluchi/qlang-core";
+import { keyword, makeTagKeyword } from "@kaluchi/qlang-core";
 import { loadGraphSession, resetGraphSession }
     from "./helpers/graph-session.mjs";
 
@@ -249,7 +249,7 @@ describe("@problems → @problemMarkers URL dispatch", () => {
       + '| {:kind "reference"} | @problems');
     expect(res.result?.descriptor).toBeDefined();
     const d = res.result.descriptor;
-    expect(d.get(keyword("kind"))).toBe(keyword("unsupported-scope-kind"));
+    expect(d.get("kind")).toEqual(makeTagKeyword("UnsupportedScopeKind"));
   });
 
   it("Backslash-only path (no forward slash) → file branch",
@@ -430,11 +430,12 @@ describe("@problems → @problemMarkers URL dispatch", () => {
         'use(:jdt/graph) | @problems');
     expect(res.result?.descriptor).toBeDefined();
     const d = res.result.descriptor;
-    // Server-originated descriptors carry their :kind as a raw
-    // String (jsonToQlang keeps JSON strings as strings). Only
-    // the outer _error wrapper triggers lifting via
-    // liftServerResponse → makeErrorValue.
-    expect(d.get(keyword("kind"))).toBe("jdt-internal-error");
+    // liftServerError boundary rename: plugin's `:thrown
+    // CoreException` becomes `:kind ::CoreException`
+    // (TagKeyword, per-site identity), plugin's `:kind
+    // jdt-internal-error` lands on `:category` (broad bucket).
+    expect(d.get("kind")).toEqual(makeTagKeyword("CoreException"));
+    expect(d.get("category")).toEqual(keyword("jdt-internal-error"));
   });
 
   it("Vec subject through `|` → missing-subject (not distributed)",
@@ -448,8 +449,8 @@ describe("@problems → @problemMarkers URL dispatch", () => {
         'use(:jdt/graph) | [1 2 3] | @problems');
     expect(res.result?.descriptor).toBeDefined();
     const d = res.result.descriptor;
-    expect(d.get(keyword("kind")))
-        .toBe(keyword("unsupported-subject-type"));
+    expect(d.get("kind"))
+        .toEqual(makeTagKeyword("UnsupportedSubjectType"));
   });
 
   it("Number subject → missing-subject-type error", async () => {
@@ -458,8 +459,8 @@ describe("@problems → @problemMarkers URL dispatch", () => {
         'use(:jdt/graph) | 42 | @problems');
     expect(res.result?.descriptor).toBeDefined();
     const d = res.result.descriptor;
-    expect(d.get(keyword("kind")))
-        .toBe(keyword("unsupported-subject-type"));
+    expect(d.get("kind"))
+        .toEqual(makeTagKeyword("UnsupportedSubjectType"));
   });
 
   it("Boolean subject → missing-subject-type error", async () => {
@@ -468,8 +469,8 @@ describe("@problems → @problemMarkers URL dispatch", () => {
         'use(:jdt/graph) | true | @problems');
     expect(res.result?.descriptor).toBeDefined();
     const d = res.result.descriptor;
-    expect(d.get(keyword("kind")))
-        .toBe(keyword("unsupported-subject-type"));
+    expect(d.get("kind"))
+        .toEqual(makeTagKeyword("UnsupportedSubjectType"));
   });
 
   it("Keyword subject → missing-subject-type error", async () => {
@@ -478,8 +479,8 @@ describe("@problems → @problemMarkers URL dispatch", () => {
         'use(:jdt/graph) | :foo | @problems');
     expect(res.result?.descriptor).toBeDefined();
     const d = res.result.descriptor;
-    expect(d.get(keyword("kind")))
-        .toBe(keyword("unsupported-subject-type"));
+    expect(d.get("kind"))
+        .toEqual(makeTagKeyword("UnsupportedSubjectType"));
   });
 
   it("Nested inner (inner-of-inner) type → same range-filter "
@@ -568,7 +569,7 @@ describe("@problemsVia — pure dispatch with injected mocks", () => {
     // Fetcher mock captures its input as :scope. Result Vec is
     // [{:scope "my-project"}] — one element.
     expect(res.result).toHaveLength(1);
-    expect(res.result[0].get(keyword("scope"))).toBe("my-project");
+    expect(res.result[0].get("scope")).toBe("my-project");
   });
 
   it("Map :kind project → fetcher called on node (:fqn read "
@@ -585,7 +586,7 @@ describe("@problemsVia — pure dispatch with injected mocks", () => {
                      ["file-unused"],
                      ["types-unused"])`);
     expect(res.result).toHaveLength(1);
-    expect(res.result[0].get(keyword("received"))).toBe("app");
+    expect(res.result[0].get("received")).toBe("app");
   });
 
   it("Map :kind package → packageTypes, fileLocation, fetcher "
@@ -680,8 +681,8 @@ describe("@problemsVia — pure dispatch with injected mocks", () => {
                      ["unused"], ["unused"])`);
     const d = res.result?.descriptor;
     expect(d).toBeDefined();
-    expect(d.get(keyword("kind"))).toBe(
-        keyword("unsupported-scope-kind"));
+    expect(d.get("kind")).toEqual(
+        makeTagKeyword("UnsupportedScopeKind"));
   });
 
   it("Field node → range filter narrows to single line",
@@ -879,7 +880,7 @@ describe("@problemsVia — pure dispatch with injected mocks", () => {
           ["file-unused"],
           ["types-unused"])`);
     expect(res.result).toHaveLength(1);
-    expect(res.result[0].get(keyword("observed-fqn")))
+    expect(res.result[0].get("observed-fqn"))
         .toBe("D:/proj/X.java");
   });
 
@@ -903,6 +904,6 @@ describe("@problemsVia — pure dispatch with injected mocks", () => {
     // its startLine (2) is within [1, 5].
     expect(res.result).toHaveLength(1);
     expect(res.result[0].get(
-        keyword("captured-fetcher-subject"))).toBe("M.java");
+        "captured-fetcher-subject")).toBe("M.java");
   });
 });
