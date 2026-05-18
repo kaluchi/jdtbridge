@@ -1,0 +1,148 @@
+|~ :jdt/render — markdown formatters over JDT graph bundles.
+
+   Pure value transforms — no HTTP, no Eclipse — each operand
+   takes a node-Map bundle from pipeValue and returns a String
+   ready to land in a markdown file or chat reply. Upstream
+   conduits in `:jdt/graph` and `:jdt/coverage` assemble the
+   bundles (`@sourceCard`, `@hierarchyCard`, `@outlineCard`,
+   `@coverageCard`) and pipe through the matching renderer; a
+   bundle-by-hand caller can call any renderer directly with
+   a Map literal carrying the documented fields. ~|
+
+|~~ Bundle :node must be a node-Map carrying :fqn and :kind. Any
+    other shape raises `::BundleNodeShapeError` from the JS-side
+    renderer dispatch wrapper. ~~|
+::BundleNodeShapeError
+  ::builtin{:category :jdt/render :operand :mdSource}
+
+|~~ Bundle :coverage must be a Map produced by `@coverage`
+    carrying `:counters` (and optionally `:lines`). ~~|
+::BundleCoverageShapeError
+  ::builtin{:category :jdt/render :operand :mdCoverage}
+
+|~~ Markdown card for the viewed member: badge + fqn header,
+    optional location line, optional fenced source block,
+    outgoing / incoming reference groups, and an inline supers /
+    subtypes hierarchy section when type-level data is present.
+
+    Bundle shape — every key optional except `:node`:
+      :node      node-Map of the viewed type / method / field
+      :text      String — raw source between the member's
+                 declaration braces, fenced as ```` ```java ````
+      :outgoing  Vec of `:reference` records from `@outgoingRefs`
+      :incoming  Vec of `:reference` records from `@incomingRefs`
+      :supers    Vec of `:type` skeletons (type-level only)
+      :subtypes  Vec of `:type` skeletons (type-level only)
+
+    Sections appear only when their slot is populated — no
+    placeholders, no flag-gated layout. The `[badge] fqn` form
+    on every line of every reference group is the
+    zero-modification navigation primitive: copy the line into
+    `jdt q '"…" | @source'` to read the target's source.
+
+    ~{ {:node {:fqn "pkg.Foo" :kind "type"
+              :location {:file "F.java" :startLine 1 :endLine 9}}}
+       | mdSource | contains("pkg.Foo") }
+  ~~|
+:mdSource
+  ::builtin{:category :jdt/render
+            :subject :map
+            :modifiers []
+            :returns :string
+            :throws [::BundleNodeShapeError]}
+
+|~~ Markdown card for a type's hierarchy — ↑ direct supertypes
+    and ↓ direct subtypes, each line a badge + fqn pair. Two
+    independent sections, omitted when their Vec is empty.
+
+    Bundle shape:
+      :node     :type detail node-Map (required)
+      :supers   Vec of :type skeletons (direct parents)
+      :subtypes Vec of :type skeletons (direct children)
+
+    Transitive ascent / descent is the caller's choice — feed
+    `@ancestors` / `@descendants` results into `:supers` /
+    `:subtypes` for the full chain.
+
+    ~{ {:node {:fqn "pkg.Foo" :kind "type"}
+       :supers [{:fqn "java.lang.Object" :kind "type"}]
+       :subtypes []}
+       | mdHierarchy | contains("Supertypes") }
+  ~~|
+:mdHierarchy
+  ::builtin{:category :jdt/render
+            :subject :map
+            :modifiers []
+            :returns :string
+            :throws [::BundleNodeShapeError]}
+
+|~~ Markdown card for a type's structural outline — fields,
+    methods, inner types grouped per source-order convention.
+    Each line carries the badge, the local name (no fqn),
+    type / return-type / param-signature, modifier list, and
+    `:location` line range.
+
+    Bundle shape:
+      :node    :type detail node-Map (required)
+      :members Vec of member skeletons from `@members`
+
+    Inner types appear without recursion — each as a single
+    `[C] Name` row; feed them separately through `mdOutline`
+    for the nested layout.
+
+    ~{ {:node {:fqn "pkg.Foo" :kind "type"} :members []}
+       | mdOutline | contains("pkg.Foo") }
+  ~~|
+:mdOutline
+  ::builtin{:category :jdt/render
+            :subject :map
+            :modifiers []
+            :returns :string
+            :throws [::BundleNodeShapeError]}
+
+|~~ Markdown reference list for a Vec of `:reference` records.
+    Subject is the Vec itself (not a bundle Map). Records share
+    the shape `@incomingRefs` / `@outgoingRefs` produce:
+    `{:from <node> :to <node> :refKind "call"|"read"|"write"
+    |"typeUse" :direction "incoming"|"outgoing"}`.
+
+    Direction picked from the first record's `:direction` —
+    `incoming` lists `:from`, `outgoing` lists `:to`, absent
+    direction defaults to `:to`. When the Vec mixes `:refKind`
+    values the output groups them under per-kind sub-headings
+    (`Calls`, `Reads`, `Writes`, `Type uses`).
+
+    ~{ [] | mdRefs | eq("") }
+  ~~|
+:mdRefs
+  ::builtin{:category :jdt/render
+            :subject :vec
+            :modifiers []
+            :returns :string
+            :throws []}
+
+|~~ Markdown coverage card — counters table (Instructions /
+    Branches / Lines / Methods / Types / Complexity) plus
+    per-line breakdown (Covered / Partial / Uncovered) when
+    the subject is an ISourceNode (type / method / source file).
+
+    Bundle shape:
+      :node     detail node-Map of the viewed element (required)
+      :coverage Map from `@coverage` — `:counters` always,
+                `:lines` block only on ISourceNode subjects
+
+    Layout mirrors EclEmma's Coverage view: counter names match
+    its column headers (`Types` not `Classes`, `Complexity` not
+    `Cxty`), ratios render as `0.0 %`, and consecutive line
+    numbers collapse to ranges (`33-35, 39, 41-50`).
+
+    ~{ {:node {:fqn "pkg.Foo" :kind "type"}
+        :coverage {:counters {}}}
+       | mdCoverage | contains("pkg.Foo") }
+  ~~|
+:mdCoverage
+  ::builtin{:category :jdt/render
+            :subject :map
+            :modifiers []
+            :returns :string
+            :throws [::BundleNodeShapeError ::BundleCoverageShapeError]}

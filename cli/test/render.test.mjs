@@ -1,18 +1,30 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createSession } from "@kaluchi/qlang-core/session";
-import { bindJdtRenderOperands } from "../lib/jdt/render.impl.mjs";
+import { createImpls as createRenderImpls } from "../lib/jdt/render.impl.mjs";
 
 // Pure unit tests for the host-bound markdown renderers. No HTTP,
-// no Eclipse — each test constructs a bundle Map and invokes the
-// renderer through a fresh qlang session so the public operand
-// dispatch path is exercised.
+// no Eclipse — each test constructs a bundle Map, loads
+// `:jdt/render` through the locator, and invokes the renderer
+// through a fresh qlang session so the public operand dispatch
+// path is exercised end-to-end.
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const MODULE_LIB = join(__dirname, "..", "lib");
+
+function renderLocator(namespaceName) {
+  if (namespaceName !== "jdt/render") return null;
+  const qlangPath = join(MODULE_LIB, "jdt", "render.qlang");
+  return { source: readFileSync(qlangPath, "utf8"), impls: createRenderImpls() };
+}
 
 async function runWithBundle(operandName, bundle) {
-  const session = await createSession();
-  bindJdtRenderOperands(session);
+  const session = await createSession({ locator: renderLocator });
   session.bind("__bundle", bundle);
   const { result, error } = await session.evalCell(
-      `__bundle | ${operandName}`);
+      `use(:jdt/render) | __bundle | ${operandName}`);
   if (error) throw error;
   return result;
 }

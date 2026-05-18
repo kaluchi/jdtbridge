@@ -1,22 +1,36 @@
-// Host-bound render operands for the :jdt/graph module.
+// Host-bound render-operand impls for `:jdt/render`.
 //
-// Each operand is a pure value transform: takes a node-Map bundle
-// from pipeValue, returns a markdown String. No HTTP, no session
-// state — the bundle must already hold everything the renderer
-// needs, collected by upstream graph axes.
+// Pure value transforms — every operand takes a node-Map bundle
+// from pipeValue and returns a markdown String. No HTTP, no
+// Eclipse: the bundle must already hold everything the renderer
+// needs, collected by upstream `:jdt/graph` / `:jdt/coverage`
+// conduits or assembled by hand.
 //
-// The contract is documented in jdt-query-spec.md § Markdown
-// rendering; the badge legend and the "server exhaustive, client
-// formats" split live there.
+// qlang 0.7 invariants applied here:
+//   * Map keys are plain Strings — Keyword objects ride as VALUES.
+//   * Bundle / node shape mismatches lift through per-site error
+//     descriptors carrying `:kind ::BundleNodeShapeError` /
+//     `:kind ::BundleCoverageShapeError` (declared in
+//     `lib/jdt/render.qlang`), surfacing through `result !| type`.
+//   * Catalog body in `render.qlang` declares the operand surface;
+//     `createImpls()` below pairs each declaration with its JS
+//     dispatch wrapper, and `use(:jdt/render)` stamps `:impl`
+//     onto every descriptor through `stampStructuralFacts` —
+//     same path `:jdt/graph` / `:jdt/coverage` follow.
 
 import { valueOp } from '@kaluchi/qlang-core/dispatch';
+import {
+    keyword,
+    makeErrorValue,
+    makeTagKeyword,
+} from '@kaluchi/qlang-core';
 
 // ── Map accessor helpers ────────────────────────────────────────
 //
-// qlang 0.7 node-Maps are JS Map objects keyed by plain Strings
-// — Keyword objects ride only as VALUES (pipeline-visible
-// identifiers carrying `.literal`). The string-key constants below
-// are named symbolically so a rename ripples through one place.
+// qlang 0.7 node-Maps are JS Map objects keyed by plain Strings —
+// Keyword objects ride only as VALUES (pipeline-visible identifiers
+// carrying `.literal`). The string-key constants below are named
+// symbolically so a rename ripples through one place.
 
 // Bundle-level keys
 const K_NODE       = 'node';
@@ -56,7 +70,6 @@ const K_SIGNATURE     = 'signature';
 const K_TYPE          = 'type';
 const K_MODIFIERS     = 'modifiers';
 const K_RETURN_TYPE   = 'returnType';
-const K_CONTAINING_TP = 'containingType';
 const K_LOCATION      = 'location';
 const K_FILE          = 'file';
 const K_START_LINE    = 'startLine';
@@ -73,20 +86,39 @@ function mapGet(m, key) {
     return m instanceof Map ? m.get(key) : undefined;
 }
 
-function ensureMap(value, operandName) {
-    if (!(value instanceof Map)) {
-        throw new TypeError(
-            `${operandName} expects a node-Map bundle, got ${
-                describe(value)}`);
-    }
-    return value;
+function describeShape(v) {
+    if (v === null) return 'null';
+    if (Array.isArray(v)) return 'vec';
+    if (v instanceof Map) return 'map';
+    return typeof v;
 }
 
-function describe(v) {
-    if (v === null) return 'null';
-    if (Array.isArray(v)) return 'Vec';
-    if (v instanceof Map) return 'Map';
-    return typeof v;
+function bundleNodeShapeError(operandName, actualShape) {
+    const ctx = new Map();
+    ctx.set('operand', keyword(operandName));
+    ctx.set('actualShape', actualShape);
+    const descriptor = new Map();
+    descriptor.set('kind', makeTagKeyword('BundleNodeShapeError'));
+    descriptor.set('origin', keyword('jdt/render'));
+    descriptor.set('message',
+            `${operandName}: bundle :node must be a node-Map with `
+            + `:fqn and :kind, got ${actualShape}`);
+    descriptor.set('context', ctx);
+    return makeErrorValue(descriptor);
+}
+
+function bundleCoverageShapeError(actualShape) {
+    const ctx = new Map();
+    ctx.set('operand', keyword('mdCoverage'));
+    ctx.set('actualShape', actualShape);
+    const descriptor = new Map();
+    descriptor.set('kind', makeTagKeyword('BundleCoverageShapeError'));
+    descriptor.set('origin', keyword('jdt/render'));
+    descriptor.set('message',
+            'mdCoverage: bundle :coverage must be a /coverage/node '
+            + `Map from @coverage, got ${actualShape}`);
+    descriptor.set('context', ctx);
+    return makeErrorValue(descriptor);
 }
 
 // ── Badge selection ────────────────────────────────────────────
@@ -110,12 +142,10 @@ const TYPE_KIND_BADGE = {
     record: '[R]',
 };
 
-/**
- * Pick the one-shot `[X]` badge for a node-Map. Types route through
- * :typeKind so an interface reads as `[I]` rather than the default
- * `[C]` that `:kind "type"` alone would yield. Constants (static +
- * final fields) get `[K]` instead of `[F]`.
- */
+// Pick the one-shot `[X]` badge for a node-Map. Types route through
+// :typeKind so an interface reads as `[I]` rather than the default
+// `[C]` that `:kind "type"` alone would yield. Constants (static +
+// final fields) get `[K]` instead of `[F]`.
 function badgeOf(node) {
     if (!(node instanceof Map)) return '[?]';
     const kind = mapGet(node, K_KIND);
@@ -155,25 +185,13 @@ function locationLine(node) {
 
 // ── mdSource: method / field / type card ───────────────────────
 
-/**
- * Bundle shape for mdSource (all keys optional but :node required):
- *   :node      — detail node-Map of the viewed member
- *   :text      — source text String
- *   :outgoing  — Vec of :reference records produced by @outgoingRefs
- *   :incoming  — Vec of :reference records produced by @incomingRefs
- *   :supers    — Vec of :type skeletons (type-level only)
- *   :subtypes  — Vec of :type skeletons (type-level only)
- *
- * Any missing section is skipped — determinism rule: a section
- * appears iff its data was supplied. Never collapsed, never
- * summarised, never flag-gated.
- */
 function formatMdSource(bundle) {
-    ensureMap(bundle, 'mdSource');
+    if (!(bundle instanceof Map)) {
+        return bundleNodeShapeError('mdSource', describeShape(bundle));
+    }
     const node = mapGet(bundle, K_NODE);
     if (!(node instanceof Map)) {
-        throw new TypeError(
-            'mdSource: :node must be a node-Map carrying :fqn and :kind');
+        return bundleNodeShapeError('mdSource', describeShape(node));
     }
 
     const out = [];
@@ -236,16 +254,10 @@ function refSectionHeader(direction, subjectKind) {
 
 // ── Reference-group rendering ──────────────────────────────────
 
-/**
- * Render Vec of :reference records into a flat list. Each record
- * carries :from (the calling site), :to (the target), :refKind.
- * `sideKey` picks which side is the "other" — for outgoing refs
- * from the viewed member we show :to, for incoming :from.
- *
- * A line per distinct target FQN; the `[badge] fqn` form is the
- * zero-modification-navigation primitive — copy a line and
- * `jdt q '"…" | @source'` renders its card.
- */
+// Render Vec of :reference records into a flat list. Each record
+// carries :from (the calling site), :to (the target), :refKind.
+// `sideKey` picks which side is the "other" — for outgoing refs
+// from the viewed member we show :to, for incoming :from.
 function renderRefGroup(refs, sideKey) {
     const key = sideKey === 'to' ? K_TO : K_FROM;
     const lines = [];
@@ -279,23 +291,13 @@ function renderRefGroup(refs, sideKey) {
 
 // ── mdHierarchy: ↑/↓ tree for a type ───────────────────────────
 
-/**
- * Bundle shape:
- *   :node     — :type detail node-Map (required)
- *   :supers   — Vec of :type skeletons (direct parents)
- *   :subtypes — Vec of :type skeletons (direct children)
- *
- * Renders the two sections with arrows; no depth indent at the
- * MVP — flatten the list. Transitive hierarchy is the caller's
- * choice (feed @ancestors / @descendants into :supers / :subtypes
- * for the full chain).
- */
 function formatMdHierarchy(bundle) {
-    ensureMap(bundle, 'mdHierarchy');
+    if (!(bundle instanceof Map)) {
+        return bundleNodeShapeError('mdHierarchy', describeShape(bundle));
+    }
     const node = mapGet(bundle, K_NODE);
     if (!(node instanceof Map)) {
-        throw new TypeError(
-            'mdHierarchy: :node must be a node-Map');
+        return bundleNodeShapeError('mdHierarchy', describeShape(node));
     }
     const out = [];
     out.push('#### ' + badgeOf(node) + ' '
@@ -328,18 +330,12 @@ function formatMdHierarchy(bundle) {
 
 // ── mdRefs: flat refs list (Vec of reference records) ─────────
 
-/**
- * Render a Vec of :reference records as a flat markdown list, one
- * line per distinct target, grouped by :refKind when the Vec
- * mixes kinds. Subject side is picked from :direction on the
- * first record carrying it; absent :direction → :to.
- */
+// Render a Vec of :reference records as a flat markdown list, one
+// line per distinct target, grouped by :refKind when the Vec
+// mixes kinds. Subject side is picked from :direction on the
+// first record carrying it; absent :direction → :to.
 function formatMdRefs(refs) {
-    if (!Array.isArray(refs)) {
-        throw new TypeError(
-            'mdRefs expects a Vec of :reference records, got '
-            + describe(refs));
-    }
+    if (!Array.isArray(refs)) return '';
     if (refs.length === 0) return '';
 
     const sideKey = pickRefSide(refs);
@@ -392,24 +388,13 @@ function kindHeader(kind) {
 
 // ── mdOutline: structural tree of a type ───────────────────────
 
-/**
- * Bundle shape for mdOutline:
- *   :node    — :type detail node-Map (required)
- *   :members — Vec of member skeletons (methods / fields /
- *              innerTypes). Upstream fetches via @members.
- *
- * Renders the viewed type header, then three sub-sections in
- * source convention order — fields, methods, inner types — each
- * line a one-row signature with badge, modifiers, and line
- * range. Inner types drop in as `[C] Name` without recursion;
- * feed them separately for a nested outline.
- */
 function formatMdOutline(bundle) {
-    ensureMap(bundle, 'mdOutline');
+    if (!(bundle instanceof Map)) {
+        return bundleNodeShapeError('mdOutline', describeShape(bundle));
+    }
     const node = mapGet(bundle, K_NODE);
     if (!(node instanceof Map)) {
-        throw new TypeError(
-            'mdOutline: :node must be a :type detail node-Map');
+        return bundleNodeShapeError('mdOutline', describeShape(node));
     }
 
     const out = [];
@@ -526,34 +511,17 @@ const COUNTER_ROWS = [
     [K_C_COMPLEXITY,  'Complexity'],
 ];
 
-/**
- * Bundle shape for mdCoverage:
- *   :node     — detail node-Map of the viewed element (required)
- *   :coverage — /coverage/node response Map: :counters always,
- *               :lines block when subject is an ISourceNode
- *
- * Layout follows EclEmma's Coverage View vocabulary verbatim:
- *
- *   `Element` (header) `Counter | Coverage | Covered | Missed | Total`
- *
- * with EclEmma counter names (`Types` not `Classes`, `Complexity`
- * not `Cxty`) and `0.0 %` ratio format. The Lines section, when
- * present, splits entries into Covered / Partial / Uncovered with
- * consecutive line numbers collapsed to ranges (`33-35, 39, 41-50`)
- * — same idiom as coverage.py's Missing column.
- */
 function formatMdCoverage(bundle) {
-    ensureMap(bundle, 'mdCoverage');
+    if (!(bundle instanceof Map)) {
+        return bundleNodeShapeError('mdCoverage', describeShape(bundle));
+    }
     const node = mapGet(bundle, K_NODE);
     if (!(node instanceof Map)) {
-        throw new TypeError(
-            'mdCoverage: :node must be a node-Map');
+        return bundleNodeShapeError('mdCoverage', describeShape(node));
     }
     const coverage = mapGet(bundle, K_COVERAGE);
     if (!(coverage instanceof Map)) {
-        throw new TypeError(
-            'mdCoverage: :coverage must be a Map from @coverage, got '
-            + describe(coverage));
+        return bundleCoverageShapeError(describeShape(coverage));
     }
 
     const out = [];
@@ -606,8 +574,8 @@ function formatCountersTable(counters) {
     return lines;
 }
 
-/** EclEmma's `0.0 %` format — one decimal, space before `%`. Empty
- *  string when total = 0 (server emits null ratio in that case). */
+// EclEmma's `0.0 %` format — one decimal, space before `%`. Empty
+// string when total = 0 (server emits null ratio in that case).
 function formatRatio(r) {
     if (r === null || r === undefined || Number.isNaN(r)) return '';
     return (r * 100).toFixed(1) + ' %';
@@ -640,15 +608,10 @@ function formatLinesBlock(entries) {
     return out;
 }
 
-/**
- * Per-line partial entry: line number plus the branch hover-text
- * EclEmma uses on its gutter annotations:
- *
- *   `{0} of {1} branches missed.`
- *
- * (verbatim from `AnnotationTextSomeBranchesMissed_message` in
- * EclEmma's `uimessages.properties`).
- */
+// Per-line partial entry: line number plus the branch hover-text
+// EclEmma uses on its gutter annotations — `{0} of {1} branches
+// missed.` (verbatim from `AnnotationTextSomeBranchesMissed_message`
+// in EclEmma's `uimessages.properties`).
 function formatPartialEntry(entry) {
     const line   = mapGet(entry, K_LINE_NUMBER);
     const missed = mapGet(entry, K_BRANCH_MISSED);
@@ -662,11 +625,9 @@ function formatPartialEntry(entry) {
     return String(line);
 }
 
-/**
- * Collapse a sorted (or unsorted) list of integers into
- * comma-joined consecutive ranges: `[42,43,44,46,50,51,52]`
- * → `"42-44, 46, 50-52"`.
- */
+// Collapse a sorted (or unsorted) list of integers into
+// comma-joined consecutive ranges: `[42,43,44,46,50,51,52]`
+// → `"42-44, 46, 50-52"`.
 function collapseRanges(numbers) {
     if (numbers.length === 0) return '';
     const sorted = [...numbers].sort((a, b) => a - b);
@@ -688,17 +649,14 @@ function collapseRanges(numbers) {
     return out.join(', ');
 }
 
-// ── Operand bindings ───────────────────────────────────────────
+// ── Operand impls — keyed by catalog binding name ─────────────
 
-export function bindJdtRenderOperands(session) {
-    session.bind('mdSource', valueOp('mdSource', 1,
-            async (bundle) => formatMdSource(bundle)));
-    session.bind('mdHierarchy', valueOp('mdHierarchy', 1,
-            async (bundle) => formatMdHierarchy(bundle)));
-    session.bind('mdOutline', valueOp('mdOutline', 1,
-            async (bundle) => formatMdOutline(bundle)));
-    session.bind('mdRefs', valueOp('mdRefs', 1,
-            async (refs) => formatMdRefs(refs)));
-    session.bind('mdCoverage', valueOp('mdCoverage', 1,
-            async (bundle) => formatMdCoverage(bundle)));
+export function createImpls() {
+    return {
+        mdSource:    valueOp('mdSource',    1, async (b) => formatMdSource(b)),
+        mdHierarchy: valueOp('mdHierarchy', 1, async (b) => formatMdHierarchy(b)),
+        mdOutline:   valueOp('mdOutline',   1, async (b) => formatMdOutline(b)),
+        mdRefs:      valueOp('mdRefs',      1, async (b) => formatMdRefs(b)),
+        mdCoverage:  valueOp('mdCoverage',  1, async (b) => formatMdCoverage(b)),
+    };
 }

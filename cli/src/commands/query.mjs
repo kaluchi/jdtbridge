@@ -25,7 +25,7 @@ import { bindFormatOperands } from '@kaluchi/qlang-cli/format-operands';
 import { bindParseOperands } from '@kaluchi/qlang-cli/parse-operands';
 import { createImpls as createGraphImpls } from '../../lib/jdt/graph.impl.mjs';
 import { createImpls as createCoverageImpls } from '../../lib/jdt/coverage.impl.mjs';
-import { bindJdtRenderOperands } from '../../lib/jdt/render.impl.mjs';
+import { createImpls as createRenderImpls } from '../../lib/jdt/render.impl.mjs';
 import { BridgeNotRunningError, isConnectionError } from '../client.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -35,6 +35,7 @@ function createLocator() {
   const implFactories = {
     'jdt/graph':    createGraphImpls,
     'jdt/coverage': createCoverageImpls,
+    'jdt/render':   createRenderImpls,
   };
 
   return (namespaceName) => {
@@ -177,9 +178,9 @@ export async function query(args) {
     });
     bindFormatOperands(session);
     bindParseOperands(session);
-    bindJdtRenderOperands(session);
     const cellEntry = await session.evalCell(
-        `use(:jdt/aliases) | use(:jdt/graph) | use(:jdt/coverage) | ${querySource}`);
+        'use(:jdt/aliases) | use(:jdt/render) | use(:jdt/graph) | use(:jdt/coverage)'
+        + ` | ${querySource}`);
 
     if (cellEntry.error) {
       printQueryResult(parseErrorToValue(cellEntry.error, cellEntry.uri));
