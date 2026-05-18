@@ -33,8 +33,10 @@ jdt q '"<project>" | @problems'              # compilation errors in project
 FQN format: `pkg.Class#method` or `pkg.Class#method(ParamType)`.
 
 The full operand catalog shows through `jdt q 'manifest |
-filter(/category | eq(:jdt/graph)) * /name'`. Bare-name lookup
-of any operand reifies its descriptor: `jdt q '@subtypes'`.
+filter(/category | eq(:jdt/graph)) * /name'`. The introspection
+axes on a binding keyword surface its descriptor, prose, and
+runnable examples — `jdt q ':@subtypes | spec'`,
+`jdt q ':@subtypes | docs'`, `jdt q ':@subtypes | examples'`.
 
 ## When to use what
 

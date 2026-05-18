@@ -28,7 +28,7 @@ are not admissible outside their native scope.
 | **detail** | A node-Map carrying the canonical header plus the full per-kind payload (javadoc, type parameters, interfaces, source ranges, classpath entries, …). Seed operands (`@type`, `@method`, `@field`, `@project`, `@package`, `@file`) return detail. |
 | **seed** | An operand that produces a starting `pipeValue` without needing one — either nullary (`@projects`, `@problems`) or taking a String/Map subject that identifies a single node (`@type`, `@method`, `@types("*Pat*")`). Seeds begin a pipeline. |
 | **axis** | An operand that navigates from an existing node to one or more related nodes (`@members`, `@supers`, `@incomingRefs`, `@containingType`). Axes consume a subject from `pipeValue`. |
-| **conduit** | A `let`-bound qlang fragment living inside the `:jdt/graph` module, composed from primitive axes (`@callers`, `@ancestors`, `@descendants`, `@publicOrphans`, `@asNode`, `@detail`). Conduits are documented and introspectable via `reify`. |
+| **conduit** | A qlang fragment declared via a `BindStep` (`:@name body`) inside the `:jdt/graph` module, composed from primitive axes (`@callers`, `@ancestors`, `@descendants`, `@publicOrphans`, `@asNode`, `@detail`). Each conduit's source, docs, and runnable examples surface through the introspection axes — `:@name | source`, `:@name | docs`, `:@name | examples` (and `:@name | spec` for the manifest-shape descriptor). |
 
 ### Identity
 
