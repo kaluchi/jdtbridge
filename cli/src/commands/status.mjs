@@ -206,49 +206,50 @@ function guideSection() {
   const h = helpSection();
   const fence = (cmd, body) =>
     `\`\`\`bash\n$ ${cmd}\n${body}\n\`\`\``;
-  const preamble = `After an edit:
+  const preamble = `The dashboard above is one Eclipse snapshot. \`jdt q\` evaluates
+a qlang pipeline against the same workspace, so every section's
+data — projects, problems, references, source — is reachable
+through one operand catalog.
 
-  jdt q '@problems'             errors + warnings workspace-wide
-  jdt test run <FQN> -f -q      affected test, streaming result
+A pipeline starts with a subject and threads it through
+\`|\`-separated steps. The subject is a fully-qualified-name
+String, or a nullary axis that produces one (\`@projects\`,
+\`@problems\`):
 
-\`@problems\` on the plugin side calls \`refreshLocal(DEPTH_INFINITE)\`
-and then waits for auto-build to finish before reading markers, so
-a single invocation covers edits to existing files and
-compile-dependent warnings. \`jdt build --project <name>\` (default
-= clean + full rebuild, \`--incremental\` for incremental only) is
-reserved for the cases auto-build does not cover:
+  jdt q '"java.lang.String" | @methods * /name | distinct'
+  jdt q '@problems | filter(/severity | eq("error")) | count'
 
-- auto-build turned off in Eclipse preferences;
-- a new \`.java\` file not yet visible via \`@problems\` or \`jdt test run\` (auto-build indexing sometimes lags a fresh \`refreshLocal\`);
-- \`pom.xml\` / \`build.gradle\` / \`.classpath\` changes that need project config re-read;
-- when the incremental state is suspect (stale cached errors after major branch switch) and a clean rebuild is the known-good reset.
+\`|\` pipes the value through; \`*\` fans out per Vec element;
+\`/key\` projects a Map field.
 
-Exit code: 0 if the build finished with no compile errors, 1 if any.
+Axes most worth knowing first:
 
-The workspace has launch configurations for every run, build, and
-test. \`jdt launch configs\` lists them; \`jdt launch run <id>\` picks
-up the VM args, classpath, profiles, and environment a hand-rolled
-\`mvn\` or \`npm\` line cannot replicate. \`mvn clean\` on top of that
-wipes Eclipse's incremental build cache — the next compile then
-takes minutes instead of seconds.
+  @type        fqn  → :type detail node-Map
+  @members     type → Vec of method/field/inner-type skeletons
+  @callers     method → distinct skeletons of every call site
+  @source      type/method/field → raw Java source (a String)
+  @problems    project / file / workspace → Vec of compile markers
+  @sourceCard  fqn  → markdown card with source + outgoing/incoming refs
 
-A single jdt query that returns the answer beats multiple \`Read\`
-and \`Grep\` iterations reconstructing what Eclipse already holds
-resolved.
+Errors travel as data on the fail-track. Pipe through \`!|\` to
+inspect:
 
-Edits to workspace files go through the Edit and Write tools, not
-\`sed\`, \`cat >\`, or shell redirects: only the former trigger the
-PostToolUse \`jdt refresh\` hook. A bypassed edit stays invisible to
-Eclipse until the next jdt query does its own \`refreshLocal\`; if
-the file is open in the Eclipse editor, the editor will show stale
-content and overwrite the on-disk change on save.
+  jdt q '"no.such.Type" | @type !| type'                       # → ::TypeNotFound
+  jdt q '"String#valueOf" | @method !| /context/candidates'    # AmbiguousMatch's overload list
 
-Git operations that rewrite the working tree — \`git stash\`,
-\`git checkout <file>\`, \`git reset\` — stay out of scope; the
-developer owns that state. \`git worktree\` is also off-limits:
-Eclipse and EGit do not support worktrees cleanly (projects bind
-to a fixed path, the worktree-mode \`.git\` file confuses parts of
-the tooling), so the workspace stays on a single checkout.`;
+Every binding is self-describing through axes on its keyword.
+Primitives (\`:@type\`) carry a structured descriptor; conduits
+(\`:@callers\`) carry the qlang source of their body:
+
+  jdt q ':@type | spec'         # primitive descriptor — subject / returns / throws
+  jdt q ':@callers | source'    # conduit body
+  jdt q ':@type | docs'         # catalog prose
+  jdt q ':@type | examples'     # runnable ~{...} snippets
+  jdt q 'manifest * /name'      # every operand in this session
+
+The full reference — grammar, axis catalog, combinators
+(\`* >> !|\`), cookbook — is inlined below as \`jdt help q\`.
+The full CLI command catalog follows as \`jdt help\`.`;
   return {
     title: "Guide",
     cmd: "jdt status guide",
